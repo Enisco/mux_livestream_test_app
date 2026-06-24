@@ -38,6 +38,14 @@ class GTubeApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         routerConfig: appRouter,
+        builder: (context, child) => BlocListener<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is AuthLoggedOut) {
+              appRouter.go(AppRoutes.signIn);
+            }
+          },
+          child: child!,
+        ),
       ),
     );
   }

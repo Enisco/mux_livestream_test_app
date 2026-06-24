@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
-import '../core/mux_config.dart';
+import '../core/logger.dart';
+import '../features/creator/repo/creator_repo.dart';
 import 'player_screen.dart';
 
 class JoinLivestreamScreen extends StatefulWidget {
@@ -15,6 +17,11 @@ class JoinLivestreamScreen extends StatefulWidget {
 class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
   final _idController = TextEditingController();
   String? _error;
+  bool _loading = false;
+  String? _sessionId;
+
+  String _clientSessionId() =>
+      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
 
   @override
   void dispose() {
@@ -22,32 +29,48 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
     super.dispose();
   }
 
-  String? _extractPlaybackId(String input) {
-    final muxUrlMatch = RegExp(r'stream\.mux\.com/([^./?]+)').firstMatch(input);
-    if (muxUrlMatch != null) return muxUrlMatch.group(1);
-    if (RegExp(r'^[a-zA-Z0-9]{8,}$').hasMatch(input)) return input;
-    return null;
-  }
-
-  void _join() {
+  Future<void> _join() async {
     final input = _idController.text.trim();
     if (input.isEmpty) {
-      setState(() => _error = AppStrings.invalidPlaybackId);
+      setState(() => _error = AppStrings.streamIdInvalid);
       return;
     }
-    final playbackId = _extractPlaybackId(input);
-    if (playbackId == null) {
-      setState(() => _error = AppStrings.invalidPlaybackId);
+
+    // If the user pasted a full HLS URL, open it directly in the player.
+    if (input.startsWith('https://')) {
+      logger.i('JoinStream: using pasted URL directly → $input');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PlayerScreen.network(networkUrl: input),
+        ),
+      );
       return;
     }
-    setState(() => _error = null);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            PlayerScreen.network(networkUrl: MuxConfig.hlsUrl(playbackId)),
-      ),
-    );
+
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+
+    try {
+      final repo = GetIt.instance<CreatorRepo>();
+      final token = await repo.getPlaybackToken(input, _clientSessionId());
+      logger.i('JoinStream: opening player → ${token.hlsUrl}');
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PlayerScreen.network(networkUrl: token.hlsUrl),
+        ),
+      );
+    } catch (e) {
+      logger.e('JoinStream: failed', error: e);
+      if (mounted) setState(() => _error = 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -69,7 +92,7 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
             TextField(
               controller: _idController,
               decoration: InputDecoration(
-                hintText: AppStrings.playbackIdHint,
+                hintText: AppStrings.streamIdHint,
                 prefixIcon: const Icon(Icons.live_tv_rounded),
                 errorText: _error,
                 filled: true,
@@ -93,9 +116,20 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _join,
-              icon: const Icon(Icons.cast_rounded),
-              label: const Text(AppStrings.joinStream),
+              onPressed: _loading ? null : _join,
+              icon: _loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Icon(Icons.cast_rounded),
+              label: Text(
+                _loading ? AppStrings.fetchingUrl : AppStrings.joinStream,
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.black,

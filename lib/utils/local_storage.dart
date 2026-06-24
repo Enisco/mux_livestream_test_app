@@ -12,6 +12,7 @@ class LocalStorage {
   static const muxLivePlaybackIdKey = 'gtube_mux_live_playback_id';
   static const streamKeyRefKey = 'gtube_stream_key_ref';
   static const streamRtmpUrlKey = 'gtube_rtmp_ingest_url';
+  static const liveMediaIdKey = 'gtube_live_media_id';
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -44,6 +45,7 @@ class LocalStorage {
   static String? get muxLivePlaybackId => getString(muxLivePlaybackIdKey);
   static String? get streamKeyRef => getString(streamKeyRefKey);
   static String? get streamRtmpUrl => getString(streamRtmpUrlKey);
+  static String? get liveMediaId => getString(liveMediaIdKey);
 
   // Batch save for stream credentials returned by provision endpoint
   static Future<void> saveStreamCredentials({
@@ -66,5 +68,6 @@ class LocalStorage {
     remove(muxLivePlaybackIdKey),
     remove(streamKeyRefKey),
     remove(streamRtmpUrlKey),
+    remove(liveMediaIdKey),
   ]).then((_) {});
 }

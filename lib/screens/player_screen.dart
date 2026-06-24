@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
+import '../core/logger.dart';
 import '../widgets/player/controls_overlay.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -28,12 +29,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _hasError = false;
+  bool _isStreamInactive = false;
+  bool _isRetrying = false;
+  int _retryCount = 0;
+  Timer? _retryTimer;
   bool _showControls = true;
   Timer? _hideTimer;
   bool _isFullscreen = false;
   double _playbackSpeed = 1.0;
 
   static const _speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+  static const _maxRetries = 6;
+  static const _retryDelay = Duration(seconds: 5);
 
   @override
   void initState() {
@@ -53,6 +60,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _initPlayer() async {
+    final src = widget.networkUrl ?? widget.filePath;
+    logger.d(
+      'PlayerScreen: initializing → $src (attempt ${_retryCount + 1}/${_maxRetries + 1})',
+    );
     try {
       final VideoPlayerController ctrl;
       if (widget.networkUrl != null) {
@@ -65,18 +76,66 @@ class _PlayerScreenState extends State<PlayerScreen> {
       await ctrl.initialize();
       ctrl.addListener(_onUpdate);
       _controller = ctrl;
-      setState(() => _isInitialized = true);
+      setState(() {
+        _isInitialized = true;
+        _isRetrying = false;
+      });
+      logger.i('PlayerScreen: initialized OK → $src');
       ctrl.play();
       _scheduleHide();
-    } catch (_) {
-      setState(() => _hasError = true);
+    } catch (e, st) {
+      logger.e(
+        'PlayerScreen: failed to load (attempt ${_retryCount + 1})\nURL: $src',
+        error: e,
+        stackTrace: st,
+      );
+      final msg = e.toString();
+      // HTTP 412 = Mux stream not yet active; retry until it starts
+      final inactive = msg.contains('412') || msg.contains('-16845');
+      if (inactive && _retryCount < _maxRetries) {
+        _retryCount++;
+        logger.d(
+          'PlayerScreen: stream not live, retrying in 5s ($_retryCount/$_maxRetries)',
+        );
+        setState(() => _isRetrying = true);
+        _retryTimer = Timer(_retryDelay, _initPlayer);
+      } else {
+        setState(() {
+          _hasError = true;
+          _isStreamInactive = inactive;
+          _isRetrying = false;
+        });
+      }
     }
+  }
+
+  void _retry() {
+    setState(() {
+      _hasError = false;
+      _isStreamInactive = false;
+      _isRetrying = false;
+      _retryCount = 0;
+    });
+    _initPlayer();
   }
 
   void _onUpdate() {
     if (!mounted) return;
+    final value = _controller!.value;
+    if (value.hasError && !_hasError) {
+      logger.e(
+        'PlayerScreen: mid-playback error\nURL: ${widget.networkUrl ?? widget.filePath}\n${value.errorDescription}',
+      );
+      final msg = value.errorDescription ?? '';
+      final inactive = msg.contains('412') || msg.contains('-16845');
+      setState(() {
+        _hasError = true;
+        _isStreamInactive = inactive;
+      });
+      return;
+    }
     setState(() {});
-    if (_controller!.value.isCompleted) {
+    if (value.isCompleted) {
       setState(() => _showControls = true);
       _hideTimer?.cancel();
     }
@@ -168,6 +227,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _retryTimer?.cancel();
     _controller?.removeListener(_onUpdate);
     _controller?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -216,6 +276,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Widget _buildBody() {
+    if (_hasError && _isStreamInactive) return _buildStreamInactive();
     if (_hasError) return _buildError();
     if (!_isInitialized) return _buildLoading();
     return _buildPlayer();
@@ -228,7 +289,57 @@ class _PlayerScreenState extends State<PlayerScreen> {
         children: [
           const CircularProgressIndicator(color: AppColors.primary),
           const SizedBox(height: 16.0),
-          Text(AppStrings.loadingVideo, style: AppStyles.loadingLabel),
+          Text(
+            _isRetrying
+                ? 'Stream is starting… ($_retryCount/$_maxRetries)'
+                : AppStrings.loadingVideo,
+            style: AppStyles.loadingLabel,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreamInactive() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.wifi_tethering_off_rounded,
+            color: AppColors.primary,
+            size: 56.0,
+          ),
+          const SizedBox(height: 16.0),
+          Text(AppStrings.streamNotLive, style: AppStyles.errorTitle),
+          const SizedBox(height: 8.0),
+          Text(
+            AppStrings.streamNotLiveDesc,
+            style: AppStyles.errorPath,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24.0),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text(AppStrings.goBack),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: _retry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

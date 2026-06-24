@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
+import '../features/auth/bloc/auth_bloc.dart';
 import '../utils/local_storage.dart';
 import 'home_screen.dart';
 import 'join_livestream_screen.dart';
-import 'online_video_screen.dart';
 import 'start_livestream_screen.dart';
 
 class LandingScreen extends StatelessWidget {
@@ -22,6 +23,17 @@ class LandingScreen extends StatelessWidget {
             expandedHeight: 130,
             pinned: true,
             backgroundColor: AppColors.background,
+            actions: [
+              IconButton(
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                tooltip: 'Logout',
+                onPressed: () =>
+                    context.read<AuthBloc>().add(AuthLogoutRequested()),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
               title: Text(AppStrings.appTitle, style: AppStyles.appBarTitle),
@@ -66,18 +78,6 @@ class LandingScreen extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _FeatureCard(
-                  icon: Icons.link_rounded,
-                  title: AppStrings.featureOnlineVideo,
-                  description: AppStrings.featureOnlineVideoDesc,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OnlineVideoScreen(),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

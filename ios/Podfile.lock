@@ -41,13 +41,6 @@ PODS:
     - DKImagePickerController/PhotoGallery
     - Flutter
   - Flutter (1.0.0)
-  - flutter_inappwebview (0.0.1):
-    - Flutter
-    - flutter_inappwebview/Core (= 0.0.1)
-    - OrderedSet (~> 5.0)
-  - flutter_inappwebview/Core (0.0.1):
-    - Flutter
-    - OrderedSet (~> 5.0)
   - flutter_secure_storage (6.0.0):
     - Flutter
   - HaishinKit (1.7.3):
@@ -67,7 +60,6 @@ PODS:
   - Logboard (2.4.2)
   - native_device_orientation (0.0.1):
     - Flutter
-  - OrderedSet (5.0.0)
   - package_info_plus (0.4.5):
     - Flutter
   - permission_handler_apple (9.4.8):
@@ -94,7 +86,6 @@ DEPENDENCIES:
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - Flutter (from `Flutter`)
-  - flutter_inappwebview (from `.symlinks/plugins/flutter_inappwebview/ios`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
   - native_device_orientation (from `.symlinks/plugins/native_device_orientation/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
@@ -112,7 +103,6 @@ SPEC REPOS:
     - HaishinKit
     - libwebp
     - Logboard
-    - OrderedSet
     - SDWebImage
     - SwiftyGif
 
@@ -125,8 +115,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/file_picker/ios"
   Flutter:
     :path: Flutter
-  flutter_inappwebview:
-    :path: ".symlinks/plugins/flutter_inappwebview/ios"
   flutter_secure_storage:
     :path: ".symlinks/plugins/flutter_secure_storage/ios"
   native_device_orientation:
@@ -152,13 +140,11 @@ SPEC CHECKSUMS:
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_inappwebview: 180a2f38c18dfbfb8f0c12f7bd42ce02dfd6c765
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
   HaishinKit: 326e27c4d06427ba53bffc68e516a92033293051
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   Logboard: 759d82599c439945d430d5a0958455b5a1974a0c
   native_device_orientation: d6a4dc6887cd8a5ce1049962367aec60139ea0f1
-  OrderedSet: aaeb196f7fef5a9edf55d89760da9176ad40b93c
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   photo_manager: 25fd77df14f4f0ba5ef99e2c61814dde77e2bceb

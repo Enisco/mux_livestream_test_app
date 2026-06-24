@@ -22,6 +22,9 @@ abstract final class AppStrings {
   // Player
   static const loadingVideo = 'Loading video…';
   static const failedToLoad = 'Failed to load video';
+  static const streamNotLive = 'Stream is not live yet';
+  static const streamNotLiveDesc =
+      'The stream hasn\'t started. Try again in a moment.';
   static const goBack = 'Go Back';
   static const tooltipVolume = 'Volume';
   static const tooltipFullscreen = 'Fullscreen (F)';
@@ -31,8 +34,6 @@ abstract final class AppStrings {
   static const landingSubtitle = 'Choose how to watch';
   static const featureGallery = 'My Videos';
   static const featureGalleryDesc = 'Browse videos stored on your device';
-  static const featureOnlineVideo = 'Online Video';
-  static const featureOnlineVideoDesc = 'Play any public video or YouTube link';
   static const featureStartLiveDesc = 'Stream your camera live via Mux';
   static const featureJoinLiveDesc = 'Watch an ongoing Mux livestream';
 
@@ -41,15 +42,6 @@ abstract final class AppStrings {
   static const createAccount = 'Create Account';
   static const email = 'Email';
   static const password = 'Password';
-
-  // Online video
-  static const onlineVideoTitle = 'Online Video';
-  static const videoUrlHint = 'Paste a video URL or YouTube link…';
-  static const playVideo = 'Play Video';
-  static const invalidUrl = 'Please enter a valid URL';
-
-  // YouTube player
-  static const youtubePlayerTitle = 'YouTube';
 
   // Start livestream
   static const cameraPermNeeded = 'Camera & Microphone Access Required';
@@ -61,6 +53,7 @@ abstract final class AppStrings {
   static const goLive = 'Go Live';
   static const rtmpUrl = 'RTMP URL';
   static const streamKey = 'Stream Key';
+  static const streamId = 'Stream ID';
   static const playbackUrl = 'Playback URL';
   static const watchStream = 'Watch Your Stream';
   static const endStream = 'End Stream';
@@ -75,9 +68,12 @@ abstract final class AppStrings {
   static const hideStreamKey = 'Hide';
 
   // Join livestream
-  static const playbackIdHint = 'Enter Mux Playback ID or stream URL…';
   static const joinStream = 'Join Stream';
-  static const invalidPlaybackId = 'Please enter a valid Playback ID';
+  static const streamIdHint = 'Enter Stream ID or Playback URL…';
+  static const streamIdInvalid = 'Please enter a valid Stream ID';
+  static const notLiveError = 'This creator is not live right now';
+  static const fetchingUrl = 'Fetching…';
+  static const noMediaIdError = 'Stream not ready — playback token unavailable';
 
   // Dynamic helpers
   static String filesCount(int n) => '$n file${n == 1 ? '' : 's'}';

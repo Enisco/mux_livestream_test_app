@@ -128,9 +128,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   Future<String?> _resolveCreatorId(String userId) async {
-    // Prefer locally cached value; fallback is null until we have a
-    // "get my creator profile" endpoint to recover from a fresh device.
-    return GetIt.instance<CreatorRepo>().cachedCreatorId;
+    final creatorRepo = GetIt.instance<CreatorRepo>();
+    // Use cached value if present (common case). Otherwise fetch from the
+    // profile endpoint — happens after logout/re-login or on a fresh device.
+    return creatorRepo.cachedCreatorId ??
+        await creatorRepo.fetchAndCacheCreatorId();
   }
 
   /// Converts email prefix to a clean lowercase handle.

@@ -10,9 +10,7 @@ import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
-import '../core/mux_config.dart';
 import '../features/creator/repo/creator_repo.dart';
-import '../services/mux_service.dart';
 import '../utils/local_storage.dart';
 import 'player_screen.dart';
 
@@ -21,14 +19,14 @@ class _StreamCredentials {
   final String creatorId;
   final String rtmpIngestUrl;
   final String streamKey;
-  final String hlsUrl;
+  final String liveMediaId;
   final String muxLiveStreamId;
 
   const _StreamCredentials({
     required this.creatorId,
     required this.rtmpIngestUrl,
     required this.streamKey,
-    required this.hlsUrl,
+    required this.liveMediaId,
     required this.muxLiveStreamId,
   });
 }
@@ -52,12 +50,11 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   _StreamCredentials? _credentials;
   bool _isStreaming = false;
   bool _streamKeyVisible = false;
+  String? _playbackUrl;
+  String? _sessionId;
 
-  Timer? _pollTimer;
-  String _statusText = AppStrings.statusIdle;
-  bool _statusActive = false;
-
-  final _muxService = MuxService();
+  String _clientSessionId() =>
+      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -77,7 +74,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
 
     _controller
         .initialize()
-        .then((_) {
+        .then((_) async {
+          await _controller.startPreview();
           if (mounted) setState(() => _phase = _Phase.idle);
         })
         .catchError((Object e) {
@@ -94,7 +92,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _pollTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -150,6 +147,17 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       final playbackId = LocalStorage.muxLivePlaybackId;
       final muxStreamId = LocalStorage.muxLiveStreamId ?? '';
 
+      logger.d(
+        'GoLive: credentials from storage\n'
+        '  creatorId:    $creatorId\n'
+        '  muxStreamId:  $muxStreamId\n'
+        '  playbackId:   $playbackId\n'
+        '  rtmpUrl:      $rtmpUrl\n'
+        '  streamKey:    $streamKey\n'
+        '  → expected full RTMP push target: $rtmpUrl/$streamKey\n'
+        '  → expected HLS URL: ${playbackId != null ? "https://stream.mux.com/$playbackId.m3u8" : "N/A"}',
+      );
+
       if (creatorId == null ||
           rtmpUrl == null ||
           streamKey == null ||
@@ -159,19 +167,41 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         );
       }
 
-      await GetIt.instance<CreatorRepo>().startLivestream(creatorId);
+      final repo = GetIt.instance<CreatorRepo>();
+      final mediaId = await repo.startLivestream(creatorId);
+      String resolvedMediaId = mediaId ?? LocalStorage.liveMediaId ?? '';
+
+      // If already-live was returned and we have no cached mediaId, fetch it from the status endpoint
+      if (resolvedMediaId.isEmpty) {
+        try {
+          final status = await repo.getCreatorLiveStatus(creatorId);
+          if (status.mediaId != null) resolvedMediaId = status.mediaId!;
+        } catch (e) {
+          logger.e('GoLive: could not resolve mediaId from status', error: e);
+        }
+      }
+
+      if (mediaId != null) {
+        await LocalStorage.setString(LocalStorage.liveMediaIdKey, mediaId);
+      } else if (resolvedMediaId.isNotEmpty) {
+        await LocalStorage.setString(
+          LocalStorage.liveMediaIdKey,
+          resolvedMediaId,
+        );
+      }
+      logger.d('GoLive: liveMediaId = $resolvedMediaId');
 
       _credentials = _StreamCredentials(
         creatorId: creatorId,
         rtmpIngestUrl: rtmpUrl,
         streamKey: streamKey,
-        hlsUrl: MuxConfig.hlsUrl(playbackId),
+        liveMediaId: resolvedMediaId,
         muxLiveStreamId: muxStreamId,
       );
 
       if (mounted) {
         setState(() => _phase = _Phase.live);
-        _startPolling();
+        _fetchAndCachePlaybackUrl();
       }
     } catch (e, st) {
       logger.e('Failed to go live', error: e, stackTrace: st);
@@ -194,6 +224,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         '  url: ${creds.rtmpIngestUrl}\n'
         '  key: ${creds.streamKey}',
       );
+      await _controller.startPreview();
       await _controller.startStreaming(
         streamKey: creds.streamKey,
         url: creds.rtmpIngestUrl,
@@ -209,6 +240,21 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     }
   }
 
+  Future<void> _fetchAndCachePlaybackUrl() async {
+    final mediaId = _credentials?.liveMediaId;
+    if (mediaId == null || mediaId.isEmpty) return;
+    try {
+      final token = await GetIt.instance<CreatorRepo>().getPlaybackToken(
+        mediaId,
+        _clientSessionId(),
+      );
+      logger.i('Playback URL ready: ${token.hlsUrl}');
+      if (mounted) setState(() => _playbackUrl = token.hlsUrl);
+    } catch (e) {
+      logger.e('Failed to fetch playback token', error: e);
+    }
+  }
+
   Future<void> _stopStreaming() async {
     try {
       await _controller.stopStreaming();
@@ -216,47 +262,29 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     if (mounted) setState(() => _isStreaming = false);
   }
 
-  // ── Status polling ───────────────────────────────────────────────────────────
-
-  void _startPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _checkStatus(),
-    );
-  }
-
-  Future<void> _checkStatus() async {
-    final creds = _credentials;
-    if (creds == null || !mounted || creds.muxLiveStreamId.isEmpty) return;
-    try {
-      final status = await _muxService.getStreamStatus(creds.muxLiveStreamId);
-      if (!mounted) return;
-      setState(() {
-        _statusActive = status == 'active';
-        _statusText = _statusActive
-            ? AppStrings.statusActive
-            : AppStrings.statusIdle;
-      });
-    } catch (_) {}
-  }
-
   Future<void> _endStream() async {
-    _pollTimer?.cancel();
     setState(() => _phase = _Phase.ending);
     try {
       await _controller.stop();
     } catch (_) {}
-    try {
-      final id = _credentials?.muxLiveStreamId ?? '';
-      if (id.isNotEmpty) await _muxService.disableLiveStream(id);
-    } catch (_) {}
+    final mediaId = (_credentials?.liveMediaId.isNotEmpty == true)
+        ? _credentials!.liveMediaId
+        : LocalStorage.liveMediaId ?? '';
+    logger.d('_endStream: mediaId = "$mediaId"');
+    if (mediaId.isNotEmpty) {
+      try {
+        await GetIt.instance<CreatorRepo>().endLivestream(mediaId);
+      } catch (e) {
+        logger.e('_endStream: backend end call failed', error: e);
+      }
+    } else {
+      logger.w('_endStream: no mediaId available, skipping backend end call');
+    }
     if (!mounted) return;
     setState(() {
       _credentials = null;
-      _statusText = AppStrings.statusIdle;
-      _statusActive = false;
       _isStreaming = false;
+      _playbackUrl = null;
       _phase = _Phase.idle;
     });
   }
@@ -392,13 +420,38 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
             _buildStreamingToggle(),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      PlayerScreen.network(networkUrl: _credentials!.hlsUrl),
-                ),
-              ),
+              onPressed: () async {
+                final mediaId = _credentials?.liveMediaId;
+                if (mediaId == null || mediaId.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text(AppStrings.noMediaIdError)),
+                  );
+                  return;
+                }
+                try {
+                  final token = await GetIt.instance<CreatorRepo>()
+                      .getPlaybackToken(mediaId, _clientSessionId());
+                  logger.i('WatchStream: opening player → ${token.hlsUrl}');
+                  if (!mounted) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PlayerScreen.network(networkUrl: token.hlsUrl),
+                    ),
+                  );
+                } catch (e) {
+                  logger.e(
+                    'WatchStream: failed to get playback token',
+                    error: e,
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Could not load stream: $e')),
+                    );
+                  }
+                }
+              },
               icon: const Icon(Icons.visibility_rounded),
               label: const Text(AppStrings.watchStream),
               style: OutlinedButton.styleFrom(
@@ -476,18 +529,19 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _statusActive
+            color: _isStreaming
                 ? AppColors.primary.withValues(alpha: 0.15)
                 : AppColors.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: _statusActive ? AppColors.primary : AppColors.textTertiary,
+              color: _isStreaming ? AppColors.primary : AppColors.textTertiary,
             ),
           ),
           child: Text(
-            _statusText.toUpperCase(),
+            (_isStreaming ? AppStrings.statusActive : AppStrings.statusIdle)
+                .toUpperCase(),
             style: AppStyles.streamStatusBadge.copyWith(
-              color: _statusActive ? AppColors.primary : AppColors.textTertiary,
+              color: _isStreaming ? AppColors.primary : AppColors.textTertiary,
             ),
           ),
         ),
@@ -499,6 +553,15 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     final c = _credentials!;
     return Column(
       children: [
+        _CredentialRow(
+          label: AppStrings.streamId,
+          value: c.liveMediaId.isNotEmpty
+              ? c.liveMediaId
+              : AppStrings.fetchingUrl,
+          onCopy: () =>
+              c.liveMediaId.isNotEmpty ? _copyToClipboard(c.liveMediaId) : null,
+        ),
+        const SizedBox(height: 8),
         _CredentialRow(
           label: AppStrings.rtmpUrl,
           value: c.rtmpIngestUrl,
@@ -529,8 +592,9 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         const SizedBox(height: 8),
         _CredentialRow(
           label: AppStrings.playbackUrl,
-          value: c.hlsUrl,
-          onCopy: () => _copyToClipboard(c.hlsUrl),
+          value: _playbackUrl ?? AppStrings.fetchingUrl,
+          onCopy: () =>
+              _playbackUrl != null ? _copyToClipboard(_playbackUrl!) : null,
         ),
       ],
     );

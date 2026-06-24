@@ -84,3 +84,41 @@ class LivestreamProvision {
     );
   }
 }
+
+class CreatorLiveStatus {
+  final bool isLive;
+  final String? mediaId;
+
+  const CreatorLiveStatus({required this.isLive, this.mediaId});
+
+  factory CreatorLiveStatus.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>;
+    return CreatorLiveStatus(
+      isLive: data['isLive'] as bool,
+      mediaId: data['mediaId'] as String?,
+    );
+  }
+}
+
+class PlaybackToken {
+  final String playbackId;
+  final String token;
+  final DateTime expiresAt;
+
+  const PlaybackToken({
+    required this.playbackId,
+    required this.token,
+    required this.expiresAt,
+  });
+
+  factory PlaybackToken.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>;
+    return PlaybackToken(
+      playbackId: data['playbackId'] as String,
+      token: data['token'] as String,
+      expiresAt: DateTime.parse(data['expiresAt'] as String),
+    );
+  }
+
+  String get hlsUrl => 'https://stream.mux.com/$playbackId.m3u8?token=$token';
+}
