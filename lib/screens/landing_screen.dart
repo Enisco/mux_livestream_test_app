@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
+import '../utils/local_storage.dart';
 import 'home_screen.dart';
 import 'join_livestream_screen.dart';
 import 'online_video_screen.dart';
@@ -38,9 +39,19 @@ class LandingScreen extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: Text(
-                AppStrings.landingSubtitle,
-                style: AppStyles.fileCount,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (LocalStorage.cachedFirstName case final name?)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Hello, $name!',
+                        style: AppStyles.landingCardTitle,
+                      ),
+                    ),
+                  Text(AppStrings.landingSubtitle, style: AppStyles.fileCount),
+                ],
               ),
             ),
           ),
@@ -64,29 +75,33 @@ class LandingScreen extends StatelessWidget {
                   description: AppStrings.featureOnlineVideoDesc,
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const OnlineVideoScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const OnlineVideoScreen(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 _FeatureCard(
                   icon: Icons.videocam_rounded,
-                  title: AppStrings.featureStartLive,
+                  title: AppStrings.goLive,
                   description: AppStrings.featureStartLiveDesc,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const StartLivestreamScreen()),
+                      builder: (_) => const StartLivestreamScreen(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 _FeatureCard(
                   icon: Icons.cast_rounded,
-                  title: AppStrings.featureJoinLive,
+                  title: AppStrings.joinStream,
                   description: AppStrings.featureJoinLiveDesc,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const JoinLivestreamScreen()),
+                      builder: (_) => const JoinLivestreamScreen(),
+                    ),
                   ),
                 ),
               ]),

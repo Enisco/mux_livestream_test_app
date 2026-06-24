@@ -25,10 +25,10 @@ abstract final class AppColors {
   static const overlayLight = Color(0x33000000);
 
   // Video-format badge palette – all warm/amber-adjacent, no cool blues or purples
-  static const fmtMp4 = Color(0xFFF59300);   // amber (primary)
-  static const fmtMkv = Color(0xFFD4950A);   // dark golden
-  static const fmtAvi = Color(0xFFE07A5F);   // warm coral / terracotta
-  static const fmtMov = Color(0xFFA68A6E);   // warm tan
-  static const fmtWebm = Color(0xFFF5CA5D);  // light off-white gold
+  static const fmtMp4 = Color(0xFFF59300); // amber (primary)
+  static const fmtMkv = Color(0xFFD4950A); // dark golden
+  static const fmtAvi = Color(0xFFE07A5F); // warm coral / terracotta
+  static const fmtMov = Color(0xFFA68A6E); // warm tan
+  static const fmtWebm = Color(0xFFF5CA5D); // light off-white gold
   static const fmtDefault = primary;
 }

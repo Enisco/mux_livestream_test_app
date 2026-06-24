@@ -186,12 +186,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   SliverPadding _buildVideoList() {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(
-        16.0,
-        8.0,
-        16.0,
-        100,
-      ),
+      padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 100),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, i) => Padding(

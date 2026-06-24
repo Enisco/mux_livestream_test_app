@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/logger.dart';
 import '../core/mux_config.dart';
 
 class MuxLiveStream {
@@ -32,9 +33,9 @@ class MuxService {
       'Basic ${base64Encode(utf8.encode('${MuxConfig.tokenId}:${MuxConfig.tokenSecret}'))}';
 
   Map<String, String> get _jsonHeaders => {
-        'Content-Type': 'application/json',
-        'Authorization': _authHeader,
-      };
+    'Content-Type': 'application/json',
+    'Authorization': _authHeader,
+  };
 
   Future<MuxLiveStream> createLiveStream() async {
     final response = await http.post(
@@ -86,14 +87,36 @@ class MuxService {
   }
 
   Future<String> whipHandshake(String streamKey, String offerSdp) async {
-    final response = await http.post(
-      Uri.parse(MuxConfig.whipUrl(streamKey)),
-      headers: {'Content-Type': 'application/sdp'},
-      body: offerSdp,
+    final url = MuxConfig.whipUrl(streamKey);
+    logger.d(
+      'WHIP → POST $url\n'
+      'SDP length: ${offerSdp.length} chars\n'
+      'SDP preview: ${offerSdp.substring(0, offerSdp.length.clamp(0, 200))}',
     );
-    if (response.statusCode != 201 && response.statusCode != 200) {
-      throw MuxApiException(response.statusCode, response.body);
+
+    final client = http.Client();
+    try {
+      final response = await client.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/sdp',
+          'Accept': 'application/sdp',
+        },
+        body: offerSdp,
+      );
+      logger.d(
+        'WHIP ← ${response.statusCode}\n'
+        'Body: ${response.body.substring(0, response.body.length.clamp(0, 300))}',
+      );
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        throw MuxApiException(response.statusCode, response.body);
+      }
+      return response.body;
+    } catch (e) {
+      logger.e('WHIP request failed for key=$streamKey url=$url', error: e);
+      rethrow;
+    } finally {
+      client.close();
     }
-    return response.body;
   }
 }

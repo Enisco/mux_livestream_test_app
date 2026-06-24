@@ -1,25 +1,39 @@
 import 'dart:async';
 
+import 'package:apivideo_live_stream/apivideo_live_stream.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
+import '../core/logger.dart';
+import '../core/mux_config.dart';
+import '../features/creator/repo/creator_repo.dart';
 import '../services/mux_service.dart';
+import '../utils/local_storage.dart';
 import 'player_screen.dart';
 
-enum _Phase {
-  cameraSetup,
-  cameraLoading,
-  cameraError,
-  idle,
-  creating,
-  live,
-  ending,
+// Credentials loaded from LocalStorage after "Go Live" is tapped.
+class _StreamCredentials {
+  final String creatorId;
+  final String rtmpIngestUrl;
+  final String streamKey;
+  final String hlsUrl;
+  final String muxLiveStreamId;
+
+  const _StreamCredentials({
+    required this.creatorId,
+    required this.rtmpIngestUrl,
+    required this.streamKey,
+    required this.hlsUrl,
+    required this.muxLiveStreamId,
+  });
 }
+
+enum _Phase { initializing, error, idle, creating, live, ending }
 
 class StartLivestreamScreen extends StatefulWidget {
   const StartLivestreamScreen({super.key});
@@ -28,118 +42,165 @@ class StartLivestreamScreen extends StatefulWidget {
   State<StartLivestreamScreen> createState() => _StartLivestreamScreenState();
 }
 
-class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
-  _Phase _phase = _Phase.cameraSetup;
+class _StartLivestreamScreenState extends State<StartLivestreamScreen>
+    with WidgetsBindingObserver {
+  late final ApiVideoLiveStreamController _controller;
 
-  final _localRenderer = RTCVideoRenderer();
-  MediaStream? _localStream;
-  RTCPeerConnection? _peerConnection;
+  _Phase _phase = _Phase.initializing;
+  String? _initError;
 
-  MuxLiveStream? _muxStream;
+  _StreamCredentials? _credentials;
   bool _isStreaming = false;
   bool _streamKeyVisible = false;
+
   Timer? _pollTimer;
   String _statusText = AppStrings.statusIdle;
   bool _statusActive = false;
 
   final _muxService = MuxService();
 
+  // ── Lifecycle ────────────────────────────────────────────────────────────────
+
   @override
   void initState() {
     super.initState();
-    _localRenderer.initialize();
+    WidgetsBinding.instance.addObserver(this);
+
+    _controller = ApiVideoLiveStreamController(
+      initialAudioConfig: AudioConfig(),
+      initialVideoConfig: VideoConfig.withDefaultBitrate(),
+      onConnectionSuccess: _onConnectionSuccess,
+      onConnectionFailed: _onConnectionFailed,
+      onDisconnection: _onDisconnection,
+      onError: _onError,
+    );
+
+    _controller
+        .initialize()
+        .then((_) {
+          if (mounted) setState(() => _phase = _Phase.idle);
+        })
+        .catchError((Object e) {
+          logger.e('Camera/mic init failed', error: e);
+          if (mounted) {
+            setState(() {
+              _phase = _Phase.error;
+              _initError = e.toString();
+            });
+          }
+        });
   }
 
-  Future<void> _startCamera() async {
-    setState(() => _phase = _Phase.cameraLoading);
-    try {
-      final stream = await navigator.mediaDevices.getUserMedia({
-        'audio': true,
-        'video': {
-          'facingMode': 'user',
-          'width': {'ideal': 1280},
-          'height': {'ideal': 720},
-        },
-      });
-      _localStream = stream;
-      _localRenderer.srcObject = stream;
-      if (mounted) setState(() => _phase = _Phase.idle);
-    } catch (_) {
-      if (mounted) setState(() => _phase = _Phase.cameraError);
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pollTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_controller.isInitialized) return;
+    if (state == AppLifecycleState.inactive) {
+      _controller.stop();
+    } else if (state == AppLifecycleState.resumed) {
+      _controller.startPreview();
     }
   }
 
-  Future<void> _createStream() async {
+  // ── RTMP event callbacks ─────────────────────────────────────────────────────
+
+  void _onConnectionSuccess() {
+    logger.d('RTMP connected ✓');
+    if (mounted) setState(() => _isStreaming = true);
+  }
+
+  void _onConnectionFailed(String reason) {
+    logger.e('RTMP connection failed: $reason');
+    if (!mounted) return;
+    setState(() => _isStreaming = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Connection failed: $reason')));
+  }
+
+  void _onDisconnection() {
+    logger.d('RTMP disconnected');
+    if (mounted) setState(() => _isStreaming = false);
+  }
+
+  void _onError(Exception error) {
+    logger.e('Live stream error', error: error);
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Stream error: $error')));
+    }
+  }
+
+  // ── Go Live ──────────────────────────────────────────────────────────────────
+
+  Future<void> _goLive() async {
     setState(() => _phase = _Phase.creating);
     try {
-      final stream = await _muxService.createLiveStream();
-      _muxStream = stream;
+      final creatorId = LocalStorage.creatorId;
+      final rtmpUrl = LocalStorage.streamRtmpUrl;
+      final streamKey = LocalStorage.streamKeyRef;
+      final playbackId = LocalStorage.muxLivePlaybackId;
+      final muxStreamId = LocalStorage.muxLiveStreamId ?? '';
+
+      if (creatorId == null ||
+          rtmpUrl == null ||
+          streamKey == null ||
+          playbackId == null) {
+        throw Exception(
+          'Stream credentials not found. Please sign out and sign in again.',
+        );
+      }
+
+      await GetIt.instance<CreatorRepo>().startLivestream(creatorId);
+
+      _credentials = _StreamCredentials(
+        creatorId: creatorId,
+        rtmpIngestUrl: rtmpUrl,
+        streamKey: streamKey,
+        hlsUrl: MuxConfig.hlsUrl(playbackId),
+        muxLiveStreamId: muxStreamId,
+      );
+
       if (mounted) {
         setState(() => _phase = _Phase.live);
         _startPolling();
       }
-    } catch (e) {
+    } catch (e, st) {
+      logger.e('Failed to go live', error: e, stackTrace: st);
       if (!mounted) return;
       setState(() => _phase = _Phase.idle);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create stream: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to start stream: $e')));
     }
   }
 
+  // ── RTMP streaming ───────────────────────────────────────────────────────────
+
   Future<void> _startStreaming() async {
-    final muxStream = _muxStream;
-    final localStream = _localStream;
-    if (muxStream == null || localStream == null) return;
-
+    final creds = _credentials;
+    if (creds == null) return;
     try {
-      final pc = await createPeerConnection({
-        'iceServers': [
-          {'urls': 'stun:stun.l.google.com:19302'},
-          {'urls': 'stun:stun1.l.google.com:19302'},
-        ],
-      });
-      _peerConnection = pc;
-
-      for (final track in localStream.getTracks()) {
-        await pc.addTrack(track, localStream);
-      }
-
-      final gatheringCompleter = Completer<void>();
-      pc.onIceGatheringState = (RTCIceGatheringState state) {
-        if (state == RTCIceGatheringState.RTCIceGatheringStateComplete &&
-            !gatheringCompleter.isCompleted) {
-          gatheringCompleter.complete();
-        }
-      };
-
-      final offer = await pc.createOffer({
-        'offerToReceiveAudio': false,
-        'offerToReceiveVideo': false,
-      });
-      await pc.setLocalDescription(offer);
-
-      // Wait for ICE gathering (10s timeout)
-      await gatheringCompleter.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          if (!gatheringCompleter.isCompleted) gatheringCompleter.complete();
-        },
+      logger.d(
+        'RTMP → startStreaming\n'
+        '  url: ${creds.rtmpIngestUrl}\n'
+        '  key: ${creds.streamKey}',
       );
-
-      final localDesc = await pc.getLocalDescription();
-      if (localDesc?.sdp == null) throw Exception('No local SDP');
-
-      final answerSdp = await _muxService.whipHandshake(
-        muxStream.streamKey,
-        localDesc!.sdp!,
+      await _controller.startStreaming(
+        streamKey: creds.streamKey,
+        url: creds.rtmpIngestUrl,
       );
-      await pc.setRemoteDescription(RTCSessionDescription(answerSdp, 'answer'));
-
-      if (mounted) setState(() => _isStreaming = true);
-    } catch (e) {
-      await _peerConnection?.close();
-      _peerConnection = null;
+      // _isStreaming flips to true via _onConnectionSuccess
+    } catch (e, st) {
+      logger.e('RTMP startStreaming failed', error: e, stackTrace: st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to start streaming: $e')),
@@ -149,43 +210,53 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
   }
 
   Future<void> _stopStreaming() async {
-    await _peerConnection?.close();
-    _peerConnection = null;
+    try {
+      await _controller.stopStreaming();
+    } catch (_) {}
     if (mounted) setState(() => _isStreaming = false);
   }
 
+  // ── Status polling ───────────────────────────────────────────────────────────
+
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _checkStatus());
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _checkStatus(),
+    );
   }
 
   Future<void> _checkStatus() async {
-    final stream = _muxStream;
-    if (stream == null || !mounted) return;
+    final creds = _credentials;
+    if (creds == null || !mounted || creds.muxLiveStreamId.isEmpty) return;
     try {
-      final status = await _muxService.getStreamStatus(stream.id);
+      final status = await _muxService.getStreamStatus(creds.muxLiveStreamId);
       if (!mounted) return;
       setState(() {
         _statusActive = status == 'active';
-        _statusText = _statusActive ? AppStrings.statusActive : AppStrings.statusIdle;
+        _statusText = _statusActive
+            ? AppStrings.statusActive
+            : AppStrings.statusIdle;
       });
     } catch (_) {}
   }
 
   Future<void> _endStream() async {
-    final stream = _muxStream;
-    if (stream == null) return;
-    await _stopStreaming();
     _pollTimer?.cancel();
     setState(() => _phase = _Phase.ending);
     try {
-      await _muxService.disableLiveStream(stream.id);
+      await _controller.stop();
+    } catch (_) {}
+    try {
+      final id = _credentials?.muxLiveStreamId ?? '';
+      if (id.isNotEmpty) await _muxService.disableLiveStream(id);
     } catch (_) {}
     if (!mounted) return;
     setState(() {
-      _muxStream = null;
+      _credentials = null;
       _statusText = AppStrings.statusIdle;
       _statusActive = false;
+      _isStreaming = false;
       _phase = _Phase.idle;
     });
   }
@@ -200,21 +271,14 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _pollTimer?.cancel();
-    _peerConnection?.close();
-    _localStream?.dispose();
-    _localRenderer.dispose();
-    super.dispose();
-  }
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.startLiveTitle),
+        title: const Text(AppStrings.goLive),
         backgroundColor: AppColors.background,
       ),
       body: _buildBody(),
@@ -223,13 +287,12 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
 
   Widget _buildBody() {
     switch (_phase) {
-      case _Phase.cameraSetup:
-      case _Phase.cameraError:
-        return _buildCameraSetup();
-      case _Phase.cameraLoading:
+      case _Phase.initializing:
         return const Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         );
+      case _Phase.error:
+        return _buildErrorState();
       case _Phase.creating:
       case _Phase.ending:
         return Center(
@@ -253,14 +316,18 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
     }
   }
 
-  Widget _buildCameraSetup() {
+  Widget _buildErrorState() {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.videocam_rounded, size: 64, color: AppColors.primary),
+          const Icon(
+            Icons.videocam_off_rounded,
+            size: 64,
+            color: AppColors.textTertiary,
+          ),
           const SizedBox(height: 24),
           const Text(
             AppStrings.cameraPermNeeded,
@@ -273,40 +340,23 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            _phase == _Phase.cameraError
-                ? AppStrings.cameraPermDeniedBody
-                : AppStrings.cameraPermBody,
+            _initError ?? AppStrings.cameraPermDeniedBody,
             style: const TextStyle(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          if (_phase == _Phase.cameraError)
-            OutlinedButton(
-              onPressed: openAppSettings,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(AppStrings.openSettings),
-            )
-          else
-            FilledButton.icon(
-              onPressed: _startCamera,
-              icon: const Icon(Icons.videocam_rounded),
-              label: const Text('Enable Camera'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          OutlinedButton(
+            onPressed: openAppSettings,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
+            child: const Text(AppStrings.openSettings),
+          ),
         ],
       ),
     );
@@ -322,7 +372,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
           const SizedBox(height: 16),
           if (_phase == _Phase.idle)
             FilledButton.icon(
-              onPressed: _createStream,
+              onPressed: _goLive,
               icon: const Icon(Icons.live_tv_rounded),
               label: const Text(AppStrings.goLive),
               style: FilledButton.styleFrom(
@@ -346,7 +396,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      PlayerScreen.network(networkUrl: _muxStream!.hlsUrl),
+                      PlayerScreen.network(networkUrl: _credentials!.hlsUrl),
                 ),
               ),
               icon: const Icon(Icons.visibility_rounded),
@@ -381,18 +431,16 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
           fit: StackFit.expand,
           children: [
             Container(color: AppColors.surface),
-            RTCVideoView(
-              _localRenderer,
-              mirror: true,
-              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-            ),
+            ApiVideoCameraPreview(controller: _controller),
             if (_isStreaming)
               Positioned(
                 top: 12,
                 left: 12,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.error,
                     borderRadius: BorderRadius.circular(6),
@@ -424,10 +472,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
   Widget _buildStatusBadge() {
     return Row(
       children: [
-        Text(
-          '${AppStrings.streamStatus}: ',
-          style: AppStyles.credLabel,
-        ),
+        Text('${AppStrings.streamStatus}: ', style: AppStyles.credLabel),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
@@ -436,15 +481,13 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
                 : AppColors.surface,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color:
-                  _statusActive ? AppColors.primary : AppColors.textTertiary,
+              color: _statusActive ? AppColors.primary : AppColors.textTertiary,
             ),
           ),
           child: Text(
             _statusText.toUpperCase(),
             style: AppStyles.streamStatusBadge.copyWith(
-              color:
-                  _statusActive ? AppColors.primary : AppColors.textTertiary,
+              color: _statusActive ? AppColors.primary : AppColors.textTertiary,
             ),
           ),
         ),
@@ -453,20 +496,20 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
   }
 
   Widget _buildCredentials() {
-    final s = _muxStream!;
+    final c = _credentials!;
     return Column(
       children: [
         _CredentialRow(
           label: AppStrings.rtmpUrl,
-          value: s.rtmpIngestUrl,
-          onCopy: () => _copyToClipboard(s.rtmpIngestUrl),
+          value: c.rtmpIngestUrl,
+          onCopy: () => _copyToClipboard(c.rtmpIngestUrl),
         ),
         const SizedBox(height: 8),
         _CredentialRow(
           label: AppStrings.streamKey,
-          value: s.streamKey,
+          value: c.streamKey,
           obscure: !_streamKeyVisible,
-          onCopy: () => _copyToClipboard(s.streamKey),
+          onCopy: () => _copyToClipboard(c.streamKey),
           trailing: TextButton(
             onPressed: () =>
                 setState(() => _streamKeyVisible = !_streamKeyVisible),
@@ -486,8 +529,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
         const SizedBox(height: 8),
         _CredentialRow(
           label: AppStrings.playbackUrl,
-          value: s.hlsUrl,
-          onCopy: () => _copyToClipboard(s.hlsUrl),
+          value: c.hlsUrl,
+          onCopy: () => _copyToClipboard(c.hlsUrl),
         ),
       ],
     );
@@ -523,6 +566,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen> {
           );
   }
 }
+
+// ── Credential row widget ──────────────────────────────────────────────────────
 
 class _CredentialRow extends StatelessWidget {
   const _CredentialRow({

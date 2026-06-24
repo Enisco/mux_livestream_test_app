@@ -27,9 +27,7 @@ class SpeedSelector extends StatelessWidget {
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         backgroundColor: AppColors.overlayLight,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.0),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
       ),
       onPressed: () => _showMenu(context),
       child: Text(_label(current), style: AppStyles.speedLabel),

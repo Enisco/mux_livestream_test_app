@@ -15,10 +15,10 @@ class PlayerScreen extends StatefulWidget {
   final String? networkUrl;
 
   const PlayerScreen.file({super.key, required this.filePath})
-      : networkUrl = null;
+    : networkUrl = null;
 
   const PlayerScreen.network({super.key, required this.networkUrl})
-      : filePath = null;
+    : filePath = null;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -43,10 +43,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   String get _displayTitle {
     if (widget.networkUrl != null) {
-      final segments = Uri.tryParse(widget.networkUrl!)
-          ?.pathSegments
-          .where((s) => s.isNotEmpty)
-          .toList();
+      final segments = Uri.tryParse(
+        widget.networkUrl!,
+      )?.pathSegments.where((s) => s.isNotEmpty).toList();
       if (segments != null && segments.isNotEmpty) return segments.last;
       return widget.networkUrl!;
     }
@@ -126,7 +125,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final target = ctrl.value.position + offset;
     final dur = ctrl.value.duration;
     ctrl.seekTo(
-      target < Duration.zero ? Duration.zero : target > dur ? dur : target,
+      target < Duration.zero
+          ? Duration.zero
+          : target > dur
+          ? dur
+          : target,
     );
     _resetHide();
   }
@@ -135,7 +138,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final ctrl = _controller;
     if (ctrl == null) return;
     ctrl.seekTo(
-      Duration(milliseconds: (fraction * ctrl.value.duration.inMilliseconds).round()),
+      Duration(
+        milliseconds: (fraction * ctrl.value.duration.inMilliseconds).round(),
+      ),
     );
   }
 
@@ -206,10 +211,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Focus(
       autofocus: true,
       onKeyEvent: _handleKey,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: _buildBody(),
-      ),
+      child: Scaffold(backgroundColor: Colors.black, body: _buildBody()),
     );
   }
 
@@ -245,10 +247,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           const SizedBox(height: 16.0),
           Text(AppStrings.failedToLoad, style: AppStyles.errorTitle),
           const SizedBox(height: 8.0),
-          Text(
-            _displayTitle,
-            style: AppStyles.errorPath,
-          ),
+          Text(_displayTitle, style: AppStyles.errorPath),
           const SizedBox(height: 24.0),
           TextButton.icon(
             onPressed: () => Navigator.of(context).pop(),

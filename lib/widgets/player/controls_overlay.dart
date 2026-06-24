@@ -112,10 +112,7 @@ class _TopBar extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 4.0,
-          vertical: 4.0,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0),
         child: Row(
           children: [
             IconButton(
@@ -210,12 +207,7 @@ class _BottomBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          8.0,
-          0,
-          8.0,
-          4.0,
-        ),
+        padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 4.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

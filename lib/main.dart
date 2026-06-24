@@ -1,22 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'core/app_strings.dart';
 import 'core/app_theme.dart';
-import 'screens/landing_screen.dart';
+import 'core/locator.dart';
+import 'core/router.dart';
+import 'features/auth/bloc/auth_bloc.dart';
 
-void main() {
-  runApp(const VideoPlayerApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+
+  await dotenv.load(fileName: '.env');
+  await setupLocator();
+  setupSessionExpiredCallback();
+
+  runApp(const GTubeApp());
 }
 
-class VideoPlayerApp extends StatelessWidget {
-  const VideoPlayerApp({super.key});
+class GTubeApp extends StatelessWidget {
+  const GTubeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'GTube',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      home: const LandingScreen(),
+    return BlocProvider(
+      create: (_) => AuthBloc(),
+      child: MaterialApp.router(
+        title: AppStrings.appTitle,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark,
+        routerConfig: appRouter,
+      ),
     );
   }
 }

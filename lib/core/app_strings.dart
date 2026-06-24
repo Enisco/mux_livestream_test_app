@@ -4,7 +4,8 @@ abstract final class AppStrings {
   // Home – library
   static const addVideos = 'Add Video';
   static const noVideosTitle = 'No videos found';
-  static const noVideosSubtitle = 'No video files were found.\nTap + to open a specific file.';
+  static const noVideosSubtitle =
+      'No video files were found.\nTap + to open a specific file.';
 
   // Home – scanning
   static const scanningVideos = 'Scanning for videos…';
@@ -32,10 +33,14 @@ abstract final class AppStrings {
   static const featureGalleryDesc = 'Browse videos stored on your device';
   static const featureOnlineVideo = 'Online Video';
   static const featureOnlineVideoDesc = 'Play any public video or YouTube link';
-  static const featureStartLive = 'Go Live';
   static const featureStartLiveDesc = 'Stream your camera live via Mux';
-  static const featureJoinLive = 'Join Stream';
   static const featureJoinLiveDesc = 'Watch an ongoing Mux livestream';
+
+  // Auth
+  static const signIn = 'Sign In';
+  static const createAccount = 'Create Account';
+  static const email = 'Email';
+  static const password = 'Password';
 
   // Online video
   static const onlineVideoTitle = 'Online Video';
@@ -47,7 +52,6 @@ abstract final class AppStrings {
   static const youtubePlayerTitle = 'YouTube';
 
   // Start livestream
-  static const startLiveTitle = 'Go Live';
   static const cameraPermNeeded = 'Camera & Microphone Access Required';
   static const cameraPermBody =
       'GTube needs camera and microphone access\nto stream live video.';
@@ -71,7 +75,6 @@ abstract final class AppStrings {
   static const hideStreamKey = 'Hide';
 
   // Join livestream
-  static const joinLiveTitle = 'Join Stream';
   static const playbackIdHint = 'Enter Mux Playback ID or stream URL…';
   static const joinStream = 'Join Stream';
   static const invalidPlaybackId = 'Please enter a valid Playback ID';

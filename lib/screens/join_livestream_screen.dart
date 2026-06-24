@@ -44,7 +44,8 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PlayerScreen.network(networkUrl: MuxConfig.hlsUrl(playbackId)),
+        builder: (_) =>
+            PlayerScreen.network(networkUrl: MuxConfig.hlsUrl(playbackId)),
       ),
     );
   }
@@ -54,7 +55,7 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.joinLiveTitle),
+        title: const Text(AppStrings.joinStream),
         backgroundColor: AppColors.background,
       ),
       body: Padding(

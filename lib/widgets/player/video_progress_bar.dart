@@ -61,12 +61,8 @@ class _VideoProgressBarState extends State<VideoProgressBar> {
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackHeight: 3.0,
-            thumbShape: const RoundSliderThumbShape(
-              enabledThumbRadius: 7.0,
-            ),
-            overlayShape: const RoundSliderOverlayShape(
-              overlayRadius: 16.0,
-            ),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.0),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16.0),
             activeTrackColor: AppColors.primary,
             inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
             thumbColor: Colors.white,
