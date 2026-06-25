@@ -72,21 +72,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       onError: _onError,
     );
 
-    _controller
-        .initialize()
-        .then((_) async {
-          await _controller.startPreview();
-          if (mounted) setState(() => _phase = _Phase.idle);
-        })
-        .catchError((Object e) {
-          logger.e('Camera/mic init failed', error: e);
-          if (mounted) {
-            setState(() {
-              _phase = _Phase.error;
-              _initError = e.toString();
-            });
-          }
-        });
+    _initCamera();
   }
 
   @override
@@ -103,6 +89,32 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       _controller.stop();
     } else if (state == AppLifecycleState.resumed) {
       _controller.startPreview();
+    }
+  }
+
+  Future<void> _initCamera() async {
+    final camera = await Permission.camera.request();
+    final mic = await Permission.microphone.request();
+    if (!mounted) return;
+    if (!camera.isGranted || !mic.isGranted) {
+      setState(() {
+        _phase = _Phase.error;
+        _initError = AppStrings.cameraPermDeniedBody;
+      });
+      return;
+    }
+    try {
+      await _controller.initialize();
+      await _controller.startPreview();
+      if (mounted) setState(() => _phase = _Phase.idle);
+    } catch (e) {
+      logger.e('Camera/mic init failed', error: e);
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.error;
+          _initError = e.toString();
+        });
+      }
     }
   }
 
@@ -224,7 +236,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         '  url: ${creds.rtmpIngestUrl}\n'
         '  key: ${creds.streamKey}',
       );
-      await _controller.startPreview();
       await _controller.startStreaming(
         streamKey: creds.streamKey,
         url: creds.rtmpIngestUrl,
