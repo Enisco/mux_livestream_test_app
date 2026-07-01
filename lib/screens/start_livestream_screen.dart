@@ -49,6 +49,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
 
   _StreamCredentials? _credentials;
   bool _isStreaming = false;
+  bool _isStartingStream = false;
   bool _streamKeyVisible = false;
   String? _playbackUrl;
   String? _sessionId;
@@ -229,7 +230,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
 
   Future<void> _startStreaming() async {
     final creds = _credentials;
-    if (creds == null) return;
+    if (creds == null || _isStartingStream) return;
+    setState(() => _isStartingStream = true);
     try {
       logger.d(
         'RTMP → startStreaming\n'
@@ -248,6 +250,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
           SnackBar(content: Text('Failed to start streaming: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isStartingStream = false);
     }
   }
 
@@ -332,25 +336,14 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         );
       case _Phase.error:
         return _buildErrorState();
+      case _Phase.idle:
       case _Phase.creating:
       case _Phase.ending:
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: AppColors.primary),
-              const SizedBox(height: 16),
-              Text(
-                _phase == _Phase.creating
-                    ? AppStrings.creatingStream
-                    : AppStrings.endingStream,
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        );
-      case _Phase.idle:
       case _Phase.live:
+        // Always keep ApiVideoCameraPreview mounted so the camera session stays
+        // alive. Show a translucent overlay for creating/ending states instead
+        // of replacing the whole screen (which would destroy the surface texture
+        // and invalidate the Camera2 capture session).
         return _buildMain();
     }
   }
@@ -402,87 +395,115 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   }
 
   Widget _buildMain() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildCameraPreview(),
-          const SizedBox(height: 16),
-          if (_phase == _Phase.idle)
-            FilledButton.icon(
-              onPressed: _goLive,
-              icon: const Icon(Icons.live_tv_rounded),
-              label: const Text(AppStrings.goLive),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            )
-          else ...[
-            _buildStatusBadge(),
-            const SizedBox(height: 16),
-            _buildCredentials(),
-            const SizedBox(height: 16),
-            _buildStreamingToggle(),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final mediaId = _credentials?.liveMediaId;
-                if (mediaId == null || mediaId.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text(AppStrings.noMediaIdError)),
-                  );
-                  return;
-                }
-                try {
-                  final token = await GetIt.instance<CreatorRepo>()
-                      .getPlaybackToken(mediaId, _clientSessionId());
-                  logger.i('WatchStream: opening player → ${token.hlsUrl}');
-                  if (!mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PlayerScreen.network(networkUrl: token.hlsUrl),
+    final isLoading =
+        _phase == _Phase.creating || _phase == _Phase.ending;
+    final loadingLabel = _phase == _Phase.creating
+        ? AppStrings.creatingStream
+        : AppStrings.endingStream;
+
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildCameraPreview(),
+              const SizedBox(height: 16),
+              if (_phase == _Phase.idle || isLoading)
+                FilledButton.icon(
+                  onPressed: isLoading ? null : _goLive,
+                  icon: const Icon(Icons.live_tv_rounded),
+                  label: const Text(AppStrings.goLive),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  );
-                } catch (e) {
-                  logger.e(
-                    'WatchStream: failed to get playback token',
-                    error: e,
-                  );
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Could not load stream: $e')),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.visibility_rounded),
-              label: const Text(AppStrings.watchStream),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  ),
+                )
+              else ...[
+                _buildStatusBadge(),
+                const SizedBox(height: 16),
+                _buildCredentials(),
+                const SizedBox(height: 16),
+                _buildStreamingToggle(),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final mediaId = _credentials?.liveMediaId;
+                    if (mediaId == null || mediaId.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text(AppStrings.noMediaIdError)),
+                      );
+                      return;
+                    }
+                    try {
+                      final token = await GetIt.instance<CreatorRepo>()
+                          .getPlaybackToken(mediaId, _clientSessionId());
+                      logger.i('WatchStream: opening player → ${token.hlsUrl}');
+                      if (!mounted) return;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PlayerScreen.network(networkUrl: token.hlsUrl),
+                        ),
+                      );
+                    } catch (e) {
+                      logger.e(
+                        'WatchStream: failed to get playback token',
+                        error: e,
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Could not load stream: $e')),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.visibility_rounded),
+                  label: const Text(AppStrings.watchStream),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _endStream,
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  child: const Text(AppStrings.endStream),
+                ),
+              ],
+            ],
+          ),
+        ),
+        // Translucent overlay while creating/ending — keeps camera in the tree.
+        if (isLoading)
+          Container(
+            color: Colors.black54,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: AppColors.primary),
+                  const SizedBox(height: 16),
+                  Text(
+                    loadingLabel,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _endStream,
-              style: TextButton.styleFrom(foregroundColor: AppColors.error),
-              child: const Text(AppStrings.endStream),
-            ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -612,33 +633,51 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   }
 
   Widget _buildStreamingToggle() {
-    return _isStreaming
-        ? OutlinedButton.icon(
-            onPressed: _stopStreaming,
-            icon: const Icon(Icons.stop_rounded),
-            label: const Text(AppStrings.stopStreaming),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.error,
-              side: const BorderSide(color: AppColors.error),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+    if (_isStreaming) {
+      return OutlinedButton.icon(
+        onPressed: _stopStreaming,
+        icon: const Icon(Icons.stop_rounded),
+        label: const Text(AppStrings.stopStreaming),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.error,
+          side: const BorderSide(color: AppColors.error),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+    return FilledButton(
+      onPressed: _isStartingStream ? null : _startStreaming,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.error,
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: AppColors.error.withValues(alpha: 0.6),
+        disabledForegroundColor: Colors.white70,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: _isStartingStream
+          ? const SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2.5,
               ),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.videocam_rounded),
+                SizedBox(width: 8),
+                Text(AppStrings.startStreaming),
+              ],
             ),
-          )
-        : FilledButton.icon(
-            onPressed: _startStreaming,
-            icon: const Icon(Icons.videocam_rounded),
-            label: const Text(AppStrings.startStreaming),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
+    );
   }
 }
 
