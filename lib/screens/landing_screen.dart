@@ -6,7 +6,9 @@ import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../utils/local_storage.dart';
+import 'discover_feed_screen.dart';
 import 'home_screen.dart';
+import 'vertical_feed_screen.dart';
 import 'join_livestream_screen.dart';
 import 'start_livestream_screen.dart';
 
@@ -71,6 +73,30 @@ class LandingScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                _FeatureCard(
+                  icon: Icons.explore_rounded,
+                  title: AppStrings.discover,
+                  description: AppStrings.featureDiscoverDesc,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DiscoverFeedScreen(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _FeatureCard(
+                  icon: Icons.video_collection_rounded,
+                  title: AppStrings.shortVideos,
+                  description: AppStrings.featureShortVideosDesc,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VerticalFeedScreen(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _FeatureCard(
                   icon: Icons.video_library_rounded,
                   title: AppStrings.featureGallery,

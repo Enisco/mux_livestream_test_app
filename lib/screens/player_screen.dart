@@ -3,23 +3,36 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:video_player/video_player.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
+import '../services/analytics_service.dart';
 import '../widgets/player/controls_overlay.dart';
 
 class PlayerScreen extends StatefulWidget {
   final String? filePath;
   final String? networkUrl;
+  final String? mediaId;
+  final String? creatorId;
+  final String source;
 
   const PlayerScreen.file({super.key, required this.filePath})
-    : networkUrl = null;
+    : networkUrl = null,
+      mediaId = null,
+      creatorId = null,
+      source = 'unknown';
 
-  const PlayerScreen.network({super.key, required this.networkUrl})
-    : filePath = null;
+  const PlayerScreen.network({
+    super.key,
+    required this.networkUrl,
+    this.mediaId,
+    this.creatorId,
+    this.source = 'unknown',
+  }) : filePath = null;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -41,6 +54,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const _speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
   static const _maxRetries = 6;
   static const _retryDelay = Duration(seconds: 5);
+
+  bool _analyticsViewStarted = false;
+  bool _analyticsCompleted = false;
+  double _lastProgressPos = 0;
+  bool? _wasPlaying;
 
   @override
   void initState() {
@@ -134,10 +152,69 @@ class _PlayerScreenState extends State<PlayerScreen> {
       });
       return;
     }
+    _trackAnalytics(value);
     setState(() {});
     if (value.isCompleted) {
       setState(() => _showControls = true);
       _hideTimer?.cancel();
+    }
+  }
+
+  void _trackAnalytics(VideoPlayerValue value) {
+    final mediaId = widget.mediaId;
+    final creatorId = widget.creatorId;
+    if (mediaId == null || creatorId == null) return;
+    final analytics = GetIt.instance<AnalyticsService>();
+    final position = value.position.inMilliseconds / 1000.0;
+    final isPlaying = value.isPlaying;
+
+    if (!_analyticsViewStarted && isPlaying) {
+      _analyticsViewStarted = true;
+      analytics.trackViewStarted(
+        mediaId: mediaId,
+        creatorId: creatorId,
+        source: widget.source,
+        positionSeconds: position,
+      );
+      _wasPlaying = isPlaying;
+      return;
+    }
+    if (_wasPlaying != null && _wasPlaying != isPlaying) {
+      if (isPlaying) {
+        analytics.trackPlay(
+          mediaId: mediaId,
+          creatorId: creatorId,
+          positionSeconds: position,
+          source: widget.source,
+        );
+      } else if (!value.isCompleted) {
+        analytics.trackPause(
+          mediaId: mediaId,
+          creatorId: creatorId,
+          positionSeconds: position,
+          source: widget.source,
+        );
+      }
+    }
+    _wasPlaying = isPlaying;
+    if (isPlaying && (position - _lastProgressPos) >= 10.0) {
+      _lastProgressPos = position;
+      analytics.trackProgress(
+        mediaId: mediaId,
+        creatorId: creatorId,
+        positionSeconds: position,
+        source: widget.source,
+      );
+    }
+    if (!_analyticsCompleted && value.isCompleted) {
+      _analyticsCompleted = true;
+      analytics.trackCompletion(
+        mediaId: mediaId,
+        creatorId: creatorId,
+        positionSeconds: position,
+        source: widget.source,
+      );
+      analytics.flush();
     }
   }
 

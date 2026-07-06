@@ -50,6 +50,9 @@ class DeviceInfoService {
     _deviceId = storedId;
   }
 
+  String get platform => _platform;
+  String get appVersion => _appVersion;
+
   Map<String, String> get headers => {
     'x-device-id': _deviceId,
     'x-device-name': _deviceName,

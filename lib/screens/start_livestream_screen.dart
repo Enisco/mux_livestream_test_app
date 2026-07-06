@@ -395,8 +395,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   }
 
   Widget _buildMain() {
-    final isLoading =
-        _phase == _Phase.creating || _phase == _Phase.ending;
+    final isLoading = _phase == _Phase.creating || _phase == _Phase.ending;
     final loadingLabel = _phase == _Phase.creating
         ? AppStrings.creatingStream
         : AppStrings.endingStream;
@@ -436,7 +435,9 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                     final mediaId = _credentials?.liveMediaId;
                     if (mediaId == null || mediaId.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text(AppStrings.noMediaIdError)),
+                        const SnackBar(
+                          content: Text(AppStrings.noMediaIdError),
+                        ),
                       );
                       return;
                     }
@@ -656,9 +657,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         disabledBackgroundColor: AppColors.error.withValues(alpha: 0.6),
         disabledForegroundColor: Colors.white70,
         padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: _isStartingStream
           ? const SizedBox(

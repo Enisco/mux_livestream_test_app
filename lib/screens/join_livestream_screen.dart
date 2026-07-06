@@ -30,21 +30,9 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
   }
 
   Future<void> _join() async {
-    final input = _idController.text.trim();
-    if (input.isEmpty) {
+    final creatorId = _idController.text.trim();
+    if (creatorId.isEmpty) {
       setState(() => _error = AppStrings.streamIdInvalid);
-      return;
-    }
-
-    // If the user pasted a full HLS URL, open it directly in the player.
-    if (input.startsWith('https://')) {
-      logger.i('JoinStream: using pasted URL directly → $input');
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PlayerScreen.network(networkUrl: input),
-        ),
-      );
       return;
     }
 
@@ -55,7 +43,18 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
 
     try {
       final repo = GetIt.instance<CreatorRepo>();
-      final token = await repo.getPlaybackToken(input, _clientSessionId());
+
+      final status = await repo.getCreatorLiveStatus(creatorId);
+      if (!mounted) return;
+      if (!status.isLive || status.mediaId == null) {
+        setState(() => _error = AppStrings.notLiveError);
+        return;
+      }
+
+      final token = await repo.getPlaybackToken(
+        status.mediaId!,
+        _clientSessionId(),
+      );
       logger.i('JoinStream: opening player → ${token.hlsUrl}');
 
       if (!mounted) return;

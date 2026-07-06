@@ -30,4 +30,17 @@ abstract final class ApiEndpoints {
 
   static String livestreamPlaybackToken(String mediaId) =>
       '$_media/live/streams/$mediaId/playback-token';
+
+  // Engagement
+  static const interactions = '/v1/engagement/interactions';
+  static const publicComments = '/v1/public/engagement/comments';
+
+  // Analytics
+  static const beaconsAuth = '/v1/analytics/beacons/auth';
+
+  // Discovery
+  static const webFeed = '/v1/discovery/web-feed';
+  static const verticalFeed = '/v1/discovery/vertical-feed';
+  static String mediaDetail(String id) => '/v1/discovery/media/$id/detail';
+  static String mediaPlaybackInfo(String id) => '/v1/media/$id/playback-info';
 }

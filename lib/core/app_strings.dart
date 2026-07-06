@@ -69,11 +69,20 @@ abstract final class AppStrings {
 
   // Join livestream
   static const joinStream = 'Join Stream';
-  static const streamIdHint = 'Enter Stream ID or Playback URL…';
-  static const streamIdInvalid = 'Please enter a valid Stream ID';
+  static const streamIdHint = 'Enter Creator ID…';
+  static const streamIdInvalid = 'Please enter a Creator ID';
   static const notLiveError = 'This creator is not live right now';
   static const fetchingUrl = 'Fetching…';
   static const noMediaIdError = 'Stream not ready — playback token unavailable';
+
+  // Discover feed
+  static const discover = 'Discover';
+  static const featureDiscoverDesc = 'Browse videos, music and live content';
+  static const watchNow = 'Watch Now';
+
+  // Vertical feed
+  static const shortVideos = 'Short Videos';
+  static const featureShortVideosDesc = 'Full-screen vertical video feed';
 
   // Dynamic helpers
   static String filesCount(int n) => '$n file${n == 1 ? '' : 's'}';
