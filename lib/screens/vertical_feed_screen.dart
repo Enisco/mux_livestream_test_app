@@ -9,10 +9,12 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/logger.dart';
+import '../features/discovery/models/media_detail.dart';
 import '../features/discovery/models/vertical_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
 import '../services/analytics_service.dart';
 import '../services/playback_info_cache.dart';
+import '../services/vertical_feed_preloader.dart';
 
 class VerticalFeedScreen extends StatefulWidget {
   const VerticalFeedScreen({super.key});
@@ -41,13 +43,27 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _load();
+
+    final preloader = GetIt.instance<VerticalFeedPreloader>();
+    if (preloader.hasData) {
+      // Use pre-fetched data — no loading state, first video plays instantly.
+      _items.addAll(preloader.items);
+      _nextCursor = preloader.nextCursor;
+      _loading = false;
+      // URLs for items 0-2 are already in the cache; pre-fetch 3 & 4 now.
+      _prefetch(3);
+      _prefetch(4);
+    } else {
+      _load();
+    }
   }
 
   @override
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pageController.dispose();
+    // Dispose held players and immediately re-warm for the next visit.
+    GetIt.instance<VerticalFeedPreloader>().reset();
     super.dispose();
   }
 
@@ -157,7 +173,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
               key: ValueKey(_items[i].mediaId),
               item: _items[i],
               isActive: i == _currentIndex,
-              preload: i == _currentIndex + 1,
+              preload: i == _currentIndex + 1 || i == _currentIndex + 2,
               clientSessionId: _clientSessionId(),
               cache: _cache,
             ),
@@ -299,8 +315,13 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   final List<StreamSubscription<dynamic>> _subs = [];
   _PagePhase _phase = _PagePhase.idle;
   bool _isMuted = false;
+  bool _isDragging = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+
+  // Creator info fetched from media detail endpoint (not in feed response)
+  String? _creatorHandle;
+  String? _creatorDisplayName;
 
   bool get _isPlaying => _player?.state.playing ?? false;
   bool get _isBuffering => _player?.state.buffering ?? false;
@@ -313,6 +334,8 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   @override
   void initState() {
     super.initState();
+    _creatorHandle = widget.item.creatorHandle;
+    _creatorDisplayName = widget.item.creatorDisplayName;
     if (widget.isActive) {
       _activate();
     } else if (widget.preload) {
@@ -342,6 +365,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     for (final s in _subs) {
       s.cancel();
     }
+    _player?.pause();
     _player?.dispose();
     if (_analyticsViewStarted) GetIt.instance<AnalyticsService>().flush();
     super.dispose();
@@ -355,12 +379,83 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       return;
     }
     if (_phase == _PagePhase.loading) return;
+    final preloaded =
+        GetIt.instance<VerticalFeedPreloader>().takePlayer(widget.item.mediaId);
+    if (preloaded != null) {
+      await _attachPreloaded(preloaded, play: true);
+      return;
+    }
     await _resolveAndStart(play: true);
   }
 
   Future<void> _preloadPlayer() async {
     if (_player != null || _phase == _PagePhase.loading) return;
+    final preloaded =
+        GetIt.instance<VerticalFeedPreloader>().takePlayer(widget.item.mediaId);
+    if (preloaded != null) {
+      await _attachPreloaded(preloaded, play: false);
+      return;
+    }
     await _resolveAndStart(play: false);
+  }
+
+  /// Attaches a player that was already opened by [VerticalFeedPreloader].
+  /// Skips the loading phase entirely — the player is already buffering.
+  Future<void> _attachPreloaded(PreloadedPlayer preloaded, {required bool play}) async {
+    final player = preloaded.player;
+    final controller = preloaded.controller;
+    _player = player;
+    _videoController = controller;
+
+    // Sync whatever state the player already accumulated while preloading.
+    _position = player.state.position;
+    _duration = player.state.duration;
+
+    _subs.addAll([
+      player.stream.playing.listen((v) {
+        if (!mounted) return;
+        _trackPlayAnalytics(playing: v);
+        setState(() {});
+      }),
+      player.stream.position.listen((v) {
+        if (!mounted || _isDragging) return;
+        _trackProgressAnalytics(v);
+        setState(() => _position = v);
+      }),
+      player.stream.duration.listen((v) {
+        if (mounted) setState(() => _duration = v);
+      }),
+      player.stream.buffering.listen((_) {
+        if (mounted) setState(() {});
+      }),
+      player.stream.error.listen((e) {
+        if (!mounted) return;
+        if (e.contains('audio device') || e.contains('no sound')) {
+          logger.d('VerticalFeedPage: non-fatal audio init warning (ignored) → $e');
+          return;
+        }
+        logger.e('VerticalFeedPage: player error → $e');
+        setState(() => _phase = _PagePhase.error);
+      }),
+    ]);
+
+    if (!mounted) {
+      _disposePlayer();
+      return;
+    }
+
+    setState(() => _phase = _PagePhase.playing);
+    unawaited(_fetchCreatorInfo());
+
+    await player.setVolume(_isMuted ? 0 : 100);
+    if (!mounted || _player != player) return;
+
+    if (play) {
+      await player.play();
+    } else if (widget.isActive) {
+      // Preload→activate race: page became active while attaching with play:false.
+      await _player?.play();
+    }
   }
 
   void _deactivate() {
@@ -372,6 +467,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       s.cancel();
     }
     _subs.clear();
+    _player?.pause();
     _player?.dispose();
     _player = null;
     _videoController = null;
@@ -386,13 +482,41 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   Future<String?> _resolveUrl() async {
     final cached = widget.cache.get(widget.item.mediaId);
-    if (cached != null) return cached.playbackUrl;
-    final info = await GetIt.instance<DiscoveryRepo>().fetchPlaybackInfo(
+    if (cached != null) {
+      // URL is cached but creator info may not be — fetch it now without blocking.
+      unawaited(_fetchCreatorInfo());
+      return cached.playbackUrl;
+    }
+    final detail = await GetIt.instance<DiscoveryRepo>().fetchMediaDetail(
       widget.item.mediaId,
       clientSessionId: widget.clientSessionId,
+      includeSuggestions: false,
     );
-    if (info != null) widget.cache.put(widget.item.mediaId, info);
-    return info?.playbackUrl;
+    if (detail.playback != null) widget.cache.put(widget.item.mediaId, detail.playback!);
+    _applyCreatorInfo(detail.creator);
+    return detail.playback?.playbackUrl;
+  }
+
+  Future<void> _fetchCreatorInfo() async {
+    if (_creatorHandle != null || _creatorDisplayName != null) return;
+    try {
+      final detail = await GetIt.instance<DiscoveryRepo>().fetchMediaDetail(
+        widget.item.mediaId,
+        clientSessionId: widget.clientSessionId,
+        includeSuggestions: false,
+      );
+      if (mounted) _applyCreatorInfo(detail.creator);
+    } catch (e) {
+      logger.w('VerticalFeedPage: creator info fetch failed → $e');
+    }
+  }
+
+  void _applyCreatorInfo(MediaCreatorInfo? creator) {
+    if (creator == null) return;
+    final handle = creator.handle.isNotEmpty ? creator.handle : null;
+    final name = creator.displayName.isNotEmpty ? creator.displayName : null;
+    if (handle == _creatorHandle && name == _creatorDisplayName) return;
+    if (mounted) setState(() { _creatorHandle = handle; _creatorDisplayName = name; });
   }
 
   Future<void> _resolveAndStart({required bool play}) async {
@@ -433,7 +557,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
         setState(() {});
       }),
       player.stream.position.listen((v) {
-        if (!mounted) return;
+        if (!mounted || _isDragging) return;
         _trackProgressAnalytics(v);
         setState(() => _position = v);
       }),
@@ -445,6 +569,10 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       }),
       player.stream.error.listen((e) {
         if (!mounted) return;
+        if (e.contains('audio device') || e.contains('no sound')) {
+          logger.d('VerticalFeedPage: non-fatal audio init warning (ignored) → $e');
+          return;
+        }
         logger.e('VerticalFeedPage: player error → $e');
         setState(() => _phase = _PagePhase.error);
       }),
@@ -503,7 +631,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       analytics.trackViewStarted(
         mediaId: widget.item.mediaId,
         creatorId: widget.item.creatorId,
-        source: 'vertical_feed',
+        source: 'home_feed',
         positionSeconds: pos,
       );
       _wasPlaying = playing;
@@ -515,14 +643,14 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
           mediaId: widget.item.mediaId,
           creatorId: widget.item.creatorId,
           positionSeconds: pos,
-          source: 'vertical_feed',
+          source: 'home_feed',
         );
       } else {
         analytics.trackPause(
           mediaId: widget.item.mediaId,
           creatorId: widget.item.creatorId,
           positionSeconds: pos,
-          source: 'vertical_feed',
+          source: 'home_feed',
         );
       }
     }
@@ -538,7 +666,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
         mediaId: widget.item.mediaId,
         creatorId: widget.item.creatorId,
         positionSeconds: pos,
-        source: 'vertical_feed',
+        source: 'home_feed',
       );
     }
   }
@@ -656,7 +784,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
             mainAxisSize: MainAxisSize.min,
             children: [
               _AvatarButton(
-                displayName: item.creatorDisplayName ?? item.creatorId,
+                displayName: _creatorDisplayName ?? _creatorHandle ?? '',
               ),
               const SizedBox(height: 24),
               _FeedActionButton(
@@ -694,6 +822,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   Widget _buildBottomInfo() {
     final item = widget.item;
+    final channelLabel = _creatorHandle != null
+        ? '@$_creatorHandle'
+        : _creatorDisplayName;
     return Positioned(
       left: 12,
       right: 80,
@@ -711,15 +842,16 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                   padding: EdgeInsets.only(bottom: 6),
                   child: _LiveBadge(),
                 ),
-              Text(
-                '@${item.creatorHandle ?? item.creatorId}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+              if (channelLabel != null)
+                Text(
+                  channelLabel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                  ),
                 ),
-              ),
               const SizedBox(height: 4),
               Text(
                 item.title,
@@ -742,17 +874,39 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     if (_duration == Duration.zero) return const SizedBox.shrink();
     final progress =
         (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
-    // Offset above the system gesture bar so it's always visible.
     final bottomInset = MediaQuery.of(context).padding.bottom;
     return Positioned(
       left: 0,
       right: 0,
       bottom: bottomInset,
-      child: LinearProgressIndicator(
-        value: progress,
-        backgroundColor: Colors.white24,
-        color: Colors.white70,
-        minHeight: 2,
+      child: SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          trackHeight: 2.5,
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+          overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+          activeTrackColor: Colors.white,
+          inactiveTrackColor: Colors.white30,
+          thumbColor: Colors.white,
+          overlayColor: Colors.white24,
+          trackShape: const RectangularSliderTrackShape(),
+        ),
+        child: Slider(
+          value: progress,
+          onChangeStart: (_) => setState(() => _isDragging = true),
+          onChanged: (v) {
+            final pos = Duration(
+              milliseconds: (v * _duration.inMilliseconds).round(),
+            );
+            setState(() => _position = pos);
+          },
+          onChangeEnd: (v) {
+            final pos = Duration(
+              milliseconds: (v * _duration.inMilliseconds).round(),
+            );
+            _player?.seek(pos);
+            setState(() => _isDragging = false);
+          },
+        ),
       ),
     );
   }

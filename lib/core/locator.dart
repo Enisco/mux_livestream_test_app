@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/device_info_service.dart';
 import '../services/playback_info_cache.dart';
 import '../services/token_storage_service.dart';
+import '../services/vertical_feed_preloader.dart';
 import '../utils/local_storage.dart';
 
 final getIt = GetIt.instance;
@@ -33,4 +34,10 @@ Future<void> setupLocator() async {
   getIt.registerLazySingleton<EngagementRepo>(() => EngagementRepo());
   getIt.registerLazySingleton<AnalyticsService>(() => AnalyticsService());
   getIt.registerLazySingleton<PlaybackInfoCache>(() => PlaybackInfoCache());
+  getIt.registerLazySingleton<VerticalFeedPreloader>(
+    () => VerticalFeedPreloader(
+      repo: getIt<DiscoveryRepo>(),
+      cache: getIt<PlaybackInfoCache>(),
+    ),
+  );
 }

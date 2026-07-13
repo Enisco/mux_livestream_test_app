@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../features/auth/bloc/auth_bloc.dart';
+import '../services/vertical_feed_preloader.dart';
 import '../utils/local_storage.dart';
 import 'discover_feed_screen.dart';
 import 'home_screen.dart';
@@ -12,8 +14,21 @@ import 'vertical_feed_screen.dart';
 import 'join_livestream_screen.dart';
 import 'start_livestream_screen.dart';
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
+
+  @override
+  State<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fetch feed data and silently open players for the first 3 videos so
+    // the feed plays instantly when the user taps "Short Videos".
+    GetIt.instance<VerticalFeedPreloader>().warmUp();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -30,10 +30,11 @@ class DiscoveryRepo {
   Future<MediaDetailData> fetchMediaDetail(
     String mediaId, {
     String? clientSessionId,
+    bool includeSuggestions = true,
   }) async {
     final params = <String, dynamic>{
-      'includeSuggestions': true,
-      'suggestionsLimit': 10,
+      'includeSuggestions': includeSuggestions,
+      if (includeSuggestions) 'suggestionsLimit': 10,
     };
     if (clientSessionId != null) params['clientSessionId'] = clientSessionId;
 
