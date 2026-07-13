@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +11,8 @@ import 'core/app_theme.dart';
 import 'core/locator.dart';
 import 'core/router.dart';
 import 'features/auth/bloc/auth_bloc.dart';
+import 'services/token_storage_service.dart';
+import 'services/vertical_feed_preloader.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +28,12 @@ Future<void> main() async {
   await dotenv.load(fileName: '.env');
   await setupLocator();
   setupSessionExpiredCallback();
+
+  // Pre-warm the vertical feed immediately after auth is confirmed so the first
+  // video has the maximum lead time to buffer before the user opens the screen.
+  if (await getIt<TokenStorageService>().hasSession) {
+    unawaited(getIt<VerticalFeedPreloader>().warmUp());
+  }
 
   runApp(const GTubeApp());
 }

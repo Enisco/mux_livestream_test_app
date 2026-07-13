@@ -46,14 +46,43 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
 
     final preloader = GetIt.instance<VerticalFeedPreloader>();
     if (preloader.hasData) {
-      // Use pre-fetched data — no loading state, first video plays instantly.
-      _items.addAll(preloader.items);
-      _nextCursor = preloader.nextCursor;
-      _loading = false;
-      // URLs for items 0-2 are already in the cache; pre-fetch 3 & 4 now.
+      _usePreloaderData(preloader);
+    } else if (preloader.isWarmingUp) {
+      // Warmup started in main() but isn't done yet — wait for it instead of
+      // running a separate fetch that would duplicate the network calls.
+      unawaited(_waitForWarmup(preloader));
+    } else {
+      _load();
+    }
+  }
+
+  void _usePreloaderData(VerticalFeedPreloader preloader) {
+    _items.addAll(preloader.items);
+    _nextCursor = preloader.nextCursor;
+    _loading = false;
+    // Items 0-2 are already in cache and their players are initialising; pre-fetch
+    // URLs for 3 & 4 so the cache is warm for when advance() initialises them.
+    _prefetch(3);
+    _prefetch(4);
+  }
+
+  Future<void> _waitForWarmup(VerticalFeedPreloader preloader) async {
+    // 8-second ceiling — if the network is very slow, fall back to our own load.
+    await preloader.whenWarmedUp.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {},
+    );
+    if (!mounted) return;
+    if (preloader.hasData && _items.isEmpty) {
+      setState(() {
+        _items.addAll(preloader.items);
+        _nextCursor = preloader.nextCursor;
+        _loading = false;
+      });
       _prefetch(3);
       _prefetch(4);
-    } else {
+    } else if (_items.isEmpty) {
+      // Warmup timed out or failed — fetch independently.
       _load();
     }
   }
@@ -136,7 +165,9 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     setState(() => _currentIndex = index);
     _prefetch(index + 1);
     _prefetch(index + 2);
-    if (index >= _items.length - 3) _loadMore();
+    if (index >= _items.length - 3) { _loadMore(); }
+    // Advance the rolling player window: initialise N+1 & N+2, dispose stale ones.
+    GetIt.instance<VerticalFeedPreloader>().advance(index, _items);
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -173,7 +204,11 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
               key: ValueKey(_items[i].mediaId),
               item: _items[i],
               isActive: i == _currentIndex,
-              preload: i == _currentIndex + 1 || i == _currentIndex + 2,
+              // Keep currentIndex-1 (previous) alive for instant back-scroll.
+              // Pre-init currentIndex+1 and currentIndex+2 (upcoming).
+              preload: i != _currentIndex &&
+                  i >= _currentIndex - 1 &&
+                  i <= _currentIndex + 2,
               clientSessionId: _clientSessionId(),
               cache: _cache,
             ),
@@ -379,8 +414,22 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       return;
     }
     if (_phase == _PagePhase.loading) return;
-    final preloaded =
-        GetIt.instance<VerticalFeedPreloader>().takePlayer(widget.item.mediaId);
+
+    final preloader = GetIt.instance<VerticalFeedPreloader>();
+
+    // Try an immediate claim first.
+    var preloaded = preloader.takePlayer(widget.item.mediaId);
+
+    // If the preloader is still opening the player, wait for it rather than
+    // spawning a duplicate. This avoids duplicate network calls and gives the
+    // fastest possible start when the user taps in before init completes.
+    if (preloaded == null && preloader.isInitializing(widget.item.mediaId)) {
+      setState(() => _phase = _PagePhase.loading);
+      preloaded = await preloader.awaitPlayer(widget.item.mediaId);
+      if (!mounted || _player != null) return;
+      if (_phase != _PagePhase.loading) return; // _disposePlayer() ran while waiting
+    }
+
     if (preloaded != null) {
       await _attachPreloaded(preloaded, play: true);
       return;
@@ -390,12 +439,17 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   Future<void> _preloadPlayer() async {
     if (_player != null || _phase == _PagePhase.loading) return;
-    final preloaded =
-        GetIt.instance<VerticalFeedPreloader>().takePlayer(widget.item.mediaId);
+
+    final preloader = GetIt.instance<VerticalFeedPreloader>();
+    final preloaded = preloader.takePlayer(widget.item.mediaId);
+
     if (preloaded != null) {
       await _attachPreloaded(preloaded, play: false);
       return;
     }
+    // If the preloader is already initialising this item, don't race with it —
+    // leave the player in _players so _activate() can claim it instantly.
+    if (preloader.isInitializing(widget.item.mediaId)) return;
     await _resolveAndStart(play: false);
   }
 
