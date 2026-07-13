@@ -39,8 +39,12 @@ class MediaComment {
     author: json['author'] is Map<String, dynamic>
         ? CommentAuthor.fromJson(json['author'] as Map<String, dynamic>)
         : null,
-    createdAt:
-        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+    createdAt: () {
+      final raw = json['createdAt'];
+      if (raw is String) return DateTime.tryParse(raw) ?? DateTime.now();
+      if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+      return DateTime.now();
+    }(),
     likeCount: json['likeCount'] as int? ?? 0,
     replyCount: json['replyCount'] as int? ?? 0,
   );
@@ -53,7 +57,9 @@ class CommentsResponse {
   const CommentsResponse({required this.items, this.nextCursor});
 
   factory CommentsResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? {};
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : <String, dynamic>{};
     return CommentsResponse(
       items: (data['items'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()

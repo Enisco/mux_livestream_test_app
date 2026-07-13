@@ -42,20 +42,29 @@ class ApiService {
           options.headers['Authorization'] = 'Bearer $token';
         }
 
-        logger.d('→ ${options.method} ${options.path}');
+        final qp = options.queryParameters.isNotEmpty
+            ? ' params=${options.queryParameters}'
+            : '';
+        final body = options.data != null ? '\n  body: ${options.data}' : '';
+        logger.d('→ ${options.method} ${options.path}$qp$body');
         return handler.next(options);
       },
       onResponse: (response, handler) {
         logger.d(
-          '← ${response.statusCode} ${response.requestOptions.path}\n${response.data}',
+          '← ${response.statusCode} ${response.requestOptions.method} '
+          '${response.requestOptions.path}\n${response.data}',
         );
         return handler.next(response);
       },
       onError: (error, handler) async {
         final statusCode = error.response?.statusCode;
         final path = error.requestOptions.path;
+        final responseBody = error.response?.data;
 
-        logger.e('← $statusCode $path: ${error.message}');
+        logger.e(
+          '← $statusCode ${error.requestOptions.method} $path: ${error.message}'
+          '${responseBody != null ? '\n  response: $responseBody' : ''}',
+        );
 
         // Silent token refresh on 401, but never for auth endpoints themselves.
         if (statusCode == 401 &&

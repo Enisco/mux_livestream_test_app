@@ -27,7 +27,7 @@ class AuthRepo {
       data: {
         'firstName': firstName,
         'lastName': lastName,
-        'email': email,
+        'email': email.toLowerCase(),
         'phone': phone,
         'password': password,
         'gender': gender,
@@ -44,7 +44,7 @@ class AuthRepo {
     final response = await _api.post(
       ApiEndpoints.login,
       data: {
-        'email': email,
+        'email': email.toLowerCase(),
         'password': password,
         'rememberDevice': true,
         'clientType': 'native',

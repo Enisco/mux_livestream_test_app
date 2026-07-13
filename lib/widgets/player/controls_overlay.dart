@@ -4,6 +4,7 @@ import '../../core/app_colors.dart';
 import '../../core/app_strings.dart';
 import '../../core/app_styles.dart';
 import 'play_pause_button.dart';
+import 'quality_selector.dart';
 import 'seek_button.dart';
 import 'speed_selector.dart';
 import 'video_progress_bar.dart';
@@ -19,6 +20,8 @@ class ControlsOverlay extends StatelessWidget {
   final double playbackSpeed;
   final bool isFullscreen;
   final List<double> speeds;
+  final List<String> qualities;
+  final String currentQuality;
 
   final VoidCallback onBack;
   final VoidCallback onPlayPause;
@@ -27,6 +30,7 @@ class ControlsOverlay extends StatelessWidget {
   final ValueChanged<double> onSeek;
   final ValueChanged<double> onVolumeChanged;
   final ValueChanged<double> onSpeedChanged;
+  final ValueChanged<String> onQualityChanged;
   final VoidCallback onFullscreenToggle;
   final VoidCallback? onProgressDragStart;
   final VoidCallback? onProgressDragEnd;
@@ -42,6 +46,8 @@ class ControlsOverlay extends StatelessWidget {
     required this.playbackSpeed,
     required this.isFullscreen,
     required this.speeds,
+    required this.qualities,
+    required this.currentQuality,
     required this.onBack,
     required this.onPlayPause,
     required this.onSeekBack,
@@ -49,6 +55,7 @@ class ControlsOverlay extends StatelessWidget {
     required this.onSeek,
     required this.onVolumeChanged,
     required this.onSpeedChanged,
+    required this.onQualityChanged,
     required this.onFullscreenToggle,
     this.onProgressDragStart,
     this.onProgressDragEnd,
@@ -89,9 +96,12 @@ class ControlsOverlay extends StatelessWidget {
             playbackSpeed: playbackSpeed,
             isFullscreen: isFullscreen,
             speeds: speeds,
+            qualities: qualities,
+            currentQuality: currentQuality,
             onSeek: onSeek,
             onVolumeChanged: onVolumeChanged,
             onSpeedChanged: onSpeedChanged,
+            onQualityChanged: onQualityChanged,
             onFullscreenToggle: onFullscreenToggle,
             onProgressDragStart: onProgressDragStart,
             onProgressDragEnd: onProgressDragEnd,
@@ -180,9 +190,12 @@ class _BottomBar extends StatelessWidget {
   final double playbackSpeed;
   final bool isFullscreen;
   final List<double> speeds;
+  final List<String> qualities;
+  final String currentQuality;
   final ValueChanged<double> onSeek;
   final ValueChanged<double> onVolumeChanged;
   final ValueChanged<double> onSpeedChanged;
+  final ValueChanged<String> onQualityChanged;
   final VoidCallback onFullscreenToggle;
   final VoidCallback? onProgressDragStart;
   final VoidCallback? onProgressDragEnd;
@@ -194,9 +207,12 @@ class _BottomBar extends StatelessWidget {
     required this.playbackSpeed,
     required this.isFullscreen,
     required this.speeds,
+    required this.qualities,
+    required this.currentQuality,
     required this.onSeek,
     required this.onVolumeChanged,
     required this.onSpeedChanged,
+    required this.onQualityChanged,
     required this.onFullscreenToggle,
     this.onProgressDragStart,
     this.onProgressDragEnd,
@@ -224,6 +240,12 @@ class _BottomBar extends StatelessWidget {
                 children: [
                   VolumeControl(volume: volume, onChanged: onVolumeChanged),
                   const Spacer(),
+                  QualitySelector(
+                    qualities: qualities,
+                    current: currentQuality,
+                    onSelected: onQualityChanged,
+                  ),
+                  const SizedBox(width: 8.0),
                   SpeedSelector(
                     current: playbackSpeed,
                     speeds: speeds,

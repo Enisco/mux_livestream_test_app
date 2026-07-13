@@ -449,8 +449,10 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              PlayerScreen.network(networkUrl: token.hlsUrl),
+                          builder: (_) => PlayerScreen.network(
+                            networkUrl: token.hlsUrl,
+                            title: 'Your Livestream',
+                          ),
                         ),
                       );
                     } catch (e) {

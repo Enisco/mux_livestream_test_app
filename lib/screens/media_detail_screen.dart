@@ -168,11 +168,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       );
       return;
     }
+    final title = _detail?.media.title.isNotEmpty == true
+        ? _detail!.media.title
+        : widget.item.title;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PlayerScreen.network(
           networkUrl: url,
+          title: title,
           mediaId: widget.item.entityId,
           creatorId: _detail?.creator?.creatorId,
           source: 'home_feed',

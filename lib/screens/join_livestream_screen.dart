@@ -61,7 +61,10 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PlayerScreen.network(networkUrl: token.hlsUrl),
+          builder: (_) => PlayerScreen.network(
+            networkUrl: token.hlsUrl,
+            title: 'Livestream',
+          ),
         ),
       );
     } catch (e) {

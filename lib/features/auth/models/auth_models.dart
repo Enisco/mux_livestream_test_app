@@ -157,9 +157,11 @@ class LoginResponse {
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : <String, dynamic>{};
     return LoginResponse(
-      type: data['type'] as String,
+      type: data['type'] as String? ?? 'LOGGED_IN',
       user: GtubeUser.fromJson(data['user'] as Map<String, dynamic>),
       session: GtubeSession.fromJson(data['session'] as Map<String, dynamic>),
       accessToken: data['accessToken'] as String,

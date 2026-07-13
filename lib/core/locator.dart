@@ -7,6 +7,7 @@ import '../features/engagement/repo/engagement_repo.dart';
 import '../services/analytics_service.dart';
 import '../services/api_service.dart';
 import '../services/device_info_service.dart';
+import '../services/playback_info_cache.dart';
 import '../services/token_storage_service.dart';
 import '../utils/local_storage.dart';
 
@@ -31,4 +32,5 @@ Future<void> setupLocator() async {
   getIt.registerLazySingleton<DiscoveryRepo>(() => DiscoveryRepo());
   getIt.registerLazySingleton<EngagementRepo>(() => EngagementRepo());
   getIt.registerLazySingleton<AnalyticsService>(() => AnalyticsService());
+  getIt.registerLazySingleton<PlaybackInfoCache>(() => PlaybackInfoCache());
 }

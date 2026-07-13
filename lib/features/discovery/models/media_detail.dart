@@ -18,7 +18,9 @@ class MediaDetailData {
   });
 
   factory MediaDetailData.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? {};
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : <String, dynamic>{};
     final suggestionsMap = data['suggestions'] as Map<String, dynamic>?;
     return MediaDetailData(
       media: data['media'] is Map<String, dynamic>

@@ -22,7 +22,8 @@ class EngagementRepo {
         'interactionType': interactionType,
       },
     );
-    final data = (response.data as Map<String, dynamic>?)?['data'];
+    final body = response.data;
+    final data = body is Map<String, dynamic> ? body['data'] : null;
     if (data is Map<String, dynamic>) {
       return data['added'] as bool? ?? true;
     }
@@ -46,6 +47,9 @@ class EngagementRepo {
       ApiEndpoints.publicComments,
       queryParameters: params,
     );
+    if (response.data is! Map<String, dynamic>) {
+      return CommentsResponse(items: const []);
+    }
     return CommentsResponse.fromJson(response.data as Map<String, dynamic>);
   }
 }

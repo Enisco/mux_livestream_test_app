@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/app_colors.dart';
 import '../../../core/app_strings.dart';
@@ -13,6 +14,7 @@ class AuthField extends StatelessWidget {
     this.obscureText = false,
     this.suffixIcon,
     this.validator,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
@@ -22,6 +24,7 @@ class AuthField extends StatelessWidget {
   final bool obscureText;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +44,7 @@ class AuthField extends StatelessWidget {
           controller: controller,
           keyboardType: keyboardType,
           obscureText: obscureText,
+          inputFormatters: inputFormatters,
           style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
@@ -120,6 +124,17 @@ class AuthErrorBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Forces all typed characters to lowercase. Use on email fields.
+class LowerCaseInputFormatter extends TextInputFormatter {
+  const LowerCaseInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) => newValue.copyWith(text: newValue.text.toLowerCase());
 }
 
 class AuthLogoHeader extends StatelessWidget {

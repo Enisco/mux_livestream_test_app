@@ -32,7 +32,7 @@ class _SignInScreenState extends State<SignInScreen> {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthBloc>().add(
       AuthSignInRequested(
-        email: _emailCtrl.text.trim(),
+        email: _emailCtrl.text.trim().toLowerCase(),
         password: _passwordCtrl.text,
       ),
     );
@@ -90,6 +90,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     label: AppStrings.email,
                     hint: 'you@example.com',
                     keyboardType: TextInputType.emailAddress,
+                    inputFormatters: const [LowerCaseInputFormatter()],
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
                         return 'Email is required';

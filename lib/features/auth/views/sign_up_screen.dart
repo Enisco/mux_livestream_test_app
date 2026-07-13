@@ -46,7 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       AuthSignUpRequested(
         firstName: _firstNameCtrl.text.trim(),
         lastName: _lastNameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
+        email: _emailCtrl.text.trim().toLowerCase(),
         phone: _phoneCtrl.text.trim(),
         password: _passwordCtrl.text,
         gender: _selectedGender!,
@@ -134,6 +134,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     label: AppStrings.email,
                     hint: 'you@example.com',
                     keyboardType: TextInputType.emailAddress,
+                    inputFormatters: const [LowerCaseInputFormatter()],
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
                         return 'Email is required';
