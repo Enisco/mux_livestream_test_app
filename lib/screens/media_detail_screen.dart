@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
@@ -71,7 +72,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       });
       if (!_commentsLoaded) _fetchComments();
     } catch (e) {
-      logger.e('MediaDetail: fetch failed for ${widget.item.entityId}', error: e);
+      logger.e(
+        'MediaDetail: fetch failed for ${widget.item.entityId}',
+        error: e,
+      );
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -163,9 +167,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   void _openPlayer() {
     final url = _detail?.playback?.playbackUrl;
     if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Playback not available')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Playback not available')));
       return;
     }
     final title = _detail?.media.title.isNotEmpty == true
@@ -199,7 +203,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         backgroundColor: AppColors.background,
         title: _loading
             ? null
-            : Text(title, style: AppStyles.appBarTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+            : Text(
+                title,
+                style: AppStyles.appBarTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -227,8 +236,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   Widget _buildHero() {
     final thumbnailUrl =
         _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl;
-    final canPlay =
-        _detail?.playback?.playbackUrl.isNotEmpty == true;
+    final canPlay = _detail?.playback?.playbackUrl.isNotEmpty == true;
 
     return AspectRatio(
       aspectRatio: 16 / 9,
@@ -337,7 +345,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           if (detail.playback?.playbackUrl.isNotEmpty == true)
             FilledButton.icon(
               onPressed: _openPlayer,
-              icon: const Icon(Icons.play_arrow_rounded),
+              icon: const Icon(IconsaxPlusLinear.play_circle),
               label: const Text(AppStrings.watchNow),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -357,11 +365,18 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.block_rounded, color: AppColors.textTertiary, size: 18),
+                  Icon(
+                    Icons.block_rounded,
+                    color: AppColors.textTertiary,
+                    size: 18,
+                  ),
                   SizedBox(width: 10),
                   Text(
                     'Playback not available',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -478,8 +493,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               height: 1.55,
             ),
             maxLines: _descExpanded ? null : 3,
-            overflow:
-                _descExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            overflow: _descExpanded
+                ? TextOverflow.visible
+                : TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
@@ -659,7 +675,9 @@ class _InteractionButton extends StatelessWidget {
               : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? AppColors.primary : AppColors.textTertiary.withValues(alpha: 0.3),
+            color: active
+                ? AppColors.primary
+                : AppColors.textTertiary.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -816,8 +834,9 @@ class _SuggestionCard extends StatelessWidget {
                       item.meta.thumbnailUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => const _SuggestionPlaceholder(),
-                      loadingBuilder: (_, child, progress) =>
-                          progress == null ? child : const _SuggestionPlaceholder(),
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : const _SuggestionPlaceholder(),
                     )
                   : const _SuggestionPlaceholder(),
             ),

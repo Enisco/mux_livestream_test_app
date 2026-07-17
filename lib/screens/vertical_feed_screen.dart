@@ -177,7 +177,9 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     setState(() => _currentIndex = index);
     _prefetch(index + 1);
     _prefetch(index + 2);
-    if (index >= _items.length - 3) { _loadMore(); }
+    if (index >= _items.length - 3) {
+      _loadMore();
+    }
     // Advance the rolling player window: initialise N+1 & N+2, dispose stale ones.
     GetIt.instance<VerticalFeedPreloader>().advance(index, _items);
   }
@@ -188,7 +190,9 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   Widget build(BuildContext context) {
     if (_loading && _items.isEmpty) {
       return _buildShell(
-        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
       );
     }
     if (_error != null && _items.isEmpty) {
@@ -197,7 +201,10 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     if (_items.isEmpty) {
       return _buildShell(
         child: const Center(
-          child: Text('No videos available', style: TextStyle(color: Colors.white70)),
+          child: Text(
+            'No videos available',
+            style: TextStyle(color: Colors.white70),
+          ),
         ),
       );
     }
@@ -218,7 +225,8 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
               isActive: i == _currentIndex,
               // Keep currentIndex-1 (previous) alive for instant back-scroll.
               // Pre-init currentIndex+1 and currentIndex+2 (upcoming).
-              preload: i != _currentIndex &&
+              preload:
+                  i != _currentIndex &&
                   i >= _currentIndex - 1 &&
                   i <= _currentIndex + 2,
               clientSessionId: _clientSessionId(),
@@ -293,7 +301,11 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded, size: 56, color: Colors.white38),
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 56,
+              color: Colors.white38,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Could not load videos',
@@ -442,7 +454,8 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       setState(() => _phase = _PagePhase.loading);
       preloaded = await preloader.awaitPlayer(widget.item.mediaId);
       if (!mounted || _player != null) return;
-      if (_phase != _PagePhase.loading) return; // _disposePlayer() ran while waiting
+      if (_phase != _PagePhase.loading)
+        return; // _disposePlayer() ran while waiting
     }
 
     if (preloaded != null) {
@@ -470,7 +483,10 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   /// Attaches a player that was already opened by [VerticalFeedPreloader].
   /// Skips the loading phase entirely — the player is already buffering.
-  Future<void> _attachPreloaded(PreloadedPlayer preloaded, {required bool play}) async {
+  Future<void> _attachPreloaded(
+    PreloadedPlayer preloaded, {
+    required bool play,
+  }) async {
     final player = preloaded.player;
     final controller = preloaded.controller;
     _player = player;
@@ -500,7 +516,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       player.stream.error.listen((e) {
         if (!mounted) return;
         if (e.contains('audio device') || e.contains('no sound')) {
-          logger.d('VerticalFeedPage: non-fatal audio init warning (ignored) → $e');
+          logger.d(
+            'VerticalFeedPage: non-fatal audio init warning (ignored) → $e',
+          );
           return;
         }
         logger.e('VerticalFeedPage: player error → $e');
@@ -561,7 +579,8 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       clientSessionId: widget.clientSessionId,
       includeSuggestions: false,
     );
-    if (detail.playback != null) widget.cache.put(widget.item.mediaId, detail.playback!);
+    if (detail.playback != null)
+      widget.cache.put(widget.item.mediaId, detail.playback!);
     _applyCreatorInfo(detail.creator);
     return detail.playback?.playbackUrl;
   }
@@ -585,7 +604,11 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     final handle = creator.handle.isNotEmpty ? creator.handle : null;
     final name = creator.displayName.isNotEmpty ? creator.displayName : null;
     if (handle == _creatorHandle && name == _creatorDisplayName) return;
-    if (mounted) setState(() { _creatorHandle = handle; _creatorDisplayName = name; });
+    if (mounted)
+      setState(() {
+        _creatorHandle = handle;
+        _creatorDisplayName = name;
+      });
   }
 
   Future<void> _resolveAndStart({required bool play}) async {
@@ -639,7 +662,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       player.stream.error.listen((e) {
         if (!mounted) return;
         if (e.contains('audio device') || e.contains('no sound')) {
-          logger.d('VerticalFeedPage: non-fatal audio init warning (ignored) → $e');
+          logger.d(
+            'VerticalFeedPage: non-fatal audio init warning (ignored) → $e',
+          );
           return;
         }
         logger.e('VerticalFeedPage: player error → $e');
@@ -889,7 +914,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
-                icon: IconsaxPlusLinear.send,
+                icon: IconsaxPlusLinear.send_2,
                 label: 'Share',
                 onTap: () {
                   // Share is available to all users
@@ -962,8 +987,8 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   Widget _buildScrubber(BuildContext context) {
     if (_duration == Duration.zero) return const SizedBox.shrink();
-    final progress =
-        (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
+    final progress = (_position.inMilliseconds / _duration.inMilliseconds)
+        .clamp(0.0, 1.0);
     final bottomInset = MediaQuery.of(context).padding.bottom;
     return Positioned(
       left: 0,
@@ -1059,7 +1084,11 @@ class _AvatarButton extends StatelessWidget {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 14),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 14,
+                  ),
                 ),
               ),
             ),
