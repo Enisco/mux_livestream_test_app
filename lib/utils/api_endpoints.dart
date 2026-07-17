@@ -36,6 +36,10 @@ abstract final class ApiEndpoints {
   static const publicComments = '/v1/public/engagement/comments';
 
   // Analytics
+  // The /auth variant (/v1/analytics/beacons/auth) requires CSRF that mobile
+  // clients can't supply. The optional-auth route accepts the same Bearer token
+  // and lets the server attribute events to the authenticated user without CSRF.
+  static const beacons = '/v1/analytics/beacons';
   static const beaconsAuth = '/v1/analytics/beacons/auth';
 
   // Discovery
@@ -43,4 +47,6 @@ abstract final class ApiEndpoints {
   static const verticalFeed = '/v1/discovery/vertical-feed';
   static String mediaDetail(String id) => '/v1/discovery/media/$id/detail';
   static String mediaPlaybackInfo(String id) => '/v1/media/$id/playback-info';
+  static String publicMediaPlaybackInfo(String id) =>
+      '/v1/public/media/$id/playback-info';
 }

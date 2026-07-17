@@ -48,6 +48,9 @@ dependencies:
   # Logging
   logger: ^2.5.0
 
+  # Icons
+  iconsax_plus: ^1.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

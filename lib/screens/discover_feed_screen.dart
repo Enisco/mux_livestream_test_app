@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 
 import '../core/app_colors.dart';
-import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
+import '../features/auth/bloc/auth_bloc.dart';
 import '../features/discovery/models/web_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
 import 'media_detail_screen.dart';
@@ -91,17 +93,61 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (_, state) {
+        if (state is AuthSuccess || state is AuthLoggedOut) {
+          _load();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.discover),
         backgroundColor: AppColors.background,
+        scrolledUnderElevation: 0,
+        title: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.play_circle_fill_rounded,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'GTube',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              IconsaxPlusLinear.search_normal_1,
+              color: AppColors.textSecondary,
+              size: 22,
+            ),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _load,
         color: AppColors.primary,
         backgroundColor: AppColors.surface,
         child: _buildBody(),
+      ),
       ),
     );
   }
@@ -171,7 +217,7 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
 
     return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: _items.length + (_loadingMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, i) {

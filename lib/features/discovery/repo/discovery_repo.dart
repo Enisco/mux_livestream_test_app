@@ -65,12 +65,17 @@ class DiscoveryRepo {
   Future<PlaybackInfo?> fetchPlaybackInfo(
     String mediaId, {
     String? clientSessionId,
+    bool usePublicRoute = false,
   }) async {
     final params = <String, dynamic>{};
     if (clientSessionId != null) params['clientSessionId'] = clientSessionId;
 
+    final endpoint = usePublicRoute
+        ? ApiEndpoints.publicMediaPlaybackInfo(mediaId)
+        : ApiEndpoints.mediaPlaybackInfo(mediaId);
+
     final response = await _api.get(
-      ApiEndpoints.mediaPlaybackInfo(mediaId),
+      endpoint,
       queryParameters: params.isEmpty ? null : params,
     );
     final body = response.data as Map<String, dynamic>?;

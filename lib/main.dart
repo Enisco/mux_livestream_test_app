@@ -53,7 +53,8 @@ class GTubeApp extends StatelessWidget {
         builder: (context, child) => BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
             if (state is AuthLoggedOut) {
-              appRouter.go(AppRoutes.signIn);
+              // Return to the public shell — the Me tab will show the auth wall.
+              appRouter.go(AppRoutes.home);
             }
           },
           child: child!,

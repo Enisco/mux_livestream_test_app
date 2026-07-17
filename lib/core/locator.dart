@@ -38,6 +38,7 @@ Future<void> setupLocator() async {
     () => VerticalFeedPreloader(
       repo: getIt<DiscoveryRepo>(),
       cache: getIt<PlaybackInfoCache>(),
+      tokenStorage: getIt<TokenStorageService>(),
     ),
   );
 }

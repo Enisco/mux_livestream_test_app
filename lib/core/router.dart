@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/views/sign_in_screen.dart';
 import '../features/auth/views/sign_up_screen.dart';
 import '../features/splash/splash_screen.dart';
-import '../screens/landing_screen.dart';
+import '../screens/main_shell.dart';
 import '../services/api_service.dart';
 
 abstract final class AppRoutes {
@@ -30,7 +30,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.home,
-      builder: (context, state) => const LandingScreen(),
+      builder: (context, state) => const MainShell(),
     ),
   ],
 );

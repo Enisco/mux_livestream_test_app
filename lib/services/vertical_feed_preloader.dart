@@ -7,6 +7,7 @@ import '../core/logger.dart';
 import '../features/discovery/models/vertical_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
 import 'playback_info_cache.dart';
+import 'token_storage_service.dart';
 
 const _kInitialPreloadCount = 3;
 
@@ -32,10 +33,15 @@ class PreloadedPlayer {
 class VerticalFeedPreloader {
   final DiscoveryRepo _repo;
   final PlaybackInfoCache _cache;
+  final TokenStorageService _tokenStorage;
 
-  VerticalFeedPreloader({required DiscoveryRepo repo, required PlaybackInfoCache cache})
-      : _repo = repo,
-        _cache = cache;
+  VerticalFeedPreloader({
+    required DiscoveryRepo repo,
+    required PlaybackInfoCache cache,
+    required TokenStorageService tokenStorage,
+  })  : _repo = repo,
+        _cache = cache,
+        _tokenStorage = tokenStorage;
 
   List<VerticalFeedItem> _items = const [];
   String? _nextCursor;
@@ -53,11 +59,16 @@ class VerticalFeedPreloader {
   Completer<void>? _warmupCompleter;
 
   bool _loading = false;
+  bool _isAuthenticated = false;
   String? _sessionId;
 
   List<VerticalFeedItem> get items => List.unmodifiable(_items);
   String? get nextCursor => _nextCursor;
   bool get hasData => _items.isNotEmpty;
+
+  /// Whether the last [warmUp] ran with an authenticated session.
+  /// Used by callers to select the appropriate playback-info route.
+  bool get isAuthenticated => _isAuthenticated;
 
   /// True while [warmUp] is fetching feed data.
   bool get isWarmingUp => _loading;
@@ -78,9 +89,14 @@ class VerticalFeedPreloader {
   /// Fetches feed items and silently initialises players for the first
   /// [_kInitialPreloadCount] videos. Idempotent — does nothing if a load is
   /// already in progress or data is already present.
+  ///
+  /// Checks auth state internally: unauthenticated users get the feed metadata
+  /// but player pre-init uses the public `/v1/public/media/:id/playback-info`
+  /// route so no 401 is ever produced.
   Future<void> warmUp() async {
     if (_loading || _items.isNotEmpty) return;
     _loading = true;
+    _isAuthenticated = await _tokenStorage.hasSession;
     try {
       final result = await _repo.fetchVerticalFeed();
       _items = result.items;
@@ -133,6 +149,7 @@ class VerticalFeedPreloader {
         final info = await _repo.fetchPlaybackInfo(
           item.mediaId,
           clientSessionId: _clientSessionId(),
+          usePublicRoute: !_isAuthenticated,
         );
         if (info != null) {
           _cache.put(item.mediaId, info);
@@ -216,6 +233,7 @@ class VerticalFeedPreloader {
     _nextCursor = null;
     _sessionId = null;
     _loading = false;
+    _isAuthenticated = false;
     unawaited(warmUp());
   }
 }

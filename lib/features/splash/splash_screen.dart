@@ -29,31 +29,26 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final tokenStorage = getIt<TokenStorageService>();
-    if (!await tokenStorage.hasSession) {
-      if (mounted) context.go(AppRoutes.signIn);
-      return;
-    }
+    if (await tokenStorage.hasSession) {
+      // Refresh tokens — updates stored tokens and user cache.
+      final authRepo = getIt<AuthRepo>();
+      final refreshed = await authRepo.tryRefreshSession();
+      if (!mounted) return;
 
-    // Refresh tokens — updates stored tokens and user cache.
-    final authRepo = getIt<AuthRepo>();
-    final refreshed = await authRepo.tryRefreshSession();
-    if (!mounted) return;
-
-    if (!refreshed) {
-      context.go(AppRoutes.signIn);
-      return;
-    }
-
-    // Re-provision livestream credentials on every app launch (idempotent).
-    final creatorId = LocalStorage.creatorId;
-    if (creatorId != null) {
-      try {
-        await getIt<CreatorRepo>().provisionLivestream(creatorId);
-      } catch (_) {
-        // Non-fatal — stream credentials may already be cached locally.
+      // Re-provision livestream credentials on every app launch (idempotent).
+      if (refreshed) {
+        final creatorId = LocalStorage.creatorId;
+        if (creatorId != null) {
+          try {
+            await getIt<CreatorRepo>().provisionLivestream(creatorId);
+          } catch (_) {
+            // Non-fatal.
+          }
+        }
       }
     }
 
+    // Always land on the public shell — auth state is handled inside each tab.
     if (mounted) context.go(AppRoutes.home);
   }
 

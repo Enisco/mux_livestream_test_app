@@ -108,7 +108,7 @@ class AnalyticsService {
     final events = List<Map<String, dynamic>>.from(_buffer);
     _buffer.clear();
     try {
-      await _api.post(ApiEndpoints.beaconsAuth, data: {'events': events});
+      await _api.post(ApiEndpoints.beacons, data: {'events': events});
       logger.d('Analytics: flushed ${events.length} event(s)');
     } catch (e) {
       logger.w('Analytics: flush failed (${events.length} event(s) dropped)', error: e);

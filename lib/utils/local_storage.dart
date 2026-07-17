@@ -29,13 +29,40 @@ class LocalStorage {
   // Typed getters
   static String? get creatorId => getString(creatorIdKey);
 
-  /// Returns the cached user's first name without importing GtubeUser.
   static String? get cachedFirstName {
     final raw = getString(cachedUserKey);
     if (raw == null) return null;
     try {
+      return (jsonDecode(raw) as Map<String, dynamic>)['firstName'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String? get cachedFullName {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
-      return map['firstName'] as String?;
+      final first = (map['firstName'] as String?) ?? '';
+      final last = (map['lastName'] as String?) ?? '';
+      final full = '$first $last'.trim();
+      return full.isNotEmpty ? full : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Derives a display handle from the cached user's email (e.g. "@johndoe").
+  static String? get cachedHandle {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final email = (jsonDecode(raw) as Map<String, dynamic>)['email'] as String?;
+      if (email == null) return null;
+      final prefix = email.split('@').first;
+      final clean = prefix.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '').toLowerCase();
+      return clean.isNotEmpty ? '@$clean' : null;
     } catch (_) {
       return null;
     }

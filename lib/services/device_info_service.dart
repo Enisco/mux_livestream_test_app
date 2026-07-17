@@ -58,5 +58,9 @@ class DeviceInfoService {
     'x-device-name': _deviceName,
     'x-app-version': _appVersion,
     'x-client-platform': _platform,
+    // Marks requests as programmatic (AJAX/API), bypassing server CSRF checks
+    // that target browser form submissions. Safe because browsers block
+    // cross-origin scripts from setting this header.
+    'x-requested-with': 'XMLHttpRequest',
   };
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
+import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -14,7 +15,9 @@ import '../features/discovery/models/vertical_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
 import '../services/analytics_service.dart';
 import '../services/playback_info_cache.dart';
+import '../services/token_storage_service.dart';
 import '../services/vertical_feed_preloader.dart';
+import '../utils/auth_sheet.dart';
 
 class VerticalFeedScreen extends StatefulWidget {
   const VerticalFeedScreen({super.key});
@@ -35,13 +38,20 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   bool _loadingMore = false;
   String? _error;
   String? _sessionId;
+  bool _isLoggedIn = false;
 
   String _clientSessionId() =>
       _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
 
+  Future<void> _checkAuth() async {
+    final has = await GetIt.instance<TokenStorageService>().hasSession;
+    if (mounted) setState(() => _isLoggedIn = has);
+  }
+
   @override
   void initState() {
     super.initState();
+    _checkAuth();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     final preloader = GetIt.instance<VerticalFeedPreloader>();
@@ -150,10 +160,12 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     if (index < 0 || index >= _items.length) return;
     final item = _items[index];
     if (_cache.get(item.mediaId) != null) return;
+    final usePublic = !GetIt.instance<VerticalFeedPreloader>().isAuthenticated;
     try {
       final info = await _repo.fetchPlaybackInfo(
         item.mediaId,
         clientSessionId: _clientSessionId(),
+        usePublicRoute: usePublic,
       );
       if (info != null) _cache.put(item.mediaId, info);
     } catch (e) {
@@ -211,6 +223,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                   i <= _currentIndex + 2,
               clientSessionId: _clientSessionId(),
               cache: _cache,
+              isLoggedIn: _isLoggedIn,
             ),
           ),
           _buildTopBar(context),
@@ -328,6 +341,7 @@ class _VerticalFeedPage extends StatefulWidget {
     required this.preload,
     required this.clientSessionId,
     required this.cache,
+    required this.isLoggedIn,
   });
 
   final VerticalFeedItem item;
@@ -335,6 +349,7 @@ class _VerticalFeedPage extends StatefulWidget {
   final bool preload;
   final String clientSessionId;
   final PlaybackInfoCache cache;
+  final bool isLoggedIn;
 
   @override
   State<_VerticalFeedPage> createState() => _VerticalFeedPageState();
@@ -839,31 +854,52 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
             children: [
               _AvatarButton(
                 displayName: _creatorDisplayName ?? _creatorHandle ?? '',
+                onFollow: () {
+                  if (!widget.isLoggedIn) {
+                    showAuthSheet(context, 'follow this creator');
+                    return;
+                  }
+                  // TODO: implement follow
+                },
               ),
               const SizedBox(height: 24),
               _FeedActionButton(
-                icon: Icons.favorite_rounded,
+                icon: IconsaxPlusLinear.heart,
                 label: _formatCount(item.likeCount),
                 color: Colors.white,
-                onTap: () {},
+                onTap: () {
+                  if (!widget.isLoggedIn) {
+                    showAuthSheet(context, 'like this video');
+                    return;
+                  }
+                  // TODO: implement like
+                },
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
-                icon: Icons.chat_bubble_rounded,
+                icon: IconsaxPlusLinear.message,
                 label: _formatCount(item.commentCount),
-                onTap: () {},
+                onTap: () {
+                  if (!widget.isLoggedIn) {
+                    showAuthSheet(context, 'comment on this video');
+                    return;
+                  }
+                  // TODO: open comment sheet
+                },
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
-                icon: Icons.share_rounded,
+                icon: IconsaxPlusLinear.send,
                 label: 'Share',
-                onTap: () {},
+                onTap: () {
+                  // Share is available to all users
+                },
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
                 icon: _isMuted
-                    ? Icons.volume_off_rounded
-                    : Icons.volume_up_rounded,
+                    ? IconsaxPlusLinear.volume_slash
+                    : IconsaxPlusLinear.volume_high,
                 label: _isMuted ? 'Unmute' : 'Sound',
                 onTap: _toggleMute,
               ),
@@ -977,7 +1013,8 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
 class _AvatarButton extends StatelessWidget {
   final String displayName;
-  const _AvatarButton({required this.displayName});
+  final VoidCallback onFollow;
+  const _AvatarButton({required this.displayName, required this.onFollow});
 
   @override
   Widget build(BuildContext context) {
@@ -1012,15 +1049,18 @@ class _AvatarButton extends StatelessWidget {
             bottom: 0,
             left: 0,
             right: 0,
-            child: Center(
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+            child: GestureDetector(
+              onTap: onFollow,
+              child: Center(
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 14),
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 14),
               ),
             ),
           ),
