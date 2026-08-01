@@ -10,14 +10,17 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/logger.dart';
+import '../features/analytics/models/analytics_models.dart';
 import '../features/discovery/models/media_detail.dart';
 import '../features/discovery/models/vertical_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
 import '../services/analytics_service.dart';
+import '../services/app_session_service.dart';
 import '../services/playback_info_cache.dart';
 import '../services/token_storage_service.dart';
 import '../services/vertical_feed_preloader.dart';
 import '../utils/auth_sheet.dart';
+import '../widgets/analytics/promoted_impression_tracker.dart';
 
 class VerticalFeedScreen extends StatefulWidget {
   const VerticalFeedScreen({super.key});
@@ -37,11 +40,10 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
-  String? _sessionId;
   bool _isLoggedIn = false;
 
-  String _clientSessionId() =>
-      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+  String get _clientSessionId =>
+      GetIt.instance<AppSessionService>().clientSessionId;
 
   Future<void> _checkAuth() async {
     final has = await GetIt.instance<TokenStorageService>().hasSession;
@@ -164,7 +166,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     try {
       final info = await _repo.fetchPlaybackInfo(
         item.mediaId,
-        clientSessionId: _clientSessionId(),
+        clientSessionId: _clientSessionId,
         usePublicRoute: usePublic,
       );
       if (info != null) _cache.put(item.mediaId, info);
@@ -229,7 +231,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                   i != _currentIndex &&
                   i >= _currentIndex - 1 &&
                   i <= _currentIndex + 2,
-              clientSessionId: _clientSessionId(),
+              clientSessionId: _clientSessionId,
               cache: _cache,
               isLoggedIn: _isLoggedIn,
             ),
@@ -392,6 +394,10 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   bool _analyticsViewStarted = false;
   double _lastProgressPos = 0;
   bool? _wasPlaying;
+  final WatchClock _watchClock = WatchClock();
+
+  static const _source = AnalyticsSource.homeFeed;
+  String? get _mediaType => widget.item.mediaType;
 
   @override
   void initState() {
@@ -424,12 +430,14 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   @override
   void dispose() {
+    // Close the session before tearing the player down — trackViewEnded is a
+    // flush-immediately event, so nothing is lost if the screen goes away.
+    _trackViewEndedAnalytics();
     for (final s in _subs) {
       s.cancel();
     }
     _player?.pause();
     _player?.dispose();
-    if (_analyticsViewStarted) GetIt.instance<AnalyticsService>().flush();
     super.dispose();
   }
 
@@ -454,8 +462,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       setState(() => _phase = _PagePhase.loading);
       preloaded = await preloader.awaitPlayer(widget.item.mediaId);
       if (!mounted || _player != null) return;
-      if (_phase != _PagePhase.loading)
+      if (_phase != _PagePhase.loading) {
         return; // _disposePlayer() ran while waiting
+      }
     }
 
     if (preloaded != null) {
@@ -547,6 +556,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   void _deactivate() {
     _player?.pause();
+    // The viewer swiped away: this playback session is over even though the
+    // page stays alive for a fast scroll-back.
+    _trackViewEndedAnalytics();
   }
 
   void _disposePlayer() {
@@ -579,8 +591,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       clientSessionId: widget.clientSessionId,
       includeSuggestions: false,
     );
-    if (detail.playback != null)
+    if (detail.playback != null) {
       widget.cache.put(widget.item.mediaId, detail.playback!);
+    }
     _applyCreatorInfo(detail.creator);
     return detail.playback?.playbackUrl;
   }
@@ -604,11 +617,12 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     final handle = creator.handle.isNotEmpty ? creator.handle : null;
     final name = creator.displayName.isNotEmpty ? creator.displayName : null;
     if (handle == _creatorHandle && name == _creatorDisplayName) return;
-    if (mounted)
+    if (mounted) {
       setState(() {
         _creatorHandle = handle;
         _creatorDisplayName = name;
       });
+    }
   }
 
   Future<void> _resolveAndStart({required bool play}) async {
@@ -720,12 +734,20 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   void _trackPlayAnalytics({required bool playing}) {
     final analytics = GetIt.instance<AnalyticsService>();
     final pos = (_player?.state.position.inMilliseconds ?? 0) / 1000.0;
+
+    if (playing) {
+      _watchClock.start();
+    } else {
+      _watchClock.stop();
+    }
+
     if (!_analyticsViewStarted && playing) {
       _analyticsViewStarted = true;
       analytics.trackViewStarted(
         mediaId: widget.item.mediaId,
         creatorId: widget.item.creatorId,
-        source: 'home_feed',
+        mediaType: _mediaType,
+        source: _source,
         positionSeconds: pos,
       );
       _wasPlaying = playing;
@@ -736,15 +758,18 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
         analytics.trackPlay(
           mediaId: widget.item.mediaId,
           creatorId: widget.item.creatorId,
+          mediaType: _mediaType,
           positionSeconds: pos,
-          source: 'home_feed',
+          source: _source,
         );
       } else {
         analytics.trackPause(
           mediaId: widget.item.mediaId,
           creatorId: widget.item.creatorId,
+          mediaType: _mediaType,
           positionSeconds: pos,
-          source: 'home_feed',
+          watchDurationSeconds: _watchClock.seconds,
+          source: _source,
         );
       }
     }
@@ -754,15 +779,49 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   void _trackProgressAnalytics(Duration position) {
     if (!_analyticsViewStarted || !_isPlaying) return;
     final pos = position.inMilliseconds / 1000.0;
-    if ((pos - _lastProgressPos) >= 10.0) {
-      _lastProgressPos = pos;
-      GetIt.instance<AnalyticsService>().trackProgress(
-        mediaId: widget.item.mediaId,
-        creatorId: widget.item.creatorId,
-        positionSeconds: pos,
-        source: 'home_feed',
-      );
-    }
+    if ((pos - _lastProgressPos).abs() < 10.0) return;
+    _lastProgressPos = pos;
+    GetIt.instance<AnalyticsService>().trackProgress(
+      mediaId: widget.item.mediaId,
+      creatorId: widget.item.creatorId,
+      mediaType: _mediaType,
+      positionSeconds: pos,
+      watchDurationSeconds: _watchClock.seconds,
+      source: _source,
+    );
+  }
+
+  void _trackSeekAnalytics(Duration target) {
+    if (!_analyticsViewStarted) return;
+    final pos = target.inMilliseconds / 1000.0;
+    _lastProgressPos = pos;
+    GetIt.instance<AnalyticsService>().trackSeek(
+      mediaId: widget.item.mediaId,
+      creatorId: widget.item.creatorId,
+      mediaType: _mediaType,
+      positionSeconds: pos,
+      source: _source,
+    );
+  }
+
+  /// Closes the playback session for this tile. Called when the viewer swipes
+  /// away or the page is disposed. Scrolling back re-arms `view_started`, which
+  /// is the correct shape for a feed: each visit is its own view.
+  void _trackViewEndedAnalytics() {
+    if (!_analyticsViewStarted) return;
+    _analyticsViewStarted = false;
+    _wasPlaying = null;
+    _watchClock.stop();
+    GetIt.instance<AnalyticsService>().trackViewEnded(
+      mediaId: widget.item.mediaId,
+      creatorId: widget.item.creatorId,
+      mediaType: _mediaType,
+      positionSeconds: (_player?.state.position.inMilliseconds ?? 0) / 1000.0,
+      watchDurationSeconds: _watchClock.seconds,
+      source: _source,
+    );
+    _watchClock.reset();
+    _lastProgressPos = 0;
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -770,6 +829,21 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // The billable impression is owned by this tile — the surface that served
+    // the promotion. `enabled: isActive` means only the tile the viewer is
+    // actually on accrues dwell; pre-initialised neighbours never do.
+    return PromotedImpressionTracker(
+      promotion: widget.item.promotion,
+      mediaId: widget.item.mediaId,
+      creatorId: widget.item.creatorId,
+      mediaType: _mediaType,
+      source: _source,
+      enabled: widget.isActive,
+      child: _buildPage(),
+    );
+  }
+
+  Widget _buildPage() {
     return GestureDetector(
       onTap: _togglePlayPause,
       child: Stack(
@@ -957,6 +1031,12 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                   padding: EdgeInsets.only(bottom: 6),
                   child: _LiveBadge(),
                 ),
+              // Ad disclosure for promoted placements.
+              if (item.isPromoted)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: _PromotedBadge(),
+                ),
               if (channelLabel != null)
                 Text(
                   channelLabel,
@@ -1019,6 +1099,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
               milliseconds: (v * _duration.inMilliseconds).round(),
             );
             _player?.seek(pos);
+            _trackSeekAnalytics(pos);
             setState(() => _isDragging = false);
           },
         ),
@@ -1138,6 +1219,31 @@ class _FeedActionButton extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _PromotedBadge extends StatelessWidget {
+  const _PromotedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: const Text(
+        'Promoted',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }

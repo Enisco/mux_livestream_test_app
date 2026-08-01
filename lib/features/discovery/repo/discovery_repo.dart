@@ -31,12 +31,15 @@ class DiscoveryRepo {
     String mediaId, {
     String? clientSessionId,
     bool includeSuggestions = true,
+    String? shareToken,
   }) async {
     final params = <String, dynamic>{
       'includeSuggestions': includeSuggestions,
       if (includeSuggestions) 'suggestionsLimit': 10,
     };
     if (clientSessionId != null) params['clientSessionId'] = clientSessionId;
+    // Required for unlisted media opened from a share link.
+    if (shareToken != null) params['shareToken'] = shareToken;
 
     final response = await _api.get(
       ApiEndpoints.mediaDetail(mediaId),
@@ -50,13 +53,26 @@ class DiscoveryRepo {
     int limit = 15,
     String mode = 'mixed',
     List<String> excludeMediaIds = const [],
+    String? anchorMediaId,
+    String? anchorCreatorId,
+    List<String> prioritizeMediaIds = const [],
+    bool includeServerContinueWatching = false,
   }) async {
     final body = <String, dynamic>{
-      'limit': limit,
+      // Contract: 10–20, defaults to 15.
+      'limit': limit.clamp(10, 20),
       'mode': mode,
       'excludeMediaIds': excludeMediaIds,
     };
     if (cursor != null) body['cursor'] = cursor;
+    if (anchorMediaId != null) body['anchorMediaId'] = anchorMediaId;
+    if (anchorCreatorId != null) body['anchorCreatorId'] = anchorCreatorId;
+    if (prioritizeMediaIds.isNotEmpty) {
+      body['prioritizeMediaIds'] = prioritizeMediaIds;
+    }
+    if (includeServerContinueWatching) {
+      body['includeServerContinueWatching'] = true;
+    }
 
     final response = await _api.post(ApiEndpoints.verticalFeed, data: body);
     return VerticalFeedResponse.fromJson(response.data as Map<String, dynamic>);
@@ -66,9 +82,11 @@ class DiscoveryRepo {
     String mediaId, {
     String? clientSessionId,
     bool usePublicRoute = false,
+    String? shareToken,
   }) async {
     final params = <String, dynamic>{};
     if (clientSessionId != null) params['clientSessionId'] = clientSessionId;
+    if (shareToken != null) params['shareToken'] = shareToken;
 
     final endpoint = usePublicRoute
         ? ApiEndpoints.publicMediaPlaybackInfo(mediaId)

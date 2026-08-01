@@ -66,11 +66,16 @@ class ApiService {
           '${responseBody != null ? '\n  response: $responseBody' : ''}',
         );
 
-        // Silent token refresh on 401, but never for auth endpoints themselves.
+        // Silent token refresh on 401, but never for auth endpoints themselves,
+        // and never for the authenticated analytics batch: that route can reject
+        // us for a missing browser CSRF token rather than a bad session, and a
+        // beacon must never be able to sign the user out. AnalyticsService
+        // handles that 401 itself by falling back to the optional-auth route.
         if (statusCode == 401 &&
             !path.contains(ApiEndpoints.refresh) &&
             !path.contains(ApiEndpoints.login) &&
-            !path.contains(ApiEndpoints.register)) {
+            !path.contains(ApiEndpoints.register) &&
+            !path.contains(ApiEndpoints.beaconsAuth)) {
           try {
             final refreshed = await _tryRefreshToken();
             if (refreshed) {

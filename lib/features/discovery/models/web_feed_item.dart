@@ -1,3 +1,5 @@
+import '../../analytics/models/analytics_models.dart';
+
 class WebFeedItem {
   final String entityType;
   final String entityId;
@@ -12,6 +14,16 @@ class WebFeedItem {
     this.creator,
     required this.meta,
   });
+
+  /// Server-issued promotion attribution, or null for organic items.
+  /// Lives on the feed item only — it is used to emit source-surface analytics
+  /// and is never appended to a destination route.
+  PromotionAttribution? get promotion => meta.promotion;
+
+  bool get isPromoted => meta.promotion != null;
+
+  /// `mediaType` for analytics beacons, when the feed told us.
+  String? get mediaType => meta.mediaType;
 
   factory WebFeedItem.fromJson(Map<String, dynamic> json) => WebFeedItem(
     entityType: json['entityType'] as String? ?? '',
@@ -51,21 +63,36 @@ class WebFeedItemMeta {
   final String? thumbnailUrl;
   final String? previewUrl;
   final String? thumbnailKey;
+  final String? thumbnailSource;
   final double? durationSeconds;
+  final String? mediaType;
+  final bool isLiveNow;
+  final PromotionAttribution? promotion;
 
   const WebFeedItemMeta({
     this.thumbnailUrl,
     this.previewUrl,
     this.thumbnailKey,
+    this.thumbnailSource,
     this.durationSeconds,
+    this.mediaType,
+    this.isLiveNow = false,
+    this.promotion,
   });
 
-  factory WebFeedItemMeta.fromJson(Map<String, dynamic> json) => WebFeedItemMeta(
-    thumbnailUrl: json['thumbnailUrl'] as String?,
-    previewUrl: json['previewUrl'] as String?,
-    thumbnailKey: json['thumbnailKey'] as String?,
-    durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
-  );
+  factory WebFeedItemMeta.fromJson(Map<String, dynamic> json) =>
+      WebFeedItemMeta(
+        thumbnailUrl: json['thumbnailUrl'] as String?,
+        previewUrl: json['previewUrl'] as String?,
+        thumbnailKey: json['thumbnailKey'] as String?,
+        thumbnailSource: json['thumbnailSource'] as String?,
+        durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
+        mediaType: MediaTypes.normalize(
+          json['mediaType'] as String? ?? json['type'] as String?,
+        ),
+        isLiveNow: json['isLiveNow'] as bool? ?? false,
+        promotion: PromotionAttribution.tryParse(json),
+      );
 }
 
 class WebFeedResponse {

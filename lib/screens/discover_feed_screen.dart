@@ -6,9 +6,12 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import '../core/app_colors.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
+import '../features/analytics/models/analytics_models.dart';
 import '../features/auth/bloc/auth_bloc.dart';
 import '../features/discovery/models/web_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
+import '../services/analytics_service.dart';
+import '../widgets/analytics/promoted_impression_tracker.dart';
 import 'media_detail_screen.dart';
 
 class DiscoverFeedScreen extends StatefulWidget {
@@ -233,14 +236,39 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
           );
         }
         final item = _items[i];
-        return _FeedItemCard(
-          item: item,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => MediaDetailScreen(item: item)),
-          ),
+        // Promoted cards accrue dwell here, on the surface that served them.
+        // Organic cards make this a pass-through wrapper.
+        return PromotedImpressionTracker(
+          promotion: item.promotion,
+          mediaId: item.entityId,
+          creatorId: item.creator?.creatorId ?? '',
+          mediaType: item.mediaType,
+          source: AnalyticsSource.homeFeed,
+          child: _FeedItemCard(item: item, onTap: () => _openItem(item)),
         );
       },
+    );
+  }
+
+  /// Primary content navigation from a home-feed card.
+  ///
+  /// Emits the non-billable `click` and — only when the card carries
+  /// server-issued attribution — `promotion_click`, both before navigating.
+  /// The attribution stops here: the detail screen is never told about it.
+  void _openItem(WebFeedItem item) {
+    GetIt.instance<AnalyticsService>().trackContentClick(
+      mediaId: item.entityId,
+      creatorId: item.creator?.creatorId ?? '',
+      mediaType: item.mediaType,
+      source: AnalyticsSource.homeFeed,
+      promotion: item.promotion,
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            MediaDetailScreen(item: item, source: AnalyticsSource.homeFeed),
+      ),
     );
   }
 }
@@ -298,6 +326,28 @@ class _FeedItemCard extends StatelessWidget {
             )
           else
             const _ThumbnailPlaceholder(),
+          // Ad disclosure — a promoted placement must be visibly labelled.
+          if (item.isPromoted)
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Promoted',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+            ),
           // Duration badge
           if (item.meta.durationSeconds != null)
             Positioned(

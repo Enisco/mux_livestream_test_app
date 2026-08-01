@@ -11,6 +11,7 @@ import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
 import '../features/creator/repo/creator_repo.dart';
+import '../services/app_session_service.dart';
 import '../utils/local_storage.dart';
 import 'player_screen.dart';
 
@@ -52,10 +53,10 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   bool _isStartingStream = false;
   bool _streamKeyVisible = false;
   String? _playbackUrl;
-  String? _sessionId;
 
-  String _clientSessionId() =>
-      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+  /// Shared app-run client session ID — see [AppSessionService].
+  String get _clientSessionId =>
+      GetIt.instance<AppSessionService>().clientSessionId;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     try {
       final token = await GetIt.instance<CreatorRepo>().getPlaybackToken(
         mediaId,
-        _clientSessionId(),
+        _clientSessionId,
       );
       logger.i('Playback URL ready: ${token.hlsUrl}');
       if (mounted) setState(() => _playbackUrl = token.hlsUrl);
@@ -443,7 +444,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                     }
                     try {
                       final token = await GetIt.instance<CreatorRepo>()
-                          .getPlaybackToken(mediaId, _clientSessionId());
+                          .getPlaybackToken(mediaId, _clientSessionId);
                       logger.i('WatchStream: opening player → ${token.hlsUrl}');
                       if (!mounted) return;
                       Navigator.push(

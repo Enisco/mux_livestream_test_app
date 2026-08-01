@@ -12,6 +12,7 @@ import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
+import '../features/analytics/models/analytics_models.dart';
 import '../services/analytics_service.dart';
 import '../widgets/player/controls_overlay.dart';
 
@@ -21,13 +22,15 @@ class PlayerScreen extends StatefulWidget {
   final String? title;
   final String? mediaId;
   final String? creatorId;
+  final String? mediaType;
   final String source;
 
   const PlayerScreen.file({super.key, required this.filePath, this.title})
     : networkUrl = null,
       mediaId = null,
       creatorId = null,
-      source = 'unknown';
+      mediaType = null,
+      source = AnalyticsSource.unknown;
 
   const PlayerScreen.network({
     super.key,
@@ -35,7 +38,8 @@ class PlayerScreen extends StatefulWidget {
     this.title,
     this.mediaId,
     this.creatorId,
-    this.source = 'unknown',
+    this.mediaType,
+    this.source = AnalyticsSource.unknown,
   }) : filePath = null;
 
   @override
@@ -82,7 +86,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   // Analytics
   bool _analyticsViewStarted = false;
   bool _analyticsCompleted = false;
+  bool _analyticsViewEnded = false;
   double _lastProgressPos = 0;
+  final WatchClock _watchClock = WatchClock();
 
   static const _speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
   static const _maxRetries = 6;
@@ -101,6 +107,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    // The viewer is leaving the player: close the playback session before the
+    // player is torn down, while position/watch duration are still readable.
+    _trackViewEnded();
     _hideTimer?.cancel();
     _retryTimer?.cancel();
     for (final s in _subs) {
@@ -475,14 +484,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
       target = t;
     }
     _player.seek(target);
+    _trackSeek(target);
     _resetHide();
   }
 
   void _seekFraction(double fraction) {
     if (_duration == Duration.zero) return;
-    _player.seek(
-      Duration(milliseconds: (fraction * _duration.inMilliseconds).round()),
+    final target = Duration(
+      milliseconds: (fraction * _duration.inMilliseconds).round(),
     );
+    _player.seek(target);
+    _trackSeek(target);
   }
 
   void _setSpeed(double s) {
@@ -526,18 +538,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   // ── Analytics ──────────────────────────────────────────────────────────────
 
+  /// True when this screen has an identified media item to report on. Local
+  /// file playback has none, so it emits nothing.
+  bool get _analyticsEnabled =>
+      widget.mediaId != null && widget.creatorId != null;
+
   void _trackPlayPause({required bool wasPlaying, required bool nowPlaying}) {
-    final mid = widget.mediaId;
-    final cid = widget.creatorId;
-    if (mid == null || cid == null) return;
+    if (!_analyticsEnabled) return;
+    final mid = widget.mediaId!;
+    final cid = widget.creatorId!;
     final analytics = GetIt.instance<AnalyticsService>();
     final pos = _position.inMilliseconds / 1000.0;
+
+    // Watch duration counts only time actually spent playing.
+    if (nowPlaying) {
+      _watchClock.start();
+    } else {
+      _watchClock.stop();
+    }
 
     if (!_analyticsViewStarted && nowPlaying) {
       _analyticsViewStarted = true;
       analytics.trackViewStarted(
         mediaId: mid,
         creatorId: cid,
+        mediaType: widget.mediaType,
         source: widget.source,
         positionSeconds: pos,
       );
@@ -548,6 +573,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       analytics.trackPlay(
         mediaId: mid,
         creatorId: cid,
+        mediaType: widget.mediaType,
         positionSeconds: pos,
         source: widget.source,
       );
@@ -555,43 +581,77 @@ class _PlayerScreenState extends State<PlayerScreen> {
       analytics.trackPause(
         mediaId: mid,
         creatorId: cid,
+        mediaType: widget.mediaType,
         positionSeconds: pos,
+        watchDurationSeconds: _watchClock.seconds,
         source: widget.source,
       );
     }
   }
 
   void _trackProgress(Duration position) {
-    final mid = widget.mediaId;
-    final cid = widget.creatorId;
-    if (mid == null || cid == null || !_analyticsViewStarted || !_isPlaying) {
-      return;
-    }
+    if (!_analyticsEnabled || !_analyticsViewStarted || !_isPlaying) return;
     final pos = position.inMilliseconds / 1000.0;
-    if ((pos - _lastProgressPos) >= 10.0) {
-      _lastProgressPos = pos;
-      GetIt.instance<AnalyticsService>().trackProgress(
-        mediaId: mid,
-        creatorId: cid,
-        positionSeconds: pos,
-        source: widget.source,
-      );
-    }
+    if ((pos - _lastProgressPos).abs() < 10.0) return;
+    _lastProgressPos = pos;
+    GetIt.instance<AnalyticsService>().trackProgress(
+      mediaId: widget.mediaId!,
+      creatorId: widget.creatorId!,
+      mediaType: widget.mediaType,
+      positionSeconds: pos,
+      watchDurationSeconds: _watchClock.seconds,
+      source: widget.source,
+    );
+  }
+
+  void _trackSeek(Duration target) {
+    if (!_analyticsEnabled || !_analyticsViewStarted) return;
+    final pos = target.inMilliseconds / 1000.0;
+    // Keep the progress baseline in sync so a seek doesn't immediately
+    // trigger a spurious progress beacon for the jump itself.
+    _lastProgressPos = pos;
+    GetIt.instance<AnalyticsService>().trackSeek(
+      mediaId: widget.mediaId!,
+      creatorId: widget.creatorId!,
+      mediaType: widget.mediaType,
+      positionSeconds: pos,
+      source: widget.source,
+    );
   }
 
   void _trackCompletion() {
-    final mid = widget.mediaId;
-    final cid = widget.creatorId;
-    if (mid == null || cid == null || _analyticsCompleted) return;
+    if (!_analyticsEnabled || _analyticsCompleted) return;
+    // `completion` means VOD reached its actual end. A livestream that stops
+    // producing segments is a session close, not a completion — that is what
+    // view_ended reports.
+    if (widget.mediaType == MediaTypes.livestream) return;
     _analyticsCompleted = true;
+    _watchClock.stop();
     final analytics = GetIt.instance<AnalyticsService>();
     analytics.trackCompletion(
-      mediaId: mid,
-      creatorId: cid,
+      mediaId: widget.mediaId!,
+      creatorId: widget.creatorId!,
+      mediaType: widget.mediaType,
       positionSeconds: _position.inMilliseconds / 1000.0,
+      watchDurationSeconds: _watchClock.seconds,
       source: widget.source,
     );
-    analytics.flush();
+  }
+
+  void _trackViewEnded() {
+    if (!_analyticsEnabled || !_analyticsViewStarted || _analyticsViewEnded) {
+      return;
+    }
+    _analyticsViewEnded = true;
+    _watchClock.stop();
+    GetIt.instance<AnalyticsService>().trackViewEnded(
+      mediaId: widget.mediaId!,
+      creatorId: widget.creatorId!,
+      mediaType: widget.mediaType,
+      positionSeconds: _position.inMilliseconds / 1000.0,
+      watchDurationSeconds: _watchClock.seconds,
+      source: widget.source,
+    );
   }
 
   // ── Keyboard ───────────────────────────────────────────────────────────────

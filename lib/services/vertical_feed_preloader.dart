@@ -6,6 +6,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../core/logger.dart';
 import '../features/discovery/models/vertical_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
+import 'app_session_service.dart';
 import 'playback_info_cache.dart';
 import 'token_storage_service.dart';
 
@@ -34,14 +35,17 @@ class VerticalFeedPreloader {
   final DiscoveryRepo _repo;
   final PlaybackInfoCache _cache;
   final TokenStorageService _tokenStorage;
+  final AppSessionService _session;
 
   VerticalFeedPreloader({
     required DiscoveryRepo repo,
     required PlaybackInfoCache cache,
     required TokenStorageService tokenStorage,
+    required AppSessionService session,
   })  : _repo = repo,
         _cache = cache,
-        _tokenStorage = tokenStorage;
+        _tokenStorage = tokenStorage,
+        _session = session;
 
   List<VerticalFeedItem> _items = const [];
   String? _nextCursor;
@@ -60,7 +64,6 @@ class VerticalFeedPreloader {
 
   bool _loading = false;
   bool _isAuthenticated = false;
-  String? _sessionId;
 
   List<VerticalFeedItem> get items => List.unmodifiable(_items);
   String? get nextCursor => _nextCursor;
@@ -82,9 +85,6 @@ class VerticalFeedPreloader {
 
   /// True while [_initPlayer] is running for [mediaId].
   bool isInitializing(String mediaId) => _initializing.contains(mediaId);
-
-  String _clientSessionId() =>
-      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
 
   /// Fetches feed items and silently initialises players for the first
   /// [_kInitialPreloadCount] videos. Idempotent — does nothing if a load is
@@ -148,7 +148,7 @@ class VerticalFeedPreloader {
       if (url == null) {
         final info = await _repo.fetchPlaybackInfo(
           item.mediaId,
-          clientSessionId: _clientSessionId(),
+          clientSessionId: _session.clientSessionId,
           usePublicRoute: !_isAuthenticated,
         );
         if (info != null) {
@@ -231,7 +231,6 @@ class VerticalFeedPreloader {
     _claimed.clear();
     _items = const [];
     _nextCursor = null;
-    _sessionId = null;
     _loading = false;
     _isAuthenticated = false;
     unawaited(warmUp());

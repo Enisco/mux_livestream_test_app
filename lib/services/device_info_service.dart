@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -52,6 +53,19 @@ class DeviceInfoService {
 
   String get platform => _platform;
   String get appVersion => _appVersion;
+
+  /// `client.deviceType` for analytics beacons. Derived from the logical
+  /// shortest side rather than hardcoded to `phone`, so tablet traffic doesn't
+  /// pollute phone engagement metrics.
+  String get deviceType {
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      return 'desktop';
+    }
+    final view = ui.PlatformDispatcher.instance.implicitView;
+    if (view == null) return 'phone';
+    final logical = view.physicalSize / view.devicePixelRatio;
+    return logical.shortestSide >= 600 ? 'tablet' : 'phone';
+  }
 
   Map<String, String> get headers => {
     'x-device-id': _deviceId,

@@ -4,7 +4,9 @@ import 'package:get_it/get_it.dart';
 import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/logger.dart';
+import '../features/analytics/models/analytics_models.dart';
 import '../features/creator/repo/creator_repo.dart';
+import '../services/app_session_service.dart';
 import 'player_screen.dart';
 
 class JoinLivestreamScreen extends StatefulWidget {
@@ -18,10 +20,11 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
   final _idController = TextEditingController();
   String? _error;
   bool _loading = false;
-  String? _sessionId;
 
-  String _clientSessionId() =>
-      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+  /// One stable ID per app run — anonymous live playback sessions are tracked
+  /// against it, so it must not change between the status call and the token.
+  String get _clientSessionId =>
+      GetIt.instance<AppSessionService>().clientSessionId;
 
   @override
   void dispose() {
@@ -53,7 +56,7 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
 
       final token = await repo.getPlaybackToken(
         status.mediaId!,
-        _clientSessionId(),
+        _clientSessionId,
       );
       logger.i('JoinStream: opening player → ${token.hlsUrl}');
 
@@ -64,6 +67,10 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
           builder: (_) => PlayerScreen.network(
             networkUrl: token.hlsUrl,
             title: 'Livestream',
+            mediaId: status.mediaId,
+            creatorId: creatorId,
+            mediaType: MediaTypes.livestream,
+            source: AnalyticsSource.external,
           ),
         ),
       );

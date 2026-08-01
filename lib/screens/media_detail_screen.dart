@@ -6,17 +6,34 @@ import '../core/app_colors.dart';
 import '../core/app_strings.dart';
 import '../core/app_styles.dart';
 import '../core/logger.dart';
+import '../features/analytics/models/analytics_models.dart';
 import '../features/discovery/models/media_detail.dart';
 import '../features/discovery/models/web_feed_item.dart';
 import '../features/discovery/repo/discovery_repo.dart';
 import '../features/engagement/models/engagement_models.dart';
 import '../features/engagement/repo/engagement_repo.dart';
+import '../services/analytics_service.dart';
+import '../services/app_session_service.dart';
+import '../widgets/analytics/promoted_impression_tracker.dart';
 import 'player_screen.dart';
 
+/// Destination detail screen.
+///
+/// It emits its normal organic analytics (`impression`, playback events) and
+/// deliberately takes **no** promotion attribution: a destination screen must
+/// never emit a catch-up `promoted_qualified_impression` or a `promotion_click`.
+/// Those belong to the placement that was actually served and clicked.
 class MediaDetailScreen extends StatefulWidget {
-  const MediaDetailScreen({super.key, required this.item});
+  const MediaDetailScreen({
+    super.key,
+    required this.item,
+    this.source = AnalyticsSource.unknown,
+  });
 
   final WebFeedItem item;
+
+  /// The surface the viewer arrived from, carried through for funnel analytics.
+  final String source;
 
   @override
   State<MediaDetailScreen> createState() => _MediaDetailScreenState();
@@ -30,7 +47,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   bool _loading = true;
   String? _error;
   bool _descExpanded = false;
-  String? _sessionId;
 
   // Like / dislike
   bool _hasLiked = false;
@@ -43,9 +59,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   bool _commentsLoadingMore = false;
   String? _commentsCursor;
   bool _commentsLoaded = false;
+  bool _impressionSent = false;
 
-  String _clientSessionId() =>
-      _sessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+  String get _clientSessionId =>
+      GetIt.instance<AppSessionService>().clientSessionId;
 
   @override
   void initState() {
@@ -61,7 +78,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     try {
       final detail = await _repo.fetchMediaDetail(
         widget.item.entityId,
-        clientSessionId: _clientSessionId(),
+        clientSessionId: _clientSessionId,
       );
       if (!mounted) return;
       setState(() {
@@ -70,6 +87,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         _hasLiked = detail.viewer?.hasLiked ?? false;
         _hasDisliked = detail.viewer?.hasDisliked ?? false;
       });
+      _trackOrganicImpression();
       if (!_commentsLoaded) _fetchComments();
     } catch (e) {
       logger.e(
@@ -164,6 +182,51 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
+  /// Organic detail impression. Non-billable and never a substitute for — or a
+  /// catch-up version of — a promoted qualified impression.
+  void _trackOrganicImpression() {
+    if (_impressionSent) return;
+    final creatorId = _detail?.creator?.creatorId;
+    if (creatorId == null || creatorId.isEmpty) return;
+    _impressionSent = true;
+    GetIt.instance<AnalyticsService>().trackImpression(
+      mediaId: _mediaId,
+      creatorId: creatorId,
+      mediaType: _mediaType,
+      source: widget.source,
+    );
+  }
+
+  String get _mediaId => _detail?.media.id.isNotEmpty == true
+      ? _detail!.media.id
+      : widget.item.entityId;
+
+  String? get _mediaType =>
+      _detail?.playback?.mediaType ??
+      MediaTypes.normalize(_detail?.media.type) ??
+      widget.item.mediaType;
+
+  /// Primary navigation from the related list. The suggestion row is its own
+  /// source surface, so a promoted suggestion emits its `promotion_click` here.
+  void _openSuggestion(WebFeedItem suggestion) {
+    GetIt.instance<AnalyticsService>().trackContentClick(
+      mediaId: suggestion.entityId,
+      creatorId: suggestion.creator?.creatorId ?? '',
+      mediaType: suggestion.mediaType,
+      source: AnalyticsSource.suggestedContent,
+      promotion: suggestion.promotion,
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MediaDetailScreen(
+          item: suggestion,
+          source: AnalyticsSource.suggestedContent,
+        ),
+      ),
+    );
+  }
+
   void _openPlayer() {
     final url = _detail?.playback?.playbackUrl;
     if (url == null || url.isEmpty) {
@@ -181,9 +244,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         builder: (_) => PlayerScreen.network(
           networkUrl: url,
           title: title,
-          mediaId: widget.item.entityId,
+          mediaId: _mediaId,
           creatorId: _detail?.creator?.creatorId,
-          source: 'home_feed',
+          mediaType: _mediaType,
+          // Playback inherits the surface that brought the viewer here, so the
+          // funnel stays attributable end-to-end.
+          source: widget.source,
         ),
       ),
     );
@@ -406,13 +472,17 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             ...detail.suggestions.map(
               (s) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _SuggestionCard(
-                  item: s,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MediaDetailScreen(item: s),
-                    ),
+                // A promoted suggestion qualifies on this row, where it was
+                // served — not on the detail screen it opens.
+                child: PromotedImpressionTracker(
+                  promotion: s.promotion,
+                  mediaId: s.entityId,
+                  creatorId: s.creator?.creatorId ?? '',
+                  mediaType: s.mediaType,
+                  source: AnalyticsSource.suggestedContent,
+                  child: _SuggestionCard(
+                    item: s,
+                    onTap: () => _openSuggestion(s),
                   ),
                 ),
               ),

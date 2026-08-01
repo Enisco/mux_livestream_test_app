@@ -1,8 +1,10 @@
 # Client Media Integration Guide
 
-Last verified: 2026-07-01
+Last verified: 2026-07-02
 
 This guide explains how web and mobile clients should integrate GospelTube media playback, detail pages, feeds, thumbnails, previews, suggestions, and analytics through the API gateway.
+
+For the complete creator studio, scheduling, viewer playback, realtime state, presence, and replay contract for livestreams, see [Client Livestream Integration Guide](./client-livestream-integration.md).
 
 All routes below are gateway routes under `/v1`. Gateway JSON responses are wrapped as:
 
@@ -31,7 +33,8 @@ On errors, clients should expect:
 - For anonymous livestream playback, always send a stable per-session `clientSessionId` so the backend can issue and track a signed live playback session.
 - Feed image and preview URLs may be gateway proxy URLs such as `/v1/public/media/:id/assets/thumbnail`; use them directly as image sources.
 - The vertical feed is mobile-only and media-only. Do not use it for desktop web layouts, posts, events, creators, or mixed content feeds.
-- When a promoted feed item opens a video detail page, carry the feed attribution (`promotionCampaignId`, `promotionDeliveryId`, `promotionPlacement`) into the detail route/screen so detail can emit a catch-up promoted qualified impression if the feed card did not already qualify in the same client session.
+- Include `mediaType` (`video`, `music`, or `livestream`) on media analytics beacons whenever the client knows it.
+- Emit primary-card `click` analytics on the source surface. For a promoted unit, also emit `promotion_click` with its signed attribution before navigation. Never synthesize a paid impression or click from the destination detail screen.
 
 ## Route Summary
 
@@ -47,6 +50,7 @@ On errors, clients should expect:
 | Mobile vertical feed | `POST` | `/v1/discovery/vertical-feed` | Optional |
 | Anonymous analytics batch | `POST` | `/v1/analytics/beacons` | Optional |
 | Authenticated analytics batch | `POST` | `/v1/analytics/beacons/auth` | Required |
+| Livestream presence socket | Socket.IO | namespace `/live` on the API gateway origin | Optional |
 
 `kind` for media assets is either `thumbnail` or `preview`.
 
@@ -75,13 +79,7 @@ For unlisted links, include the share token:
 GET /v1/discovery/media/:id/detail?shareToken=abc123def456&clientSessionId=session_12345678
 ```
 
-Promotion attribution is client-side route state, not a replacement for the media detail request. If the viewer opens the detail screen from a promoted feed card, carry these feed values to the detail page by URL query params on web or navigation params on mobile:
-
-```text
-/media/:id?promotionCampaignId=camp_123&promotionDeliveryId=signed_delivery_token&promotionPlacement=catalogue
-```
-
-Do not mint, decode, or modify `promotionDeliveryId` on the client. If any promotion field is missing or invalid, render detail normally and skip the promoted detail beacon.
+Promotion attribution belongs to the served placement. Use it to emit source-surface promotion events before navigation; do not put the signed delivery token in destination URLs or reconstruct paid events from route state. Do not mint, decode, or modify `promotionDeliveryId` on the client.
 
 4. Render from `data`.
 
@@ -195,6 +193,61 @@ In this special case the client must build:
 ```text
 https://stream.mux.com/{playbackId}.m3u8?token={token}
 ```
+
+### Livestream Presence, Status, And Viewer Count
+
+Use the API gateway Socket.IO namespace `/live` while a livestream detail screen/player is active. The socket is optional-auth: authenticated web clients should connect with credentials so the gateway can read the normal auth cookie, while anonymous clients can connect without a token.
+
+Subscribe while the viewer is actively watching a live stream. Include `creatorId` when the detail payload has it so analytics samples can be creator-scoped immediately:
+
+```ts
+socket.emit("live.subscribe_stream", { creatorId, streamId }, (ack) => {
+  // ack: { ok: true, room: "stream:{streamId}", viewerCount: number }
+});
+```
+
+Unsubscribe when the viewer leaves the stream, and also unsubscribe locally after a terminal status:
+
+```ts
+socket.emit("live.unsubscribe_stream", { streamId });
+```
+
+Listen for viewer-count snapshots:
+
+```ts
+socket.on("livestream.viewer_count", (payload) => {
+  // payload: { streamId: string, viewerCount: number }
+});
+```
+
+Listen for stream status changes:
+
+```ts
+socket.on("livestream.status_changed", (payload) => {
+  // payload: {
+  //   streamId: string;
+  //   creatorId: string;
+  //   status: "idle" | "connecting" | "live" | "reconnecting" | "ended" | "errored";
+  //   startedAt?: string | null;
+  //   endedAt?: string | null;
+  // }
+});
+```
+
+Use `viewerCount` for "Watching" labels on livestream detail/player UI. Until the socket ack or event arrives, clients may show the existing feed/detail fallback count.
+
+The gateway records livestream concurrent-viewer analytics from subscribe, unsubscribe, and disconnect viewer-count changes. Clients should not emit a separate concurrent-viewer beacon.
+
+Use `status` as the canonical live runtime state for an open player:
+
+- `connecting`: show a waiting/loading live UI while the creator is starting the stream.
+- `live`: show the live player and live-edge controls.
+- `reconnecting`: keep the player available, show a reconnecting UI, and resume automatically when new segments arrive.
+- `idle`: stop treating the page as live. This usually means the creator started a session but the encoder never connected.
+- `ended`: stop treating the page as live. This is emitted after a live/reconnecting session reaches Mux idle or after the platform intentionally ends the stream.
+- `errored`: stop treating the page as live and show an error state if the backend emits an explicit creator/platform failure.
+
+For `idle`, `ended`, and `errored`, unsubscribe from `live.subscribe_stream`, hide live viewer-count UI, and refetch the detail payload so search/detail state catches up.
 
 ## Thumbnails And Previews
 
@@ -333,51 +386,44 @@ type PromotedWebFeedMeta = {
 };
 ```
 
-For promoted video media cards, preserve those values when linking to `/media/:id`. The current web client appends them as `promotionCampaignId`, `promotionDeliveryId`, and `promotionPlacement` query params. Mobile clients can store the same values in navigation state if they do not expose a URL. Do not attach these fields to organic items.
+For promoted feed items, retain these values only long enough to emit the source-placement analytics events. Do not append signed promotion attribution to the destination URL or attach it to organic items.
 
-### Promoted Media Detail Qualified Impressions
+### Card clicks and promoted clicks
 
-This applies when a promoted video card from the web/mixed feed opens the video detail page. The feed card is the primary billable `promoted_qualified_impression` for the `catalogue` placement. The detail page should emit a promoted qualified impression only as a catch-up when the feed card did not already reach the qualified visibility/dwell threshold in the same client session.
+Emit click events from the card/tile/row that the user actually activated, immediately before navigation:
 
-Minimum client behavior:
+1. Send `click` for every primary content navigation. Use the card target, creator, and actual source (`home_feed`, `suggested_content`, `creator_channel`, etc.). This event is non-billable and feeds CTR/funnel analytics.
+2. If and only if that card is a promoted placement with server-issued attribution, also send `promotion_click` with `promotionCampaignId`, `promotionPlacement`, and the unmodified `promotionDeliveryId`.
+3. Flush both in the same keepalive-capable batch before navigation. Do not require the impression dwell threshold; a fast click remains a click and does not become an impression.
 
-1. Retain `promotionCampaignId`, `promotionDeliveryId`, and `promotionPlacement` from the feed item.
-2. Open the video detail screen with that attribution attached to the route/screen state.
-3. If the promoted feed card already emitted `promoted_qualified_impression` for that delivery in the same client session, do not emit another promoted detail beacon.
-4. Load the normal media detail aggregate and playback URL.
-5. If the feed card did not already qualify, send the promoted beacon when the detail player area is visible long enough to qualify.
+Do not count context-menu, like, bookmark, follow, RSVP, preview-hover, or other secondary controls as content clicks. Destination detail/channel pages may send their normal organic `impression`, playback, and reading events, but must never emit a catch-up `promoted_qualified_impression` or `promotion_click`. The backend validates and deduplicates the paid click; never fabricate or alter a delivery token.
 
-Current web qualification for detail is at least 25% of the player wrapper visible for 1500 ms. Feed cards use the same 1500 ms dwell window. Native clients should match the dwell window and use the platform's normal visibility threshold for a meaningfully visible detail player.
+## Devotional Detail And Progress
 
-Use a stable `eventId` for the promoted qualified impression keyed by the analytics session, campaign, placement, and delivery token. This keeps retries idempotent and prevents the same delivery from being counted twice if two client surfaces accidentally queue it.
+Devotional series and entry detail pages use content-service public routes through the gateway:
 
-Example detail beacon:
+```http
+GET /v1/public/content/devotionals/series/:seriesId
+GET /v1/public/content/devotionals/entries/:entryId
+POST /v1/public/content/devotionals/entries/:entryId/progress
+```
+
+Series and entry reads accept optional auth. Authenticated series responses include `viewerProgress` so clients can render completed days, the current in-progress day, and the next unfinished entry. Authenticated entry reads mark the opened entry as `in_progress` without downgrading a completed entry.
+
+Entry detail returns `entry`, `series`, `seriesEntries`, `navigation`, and optional `viewerProgress`. Use `navigation.previousEntryId` / `navigation.nextEntryId` for previous/next buttons, and call the progress endpoint when the viewer marks a day complete:
 
 ```json
 {
-  "eventId": "2a98820a-4a24-4d7a-9e91-77a03f2d4a07",
-  "mediaId": "6a300fcd3ac339f88a7a16f7",
-  "creatorId": "6a2423ae0e90471cdcb3af5d",
-  "eventType": "promoted_qualified_impression",
-  "occurredAt": "2026-07-01T12:00:00.000Z",
-  "source": "home_feed",
-  "promotionCampaignId": "camp_123",
-  "promotionPlacement": "catalogue",
-  "promotionDeliveryId": "signed_delivery_token",
-  "visibleDurationMs": 1500,
-  "identity": {
-    "sessionId": "2bc84f6e-003b-4d7d-ae1f-2b56ce8c7932"
-  }
+  "status": "completed"
 }
 ```
 
-Important constraints:
+Send devotional analytics as content beacons:
 
-- Send the normal detail `impression` and playback beacons separately; do not replace them with the promoted beacon.
-- Use `source: "home_feed"` when the attribution came from the home/web feed. Use the actual source if another promoted surface later carries the same attribution contract.
-- Do not emit the promoted detail beacon for direct opens, share links, livestream routes, or non-video detail pages unless the client has a valid promotion attribution payload from a promoted surface.
-- Do not emit both the feed-card and detail-page promoted qualified impression for the same delivery in one client session. Settlement counts accepted `promoted_qualified_impression` beacons by campaign and placement.
-- The backend validates `promotionDeliveryId` against the campaign, placement, content, and expiry. If validation fails, do not retry with a fabricated token.
+- Series detail: `contentType: "devotional_series"` and `contentId: seriesId`.
+- Entry detail: `contentType: "devotional_entry"` and `contentId: entryId`.
+- When the viewer marks an entry complete, send `completion` for the entry. If that entry completes the final published day in the series, also send `completion` for the series.
+- Promoted devotional cards follow the same source-surface `click` + `promotion_click` rule above. The devotional detail page emits only its normal organic/detail analytics.
 
 ## Mobile Vertical Feed
 
@@ -456,6 +502,7 @@ Promoted vertical items:
 - If `isPromoted` is true, retain `promotionCampaignId`, `promotionPlacement`, and `promotionDeliveryId`.
 - Send `promoted_qualified_impression` only after the client-side visibility/dwell threshold is met.
 - Include the promotion fields in the analytics beacon so the server can validate the delivery token.
+- On primary tile navigation, send the non-billable `click` plus the verified `promotion_click` before navigating, even if the impression threshold has not completed.
 
 ## Analytics Beacons
 
@@ -476,6 +523,7 @@ Batch payload:
     {
       "eventId": "3e1c0d4d-8c52-4b2f-83d6-bbfba6a2f0de",
       "mediaId": "6a300fcd3ac339f88a7a16f7",
+      "mediaType": "video",
       "creatorId": "6a2423ae0e90471cdcb3af5d",
       "eventType": "view_started",
       "occurredAt": "2026-07-01T12:00:00.000Z",
@@ -504,8 +552,8 @@ Playback event guidance:
 | `pause` | User pauses; include `positionSeconds` and any accumulated `watchDurationSeconds`. |
 | `seek` | User seeks; include the new `positionSeconds`. |
 | `progress` | Periodically during playback, around every 10 seconds of position movement. |
-| `completion` | Playback reaches the end; flush immediately. |
-| `view_ended` | Optional explicit end event if your player lifecycle uses it. |
+| `view_ended` | Playback session ends because the user leaves, closes the player, navigates away, or a livestream reaches a terminal status; include final `positionSeconds` / `watchDurationSeconds` and flush immediately. |
+| `completion` | VOD playback reaches the actual end; flush immediately. Do not use this for livestream session close. |
 
 Implementation notes:
 
@@ -513,10 +561,10 @@ Implementation notes:
 - `identity.sessionId` is required.
 - Web anonymous beacons use the `gt_anon_viewer` cookie server-side; mobile can send `anonymousViewerId` when no cookie exists.
 - Authenticated clients should call `/v1/analytics/beacons/auth`.
-- Use `source` values such as `home_feed`, `search`, `share_link`, `notification`, `external`, or `unknown`.
-- Flush progress/completion with keepalive or equivalent when the page/app is backgrounded.
+- Use `source` values such as `creator_channel`, `home_feed`, `suggested_content`, `search`, `share_link`, `notification`, `external`, or `unknown`.
+- Flush progress, `view_ended`, and `completion` with keepalive or equivalent when the page/app is backgrounded.
 - For promoted items, `promoted_qualified_impression` requires `promotionCampaignId`, `promotionPlacement`, and `promotionDeliveryId`.
-- For promoted video detail pages, send `promoted_qualified_impression` after the detail/player visibility threshold is met only when the feed card did not already qualify in the same client session.
+- Primary content navigation emits `click`; a promoted source unit additionally emits `promotion_click` with those same required promotion fields.
 
 ## Engagement, Comments, And Auth Nudges
 
@@ -620,9 +668,10 @@ Allowed source constraints:
 - Build quality controls from `availableResolutions`.
 - Use returned thumbnail/preview URLs or file-backed thumbnail keys.
 - Send playback analytics events.
+- Include `mediaType` on media analytics beacons.
 - Hide suggestions when no items are returned.
 - Use `/v1/discovery/web-feed` for mixed/home feeds.
-- Preserve promotion attribution when a promoted video feed item navigates to media detail.
+- Emit source-attributed `click` and, for promoted units, `promotion_click` before navigation.
 - Use `/v1/discovery/vertical-feed` only for mobile media-only vertical playback.
 - For vertical feed active items, fetch detail/playback-info before playing.
-- Emit promoted qualified impressions only for promoted items with valid promotion attribution, and avoid sending both feed-card and detail-page promoted impressions for the same delivery in one client session.
+- Emit paid promotion events only from the actual promoted placement with valid server-issued attribution; destination pages never synthesize them.

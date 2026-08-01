@@ -50,6 +50,7 @@ dependencies:
 
   # Icons
   iconsax_plus: ^1.0.0
+  connectivity_plus: ^7.3.1
 
 dev_dependencies:
   flutter_test:
