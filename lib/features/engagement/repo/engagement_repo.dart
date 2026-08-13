@@ -1,9 +1,9 @@
 import 'package:get_it/get_it.dart';
 
-import '../../../core/logger.dart';
-import '../../../services/api_service.dart';
-import '../../../utils/api_endpoints.dart';
-import '../models/engagement_models.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/models/engagement_models/engagement_models.dart';
+import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 class EngagementRepo {
   final ApiService _api = GetIt.instance<ApiService>();

@@ -2,12 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
-import '../../../core/logger.dart';
-import '../../../features/creator/repo/creator_repo.dart';
-import '../models/auth_models.dart';
-import '../repo/auth_repo.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/auth/repo/auth_repo.dart';
+import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/models/auth_models/auth_models.dart';
 
-part 'auth_event.dart';
+part 'auth_events.dart';
 part 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
@@ -21,9 +21,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogoutRequested>(_onLogout);
   }
 
-  // ------------------------------------------------------------------
-  // Sign in
-  // ------------------------------------------------------------------
+  // ── Sign in ────────────────────────────────────────────────────────────────
 
   Future<void> _onSignIn(
     AuthSignInRequested event,
@@ -47,9 +45,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Sign up → auto-login → onboard creator → provision stream
-  // ------------------------------------------------------------------
+  // ── Sign up → auto-login ──────────────────────────────────────────────────
+  //
+  // No creator channel is created here: the onboarding flow only creates one if
+  // the user picks "share my ministry" and completes the setup screens. Email
+  // verification is skipped for now — see docs/OPEN_ISSUES.md.
 
   Future<void> _onSignUp(
     AuthSignUpRequested event,
@@ -57,7 +57,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      // 1. Register (returns user data, no tokens)
       await _authRepo.register(
         firstName: event.firstName,
         lastName: event.lastName,
@@ -68,25 +67,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         countryCode: event.countryCode,
       );
 
-      // 2. Auto-login to get session tokens
+      // Register returns the user but no tokens, so log in for a session.
       final loginResp = await _authRepo.login(
         email: event.email,
         password: event.password,
       );
 
-      // 3. Create creator channel — handle derived from email prefix
-      final creatorRepo = GetIt.instance<CreatorRepo>();
-      final handle = _deriveHandle(event.email);
-      final creator = await creatorRepo.onboardCreator(
-        handle: handle,
-        displayName: event.firstName,
-        bio: '${event.firstName}\'s channel on GTube',
-      );
-
-      // 4. Provision livestream profile and save credentials
-      await creatorRepo.provisionLivestream(creator.id);
-
-      emit(AuthSuccess(loginResp.user, creatorId: creator.id));
+      emit(AuthSuccess(loginResp.user));
     } on DioException catch (e) {
       emit(AuthFailure(_extractMessage(e)));
     } catch (e) {
@@ -95,9 +82,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Logout
-  // ------------------------------------------------------------------
+  // ── Logout ────────────────────────────────────────────────────────────────
 
   Future<void> _onLogout(
     AuthLogoutRequested event,
@@ -107,16 +92,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoggedOut());
   }
 
-  // ------------------------------------------------------------------
-  // Helpers
-  // ------------------------------------------------------------------
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// Provisions the livestream profile if creatorId is available in storage.
-  /// Safe to call on every login — the endpoint is idempotent.
+  /// Idempotent — safe to call on every login.
   Future<String?> _provisionIfNeeded(String userId) async {
     try {
       final creatorRepo = GetIt.instance<CreatorRepo>();
-      // Use stored creatorId; on a fresh device it may be null.
       final creatorId = await _resolveCreatorId(userId);
       if (creatorId == null) return null;
       await creatorRepo.provisionLivestream(creatorId);
@@ -129,20 +110,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<String?> _resolveCreatorId(String userId) async {
     final creatorRepo = GetIt.instance<CreatorRepo>();
-    // Use cached value if present (common case). Otherwise fetch from the
-    // profile endpoint — happens after logout/re-login or on a fresh device.
+    // Cache miss happens on a fresh device or after re-login.
     return creatorRepo.cachedCreatorId ??
         await creatorRepo.fetchAndCacheCreatorId();
-  }
-
-  /// Converts email prefix to a clean lowercase handle.
-  String _deriveHandle(String email) {
-    final prefix = email.split('@').first;
-    final clean = prefix.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
-    if (clean.isEmpty) {
-      return 'user${DateTime.now().millisecondsSinceEpoch % 100000}';
-    }
-    return clean.length > 20 ? clean.substring(0, 20) : clean;
   }
 
   String _extractMessage(DioException e) {

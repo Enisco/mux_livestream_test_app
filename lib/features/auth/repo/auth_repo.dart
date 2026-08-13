@@ -1,26 +1,28 @@
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 
-import '../../../core/logger.dart';
-import '../../../services/api_service.dart';
-import '../../../services/token_storage_service.dart';
-import '../../../utils/api_endpoints.dart';
-import '../../../utils/local_storage.dart';
-import '../models/auth_models.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/models/auth_models/auth_models.dart';
+import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/token_storage_service.dart';
+import 'package:test_app/utils/app_constants/api_endpoints.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 class AuthRepo {
   final ApiService _api = GetIt.instance<ApiService>();
   final TokenStorageService _tokenStorage =
       GetIt.instance<TokenStorageService>();
 
+  /// Only firstName/lastName/email/password are required by `RegisterUserDto`;
+  /// blank optionals are omitted from the payload rather than sent empty.
   Future<RegisterResponse> register({
     required String firstName,
     required String lastName,
     required String email,
-    required String phone,
     required String password,
-    required String gender,
-    required String countryCode,
+    String? phone,
+    String? gender,
+    String? countryCode,
   }) async {
     final response = await _api.post(
       ApiEndpoints.register,
@@ -28,13 +30,41 @@ class AuthRepo {
         'firstName': firstName,
         'lastName': lastName,
         'email': email.toLowerCase(),
-        'phone': phone,
         'password': password,
-        'gender': gender,
-        'countryCode': countryCode,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
+        if (countryCode != null && countryCode.isNotEmpty)
+          'countryCode': countryCode,
       },
     );
     return RegisterResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// `POST /v1/auth/password/forgot` — emails a reset link.
+  Future<void> requestPasswordReset({required String email}) async {
+    await _api.post(
+      ApiEndpoints.forgotPassword,
+      data: {'email': email.toLowerCase()},
+    );
+  }
+
+  /// Confirms a one-time code against an open 2FA/email-verification challenge.
+  Future<void> verifyChallenge({
+    required String challengeId,
+    required String code,
+  }) async {
+    await _api.post(
+      ApiEndpoints.verify2faChallenge,
+      data: {'challengeId': challengeId, 'code': code},
+    );
+  }
+
+  /// Asks the server to send a fresh one-time code for the same challenge.
+  Future<void> resendChallengeOtp({required String challengeId}) async {
+    await _api.post(
+      ApiEndpoints.resend2faOtp,
+      data: {'challengeId': challengeId},
+    );
   }
 
   Future<LoginResponse> login({
@@ -65,9 +95,9 @@ class AuthRepo {
     return result;
   }
 
-  /// Called on every app launch after a stored refresh token is found.
-  /// Sends refresh token in JSON body, updates stored tokens + user cache.
-  /// Returns false (and clears session) if the server rejects the token.
+  /// Called on every app launch. Clears the session only when the server
+  /// actually rejects the token — a launch with no connectivity keeps the user
+  /// signed in on the cached session.
   Future<bool> tryRefreshSession() async {
     if (!await _tokenStorage.hasSession) return false;
     try {
@@ -94,9 +124,17 @@ class AuthRepo {
       );
       return true;
     } catch (e) {
-      logger.e('Session refresh failed', error: e);
-      await _tokenStorage.clearAll();
-      return false;
+      final status = e is DioException ? e.response?.statusCode : null;
+      if (status != null && status >= 400 && status < 500) {
+        logger.e('Session refresh rejected ($status)', error: e);
+        await _tokenStorage.clearAll();
+        return false;
+      }
+      logger.w(
+        'Session refresh unreachable — keeping cached session',
+        error: e,
+      );
+      return true;
     }
   }
 

@@ -1,40 +1,49 @@
 import 'package:go_router/go_router.dart';
 
-import '../features/auth/views/sign_in_screen.dart';
-import '../features/auth/views/sign_up_screen.dart';
-import '../features/splash/splash_screen.dart';
-import '../screens/main_shell.dart';
-import '../services/api_service.dart';
+import 'package:test_app/core/routes/auth_routes.dart';
+import 'package:test_app/core/routes/creator_routes.dart';
+import 'package:test_app/core/routes/onboarding_routes.dart';
+import 'package:test_app/core/routes/shell_routes.dart';
+import 'package:test_app/shared/services/api_service.dart';
 
-abstract final class AppRoutes {
-  static const splash = '/';
-  static const signIn = '/sign-in';
-  static const signUp = '/sign-up';
-  static const home = '/home';
+/// Route paths. Route definitions live in `core/routes/*_routes.dart`.
+class AppRouter {
+  AppRouter._();
+
+  // Auth
+  static const String splash = '/';
+  static const String welcome = '/welcome';
+  static const String signIn = '/sign-in';
+  static const String signUp = '/sign-up';
+  static const String forgotPassword = '/forgot-password';
+  static const String verifyEmail = '/verify-email';
+
+  // Onboarding
+  static const String welcomeNote = '/welcome-note';
+  static const String roleSelection = '/role-selection';
+  static const String interests = '/interests';
+  static const String discoverySource = '/discovery-source';
+
+  // Creator
+  static const String creatorType = '/creator-type';
+  static const String creatorSetup = '/creator-setup';
+  static const String orgSetup = '/org-setup';
+  static const String planSelection = '/plan-selection';
+
+  // Shell
+  static const String home = '/home';
 }
 
 final appRouter = GoRouter(
-  initialLocation: AppRoutes.splash,
+  initialLocation: AppRouter.splash,
   routes: [
-    GoRoute(
-      path: AppRoutes.splash,
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.signIn,
-      builder: (context, state) => const SignInScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.signUp,
-      builder: (context, state) => const SignUpScreen(),
-    ),
-    GoRoute(
-      path: AppRoutes.home,
-      builder: (context, state) => const MainShell(),
-    ),
+    ...authRoutes,
+    ...onboardingRoutes,
+    ...creatorRoutes,
+    ...shellRoutes,
   ],
 );
 
 void setupSessionExpiredCallback() {
-  ApiService.onSessionExpired = () => appRouter.go(AppRoutes.signIn);
+  ApiService.onSessionExpired = () => appRouter.go(AppRouter.signIn);
 }

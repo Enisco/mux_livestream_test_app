@@ -2,14 +2,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test_app/features/analytics/models/analytics_models.dart';
-import 'package:test_app/services/analytics_service.dart';
-import 'package:test_app/services/api_service.dart';
-import 'package:test_app/services/app_session_service.dart';
-import 'package:test_app/services/connectivity_service.dart';
-import 'package:test_app/services/device_info_service.dart';
-import 'package:test_app/services/token_storage_service.dart';
-import 'package:test_app/utils/local_storage.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/shared/services/analytics_service.dart';
+import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/app_session_service.dart';
+import 'package:test_app/shared/services/connectivity_service.dart';
+import 'package:test_app/shared/services/device_info_service.dart';
+import 'package:test_app/shared/services/token_storage_service.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Records every beacon POST and replays a scripted status code per path.
 class _FakeApi extends ApiService {
@@ -129,8 +129,7 @@ void main() {
       analytics.trackViewStarted(mediaId: 'm1', creatorId: 'c1');
       await analytics.flushNow();
 
-      final identity =
-          api.allEvents.single['identity'] as Map<String, dynamic>;
+      final identity = api.allEvents.single['identity'] as Map<String, dynamic>;
       expect(identity['sessionId'], session.analyticsSessionId);
       expect(identity['anonymousViewerId'], session.anonymousViewerId);
       expect(identity['anonymousViewerId'], isNotEmpty);
@@ -147,26 +146,28 @@ void main() {
       expect(api.paths, ['/v1/analytics/beacons/auth']);
     });
 
-    test('falls back to the optional-auth route without losing events',
-        () async {
-      // The gateway rejects the /auth route for want of a browser CSRF token.
-      api.failures['/beacons/auth'] = 403;
+    test(
+      'falls back to the optional-auth route without losing events',
+      () async {
+        // The gateway rejects the /auth route for want of a browser CSRF token.
+        api.failures['/beacons/auth'] = 403;
 
-      analytics.trackViewStarted(mediaId: 'm1', creatorId: 'c1');
-      await analytics.flushNow();
+        analytics.trackViewStarted(mediaId: 'm1', creatorId: 'c1');
+        await analytics.flushNow();
 
-      expect(api.paths, [
-        '/v1/analytics/beacons/auth',
-        '/v1/analytics/beacons',
-      ]);
-      // Same batch delivered on the fallback route — nothing dropped.
-      expect(api.batches.last.single['mediaId'], 'm1');
+        expect(api.paths, [
+          '/v1/analytics/beacons/auth',
+          '/v1/analytics/beacons',
+        ]);
+        // Same batch delivered on the fallback route — nothing dropped.
+        expect(api.batches.last.single['mediaId'], 'm1');
 
-      // And it does not keep re-probing the rejected route.
-      analytics.trackPlay(mediaId: 'm2', creatorId: 'c1');
-      await analytics.flushNow();
-      expect(api.paths.where((p) => p.endsWith('/auth')).length, 1);
-    });
+        // And it does not keep re-probing the rejected route.
+        analytics.trackPlay(mediaId: 'm2', creatorId: 'c1');
+        await analytics.flushNow();
+        expect(api.paths.where((p) => p.endsWith('/auth')).length, 1);
+      },
+    );
   });
 
   group('beacon payload', () {
@@ -253,59 +254,63 @@ void main() {
       expect(api.allEvents.where((e) => e['eventType'] == 'click').length, 3);
     });
 
-    test('qualified impression is sent once per delivery per session',
-        () async {
-      for (var i = 0; i < 3; i++) {
+    test(
+      'qualified impression is sent once per delivery per session',
+      () async {
+        for (var i = 0; i < 3; i++) {
+          analytics.trackPromotedQualifiedImpression(
+            mediaId: 'm1',
+            creatorId: 'c1',
+            mediaType: MediaTypes.video,
+            source: AnalyticsSource.homeFeed,
+            promotion: promotion,
+            visibleDurationMs: 1500,
+          );
+        }
+        await analytics.flushNow();
+
+        final impressions = api.allEvents.where(
+          (e) => e['eventType'] == 'promoted_qualified_impression',
+        );
+        expect(impressions.length, 1);
+        expect(impressions.single['visibleDurationMs'], 1500);
+      },
+    );
+
+    test(
+      'qualified impression eventId is stable so retries are idempotent',
+      () async {
         analytics.trackPromotedQualifiedImpression(
           mediaId: 'm1',
           creatorId: 'c1',
-          mediaType: MediaTypes.video,
           source: AnalyticsSource.homeFeed,
           promotion: promotion,
           visibleDurationMs: 1500,
         );
-      }
-      await analytics.flushNow();
+        await analytics.flushNow();
+        final firstId = api.allEvents.single['eventId'] as String;
 
-      final impressions = api.allEvents.where(
-        (e) => e['eventType'] == 'promoted_qualified_impression',
-      );
-      expect(impressions.length, 1);
-      expect(impressions.single['visibleDurationMs'], 1500);
-    });
+        // A second service instance sharing the same analytics session must
+        // derive the same ID for the same delivery.
+        final twin = AnalyticsService(
+          api: api,
+          deviceInfo: _FakeDeviceInfo(),
+          session: session,
+          tokenStorage: tokens,
+          connectivity: _FakeConnectivity('wifi'),
+        );
+        twin.trackPromotedQualifiedImpression(
+          mediaId: 'm1',
+          creatorId: 'c1',
+          source: AnalyticsSource.homeFeed,
+          promotion: promotion,
+          visibleDurationMs: 1500,
+        );
+        await twin.flushNow();
 
-    test('qualified impression eventId is stable so retries are idempotent',
-        () async {
-      analytics.trackPromotedQualifiedImpression(
-        mediaId: 'm1',
-        creatorId: 'c1',
-        source: AnalyticsSource.homeFeed,
-        promotion: promotion,
-        visibleDurationMs: 1500,
-      );
-      await analytics.flushNow();
-      final firstId = api.allEvents.single['eventId'] as String;
-
-      // A second service instance sharing the same analytics session must
-      // derive the same ID for the same delivery.
-      final twin = AnalyticsService(
-        api: api,
-        deviceInfo: _FakeDeviceInfo(),
-        session: session,
-        tokenStorage: tokens,
-        connectivity: _FakeConnectivity('wifi'),
-      );
-      twin.trackPromotedQualifiedImpression(
-        mediaId: 'm1',
-        creatorId: 'c1',
-        source: AnalyticsSource.homeFeed,
-        promotion: promotion,
-        visibleDurationMs: 1500,
-      );
-      await twin.flushNow();
-
-      expect(api.allEvents.last['eventId'], firstId);
-    });
+        expect(api.allEvents.last['eventId'], firstId);
+      },
+    );
   });
 
   group('delivery reliability', () {

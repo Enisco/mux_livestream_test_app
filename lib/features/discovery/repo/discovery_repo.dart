@@ -1,10 +1,10 @@
 import 'package:get_it/get_it.dart';
 
-import '../../../services/api_service.dart';
-import '../../../utils/api_endpoints.dart';
-import '../models/media_detail.dart';
-import '../models/vertical_feed_item.dart';
-import '../models/web_feed_item.dart';
+import 'package:test_app/models/discovery_models/media_detail.dart';
+import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
+import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 class DiscoveryRepo {
   final ApiService _api = GetIt.instance<ApiService>();

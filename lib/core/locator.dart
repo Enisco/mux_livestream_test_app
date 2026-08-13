@@ -1,18 +1,19 @@
 import 'package:get_it/get_it.dart';
 
-import '../features/auth/repo/auth_repo.dart';
-import '../features/creator/repo/creator_repo.dart';
-import '../features/discovery/repo/discovery_repo.dart';
-import '../features/engagement/repo/engagement_repo.dart';
-import '../services/analytics_service.dart';
-import '../services/api_service.dart';
-import '../services/app_session_service.dart';
-import '../services/connectivity_service.dart';
-import '../services/device_info_service.dart';
-import '../services/playback_info_cache.dart';
-import '../services/token_storage_service.dart';
-import '../services/vertical_feed_preloader.dart';
-import '../utils/local_storage.dart';
+import 'package:test_app/features/auth/repo/auth_repo.dart';
+import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
+import 'package:test_app/shared/services/analytics_service.dart';
+import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/app_session_service.dart';
+import 'package:test_app/shared/services/connectivity_service.dart';
+import 'package:test_app/shared/services/device_info_service.dart';
+import 'package:test_app/shared/services/playback_info_cache.dart';
+import 'package:test_app/shared/services/token_storage_service.dart';
+import 'package:test_app/shared/services/vertical_feed_preloader.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 final getIt = GetIt.instance;
 
@@ -43,6 +44,7 @@ Future<void> setupLocator() async {
   getIt.registerLazySingleton<AuthRepo>(() => AuthRepo());
   getIt.registerLazySingleton<CreatorRepo>(() => CreatorRepo());
   getIt.registerLazySingleton<DiscoveryRepo>(() => DiscoveryRepo());
+  getIt.registerLazySingleton<OnboardingRepo>(() => OnboardingRepo());
   getIt.registerLazySingleton<EngagementRepo>(() => EngagementRepo());
   getIt.registerLazySingleton<AnalyticsService>(
     () => AnalyticsService(

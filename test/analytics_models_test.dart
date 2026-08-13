@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:test_app/features/analytics/models/analytics_models.dart';
-import 'package:test_app/features/discovery/models/vertical_feed_item.dart';
-import 'package:test_app/features/discovery/models/web_feed_item.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 
 void main() {
   group('PromotionAttribution.tryParse', () {
@@ -61,7 +61,10 @@ void main() {
         valid()..['promotionDeliveryId'] = 'another_token',
       )!;
       expect(a.deliveryKey, isNot(b.deliveryKey));
-      expect(a.deliveryKey, PromotionAttribution.tryParse(valid())!.deliveryKey);
+      expect(
+        a.deliveryKey,
+        PromotionAttribution.tryParse(valid())!.deliveryKey,
+      );
     });
   });
 

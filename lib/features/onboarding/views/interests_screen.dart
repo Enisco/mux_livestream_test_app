@@ -1,0 +1,207 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+
+import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/views/widgets/interest_chip.dart';
+import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
+import 'package:test_app/shared/components/gtube_logo_mark.dart';
+import 'package:test_app/shared/components/onboarding_scaffold.dart';
+import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/utils/app_constants/app_colors.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/utils/app_constants/app_styles.dart';
+
+/// One selectable interest, in the order the design lays them out.
+class Interest {
+  const Interest(this.label, {this.icon});
+
+  final String label;
+
+  /// Builds the unselected glyph. Several chips have none in the design.
+  final Widget Function()? icon;
+}
+
+Widget _svg(String asset) => SvgPicture.asset(
+  asset,
+  width: InterestChip.iconSize,
+  height: InterestChip.iconSize,
+);
+
+final _interests = <Interest>[
+  Interest(
+    AppStrings.interestPreaching,
+    icon: () => _svg(AppAssets.iconCatMicrophone),
+  ),
+  // The design only shows Worship and "Marriage & family" in their selected
+  // state, so their unselected glyphs are unknown — see docs/CLAUDE.md.
+  const Interest(AppStrings.interestWorship),
+  Interest(
+    AppStrings.interestBibleStudy,
+    icon: () => _svg(AppAssets.iconCatBible),
+  ),
+  Interest(AppStrings.interestYouthFamily, icon: () => const FamilyGlyph()),
+  Interest(
+    AppStrings.interestMission,
+    icon: () => _svg(AppAssets.iconCatGlobe),
+  ),
+  const Interest(AppStrings.interestGrief),
+  const Interest(AppStrings.interestMarriageFamily),
+  const Interest(AppStrings.interestLeadership),
+  Interest(AppStrings.interestFaith, icon: () => _svg(AppAssets.iconCatCoins)),
+  const Interest(AppStrings.interestMarriageRelationships),
+  const Interest(AppStrings.interestGospelArtist),
+];
+
+/// "What would you like to see?"
+class InterestsScreen extends StatefulWidget {
+  const InterestsScreen({super.key});
+
+  @override
+  State<InterestsScreen> createState() => _InterestsScreenState();
+}
+
+class _InterestsScreenState extends State<InterestsScreen> {
+  final _selected = <String>{};
+
+  /// The design draws the fill at 236 of a 350-wide track.
+  static const _progress = 236 / 350;
+
+  void _continue() {
+    // TODO(onboarding): persist the picks once the onboarding-state enums are
+    // confirmed; the design treats this step as skippable either way.
+    context.go(AppRouter.discoverySource);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OnboardingScaffold(
+      backgroundColor: AppColors.brandSecondary,
+      backgroundAsset: AppAssets.worshipBg,
+      topBar: _TopBar(progress: _progress, onSkip: _continue),
+      scrollable: false,
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            AppStrings.interestsHint,
+            textAlign: TextAlign.center,
+            style: AppStyles.caption(
+              12,
+              weight: AppStyles.medium,
+              lineHeight: 16 / 12,
+            ),
+          ),
+          const SizedBox(height: 10),
+          PrimaryButton(
+            label: AppStrings.continueLabel,
+            height: 54,
+            onPressed: _continue,
+          ),
+        ],
+      ),
+      child: _content(),
+    );
+  }
+
+  Widget _content() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: GTubeLogoMark.compact()),
+        const SizedBox(height: 8),
+        Text(
+          AppStrings.interestsTitle,
+          textAlign: TextAlign.center,
+          style: AppStyles.heading(20, letterSpacing: -0.8),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          AppStrings.interestsSubtitle,
+          textAlign: TextAlign.center,
+          style: AppStyles.body(13, color: AppColors.neutral400),
+        ),
+        const SizedBox(height: 22),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              runAlignment: WrapAlignment.center,
+              spacing: 10,
+              runSpacing: 17,
+              children: [
+                for (final interest in _interests)
+                  InterestChip(
+                    label: interest.label,
+                    icon: interest.icon?.call(),
+                    selected: _selected.contains(interest.label),
+                    onTap: () => setState(() {
+                      if (!_selected.remove(interest.label)) {
+                        _selected.add(interest.label);
+                      }
+                    }),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.progress, required this.onSkip});
+
+  final double progress;
+  final VoidCallback onSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OnboardingProgressBar(progress: progress),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 38,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => context.pop(),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Center(
+                    child: SvgPicture.asset(
+                      AppAssets.iconArrowLeft,
+                      width: 20,
+                      height: 10,
+                    ),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onSkip,
+                child: Text(
+                  AppStrings.skip,
+                  style: AppStyles.caption(
+                    12,
+                    color: AppColors.neutral50,
+                    weight: AppStyles.medium,
+                    lineHeight: 16 / 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
