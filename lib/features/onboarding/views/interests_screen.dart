@@ -1,7 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:test_app/core/locator.dart';
+import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/features/onboarding/views/widgets/interest_chip.dart';
 import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
@@ -33,14 +36,24 @@ Widget _svg(String asset) => SvgPicture.asset(
 final _interests = <Interest>[
   Interest(
     AppStrings.interestPreaching,
-    icon: () => _svg(AppAssets.iconCatMicrophone, slugs: ['sermons']),
+    icon: () => _svg(AppAssets.iconCatMicrophone),
+    slugs: ['sermons'],
   ),
-  Interest(AppStrings.interestWorship, icon: () => _svg(AppAssets.iconCatDove, slugs: ['worship'])),
+  Interest(
+    AppStrings.interestWorship,
+    icon: () => _svg(AppAssets.iconCatDove),
+    slugs: ['worship'],
+  ),
   Interest(
     AppStrings.interestBibleStudy,
-    icon: () => _svg(AppAssets.iconCatBible, slugs: ['bible-study']),
+    icon: () => _svg(AppAssets.iconCatBible),
+    slugs: ['bible-study'],
   ),
-  Interest(AppStrings.interestYouthFamily, icon: () => const FamilyGlyph(, slugs: ['youth', 'family'])),
+  Interest(
+    AppStrings.interestYouthFamily,
+    icon: () => const FamilyGlyph(),
+    slugs: ['youth', 'family'],
+  ),
   Interest(
     AppStrings.interestMission,
     icon: () => _svg(AppAssets.iconCatGlobe),
@@ -51,7 +64,8 @@ final _interests = <Interest>[
   ),
   Interest(
     AppStrings.interestMarriageFamilyRelationships,
-    icon: () => _svg(AppAssets.iconCatRings, slugs: ['family']),
+    icon: () => _svg(AppAssets.iconCatRings),
+    slugs: ['family'],
   ),
   Interest(
     AppStrings.interestLeadership,
@@ -60,7 +74,8 @@ final _interests = <Interest>[
   Interest(AppStrings.interestFaith, icon: () => _svg(AppAssets.iconCatCoins)),
   Interest(
     AppStrings.interestGospelArtist,
-    icon: () => _svg(AppAssets.iconCatMusicNote, slugs: ['gospel-music']),
+    icon: () => _svg(AppAssets.iconCatMusicNote),
+    slugs: ['gospel-music'],
   ),
 ];
 
@@ -76,9 +91,26 @@ class _InterestsScreenState extends State<InterestsScreen> {
 
   static const _progress = 236 / 350;
 
-  void _continue() {
-    // TODO(onboarding): persist the picks once the onboarding-state enums are
-    context.go(AppRouter.discoverySource);
+  /// Slugs for the picks, deduped. Chips with no API category contribute none.
+  List<String> get _slugs => <String>{
+    for (final interest in _interests)
+      if (_selected.contains(interest.label)) ...interest.slugs,
+  }.toList();
+
+  Future<void> _continue() async {
+    final slugs = _slugs;
+    if (slugs.isNotEmpty) {
+      try {
+        await getIt<OnboardingRepo>().updateViewerPreferences(
+          categorySlugs: slugs,
+        );
+      } catch (e) {
+        logger.w('Could not save interests', error: e);
+      }
+    }
+    // Carried on so the discovery step can resend them alongside its own
+    // fields; the endpoint replaces rather than merges.
+    if (mounted) context.go(AppRouter.discoverySource, extra: slugs);
   }
 
   @override

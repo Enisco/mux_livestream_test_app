@@ -32,7 +32,13 @@ final List<RouteBase> onboardingRoutes = [
   ),
   GoRoute(
     path: AppRouter.discoverySource,
-    pageBuilder: (context, state) =>
-        slideTransition(state, const DiscoverySourceScreen()),
+    pageBuilder: (context, state) => slideTransition(
+      state,
+      DiscoverySourceScreen(
+        categorySlugs: state.extra is List<String>
+            ? state.extra! as List<String>
+            : const [],
+      ),
+    ),
   ),
 ];

@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/auth/repo/auth_repo.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
@@ -102,7 +101,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   String _extractMessage(DioException e) {
     if (e.response?.data is Map) {
       final data = e.response!.data as Map;
-      final msg = data['message'];
+      final msg = data['error'];
       if (msg is String && msg.isNotEmpty) return msg;
       if (msg is List && msg.isNotEmpty) return msg.first.toString();
     }

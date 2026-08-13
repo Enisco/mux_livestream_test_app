@@ -146,6 +146,7 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
         currency: _currency,
       );
       // TODO(creator): open checkout.checkoutUrl in a browser/webview once the
+      // payment flow is agreed.
       logger.i('Checkout created: ${checkout.reference}');
     } catch (e) {
       logger.e('Checkout failed', error: e);

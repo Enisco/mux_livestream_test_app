@@ -4,7 +4,10 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 class OnboardingRepo {
-  final ApiService _api = GetIt.instance<ApiService>();
+  OnboardingRepo({ApiService? api})
+    : _api = api ?? GetIt.instance<ApiService>();
+
+  final ApiService _api;
 
   Future<void> updateViewerPreferences({
     List<String>? categorySlugs,

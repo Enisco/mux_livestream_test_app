@@ -31,7 +31,10 @@ enum DiscoverySource {
 }
 
 class DiscoverySourceScreen extends StatefulWidget {
-  const DiscoverySourceScreen({super.key});
+  const DiscoverySourceScreen({super.key, this.categorySlugs = const []});
+
+  /// Carried from the interests step so both land in one payload.
+  final List<String> categorySlugs;
 
   @override
   State<DiscoverySourceScreen> createState() => _DiscoverySourceScreenState();
@@ -60,9 +63,11 @@ class _DiscoverySourceScreenState extends State<DiscoverySourceScreen> {
   Future<void> _continue() async {
     final source = _selected?.name;
     final detail = _otherCtrl.text.trim();
-    if (source != null || detail.isNotEmpty) {
+    final slugs = widget.categorySlugs;
+    if (source != null || detail.isNotEmpty || slugs.isNotEmpty) {
       try {
         await getIt<OnboardingRepo>().updateViewerPreferences(
+          categorySlugs: slugs.isEmpty ? null : slugs,
           discoverySource: source,
           discoveryDetail: detail,
         );
