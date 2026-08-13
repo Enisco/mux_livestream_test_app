@@ -5,7 +5,6 @@ import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Outcome of the live handle check.
 enum HandleState { idle, checking, available, taken, invalid }
 
 const _radius = 8.0;
@@ -15,8 +14,6 @@ OutlineInputBorder creatorFieldBorder(Color color) => OutlineInputBorder(
   borderSide: BorderSide(color: color),
 );
 
-/// Caption above a creator-setup input. The design uses three variants (12
-/// medium, 13 medium, 12 bold), so size and weight are caller-controlled.
 class CreatorFieldLabel extends StatelessWidget {
   const CreatorFieldLabel(
     this.text, {
@@ -47,7 +44,6 @@ class CreatorFieldLabel extends StatelessWidget {
   }
 }
 
-/// Plain text input in the creator-setup style.
 class CreatorTextField extends StatelessWidget {
   const CreatorTextField({
     super.key,
@@ -80,7 +76,6 @@ class CreatorTextField extends StatelessWidget {
   }
 }
 
-/// Read-only row that opens a picker, with the design's trailing chevron.
 class CreatorSelectField extends StatelessWidget {
   const CreatorSelectField({
     super.key,
@@ -135,7 +130,6 @@ class CreatorSelectField extends StatelessWidget {
   }
 }
 
-/// Handle input plus the live availability line underneath.
 class CreatorHandleField extends StatelessWidget {
   const CreatorHandleField({
     super.key,

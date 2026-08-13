@@ -1,5 +1,3 @@
-/// Shared analytics contract types, so event names, `source` labels and
-/// promotion attribution can't drift between surfaces.
 library;
 
 abstract final class AnalyticsEventType {
@@ -23,11 +21,9 @@ abstract final class AnalyticsEventType {
     completion,
   };
 
-  /// Billable events — never fabricated from route state, never replayed.
   static const paid = {promotionClick, promotedQualifiedImpression};
 }
 
-/// `source` values the gateway accepts; anything else becomes [unknown].
 abstract final class AnalyticsSource {
   static const creatorChannel = 'creator_channel';
   static const homeFeed = 'home_feed';
@@ -60,7 +56,6 @@ abstract final class MediaTypes {
 
   static const all = {video, music, livestream};
 
-  /// Null rather than a guess — a wrong `mediaType` is worse than none.
   static String? normalize(String? raw) =>
       raw != null && all.contains(raw) ? raw : null;
 }
@@ -72,9 +67,6 @@ abstract final class PromotionPlacement {
   static const all = {catalogue, verticalFeed};
 }
 
-/// Server-issued attribution for one served placement. Built only from a
-/// feed/suggestion payload — never minted, edited, or carried into a
-/// destination route.
 class PromotionAttribution {
   final String campaignId;
   final String placement;
@@ -86,8 +78,6 @@ class PromotionAttribution {
     required this.deliveryId,
   });
 
-  /// Null unless the item is flagged promoted *and* carries all three
-  /// server-issued fields. A partial payload is treated as organic.
   static PromotionAttribution? tryParse(Map<String, dynamic>? json) {
     if (json == null) return null;
     if (json['isPromoted'] != true) return null;
@@ -109,7 +99,6 @@ class PromotionAttribution {
     'promotionDeliveryId': deliveryId,
   };
 
-  /// Identity of one paid delivery — de-duplication key and `eventId` seed.
   String get deliveryKey => '$campaignId|$placement|$deliveryId';
 
   @override
@@ -117,7 +106,6 @@ class PromotionAttribution {
       'PromotionAttribution($campaignId, $placement, ${deliveryId.length} chars)';
 }
 
-/// Accumulates `watchDurationSeconds`, counting only time actually playing.
 class WatchClock {
   Duration _accumulated = Duration.zero;
   DateTime? _startedAt;

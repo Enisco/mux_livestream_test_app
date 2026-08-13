@@ -7,9 +7,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// The three values `preferredProvider` accepts. The design only draws Paystack
-/// and Stripe; Flutterwave is included because the API takes it and it covers
-/// markets the other two don't.
 enum PaymentProvider {
   paystack(
     'paystack',
@@ -41,7 +38,6 @@ enum PaymentProvider {
       PaymentProvider.values.where((p) => p.value == value).firstOrNull;
 }
 
-/// Returns the chosen provider, or null if dismissed.
 class PaymentProviderSheet extends StatefulWidget {
   const PaymentProviderSheet({
     super.key,
@@ -50,11 +46,9 @@ class PaymentProviderSheet extends StatefulWidget {
     this.recommended,
   });
 
-  /// Tier name shown in the subheading, e.g. "basic".
   final String planLabel;
   final bool yearly;
 
-  /// Provider flagged by `GET /v1/payment/saas/currency-hint`.
   final PaymentProvider? recommended;
 
   static Future<PaymentProvider?> show(
@@ -140,8 +134,6 @@ class _PaymentProviderSheetState extends State<PaymentProviderSheet> {
           ],
           const SizedBox(height: 24),
           PrimaryButton(
-            // The design's "Continue with Free" label is a copy-paste from the
-            // plan screen — see docs/OPEN_ISSUES.md.
             label: '${AppStrings.continueWith}${_selected.label}',
             height: 54,
             onPressed: () => Navigator.of(context).pop(_selected),

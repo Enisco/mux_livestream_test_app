@@ -21,15 +21,10 @@ class WebFeedItem {
     this.isFollowingCreator = false,
   });
 
-  /// Server-issued promotion attribution, or null for organic items.
-  /// Lives on the feed item only — it is used to emit source-surface analytics
-  /// and is never appended to a destination route.
   PromotionAttribution? get promotion => meta.promotion;
 
   bool get isPromoted => meta.promotion != null;
 
-  /// `mediaType` for analytics beacons, when the feed told us. The gateway puts
-  /// it on `facets`; `meta` is the fallback.
   String? get mediaType => facets.mediaType ?? meta.mediaType;
 
   bool get isLiveNow => facets.isLiveNow || meta.isLiveNow;
@@ -82,8 +77,6 @@ class WebFeedCreator {
   );
 }
 
-/// `facets` on a feed item — engagement counts and classification the card
-/// needs. Note `isLiveNow` and `mediaType` live here, not in `meta`.
 class WebFeedFacets {
   final String? mediaType;
   final bool isLiveNow;

@@ -80,8 +80,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       child: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthSuccess) {
-            // Email verification is skipped for now, so sign-up lands straight
-            // on the welcome note — see docs/OPEN_ISSUES.md.
             final name = Uri.encodeComponent(_firstNameCtrl.text.trim());
             context.go('${AppRouter.welcomeNote}?name=$name');
           }
@@ -231,8 +229,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
 class _Header extends StatelessWidget {
   const _Header();
-
-  /// Title line (32) + gap (8) + two lines of 16pt subtitle.
 
   @override
   Widget build(BuildContext context) {

@@ -7,8 +7,6 @@ import 'package:test_app/shared/components/onboarding_scaffold.dart';
 
 import 'helpers/load_app_fonts.dart';
 
-/// Sizes worth covering: a short phone, where content is most likely to
-/// overflow, and a tall one.
 const _sizes = <String, Size>{
   'iPhone SE': Size(375, 667),
   'iPhone 15': Size(393, 852),
@@ -41,9 +39,6 @@ void main() {
   });
 
   group('OnboardingScaffold', () {
-    // A scrolling scaffold leaves its child unbounded vertically, so a flex
-    // child inside one cannot lay out. Screens needing one opt out and manage
-    // their own scrolling — see the `scrollable` doc on OnboardingScaffold.
     testWidgets('lays out a flex child when scrolling is off', (tester) async {
       await _pumpAt(
         tester,

@@ -21,12 +21,6 @@ class _QueuedEvent {
   int attempts = 0;
 }
 
-/// Batches media analytics beacons and posts them to the gateway.
-///
-/// Billing invariants: paid events need a server-issued [PromotionAttribution];
-/// qualified impressions de-duplicate per delivery per session on a
-/// deterministic `eventId`; failed flushes re-queue unless the server rejected
-/// the payload (4xx).
 class AnalyticsService with WidgetsBindingObserver {
   AnalyticsService({
     required ApiService api,
@@ -61,14 +55,10 @@ class AnalyticsService with WidgetsBindingObserver {
   DateTime? _retryNotBefore;
   int _consecutiveFailures = 0;
 
-  /// Set once the `/auth` beacon route rejects us — it wants a browser CSRF
-  /// token. We then stay on the optional-auth route, which still attributes via
-  /// the Bearer token.
   bool _authRouteRejected = false;
 
   final Set<String> _qualifiedImpressionsSent = {};
 
-  /// Guards against a double-tap emitting two paid clicks for one delivery.
   final Map<String, DateTime> _recentPromotionClicks = {};
   static const _clickDebounce = Duration(seconds: 2);
 
@@ -82,16 +72,12 @@ class AnalyticsService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // The mobile equivalent of a keepalive unload flush: get progress,
-    // view_ended, and completion out before the OS suspends us.
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.detached) {
       unawaited(flushNow());
     }
   }
-
-  // ── Playback events ─────────────────────────────────────────────────────────
 
   void trackViewStarted({
     required String mediaId,
@@ -182,7 +168,6 @@ class AnalyticsService with WidgetsBindingObserver {
     ),
   );
 
-  /// Viewer left, closed the player, or a livestream ended. Flushed immediately.
   void trackViewEnded({
     required String mediaId,
     required String creatorId,
@@ -204,7 +189,6 @@ class AnalyticsService with WidgetsBindingObserver {
     );
   }
 
-  /// VOD playback reached the actual end. Never used for livestream close.
   void trackCompletion({
     required String mediaId,
     required String creatorId,
@@ -226,10 +210,6 @@ class AnalyticsService with WidgetsBindingObserver {
     );
   }
 
-  // ── Discovery events ────────────────────────────────────────────────────────
-
-  /// Organic impression for a destination screen. Takes no attribution — a
-  /// destination must never emit a catch-up paid impression.
   void trackImpression({
     required String mediaId,
     required String creatorId,
@@ -245,10 +225,6 @@ class AnalyticsService with WidgetsBindingObserver {
     ),
   );
 
-  /// Primary-navigation `click`, plus `promotion_click` when the card carries
-  /// server-issued attribution. Call from the source surface just before
-  /// navigating; the flush isn't awaited. Content clicks only — not likes,
-  /// follows, bookmarks or context menus.
   void trackContentClick({
     required String mediaId,
     required String creatorId,
@@ -283,9 +259,6 @@ class AnalyticsService with WidgetsBindingObserver {
     unawaited(flushNow());
   }
 
-  /// Billable impression for a promoted placement that met the visibility/dwell
-  /// threshold. De-duplicated per delivery per session, with a deterministic
-  /// `eventId` so a retried flush is idempotent server-side.
   void trackPromotedQualifiedImpression({
     required String mediaId,
     required String creatorId,
@@ -307,7 +280,6 @@ class AnalyticsService with WidgetsBindingObserver {
         source: source,
         promotion: promotion,
         visibleDurationMs: visibleDurationMs,
-        // Stable across retries: same session + same delivery => same UUID.
         eventId: _deterministicEventId(
           '${AnalyticsEventType.promotedQualifiedImpression}|'
           '${_session.analyticsSessionId}|${promotion.deliveryKey}',
@@ -316,8 +288,6 @@ class AnalyticsService with WidgetsBindingObserver {
     );
   }
 
-  /// False if this delivery just produced a paid click — stops a double-tap
-  /// billing twice.
   bool _allowPromotionClick(PromotionAttribution promotion) {
     final now = DateTime.now();
     _recentPromotionClicks.removeWhere(
@@ -329,17 +299,12 @@ class AnalyticsService with WidgetsBindingObserver {
     return true;
   }
 
-  // ── Flushing ────────────────────────────────────────────────────────────────
-
-  /// Sends everything buffered now, bypassing the backoff window. Waits out any
-  /// in-flight batch first, so a caller is never silently no-op'd.
   Future<void> flushNow() async {
     final running = _inFlight;
     if (running != null) await running;
     await _flush(force: true);
   }
 
-  /// Legacy entry point kept for existing callers.
   void flush() => unawaited(flushNow());
 
   void _enqueue(Map<String, dynamic> event, {bool flush = true}) {
@@ -356,9 +321,6 @@ class AnalyticsService with WidgetsBindingObserver {
     }
   }
 
-  /// Bounds memory while offline. Paid and session-terminal events are dropped
-  /// last — losing a `progress` beacon costs nothing, losing a paid one costs
-  /// revenue.
   void _trimBuffer() {
     if (_buffer.length <= _maxBufferedEvents) return;
     final overflow = _buffer.length - _maxBufferedEvents;
@@ -369,7 +331,6 @@ class AnalyticsService with WidgetsBindingObserver {
       removed++;
       return true;
     });
-    // Still over budget (everything left is high-value): drop oldest first.
     if (_buffer.length > _maxBufferedEvents) {
       _buffer.removeRange(0, _buffer.length - _maxBufferedEvents);
     }
@@ -378,7 +339,6 @@ class AnalyticsService with WidgetsBindingObserver {
     );
   }
 
-  /// Concurrent callers share one in-flight run.
   Future<void> _flush({bool force = false}) {
     final running = _inFlight;
     if (running != null) return running;
@@ -393,8 +353,6 @@ class AnalyticsService with WidgetsBindingObserver {
       if (DateTime.now().isBefore(_retryNotBefore!)) return;
     }
 
-    // Successive batches so a backlog clears in one run, bounded so a flush
-    // can't monopolise the network.
     var sent = 0;
     while (_buffer.isNotEmpty && sent < _maxBatchesPerFlush) {
       final batch = _buffer.take(_maxBatchSize).toList();
@@ -406,7 +364,6 @@ class AnalyticsService with WidgetsBindingObserver {
         _retryNotBefore = null;
         logger.d('Analytics: flushed ${batch.length} event(s)');
       } catch (e) {
-        // Stop on the first failure; backoff governs when we try again.
         _handleFlushFailure(batch, e);
         break;
       }
@@ -420,8 +377,6 @@ class AnalyticsService with WidgetsBindingObserver {
 
   void _handleFlushFailure(List<_QueuedEvent> batch, Object error) {
     final status = error is DioException ? error.response?.statusCode : null;
-    // 4xx (bar throttling/timeout) means the payload itself was rejected;
-    // identical bytes would fail again.
     final retryable =
         status == null || status >= 500 || status == 408 || status == 429;
 
@@ -443,7 +398,6 @@ class AnalyticsService with WidgetsBindingObserver {
       }
       requeue.add(event);
     }
-    // Head-insert so view_started → progress → view_ended ordering survives.
     _buffer.insertAll(0, requeue);
     _trimBuffer();
 
@@ -468,8 +422,6 @@ class AnalyticsService with WidgetsBindingObserver {
         return;
       } on DioException catch (e) {
         final status = e.response?.statusCode;
-        // Auth route wants a browser CSRF token; fall back permanently to the
-        // optional-auth route, which still reads our Bearer token.
         if (status == 401 || status == 403 || status == 404) {
           _authRouteRejected = true;
           logger.d(
@@ -484,8 +436,6 @@ class AnalyticsService with WidgetsBindingObserver {
 
     await _api.post(ApiEndpoints.beacons, data: body);
   }
-
-  // ── Payload ─────────────────────────────────────────────────────────────────
 
   Map<String, dynamic> _build({
     required String eventType,
@@ -514,15 +464,12 @@ class AnalyticsService with WidgetsBindingObserver {
       'visibleDurationMs': ?visibleDurationMs,
       'identity': {
         'sessionId': _session.analyticsSessionId,
-        // Mobile has no `gt_anon_viewer` cookie — send the persisted equivalent.
         'anonymousViewerId': _session.anonymousViewerId,
       },
       'client': {
         'platform': _deviceInfo.platform,
         'appVersion': _deviceInfo.appVersion,
         'deviceType': _deviceInfo.deviceType,
-        // Captured at enqueue time: report the network playback happened on,
-        // not the one the flush went out over.
         'networkType': _connectivity.networkType,
       },
     };

@@ -21,8 +21,6 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
   String? _error;
   bool _loading = false;
 
-  /// One stable ID per app run — anonymous live playback sessions are tracked
-  /// against it, so it must not change between the status call and the token.
   String get _clientSessionId =>
       GetIt.instance<AppSessionService>().clientSessionId;
 

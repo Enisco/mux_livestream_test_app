@@ -12,12 +12,9 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Typewriter greeting on the way into onboarding. No controls: the copy types
-/// itself out, holds, then continues to [nextRoute] (role selection by default).
 class WelcomeNoteScreen extends StatefulWidget {
   const WelcomeNoteScreen({super.key, this.name, this.nextRoute});
 
-  /// First name shown in the greeting. Falls back to the cached user.
   final String? name;
   final String? nextRoute;
 
@@ -28,8 +25,6 @@ class WelcomeNoteScreen extends StatefulWidget {
 class _WelcomeNoteScreenState extends State<WelcomeNoteScreen> {
   Timer? _holdTimer;
 
-  /// The design timeline runs 5.24s; typing ends around 2.5s, so the remainder
-  /// is a deliberate hold before the flow moves on.
   static const _holdAfterTyping = Duration(milliseconds: 2700);
 
   String get _firstName {
@@ -60,8 +55,6 @@ class _WelcomeNoteScreenState extends State<WelcomeNoteScreen> {
         body: DecoratedBox(
           decoration: const BoxDecoration(gradient: AppStyles.splashBackground),
           child: SafeArea(
-            // The greeting is the whole screen — centre it rather than pinning
-            // it to a design-frame offset.
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 43),

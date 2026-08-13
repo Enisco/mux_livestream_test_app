@@ -5,9 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// One fill and radius throughout; the border switches from `neutral/700` to
-/// brand primary on focus and the focused state gains the `shadow/xl` lift.
-/// The design labels sit inside the field as placeholders rather than above it.
 class GTubeTextField extends StatefulWidget {
   const GTubeTextField({
     super.key,
@@ -122,8 +119,6 @@ class _GTubeTextFieldState extends State<GTubeTextField> {
   );
 }
 
-/// Non-editable field that opens a picker — used for "Gender (optional)". Same
-/// shell as [GTubeTextField], rendered as a button.
 class GTubeSelectField extends StatelessWidget {
   const GTubeSelectField({
     super.key,

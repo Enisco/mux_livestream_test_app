@@ -12,7 +12,6 @@ import 'package:test_app/utils/app_constants/app_theme.dart';
 class GTubeApp extends StatelessWidget {
   const GTubeApp({super.key});
 
-  /// The frame every design value is expressed in. `.s` scales against this.
   static const _designSize = Size(390, 844);
 
   @override
@@ -37,7 +36,6 @@ class GTubeApp extends StatelessWidget {
                 child: BlocListener<AuthBloc, AuthState>(
                   listener: (context, state) {
                     if (state is AuthLoggedOut) {
-                      // Back to the public shell; the Me tab shows the wall.
                       appRouter.go(AppRouter.home);
                     }
                   },

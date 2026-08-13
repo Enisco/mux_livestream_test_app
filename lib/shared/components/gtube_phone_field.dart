@@ -11,11 +11,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/phone_number.dart';
 
-/// Dial-code selector joined to a number field inside one bordered shell, so it
-/// reads as a single control alongside the other [GTubeTextField]s.
-///
-/// [controller] holds only what the user typed. Use [PhoneNumber.e164] with the
-/// selected country to build the value for the API.
 class GTubePhoneField extends StatefulWidget {
   const GTubePhoneField({
     super.key,
@@ -55,12 +50,8 @@ class _GTubePhoneFieldState extends State<GTubePhoneField> {
   @override
   void didUpdateWidget(GTubePhoneField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // A different dial code can make a shown error stale in either direction.
-    // Revalidating has to wait for the frame to finish — the enclosing Form
-    // rebuilds on it, and it is mid-build right now.
-    // Only when something has been typed: pushing a value into an untouched
-    // field would trip onUserInteraction and scold someone who has just picked
-    // a country before entering their number.
+    // Only when typed into: pushing a value into an untouched field trips
+    // onUserInteraction. Post-frame because the Form is mid-build.
     if (oldWidget.country != widget.country &&
         widget.controller.text.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -76,8 +67,6 @@ class _GTubePhoneFieldState extends State<GTubePhoneField> {
     super.dispose();
   }
 
-  /// The number lives in [widget.controller], so the enclosing [Form] only sees
-  /// edits once they are pushed into the wrapping [FormField].
   void _syncFormValue() => _formState?.didChange(widget.controller.text);
 
   Future<void> _pickCountry() async {

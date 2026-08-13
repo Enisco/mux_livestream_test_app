@@ -8,7 +8,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Dialling-code picker behind the phone field's country button.
 class CountryPickerSheet extends StatefulWidget {
   const CountryPickerSheet({super.key, this.selected});
 

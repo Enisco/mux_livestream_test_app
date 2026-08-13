@@ -16,7 +16,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// The options offered by the design, in order.
 enum DiscoverySource {
   friend(AppStrings.discoveryFriend, AppAssets.iconSourceFriend),
   church(AppStrings.discoveryChurch, AppAssets.iconSourceChurch),
@@ -31,8 +30,6 @@ enum DiscoverySource {
   final String icon;
 }
 
-/// "One last thing how did you find us?" — the discovery-source question. The
-/// design frame is misleadingly named "What would you like to see".
 class DiscoverySourceScreen extends StatefulWidget {
   const DiscoverySourceScreen({super.key});
 
@@ -45,7 +42,6 @@ class _DiscoverySourceScreenState extends State<DiscoverySourceScreen> {
   final _otherFocus = FocusNode();
   DiscoverySource? _selected;
 
-  /// The design draws the fill at 316 of a 350-wide track.
   static const _progress = 316 / 350;
 
   @override
@@ -61,8 +57,6 @@ class _DiscoverySourceScreenState extends State<DiscoverySourceScreen> {
     super.dispose();
   }
 
-  /// The question is explicitly optional, so an empty answer still proceeds and
-  /// a failed PATCH never blocks onboarding.
   Future<void> _continue() async {
     final source = _selected?.name;
     final detail = _otherCtrl.text.trim();
@@ -85,8 +79,7 @@ class _DiscoverySourceScreenState extends State<DiscoverySourceScreen> {
       backgroundColor: AppColors.brandSecondary,
       backgroundAsset: AppAssets.worshipBg,
       topBar: const _TopBar(progress: _progress),
-      // The option list scrolls inside [_content]; the heading above it stays
-      // put. A scrolling scaffold would leave that list unbounded.
+      // The option list scrolls itself; the heading stays put.
       scrollable: false,
       footer: PrimaryButton(
         label: AppStrings.continueLabel,
@@ -182,7 +175,6 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// Free-text row for a source that is not in the list.
 class _OtherField extends StatelessWidget {
   const _OtherField({required this.controller, required this.focusNode});
 

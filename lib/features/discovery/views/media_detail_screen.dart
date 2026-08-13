@@ -17,8 +17,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Destination detail screen. Emits organic analytics only — paid events belong
-/// to the placement that was served and clicked, never to the screen it opens.
 class MediaDetailScreen extends StatefulWidget {
   const MediaDetailScreen({
     super.key,
@@ -28,7 +26,6 @@ class MediaDetailScreen extends StatefulWidget {
 
   final WebFeedItem item;
 
-  /// The surface the viewer arrived from, carried through for funnel analytics.
   final String source;
 
   @override
@@ -44,12 +41,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   String? _error;
   bool _descExpanded = false;
 
-  // Like / dislike
   bool _hasLiked = false;
   bool _hasDisliked = false;
   bool _interactionLoading = false;
 
-  // Comments
   final List<MediaComment> _comments = [];
   bool _commentsLoading = false;
   bool _commentsLoadingMore = false;
@@ -200,8 +195,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       MediaTypes.normalize(_detail?.media.type) ??
       widget.item.mediaType;
 
-  /// The suggestion row is its own source surface, so a promoted suggestion
-  /// emits its `promotion_click` here.
   void _openSuggestion(WebFeedItem suggestion) {
     GetIt.instance<AnalyticsService>().trackContentClick(
       mediaId: suggestion.entityId,
@@ -241,14 +234,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           mediaId: _mediaId,
           creatorId: _detail?.creator?.creatorId,
           mediaType: _mediaType,
-          // Playback inherits the arriving surface, keeping the funnel attributable.
           source: widget.source,
         ),
       ),
     );
   }
-
-  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +281,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     );
   }
 
-  // 16:9 thumbnail with play overlay
   Widget _buildHero() {
     final thumbnailUrl =
         _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl;
@@ -311,7 +300,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               loadingBuilder: (_, child, progress) =>
                   progress == null ? child : const SizedBox.shrink(),
             ),
-          // Gradient to make play button pop
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -358,7 +346,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title + type row
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -387,19 +374,16 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             ],
           ),
 
-          // Creator row
           if (detail.creator != null) ...[
             const SizedBox(height: 14),
             _buildCreatorRow(detail.creator!),
           ],
 
-          // Description
           if (detail.media.description?.isNotEmpty == true) ...[
             const SizedBox(height: 14),
             _buildDescription(detail.media.description!),
           ],
 
-          // Watch button or unavailable notice
           const SizedBox(height: 20),
           if (detail.playback?.playbackUrl.isNotEmpty == true)
             FilledButton.icon(
@@ -441,15 +425,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               ),
             ),
 
-          // Like / Dislike
           const SizedBox(height: 16),
           _buildEngagementRow(),
 
-          // Comments
           const SizedBox(height: 28),
           _buildComments(),
 
-          // Suggestions
           if (detail.suggestions.isNotEmpty) ...[
             const SizedBox(height: 28),
             const Text(
@@ -465,7 +446,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             ...detail.suggestions.map(
               (s) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                // Qualifies on this row, where it was served.
                 child: PromotedImpressionTracker(
                   promotion: s.promotion,
                   mediaId: s.entityId,
@@ -710,8 +690,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 }
 
-// ── Like / Dislike button ─────────────────────────────────────────────────────
-
 class _InteractionButton extends StatelessWidget {
   const _InteractionButton({
     required this.icon,
@@ -765,8 +743,6 @@ class _InteractionButton extends StatelessWidget {
     );
   }
 }
-
-// ── Comment card ──────────────────────────────────────────────────────────────
 
 class _CommentCard extends StatelessWidget {
   const _CommentCard({required this.comment});
@@ -870,8 +846,6 @@ class _CommentCard extends StatelessWidget {
     );
   }
 }
-
-// ── Compact suggestion card ───────────────────────────────────────────────────
 
 class _SuggestionCard extends StatelessWidget {
   const _SuggestionCard({required this.item, required this.onTap});

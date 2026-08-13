@@ -4,7 +4,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// One comparison row: a label plus the value for each tier.
 class _Row {
   const _Row(this.label, this.free, this.basic, this.pro);
 
@@ -14,7 +13,6 @@ class _Row {
   final String pro;
 }
 
-/// Everything except pricing is static — the plans API returns amounts only.
 const _rows = <_Row>[
   _Row('Video uploads /mo', '5', '20', '∞'),
   _Row('Storage', '5 GB', '50 GB', '500 GB'),
@@ -28,8 +26,6 @@ const _rows = <_Row>[
   _Row('Priority support', '—', '—', '✓'),
 ];
 
-/// "Every feature, every plan". The design repeats its header and first two
-/// rows at the bottom; treated as a duplicated fragment and rendered once.
 class PlanComparisonSheet extends StatelessWidget {
   const PlanComparisonSheet({
     super.key,
@@ -38,10 +34,8 @@ class PlanComparisonSheet extends StatelessWidget {
     this.proPrice,
   });
 
-  /// ISO code from the plans API, e.g. "USD".
   final String currency;
 
-  /// Monthly amounts in major units; null while plans are loading.
   final int? basicPrice;
   final int? proPrice;
 
@@ -65,7 +59,6 @@ class PlanComparisonSheet extends StatelessWidget {
   static const _freeColWidth = 60.0;
   static const _tierColWidth = 75.0;
 
-  /// Symbol for the common currencies, falling back to the ISO code.
   static String symbolFor(String code) => switch (code) {
     'USD' => r'$',
     'NGN' => '₦',

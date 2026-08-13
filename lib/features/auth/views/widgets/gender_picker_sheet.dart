@@ -15,7 +15,6 @@ enum Gender {
   final String label;
 }
 
-/// Bottom sheet behind "Gender (optional)"
 class GenderPickerSheet extends StatelessWidget {
   const GenderPickerSheet({super.key});
 

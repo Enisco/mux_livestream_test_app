@@ -30,11 +30,6 @@ class InterestChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final leading = selected
         ? Icon(Icons.check, size: iconSize, color: AppColors.textPrimary)
-        // SvgPicture.asset(
-        //     AppAssets.iconCheck,
-        //     width: iconSize,
-        //     height: iconSize,
-        //   )
         : icon;
 
     return Material(

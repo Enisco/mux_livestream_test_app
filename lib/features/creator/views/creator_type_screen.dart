@@ -13,22 +13,16 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-/// Matches the `type` field on `OnboardCreatorDto`.
 enum CreatorType {
   individual,
   organization;
 
-  /// Wire value sent to the API.
   String get value => name;
 }
 
-/// "How will you share your ministry?" — the fork between the individual and
-/// organisation onboarding paths. The design frame is misleadingly named
-/// "Welcome note".
 class CreatorTypeScreen extends StatelessWidget {
   const CreatorTypeScreen({super.key});
 
-  /// The design draws the fill at 52 of a 350-wide track.
   static const _progress = 52 / 350;
 
   Future<void> _choose(BuildContext context, CreatorType type) async {

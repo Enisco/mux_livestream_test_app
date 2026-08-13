@@ -1,13 +1,10 @@
 abstract final class AppStrings {
   static const appTitle = 'GTube';
 
-  // Brand
   static const brandName = 'GospelTube';
 
-  // Splash
   static const splashTagline = 'Streaming the good news';
 
-  // Welcome (post-splash)
   static const welcomeTitle = 'Welcome to GospelTube';
   static const welcomeSubtitle = "Sign up to join GospelTube, it's free";
   static const continueWithGoogle = 'Continue with Google';
@@ -16,11 +13,8 @@ abstract final class AppStrings {
   static const alreadyHere = 'Already here?';
   static const justBrowse = 'Just browse for now';
 
-  /// Design copy is sentence case here; [signIn] below is the legacy title case
-  /// used by the not-yet-redesigned sign-in screen.
   static const signInLink = 'Sign in';
 
-  // Create account
   static const createAccountTitle = 'Create your account';
   static const createAccountSubtitle =
       'One account for watching, giving, and any ministry you serve.';
@@ -38,11 +32,9 @@ abstract final class AppStrings {
   static const termsPrefix = 'By continuing, you agree to our ';
   static const terms = 'Terms';
 
-  /// The design breaks the line after "Terms" rather than letting it wrap.
   static const termsAmpersand = '\n & ';
   static const privacyPolicy = 'Privacy Policy';
 
-  // Verify email (OTP)
   static const checkYourMail = 'Check your mail';
   static const otpSentPrefix = 'We sent a 6-digit code to ';
   static const otpSentSuffix = ". Enter it below to confirm it's you.";
@@ -50,11 +42,9 @@ abstract final class AppStrings {
   static const sendAgain = 'Send again ';
   static const verify = 'Verify';
 
-  // Welcome note
   static const welcomeNoteGreeting = 'Hello ';
   static const welcomeNoteWelcome = 'Welcome to ';
 
-  // Role selection
   static const roleQuestionPrefix = 'Welcome ';
   static const roleQuestionSuffix = 'how will you use GospelTube?';
   static const roleSubtitle =
@@ -62,8 +52,7 @@ abstract final class AppStrings {
   static const roleWatch = 'I’m here to watch & follow';
   static const roleMinistry = 'I’m here to share my ministry';
 
-  // Discovery source ("how did you find us")
-  static const discoveryTitle = 'One last thing how did you find us?';
+  static const discoveryTitle = 'One last thing, how did you find us?';
   static const discoverySubtitle =
       'It helps us reach more people. Totally optional.';
   static const discoveryFriend = 'A friend or family';
@@ -75,7 +64,6 @@ abstract final class AppStrings {
   static const typeHere = 'Type here';
   static const continueLabel = 'Continue';
 
-  // Interests ("What would you like to see?")
   static const interestsTitle = 'What would you like to see?';
   static const interestsSubtitle = 'This helps us customize your experience';
   static const interestsHint = 'Pick 3 or more for the best feed.';
@@ -92,7 +80,6 @@ abstract final class AppStrings {
   static const interestFaith = 'Faith';
   static const interestGospelArtist = 'Gospel artist';
 
-  // Creator profile setup
   static const creatorSetupTitle = 'Setup your profile in seconds';
   static const creatorSetupSubtitle = 'This sets up your studio.';
   static const channelName = 'Channel name';
@@ -108,13 +95,11 @@ abstract final class AppStrings {
       "You can polish your channel later. Let's get you set up first";
   static const selectACategory = 'What do you mostly share?';
 
-  // Creator type fork
   static const creatorTypeTitle = 'How will you share your ministry?';
   static const creatorTypeSubtitle = 'This sets up your channel.';
   static const creatorTypeIndividual = 'I’m an Individual';
   static const creatorTypeOrganization = 'We’re an organization';
 
-  // Organisation profile setup
   static const orgTypeLabel = 'Type of organization';
   static const orgTypeHint = 'e.g Church, Bible study';
   static const orgNameLabel = 'Organization name';
@@ -125,7 +110,6 @@ abstract final class AppStrings {
   static const orgTypeOthers = 'Others';
   static const addSelection = 'Add Selection';
 
-  // Plan selection
   static const yourPlan = 'Your plan';
   static const billingMonthly = 'Monthly';
   static const billingYearly = 'Yearly · 2 months free';
@@ -146,7 +130,6 @@ abstract final class AppStrings {
   static const everythingInBasic = 'Everything In Basic, plus:';
   static const everythingInPro = 'Everything In Pro, plus:';
 
-  // Log in
   static const loginTitle = 'Log in to GospelTube';
   static const noAccount = 'Don’t have an account';
   static const signUpLink = 'Sign up';
@@ -154,7 +137,6 @@ abstract final class AppStrings {
   static const logIn = 'Log in';
   static const forgotPasswordLink = 'Forgot password?';
 
-  // Forgot password
   static const forgotPasswordTitle = 'Forgot Password';
   static const forgotPasswordSubtitle =
       'No worries, we’ll send you a reset link';
@@ -162,12 +144,10 @@ abstract final class AppStrings {
   static const resetPassword = 'Reset Password';
   static const resetLinkSent = 'Check your inbox for the reset link.';
 
-  // Plan comparison
   static const everyFeatureEveryPlan = 'Every feature, every plan';
   static const tierFree = 'Free';
   static const rowPricePerMonth = 'Price /month';
 
-  // Payment provider
   static const choosePaymentProvider = 'Choose payment provider';
   static const payWith = 'Pay with';
   static const payWithSubtitle = "Choose how you'd like to complete payment.";
@@ -188,13 +168,11 @@ abstract final class AppStrings {
   static const billedYearly = 'Billed yearly · for ';
   static const planSuffix = ' plan';
 
-  // Gender picker
   static const selectAGender = 'Select a gender';
   static const genderMale = 'Male';
   static const genderFemale = 'Female';
   static const genderOther = 'Others';
 
-  // Welcome – feature carousel captions
   static const featureAudioBible = 'The Audio Bible';
   static const featureLiveService = 'Sunday service • 2.1k watching';
   static const featureDevotional = 'Daily devotional';
@@ -202,7 +180,6 @@ abstract final class AppStrings {
   static const featureVerse = '"Come to me, all who are weary..."';
   static const liveBadge = 'LIVE';
 
-  // Feed card actions
   static const sponsored = 'Sponsored';
   static const rsvp = 'RSVP';
   static const readMore = 'Read more';
@@ -214,13 +191,11 @@ abstract final class AppStrings {
   static const offline = 'No internet connection';
   static const done = 'Done';
 
-  // Bottom navigation
   static const navHome = 'Home';
   static const navExplore = 'Explore';
   static const navFollowing = 'Following';
   static const navYou = 'You';
 
-  // Home feed
   static const tabDiscover = 'Discover';
   static const tabFollowing = 'Following';
   static const tabLive = 'Live';
@@ -234,16 +209,13 @@ abstract final class AppStrings {
       'Create an account to follow creators and build\nyour own feed.';
   static const feedRetry = 'Try again';
 
-  // Home – library
   static const addVideos = 'Add Video';
   static const noVideosTitle = 'No videos found';
   static const noVideosSubtitle =
       'No video files were found.\nTap + to open a specific file.';
 
-  // Home – scanning
   static const scanningVideos = 'Scanning for videos…';
 
-  // Home – permission
   static const permissionTitle = 'Media Access Required';
   static const permissionBody =
       'Allow GTube to scan your device for video files,\njust like VLC or MX Player.';
@@ -252,7 +224,6 @@ abstract final class AppStrings {
   static const grantAccess = 'Grant Access';
   static const openSettings = 'Open Settings';
 
-  // Player
   static const loadingVideo = 'Loading video…';
   static const failedToLoad = 'Failed to load video';
   static const streamNotLive = 'Stream is not live yet';
@@ -263,20 +234,17 @@ abstract final class AppStrings {
   static const tooltipFullscreen = 'Fullscreen (F)';
   static const tooltipExitFullscreen = 'Exit fullscreen (F)';
 
-  // Landing
   static const landingSubtitle = 'Choose how to watch';
   static const featureGallery = 'My Videos';
   static const featureGalleryDesc = 'Browse videos stored on your device';
   static const featureStartLiveDesc = 'Stream your camera live via Mux';
   static const featureJoinLiveDesc = 'Watch an ongoing Mux livestream';
 
-  // Auth
   static const signIn = 'Sign In';
   static const createAccount = 'Create Account';
   static const email = 'Email';
   static const password = 'Password';
 
-  // Start livestream
   static const cameraPermNeeded = 'Camera & Microphone Access Required';
   static const cameraPermBody =
       'GTube needs camera and microphone access\nto stream live video.';
@@ -300,7 +268,6 @@ abstract final class AppStrings {
   static const showStreamKey = 'Show';
   static const hideStreamKey = 'Hide';
 
-  // Join livestream
   static const joinStream = 'Join Stream';
   static const streamIdHint = 'Enter Creator ID…';
   static const streamIdInvalid = 'Please enter a Creator ID';
@@ -308,15 +275,12 @@ abstract final class AppStrings {
   static const fetchingUrl = 'Fetching…';
   static const noMediaIdError = 'Stream not ready — playback token unavailable';
 
-  // Discover feed
   static const discover = 'Discover';
   static const featureDiscoverDesc = 'Browse videos, music and live content';
   static const watchNow = 'Watch Now';
 
-  // Vertical feed
   static const shortVideos = 'Short Videos';
   static const featureShortVideosDesc = 'Full-screen vertical video feed';
 
-  // Dynamic helpers
   static String filesCount(int n) => '$n file${n == 1 ? '' : 's'}';
 }

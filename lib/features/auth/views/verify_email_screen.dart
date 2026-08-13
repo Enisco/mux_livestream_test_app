@@ -19,7 +19,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// "Check your mail" one-time-code screen
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({
     super.key,
@@ -27,10 +26,8 @@ class VerifyEmailScreen extends StatefulWidget {
     required this.challengeId,
   });
 
-  /// Shown in the body copy so the user can spot a typo in their address.
   final String email;
 
-  /// Identifies the open challenge on the server; both endpoints require it.
   final String challengeId;
 
   @override
@@ -236,8 +233,6 @@ class _MailBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.base1,
         shape: BoxShape.circle,
-        // Approximates the design's inset glow, which Flutter's BoxShadow
-        // cannot express directly.
         gradient: const RadialGradient(
           colors: [AppColors.base1, AppColors.badgeInnerGlow],
           stops: [0.45, 1.0],

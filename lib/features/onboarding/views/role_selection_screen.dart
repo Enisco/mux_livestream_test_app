@@ -11,21 +11,11 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-/// Which path a new account takes through the rest of onboarding.
-enum OnboardingIntent {
-  /// "I'm here to watch & follow" — continues to the viewer interest picker.
-  watch,
+enum OnboardingIntent { watch, ministry }
 
-  /// "I'm here to share my ministry" — continues to the creator type fork.
-  ministry,
-}
-
-/// "How will you use GospelTube?" — the fork between the viewer and creator
-/// paths. The choice is persisted locally only; see docs/OPEN_ISSUES.md.
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key, this.name});
 
-  /// First name shown in the question. Falls back to the cached user.
   final String? name;
 
   String _firstName() {

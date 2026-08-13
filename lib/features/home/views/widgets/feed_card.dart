@@ -7,7 +7,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// action row are shared by every kind.
 enum FeedCardKind {
   video,
   audio,
@@ -73,7 +72,6 @@ class FeedCardData {
   final bool liked;
   final bool saved;
 
-  /// Hides the avatar's follow badge once the viewer already follows.
   final bool following;
   final int subscribers;
 
@@ -81,13 +79,10 @@ class FeedCardData {
   final DateTime? eventStart;
   final String? location;
 
-  /// Overlay on a devotional plan's cover, e.g. "14-day devotional plan".
   final String? planLabel;
 
-  /// Secondary line under a devotional title, e.g. "John 1-21 · Daily reading".
   final String? subtitle;
 
-  /// Blog cards count opens rather than views. Singular at exactly one.
   String viewsNoun(int n) => switch ((kind, n)) {
     (FeedCardKind.blog, 1) => 'Open',
     (FeedCardKind.blog, _) => 'Opens',
@@ -305,8 +300,6 @@ class _MetaRow extends StatelessWidget {
             style: meta,
           ),
         ),
-        // The web feed carries no publish time, so the separator and age are
-        // dropped rather than left dangling.
         if (data.age.isNotEmpty) ...[
           SizedBox(width: 6.s),
           Text(
@@ -344,8 +337,6 @@ class _MetaRow extends StatelessWidget {
   }
 }
 
-/// 32px avatar. A verified creator gets the purple ring; the plus badge is the
-/// follow affordance.
 class _Avatar extends StatelessWidget {
   const _Avatar({this.url, this.verified = false, this.onTap, this.size = 32});
 
@@ -425,8 +416,6 @@ class _MoreButton extends StatelessWidget {
   }
 }
 
-/// Thumbnail with the duration pill. Height follows the design's 195 of a
-/// 338-wide content column.
 class _MediaBlock extends StatelessWidget {
   const _MediaBlock({required this.data});
 
@@ -474,8 +463,6 @@ class _MediaBlock extends StatelessWidget {
                   ),
                 ),
               ),
-            // Series cards carry the sponsored tag inside the cover rather than
-            // in the creator row.
             if (data.sponsored && data.kind == FeedCardKind.series)
               Positioned(
                 right: 12.s,
@@ -639,7 +626,6 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-/// "4h", "2d", "3w". Empty when the feed gave no timestamp.
 String relativeAge(DateTime? at) {
   if (at == null) return '';
   final d = DateTime.now().toUtc().difference(at.toUtc());
@@ -652,7 +638,6 @@ String relativeAge(DateTime? at) {
   return '${(d.inDays / 365).floor()}y';
 }
 
-/// 12900 -> "12.9K", 1200000 -> "1.2M".
 String formatCount(int value) {
   if (value < 1000) return '$value';
   if (value < 1000000) {
@@ -719,8 +704,6 @@ class _Excerpt extends StatelessWidget {
   );
 }
 
-/// Audio: artwork, title and a waveform on one strip, with the runtime under
-/// it and a play affordance on the right. The title lives inside the strip.
 class _AudioStrip extends StatelessWidget {
   const _AudioStrip({required this.data});
 
@@ -829,8 +812,6 @@ class _AudioStrip extends StatelessWidget {
   }
 }
 
-/// Decorative level meter behind the audio title. Heights are fixed so the bars
-/// stay identical between rebuilds.
 class _Waveform extends StatelessWidget {
   const _Waveform();
 
@@ -891,7 +872,6 @@ class _Waveform extends StatelessWidget {
   }
 }
 
-/// Event: hero image, then a date block, the title, its venue/time, and RSVP.
 class _EventBody extends StatelessWidget {
   const _EventBody({required this.data, this.onRsvp});
 
@@ -919,7 +899,6 @@ class _EventBody extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (data.title case final title?) _Headline(title),
-                  // Nothing to place or time — don't leave a bare pin.
                   if (data.location != null || start != null) ...[
                     SizedBox(height: 4.s),
                     _VenueRow(location: data.location, start: start),
@@ -1021,7 +1000,6 @@ class _VenueRow extends StatelessWidget {
   }
 }
 
-/// Blog: hero image, headline, excerpt, then the read affordance.
 class _BlogBody extends StatelessWidget {
   const _BlogBody({required this.data, this.onOpen});
 
@@ -1050,7 +1028,6 @@ class _BlogBody extends StatelessWidget {
   }
 }
 
-/// Channel: no media and no action row — a promo tile for the creator.
 class _ChannelBody extends StatelessWidget {
   const _ChannelBody({
     required this.data,
@@ -1193,8 +1170,6 @@ class _OutlineButton extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      // A Container with `alignment` set expands to fill its parent; a
-      // min-size Row lets the pill hug its label instead.
       child: Container(
         height: 40.s,
         padding: EdgeInsets.symmetric(horizontal: 20.s),
@@ -1214,8 +1189,6 @@ class _OutlineButton extends StatelessWidget {
   }
 }
 
-/// Devotional plan: cover with the plan length overlaid, then the title, its
-/// reading range, and the start affordance.
 class _DevotionalBody extends StatelessWidget {
   const _DevotionalBody({required this.data, this.onStart});
 

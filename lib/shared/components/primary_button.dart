@@ -4,8 +4,6 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Gradient pill with `Drop Shadow/300`. Disabled is a `Grey/300` fill at 57%
-/// opacity.
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
     super.key,

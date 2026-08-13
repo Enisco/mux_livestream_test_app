@@ -34,7 +34,6 @@ void main() {
     });
 
     test('keeps a leading digit that merely looks like the dial code', () {
-      // National form, so the leading 1 is part of the subscriber number.
       expect(PhoneNumber.national('1415552671', us.dialCode), '1415552671');
     });
 

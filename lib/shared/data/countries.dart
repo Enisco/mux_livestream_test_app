@@ -1,12 +1,9 @@
-/// A dialling-code entry for the phone field's country selector.
 class Country {
   const Country(this.isoCode, this.name, this.dialCode);
 
-  /// ISO 3166-1 alpha-2, e.g. `US`. Also what the API's `countryCode` wants.
   final String isoCode;
   final String name;
 
-  /// Digits only, without the leading `+`.
   final String dialCode;
 
   String get display => '+$dialCode';
@@ -20,7 +17,6 @@ class Country {
 }
 
 abstract final class Countries {
-  /// Sign-up defaults to the US per product decision, not the device locale.
   static const defaultIsoCode = 'US';
 
   static Country get fallback => byIsoCode(defaultIsoCode)!;
@@ -34,8 +30,6 @@ abstract final class Countries {
     return null;
   }
 
-  /// Matches name, ISO code or dial code, so "234", "+234", "NG" and "nigeria"
-  /// all find Nigeria.
   static List<Country> search(String query) {
     final q = query.trim().toLowerCase().replaceFirst('+', '');
     if (q.isEmpty) return all;

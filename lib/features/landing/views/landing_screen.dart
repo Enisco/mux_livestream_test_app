@@ -25,8 +25,6 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-fetch feed data and silently open players for the first 3 videos so
-    // the feed plays instantly when the user taps "Short Videos".
     GetIt.instance<VerticalFeedPreloader>().warmUp();
   }
 

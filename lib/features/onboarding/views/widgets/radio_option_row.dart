@@ -5,8 +5,6 @@ import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Single-select row. The design only specifies the unselected radio glyph, so
-/// the selected state fills the same circle with the brand colour.
 class RadioOptionRow extends StatelessWidget {
   const RadioOptionRow({
     super.key,

@@ -5,10 +5,6 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 
-// ── Auth prompt sheet (shared) ────────────────────────────────────────────────
-
-/// Shows a bottom sheet prompting the user to sign in to access [feature].
-/// Pass the outer [BuildContext] so GoRouter navigation works from inside the sheet.
 void showAuthSheet(BuildContext outerContext, String feature) {
   showModalBottomSheet<void>(
     context: outerContext,
@@ -24,7 +20,6 @@ void showAuthSheet(BuildContext outerContext, String feature) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             Container(
               width: 36,
               height: 4,
@@ -89,8 +84,6 @@ void showAuthSheet(BuildContext outerContext, String feature) {
             OutlinedButton(
               onPressed: () {
                 Navigator.of(sheetCtx).pop();
-                // Sign-up starts at the welcome screen, which offers the social
-                // providers before falling through to the form.
                 outerContext.push(AppRouter.welcome);
               },
               style: OutlinedButton.styleFrom(

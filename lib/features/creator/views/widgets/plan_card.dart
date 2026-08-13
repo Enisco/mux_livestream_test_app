@@ -6,8 +6,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Static copy for one plan tier. Feature lists are not exposed by the API, so
-/// they come from the design
 class PlanCopy {
   const PlanCopy({
     required this.title,
@@ -24,7 +22,6 @@ class PlanCopy {
   final List<String> leftFeatures;
   final List<String> rightFeatures;
 
-  /// Pro carries the brand border and the "Most popular" badge.
   final bool highlighted;
 }
 
@@ -44,14 +41,11 @@ class PlanCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Major-unit amount, e.g. 19. Null while plans are loading.
   final int? price;
   final String? priceSuffix;
 
-  /// Used by Enterprise, which has no numeric price.
   final String? customPrice;
 
-  /// Enterprise renders its "Everything In Pro" line brighter than the others.
   final bool mutedInheritsLine;
 
   static const _radius = 8.0;

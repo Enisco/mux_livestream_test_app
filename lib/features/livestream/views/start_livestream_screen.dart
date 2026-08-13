@@ -15,7 +15,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-// Credentials loaded from LocalStorage after "Go Live" is tapped.
 class _StreamCredentials {
   final String creatorId;
   final String rtmpIngestUrl;
@@ -54,11 +53,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   bool _streamKeyVisible = false;
   String? _playbackUrl;
 
-  /// Shared app-run client session ID — see [AppSessionService].
   String get _clientSessionId =>
       GetIt.instance<AppSessionService>().clientSessionId;
-
-  // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -120,8 +116,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     }
   }
 
-  // ── RTMP event callbacks ─────────────────────────────────────────────────────
-
   void _onConnectionSuccess() {
     logger.d('RTMP connected ✓');
     if (mounted) setState(() => _isStreaming = true);
@@ -149,8 +143,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       ).showSnackBar(SnackBar(content: Text('Stream error: $error')));
     }
   }
-
-  // ── Go Live ──────────────────────────────────────────────────────────────────
 
   Future<void> _goLive() async {
     setState(() => _phase = _Phase.creating);
@@ -185,7 +177,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       final mediaId = await repo.startLivestream(creatorId);
       String resolvedMediaId = mediaId ?? LocalStorage.liveMediaId ?? '';
 
-      // If already-live was returned and we have no cached mediaId, fetch it from the status endpoint
       if (resolvedMediaId.isEmpty) {
         try {
           final status = await repo.getCreatorLiveStatus(creatorId);
@@ -227,8 +218,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     }
   }
 
-  // ── RTMP streaming ───────────────────────────────────────────────────────────
-
   Future<void> _startStreaming() async {
     final creds = _credentials;
     if (creds == null || _isStartingStream) return;
@@ -243,7 +232,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         streamKey: creds.streamKey,
         url: creds.rtmpIngestUrl,
       );
-      // _isStreaming flips to true via _onConnectionSuccess
     } catch (e, st) {
       logger.e('RTMP startStreaming failed', error: e, stackTrace: st);
       if (mounted) {
@@ -315,8 +303,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -341,10 +327,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       case _Phase.creating:
       case _Phase.ending:
       case _Phase.live:
-        // Always keep ApiVideoCameraPreview mounted so the camera session stays
-        // alive. Show a translucent overlay for creating/ending states instead
-        // of replacing the whole screen (which would destroy the surface texture
-        // and invalidate the Camera2 capture session).
         return _buildMain();
     }
   }
@@ -489,7 +471,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
             ],
           ),
         ),
-        // Translucent overlay while creating/ending — keeps camera in the tree.
         if (isLoading)
           Container(
             color: Colors.black54,
@@ -682,8 +663,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     );
   }
 }
-
-// ── Credential row widget ──────────────────────────────────────────────────────
 
 class _CredentialRow extends StatelessWidget {
   const _CredentialRow({

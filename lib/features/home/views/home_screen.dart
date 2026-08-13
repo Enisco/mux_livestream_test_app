@@ -39,16 +39,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-check whenever the user returns to the app from a permission-blocked state
-    // (e.g. after granting access in device Settings).
     if (state == AppLifecycleState.resumed &&
         (_phase == _Phase.permissionDenied ||
             _phase == _Phase.permissionNeeded)) {
       _initScan();
     }
   }
-
-  // ── Scanning logic ──────────────────────────────────────────────────────────
 
   Future<void> _initScan() async {
     setState(() => _phase = _Phase.loading);
@@ -57,7 +53,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       case ScanPermission.granted:
         await _runScan();
       case ScanPermission.denied:
-        // Not yet asked — show the system dialog immediately.
         setState(() => _phase = _Phase.permissionNeeded);
       case ScanPermission.permanentlyDenied:
         setState(() => _phase = _Phase.permissionDenied);
@@ -86,8 +81,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  // ── Manual file picker ───────────────────────────────────────────────────────
-
   Future<void> _pickVideos() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.video,
@@ -109,8 +102,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       MaterialPageRoute(builder: (_) => PlayerScreen.file(filePath: path)),
     );
   }
-
-  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +194,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget? _buildFab() {
-    // Hide FAB while loading or showing permission screens.
     if (_phase == _Phase.loading) return null;
     return FloatingActionButton(
       onPressed: _pickVideos,
@@ -212,8 +202,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 }
-
-// ── Private loading widget ────────────────────────────────────────────────────
 
 class _ScanLoadingView extends StatelessWidget {
   const _ScanLoadingView();

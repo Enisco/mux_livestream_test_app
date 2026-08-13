@@ -214,7 +214,6 @@ class _Chip extends StatelessWidget {
   final VoidCallback onTap;
   final bool selected;
 
-  /// The "Edit topics" affordance: brand border and label, unfilled.
   final bool outlined;
 
   @override

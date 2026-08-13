@@ -38,7 +38,6 @@ final List<RouteBase> authRoutes = [
   GoRoute(
     path: AppRouter.verifyEmail,
     pageBuilder: (context, state) {
-      // Query params keep the route deep-linkable from a verification email.
       final params = state.uri.queryParameters;
       return slideTransition(
         state,

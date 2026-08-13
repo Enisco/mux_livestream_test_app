@@ -20,8 +20,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// The home feed. Public: a guest sees the same Discover content as a signed-in
-/// viewer, and only hits the auth wall on Following or when acting on a card.
 class HomeFeedScreen extends StatefulWidget {
   const HomeFeedScreen({super.key, this.initialTab = HomeTab.discover});
 
@@ -44,8 +42,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   bool _failed = false;
   bool _authed = false;
 
-  /// Design's chip rail. The API taxonomy doesn't match these yet, so they are
-  /// display-only until that's resolved — see docs/OPEN_ISSUES.md.
   static const _topics = [
     'Trending',
     'Worship',
@@ -78,7 +74,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  /// Guests use `explore_only`, which the gateway serves unauthenticated.
+  /// Guests get the public-only feed; 'mixed' needs a session.
   String get _mode => _authed ? 'mixed' : 'explore_only';
 
   Future<void> _load() async {
@@ -127,7 +123,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     setState(() => _tab = tab);
   }
 
-  /// Everything that writes to an account is gated; browsing never is.
   bool _requireAccount(String feature) {
     if (_authed) return true;
     showAuthSheet(context, feature);
@@ -205,7 +200,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       onRefresh: _load,
       child: ListView.builder(
         controller: _scroll,
-        // Clears the floating nav pill, which the body extends underneath.
         padding: EdgeInsets.only(
           bottom: 92 + MediaQuery.paddingOf(context).bottom,
         ),
@@ -223,8 +217,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           final card = FeedCard(
             data: _toCardData(item),
             onTap: () => _openItem(item),
-            // The creator profile screen is a later section; the row opens the
-            // item until it exists.
             onCreatorTap: () => _openItem(item),
             onFollow: () => _requireAccount('follow creators'),
             onLike: () => _requireAccount('like this'),
@@ -233,8 +225,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             onMore: () => _requireAccount('use that'),
           );
 
-          // The billable impression belongs to this row — the surface that
-          // served the placement.
           return PromotedImpressionTracker(
             mediaId: item.entityId,
             creatorId: item.creator?.creatorId ?? '',
@@ -254,8 +244,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     final creator = item.creator;
     final kind = _kindOf(item);
     final isChannel = kind == FeedCardKind.channel;
-    // A `creator` row is *about* the creator: its name is the item title and
-    // its handle the subtitle. Everything else nests them under `creator`.
     final name = isChannel
         ? item.title
         : creator?.displayName ?? AppStrings.brandName;
@@ -269,8 +257,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       handle: handle,
       age: relativeAge(meta.publishedAt),
       title: isChannel || item.title.isEmpty ? null : item.title,
-      // The feed exposes no bio, so a channel card shows none; blogs reuse
-      // `subtitle` as the excerpt.
       body: kind == FeedCardKind.blog ? _excerpt(item.subtitle) : null,
       subtitle: kind == FeedCardKind.devotional
           ? _excerpt(item.subtitle)
@@ -305,9 +291,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       'creator' => FeedCardKind.channel,
       'event' => FeedCardKind.event,
       'post' => FeedCardKind.post,
-      // Devotionals are titled prose with a cover, which is the blog layout.
-      // The design also has dedicated "Devotional plan" and series cards that
-      // aren't built yet — see docs/OPEN_ISSUES.md.
       'blog' || 'devotional_entry' => FeedCardKind.blog,
       'devotional_series' => FeedCardKind.devotional,
       'media_series' => FeedCardKind.series,
@@ -319,9 +302,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     };
   }
 
-  /// The feed has no excerpt field, so `subtitle` stands in — but for some
-  /// entity types it is only status metadata ("public · active"), which must
-  /// not be shown as body copy.
   static const _statusWords = {
     'public',
     'private',
@@ -347,8 +327,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     return subtitle;
   }
 
-  /// The design overlays a plan length ("14-day devotional plan"). The feed
-  /// doesn't expose one, so the category stands in until it does.
   static String? _planLabel(List<String> slugs) =>
       slugs.isEmpty ? null : '${_titleCase(slugs.first)} plan';
 
@@ -367,8 +345,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 }
 
-/// Following has nothing to show a guest — the feed is built from who you
-/// follow, which needs an account.
 class _FollowingAuthWall extends StatelessWidget {
   const _FollowingAuthWall();
 

@@ -21,8 +21,6 @@ import 'package:test_app/shared/services/vertical_feed_preloader.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-// ── Shell ─────────────────────────────────────────────────────────────────────
-
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -31,25 +29,18 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  // Design slots: 0=Home, 1=Explore (intercepted, full-screen), 2=Following,
-  // 3=You. The old standalone Live tab has no slot in the design's bar; live
-  // content is reached from the home header's Live tab.
   int _selectedIndex = 0;
 
-  // Maps nav indices {0,2,3} → body slots {0,1,2}
   int get _bodyIndex => _selectedIndex == 0 ? 0 : _selectedIndex - 1;
 
   @override
   void initState() {
     super.initState();
-    // Kick off feed pre-warm; no-op if already started from main().
     unawaited(GetIt.instance<VerticalFeedPreloader>().warmUp());
   }
 
   void _onNavTap(int index) {
     if (index == 1) {
-      // Explore launches the vertical feed full-screen — it never becomes the
-      // "selected" tab.
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -91,8 +82,6 @@ class _MainShellState extends State<MainShell> {
       top: false,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        // A Row sizes to the pill's intrinsic height; Center would stretch to
-        // fill the whole slot.
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [GTubeNavBar(index: _selectedIndex, onChanged: _onNavTap)],
@@ -101,8 +90,6 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
-
-// ── Home Tab ──────────────────────────────────────────────────────────────────
 
 class _HomeTab extends StatelessWidget {
   const _HomeTab();
@@ -118,8 +105,6 @@ class _FollowingTab extends StatelessWidget {
   Widget build(BuildContext context) =>
       const HomeFeedScreen(initialTab: HomeTab.following);
 }
-
-// ── Live Tab ──────────────────────────────────────────────────────────────────
 
 class _LiveTab extends StatefulWidget {
   const _LiveTab();
@@ -249,7 +234,6 @@ class _GoLiveCard extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // Decorative circles
             Positioned(
               right: -28,
               top: -28,
@@ -420,8 +404,6 @@ class _JoinStreamCard extends StatelessWidget {
   }
 }
 
-// ── Profile / Me Tab ──────────────────────────────────────────────────────────
-
 class _ProfileTab extends StatefulWidget {
   const _ProfileTab();
 
@@ -473,8 +455,6 @@ class _ProfileTabState extends State<_ProfileTab> {
       ),
     );
   }
-
-  // ── Auth Wall ───────────────────────────────────────────────────────────────
 
   Widget _buildAuthWall(BuildContext context) {
     return Scaffold(
@@ -576,8 +556,6 @@ class _ProfileTabState extends State<_ProfileTab> {
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton(
-                      // Sign-up starts at the welcome screen, which offers the
-                      // social providers before falling through to the form.
                       onPressed: () => context.push(AppRouter.welcome),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textPrimary,
@@ -614,7 +592,6 @@ class _ProfileTabState extends State<_ProfileTab> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Warm radial glow behind logo
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
@@ -624,7 +601,6 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           ),
-          // Outer soft ring
           Container(
             width: 160,
             height: 160,
@@ -638,7 +614,6 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           ),
-          // Logo pill
           Container(
             width: 88,
             height: 88,
@@ -663,7 +638,6 @@ class _ProfileTabState extends State<_ProfileTab> {
               size: 46,
             ),
           ),
-          // App name + tagline
           Positioned(
             bottom: 32,
             child: Column(
@@ -694,8 +668,6 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
-  // ── Authenticated Profile ───────────────────────────────────────────────────
-
   Widget _buildProfile(BuildContext ctx) {
     final name =
         LocalStorage.cachedFullName ?? LocalStorage.cachedFirstName ?? 'User';
@@ -707,7 +679,6 @@ class _ProfileTabState extends State<_ProfileTab> {
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // Profile header with gradient background
           SliverAppBar(
             backgroundColor: Colors.transparent,
             surfaceTintColor: Colors.transparent,
@@ -730,7 +701,6 @@ class _ProfileTabState extends State<_ProfileTab> {
                   children: [
                     Row(
                       children: [
-                        // Avatar
                         Container(
                           width: 68,
                           height: 68,
@@ -797,7 +767,6 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           ),
-          // Menu sections
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
             sliver: SliverList(
@@ -860,8 +829,6 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 }
-
-// ── Menu section / item ───────────────────────────────────────────────────────
 
 class _MenuSection extends StatelessWidget {
   final String title;

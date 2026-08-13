@@ -205,7 +205,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// Apple and Google buttons above the "Or" divider.
 class _SocialRow extends StatelessWidget {
   const _SocialRow();
 

@@ -8,9 +8,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Multi-select category picker for the organisation path. Rows come from
-/// `GET /v1/user/categories`, not the design's fixed list — see
-/// docs/OPEN_ISSUES.md.
 class MultiCategorySheet extends StatefulWidget {
   const MultiCategorySheet({
     super.key,

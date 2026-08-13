@@ -23,8 +23,6 @@ Future<void> setupLocator() async {
   final deviceInfo = DeviceInfoService();
   await deviceInfo.init();
 
-  // One analytics session ID, one clientSessionId, one anonymous viewer ID for
-  // the whole app run — every screen reads them from here.
   final appSession = AppSessionService();
   await appSession.init();
 
@@ -65,7 +63,5 @@ Future<void> setupLocator() async {
     ),
   );
 
-  // Eager: registers the app-lifecycle observer that flushes buffered beacons
-  // before the OS suspends us (mobile's equivalent of a keepalive unload send).
   getIt<AnalyticsService>().init();
 }

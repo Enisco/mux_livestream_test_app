@@ -7,11 +7,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:sizing/sizing.dart';
 
-/// Pushes the app down by an offline bar instead of overlaying it.
-///
-/// The tree shape is constant — always `Column > [bar, Expanded(child)]` with
-/// the bar animating between zero and full height. Conditionally wrapping
-/// `child` instead would remount the Navigator and lose all app state.
 class GTubeNetworkBanner extends StatelessWidget {
   const GTubeNetworkBanner({super.key, required this.child});
 
@@ -24,13 +19,11 @@ class GTubeNetworkBanner extends StatelessWidget {
       builder: (context, online, _) {
         final media = MediaQuery.of(context);
         return Column(
-          // Without stretch the app loses its tight width constraint.
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _OfflineBar(visible: !online, topInset: media.padding.top),
             Expanded(
               child: MediaQuery(
-                // The bar owns the status-bar strip now; don't inset twice.
                 data: online
                     ? media
                     : media.copyWith(padding: media.padding.copyWith(top: 0)),
@@ -49,8 +42,6 @@ class _OfflineBar extends StatelessWidget {
 
   final bool visible;
 
-  /// In the bar's own padding, not a SafeArea, which would reserve the strip
-  /// even while hidden.
   final double topInset;
 
   @override

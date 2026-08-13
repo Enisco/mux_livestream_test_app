@@ -54,9 +54,6 @@ class DeviceInfoService {
   String get platform => _platform;
   String get appVersion => _appVersion;
 
-  /// `client.deviceType` for analytics beacons. Derived from the logical
-  /// shortest side rather than hardcoded to `phone`, so tablet traffic doesn't
-  /// pollute phone engagement metrics.
   String get deviceType {
     if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
       return 'desktop';
@@ -72,9 +69,6 @@ class DeviceInfoService {
     'x-device-name': _deviceName,
     'x-app-version': _appVersion,
     'x-client-platform': _platform,
-    // Marks requests as programmatic (AJAX/API), bypassing server CSRF checks
-    // that target browser form submissions. Safe because browsers block
-    // cross-origin scripts from setting this header.
     'x-requested-with': 'XMLHttpRequest',
   };
 }

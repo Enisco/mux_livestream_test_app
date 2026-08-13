@@ -126,7 +126,6 @@ class AuthErrorBanner extends StatelessWidget {
   }
 }
 
-/// Forces all typed characters to lowercase. Use on email fields.
 class LowerCaseInputFormatter extends TextInputFormatter {
   const LowerCaseInputFormatter();
 
@@ -137,11 +136,6 @@ class LowerCaseInputFormatter extends TextInputFormatter {
   ) => newValue.copyWith(text: newValue.text.toLowerCase());
 }
 
-/// Capitalises the first letter of every word. Use on name fields.
-///
-/// Only word starts are touched — the rest of each word is left as typed, so
-/// names like "McDonald" and "O'Brien" survive. The text length never changes,
-/// which keeps the caret where the user put it.
 class WordCapitalizationInputFormatter extends TextInputFormatter {
   const WordCapitalizationInputFormatter();
 
@@ -156,8 +150,7 @@ class WordCapitalizationInputFormatter extends TextInputFormatter {
       _wordStart,
       (m) => '${m[1]}${m[2]!.toUpperCase()}',
     );
-    // A few letters grow when uppercased (ß → SS); leaving those alone beats
-    // moving the caret out from under the user.
+    // A few letters grow when uppercased (ss); moving the caret is worse.
     if (capitalized.length != newValue.text.length) return newValue;
     return newValue.copyWith(text: capitalized);
   }

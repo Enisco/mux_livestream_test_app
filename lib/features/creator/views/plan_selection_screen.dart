@@ -18,8 +18,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-/// Feature copy per tier, straight from the design — the plans API returns
-/// pricing only.
 const _basicCopy = PlanCopy(
   title: AppStrings.planBasic,
   tagline: AppStrings.planBasicTagline,
@@ -103,8 +101,6 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
     }
   }
 
-  /// Monthly-equivalent price. The design shows "/mo" in both toggle states, so
-  /// the yearly plan is divided by 12.
   int? _priceFor(String tier) {
     final interval = _yearly ? 'year' : 'month';
     for (final plan in _plans) {
@@ -115,7 +111,6 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
     return null;
   }
 
-  /// Always the monthly amount — the comparison table is headed "Price /month".
   int? _monthlyPriceFor(String tier) {
     for (final plan in _plans) {
       if (plan.planTier == tier && plan.billingInterval == 'month') {
@@ -137,7 +132,6 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
 
     final creatorId = LocalStorage.creatorId;
     if (creatorId == null) {
-      // No channel yet — nothing to bill against, so just continue.
       logger.w('Skipping checkout: no cached creatorId');
       if (mounted) context.go(AppRouter.home);
       return;
@@ -152,7 +146,6 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
         currency: _currency,
       );
       // TODO(creator): open checkout.checkoutUrl in a browser/webview once the
-      // return-URL handling is agreed.
       logger.i('Checkout created: ${checkout.reference}');
     } catch (e) {
       logger.e('Checkout failed', error: e);

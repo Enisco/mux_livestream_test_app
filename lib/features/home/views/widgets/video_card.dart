@@ -32,7 +32,6 @@ class VideoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      // clipBehavior ensures the thumbnail is clipped to the card's rounded corners.
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
@@ -95,7 +94,6 @@ class _InfoSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      // Right padding reserves space for the remove button.
       padding: const EdgeInsets.fromLTRB(12.0, 12.0, 32.0 + 4.0, 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

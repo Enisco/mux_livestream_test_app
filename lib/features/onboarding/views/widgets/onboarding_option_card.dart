@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Tappable option row used throughout the onboarding forks.
 class OnboardingOptionCard extends StatelessWidget {
   const OnboardingOptionCard({
     super.key,

@@ -4,8 +4,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// The organisation kinds the design offers. Not sent to the API yet —
-/// `OnboardCreatorDto` has no field for it (see docs/OPEN_ISSUES.md).
 enum OrgType {
   church(AppStrings.orgTypeChurch),
   ministry(AppStrings.orgTypeMinistry),
@@ -17,7 +15,6 @@ enum OrgType {
   final String label;
 }
 
-/// "Type of organization" picker
 class OrgTypeSheet extends StatelessWidget {
   const OrgTypeSheet({super.key});
 

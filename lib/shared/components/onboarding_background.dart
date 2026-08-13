@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Full-bleed onboarding backdrop. The design centres a 1801.71 x 1014 plate on
-/// a 390-wide frame, so only its middle band shows; the plate scales with the
-/// screen to keep that crop identical on every device.
 class OnboardingBackground extends StatelessWidget {
   const OnboardingBackground({super.key, required this.asset});
 

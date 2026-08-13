@@ -12,7 +12,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Post-splash sign-up entry point
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -34,9 +33,6 @@ class WelcomeScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     const _Header(),
-                    // The carousel takes the slack between the header and the
-                    // actions, so a taller device gets more breathing room
-                    // rather than shifting everything down.
                     const Expanded(child: Center(child: FeatureCardCarousel())),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: _actionsInset),
@@ -96,7 +92,6 @@ class _Actions extends StatelessWidget {
             icon: AppAssets.iconGoogle,
             label: AppStrings.continueWithGoogle,
             // TODO(auth): wire to the browser handoff OAuth flow
-            // (POST /v1/auth/browser-handoffs) once the provider flow is agreed.
             onPressed: null,
           ),
           const SizedBox(height: 10),
@@ -122,8 +117,6 @@ class _Actions extends StatelessWidget {
   }
 }
 
-/// Enters the shell without an account. The feeds are public; the Me tab shows
-/// the auth wall.
 class _BrowseRow extends StatelessWidget {
   const _BrowseRow();
 
@@ -145,8 +138,6 @@ class _BrowseRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          // The glyph is 16.67x8.33 inside the design's 20x20 icon box; the
-          // asset has preserveAspectRatio="none", so it must be sized exactly.
           const SizedBox(
             width: 20,
             height: 20,

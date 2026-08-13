@@ -5,9 +5,6 @@ import 'package:flutter/foundation.dart';
 
 import 'package:test_app/core/logger.dart';
 
-/// Caches the active network transport for `client.networkType` on beacons.
-/// Subscription-based rather than queried per event, because beacons are built
-/// synchronously.
 class ConnectivityService {
   static const _unknown = 'unknown';
 
@@ -18,18 +15,14 @@ class ConnectivityService {
 
   String get networkType => _networkType;
 
-  /// True when the platform reports no usable transport — skip doomed requests.
   bool get isOffline => _networkType == 'none';
 
-  /// Drives the offline banner. Starts optimistic so a cold start doesn't flash
-  /// the bar before the first probe resolves.
   final ValueNotifier<bool> isOnline = ValueNotifier<bool>(true);
 
   Future<void> init() async {
     try {
       _apply(await _connectivity.checkConnectivity());
     } catch (e) {
-      // Never block startup; beacons carry `unknown` until the first event.
       logger.w('Connectivity: initial check failed → $e');
     }
     _sub = _connectivity.onConnectivityChanged.listen(
@@ -51,8 +44,6 @@ class ConnectivityService {
     logger.d('Connectivity: networkType → $resolved');
   }
 
-  /// Several transports can be active at once (VPN over Wi-Fi). Report the
-  /// physical one — it's what explains playback quality.
   String _resolve(List<ConnectivityResult> results) {
     if (results.isEmpty) return _unknown;
     if (results.every((r) => r == ConnectivityResult.none)) return 'none';
@@ -69,7 +60,6 @@ class ConnectivityService {
           continue;
       }
     }
-    // No physical transport identified — fall back to whatever was reported.
     for (final result in results) {
       switch (result) {
         case ConnectivityResult.vpn:

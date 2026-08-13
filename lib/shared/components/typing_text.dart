@@ -17,9 +17,6 @@ class TypingLine {
   int get length => spans.fold(0, (sum, span) => sum + span.text.length);
 }
 
-/// Character-by-character reveal with a blinking caret. One character every
-/// 70ms, two intervals at each line break, caret blinking on a 530ms period
-/// that settles once the text is fully typed.
 class TypingText extends StatefulWidget {
   const TypingText({
     super.key,
@@ -52,7 +49,6 @@ class _TypingTextState extends State<TypingText>
   @override
   void initState() {
     super.initState();
-    // Each line costs its own characters plus a pause before the next line.
     _totalTicks = widget.lines.fold(
       0,
       (sum, line) => sum + line.length + TypingText.lineBreakIntervals,
@@ -90,7 +86,6 @@ class _TypingTextState extends State<TypingText>
       builder: (context, _) {
         final tick = (_controller.value * _totalTicks).floor();
         final done = _controller.isCompleted;
-        // The caret follows the line currently being typed.
         var caretLine = widget.lines.length - 1;
         for (var i = 0; i < widget.lines.length; i++) {
           if (_revealedOn(i, tick) < widget.lines[i].length) {

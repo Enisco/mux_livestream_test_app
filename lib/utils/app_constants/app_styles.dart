@@ -2,31 +2,21 @@ import 'package:flutter/material.dart';
 
 import 'package:test_app/utils/app_constants/app_colors.dart';
 
-/// Typography and shared visual tokens. Text styles are semantic builders, not
-/// one constant per design node: pick the role, pass the size, override only
-/// where the design departs from the role's default.
 class AppStyles {
   AppStyles._();
 
-  /// UI typeface — the default for every builder below.
   static const String primaryFont = 'Satoshi';
 
-  /// Welcome carousel cards and the welcome-note typewriter. Medium + Bold only.
   static const String featureFont = 'Inter';
 
-  /// One-time-code numerals only, so [display] defaults to it. Medium only.
   static const String numeralFont = 'Red Hat Text';
 
-  // Satoshi ships Light/Regular/Medium/Bold/Black. `semiBold` has no matching
-  // file, so Flutter renders it from the nearest weight.
   static const FontWeight light = FontWeight.w300;
   static const FontWeight regular = FontWeight.w400;
   static const FontWeight medium = FontWeight.w500;
   static const FontWeight semiBold = FontWeight.w600;
   static const FontWeight bold = FontWeight.w700;
   static const FontWeight black = FontWeight.w900;
-
-  // ── Text styles ────────────────────────────────────────────────────────────
 
   static TextStyle heading(
     double size, {
@@ -142,20 +132,13 @@ class AppStyles {
     letterSpacing: letterSpacing,
   );
 
-  /// System emoji faces, tried in turn when the brand fonts have no glyph.
-  ///
-  /// The bundled brand fonts carry no emoji, and naming no fallback leaves the
-  /// engine to guess — which it gets wrong on some platforms. Listing the faces
-  /// explicitly is what makes emoji resolve on Android and on physical iOS
-  /// devices. It does **not** rescue the iOS simulator, where the system emoji
-  /// font is unreachable entirely; see docs/OPEN_ISSUES.md.
+  /// The brand fonts carry no emoji; naming the system faces is what makes
+  /// them resolve on Android and physical iOS devices.
   static const List<String> emojiFallback = [
     'Apple Color Emoji',
     'Noto Color Emoji',
     'Segoe UI Emoji',
   ];
-
-  // ── Internal ───────────────────────────────────────────────────────────────
 
   static TextStyle _base({
     required double fontSize,
@@ -176,8 +159,6 @@ class AppStyles {
       color: color ?? AppColors.textPrimary,
       height: lineHeight,
       letterSpacing: letterSpacing,
-      // Drives the variable Inter italic. Undeclared axes are ignored, so this
-      // is inert for the static cuts.
       fontVariations: [
         FontVariation('wght', resolvedWeight.value.toDouble()),
         FontVariation('opsz', fontSize.clamp(_opszMin, _opszMax)),
@@ -188,9 +169,6 @@ class AppStyles {
   static const double _opszMin = 14;
   static const double _opszMax = 32;
 
-  // ── Gradients ──────────────────────────────────────────────────────────────
-
-  /// Background of the onboarding "division Block".
   static const splashBackground = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
@@ -209,9 +187,6 @@ class AppStyles {
     colors: [AppColors.brandPrimary, AppColors.brandPrimaryDeep],
   );
 
-  // ── Shadows ────────────────────────────────────────────────────────────────
-
-  /// Applied to a focused field.
   static const fieldFocusShadow = [
     BoxShadow(
       color: Color(0x1A000000),
@@ -242,7 +217,6 @@ class AppStyles {
     ),
   ];
 
-  /// Applied to the primary CTA.
   static const primaryButtonShadow = [
     BoxShadow(
       color: Color(0x1A0C0C0D),
@@ -258,7 +232,6 @@ class AppStyles {
     ),
   ];
 
-  /// Used by the compact logo tile and sheets.
   static const logoTileShadow = [
     BoxShadow(
       color: Color(0x1AF8F8FF),
@@ -273,9 +246,6 @@ class AppStyles {
       spreadRadius: -4,
     ),
   ];
-
-  // ── Legacy ─────────────────────────────────────────────────────────────────
-  // For screens not yet rebuilt from the design. Delete each as it migrates.
 
   static const appBarTitle = TextStyle(
     fontWeight: FontWeight.bold,

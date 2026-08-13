@@ -4,9 +4,6 @@ import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// The app mark: logo glyph in a hairline tile, optionally inside the brand
-/// ring. Dimensions are the design's 1x values — [scale] resizes the whole
-/// lockup without distorting it.
 class GTubeLogoMark extends StatelessWidget {
   const GTubeLogoMark({super.key, this.scale = 1.0})
     : showRing = true,
@@ -23,11 +20,8 @@ class GTubeLogoMark extends StatelessWidget {
   final bool filled;
   final double _shadowSpread;
 
-  /// Screen-header tile. Not [GTubeLogoMark.plain] scaled down — the corner
-  /// radius stays at its full-size value.
   static Widget compact() => const _CompactLogoTile();
 
-  // Design values at 1x.
   static const _ringWidth = 52.8;
   static const _ringHeight = 63.6;
   static const _ringRadius = 13.512;
@@ -46,7 +40,6 @@ class GTubeLogoMark extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Transparent on the splash so the page gradient shows through.
           Container(
             padding: EdgeInsets.all(_tilePadding * scale),
             decoration: BoxDecoration(
@@ -78,7 +71,6 @@ class GTubeLogoMark extends StatelessWidget {
               fit: BoxFit.contain,
             ),
           ),
-          // Outer brand ring, drawn over the tile.
           if (showRing)
             Container(
               width: _ringWidth * scale,
@@ -97,7 +89,6 @@ class GTubeLogoMark extends StatelessWidget {
   }
 }
 
-/// Header-sized logo tile
 class _CompactLogoTile extends StatelessWidget {
   const _CompactLogoTile();
 

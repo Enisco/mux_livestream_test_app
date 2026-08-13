@@ -51,7 +51,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late VideoController _videoController;
   final List<StreamSubscription<dynamic>> _subs = [];
 
-  // Initialisation
   bool _isInitialized = false;
   bool _isBuffering = true;
   bool _hasError = false;
@@ -60,28 +59,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   int _retryCount = 0;
   Timer? _retryTimer;
 
-  // Playback state (mirrored from player streams for build)
   bool _isPlaying = false;
   bool _isCompleted = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  double _volume = 1.0; // 0–1 for UI; multiply ×100 for player API
+  double _volume = 1.0;
 
-  // Controls
   bool _showControls = true;
   Timer? _hideTimer;
   bool _isFullscreen = false;
   double _playbackSpeed = 1.0;
 
-  // Quality
   List<String> _qualityLabels = const ['Auto'];
   String _currentQuality = 'Auto';
   final Map<String, VideoTrack> _qualityTrackMap = {'Auto': VideoTrack.auto()};
-  // HLS streams: label → bandwidth in bps (0 = Auto/no preference).
-  // Populated by _loadHlsQualities() from the master playlist.
   final Map<String, int> _hlsBitrateMap = {};
 
-  // Analytics
   bool _analyticsViewStarted = false;
   bool _analyticsCompleted = false;
   bool _analyticsViewEnded = false;
@@ -91,8 +84,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const _speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
   static const _maxRetries = 6;
   static const _retryDelay = Duration(seconds: 5);
-
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -105,22 +96,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    // Close the session while position/watch duration are still readable.
     _trackViewEnded();
     _hideTimer?.cancel();
     _retryTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }
-    // Pause first: disposing mid-request makes libmpv fire into freed FFI
-    // callbacks.
     _player.pause();
     _player.dispose();
     _restorePortrait();
     super.dispose();
   }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   String get _mediaUri {
     if (widget.networkUrl != null) return widget.networkUrl!;
@@ -136,8 +122,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   bool get _isHlsStream => widget.networkUrl != null;
-
-  // ── Stream wiring ──────────────────────────────────────────────────────────
 
   void _listenStreams() {
     _subs.addAll([
@@ -158,8 +142,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _player.stream.track.listen(_onTrackChanged),
     ]);
   }
-
-  // ── Player init / retry ────────────────────────────────────────────────────
 
   Future<void> _initPlayer() async {
     final uri = _mediaUri;
@@ -186,8 +168,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _retry() {
     _retryTimer?.cancel();
-    // Full teardown before retry — reopening a completed player is a
-    // use-after-free in libmpv's event thread.
     for (final s in _subs) {
       s.cancel();
     }
@@ -219,13 +199,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _initPlayer();
   }
 
-  // ── Stream callbacks ───────────────────────────────────────────────────────
-
   void _onPlaying(bool v) {
     if (!mounted) return;
     final prev = _isPlaying;
     setState(() => _isPlaying = v);
-    // Here rather than in _togglePlay(), where _isPlaying is still false.
     if (v) _scheduleHide();
     _trackPlayPause(wasPlaying: prev, nowPlaying: v);
   }
@@ -252,7 +229,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _onError(String error) {
     if (!mounted || error.isEmpty) return;
-    // iOS fires this before the audio session is ready; it self-recovers.
     if (error.contains('audio device') || error.contains('no sound')) {
       logger.d('PlayerScreen: non-fatal audio init warning (ignored) → $error');
       return;
@@ -262,7 +238,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         error.contains('412') ||
         error.contains('-16845') ||
         error.contains('Precondition Failed');
-    // CDN/network blips are transient — retry before showing a hard failure.
     final transient =
         !inactive &&
         (error.contains('timed out') ||
@@ -292,8 +267,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _onTracksChanged(Tracks tracks) {
     if (!mounted) return;
-    // libmpv exposes no per-rendition metadata for HLS; options come from the
-    // manifest via _loadHlsQualities().
     if (_isHlsStream) return;
     final labels = <String>[];
     final map = <String, VideoTrack>{};
@@ -305,7 +278,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
         map[label] = t;
       }
     }
-    // Auto is always present, so _currentQuality is always a valid key.
     if (!map.containsKey('Auto')) {
       labels.insert(0, 'Auto');
       map['Auto'] = VideoTrack.auto();
@@ -323,8 +295,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _onTrackChanged(Track t) {
     if (!mounted) return;
-    // HLS quality is set via hls-bitrate; ABR switches must not reset the
-    // user's chosen label.
     if (_isHlsStream) return;
     final vt = t.video;
     String label = 'Auto';
@@ -340,13 +310,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   String _trackLabel(VideoTrack t, int index) {
     if (t.id == 'auto') return 'Auto';
     if (t.title != null && t.title!.isNotEmpty) return t.title!;
-    // Use the track height (e.g. 1080 → "1080p") from the HLS manifest.
     if (t.h != null && t.h! > 0) return '${t.h}p';
     if (t.w != null && t.w! > 0) return '${t.w}p';
     return 'Track ${index + 1}';
   }
-
-  // ── HLS quality (manifest-based) ──────────────────────────────────────────
 
   Future<void> _loadHlsQualities() async {
     final uri = _mediaUri;
@@ -372,7 +339,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _parseAndApplyHlsQualities(String content) {
     final seenLabels = <String>{};
-    final renditions = <MapEntry<int, String>>[]; // bandwidth → label
+    final renditions = <MapEntry<int, String>>[];
     final lines = content.split('\n');
     for (final line in lines) {
       final trimmed = line.trim();
@@ -412,8 +379,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _setHlsQuality(String label) async {
     final bw = _hlsBitrateMap[label];
     if (bw == null) return;
-    // 'no' lets libmpv resume automatic ABR; a number forces the nearest
-    // rendition by bandwidth.
     final value = bw == 0 ? 'no' : bw.toString();
     try {
       await (_player.platform as NativePlayer).setProperty(
@@ -425,8 +390,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       logger.e('PlayerScreen: hls-bitrate set failed → $e');
     }
   }
-
-  // ── Controls ───────────────────────────────────────────────────────────────
 
   void _scheduleHide() {
     _hideTimer?.cancel();
@@ -457,7 +420,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _hideTimer?.cancel();
     } else {
       if (_isCompleted) {
-        // libmpv stays at EOF after completion; seek to start before replaying.
         _player.seek(Duration.zero);
         setState(() => _isCompleted = false);
       }
@@ -467,7 +429,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _seek(Duration offset) {
-    // No seeking on livestreams or before duration is known
     if (_duration == Duration.zero) return;
     final t = _position + offset;
     final Duration target;
@@ -531,9 +492,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ]);
   }
 
-  // ── Analytics ──────────────────────────────────────────────────────────────
-
-  /// False for local-file playback, which has no media item to report on.
   bool get _analyticsEnabled =>
       widget.mediaId != null && widget.creatorId != null;
 
@@ -544,7 +502,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final analytics = GetIt.instance<AnalyticsService>();
     final pos = _position.inMilliseconds / 1000.0;
 
-    // Watch duration counts only time actually spent playing.
     if (nowPlaying) {
       _watchClock.start();
     } else {
@@ -601,7 +558,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _trackSeek(Duration target) {
     if (!_analyticsEnabled || !_analyticsViewStarted) return;
     final pos = target.inMilliseconds / 1000.0;
-    // Rebase so the jump itself doesn't fire a progress beacon.
     _lastProgressPos = pos;
     GetIt.instance<AnalyticsService>().trackSeek(
       mediaId: widget.mediaId!,
@@ -614,7 +570,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _trackCompletion() {
     if (!_analyticsEnabled || _analyticsCompleted) return;
-    // VOD only: a livestream running out of segments is a view_ended.
     if (widget.mediaType == MediaTypes.livestream) return;
     _analyticsCompleted = true;
     _watchClock.stop();
@@ -645,8 +600,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  // ── Keyboard ───────────────────────────────────────────────────────────────
-
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     switch (event.logicalKey) {
@@ -675,8 +628,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     return KeyEventResult.handled;
   }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -798,13 +749,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Video — fills screen, BoxFit.contain keeps aspect ratio
           Video(
             controller: _videoController,
             controls: NoVideoControls,
             fit: BoxFit.contain,
           ),
-          // Buffering spinner
           if (_isBuffering && !_isCompleted)
             const Center(
               child: CircularProgressIndicator(
@@ -812,7 +761,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 strokeWidth: 2.5,
               ),
             ),
-          // IgnorePointer stops faded-out controls intercepting taps.
           IgnorePointer(
             ignoring: !_showControls,
             child: AnimatedOpacity(

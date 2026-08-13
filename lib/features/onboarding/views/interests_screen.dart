@@ -12,14 +12,16 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// One selectable interest, in the order the design lays them out.
 class Interest {
-  const Interest(this.label, {this.icon});
+  const Interest(this.label, {this.icon, this.slugs = const []});
 
   final String label;
 
-  /// Builds the unselected glyph. Several chips have none in the design.
   final Widget Function()? icon;
+
+  /// Category slugs from `/v1/user/categories`. Empty where the design's chip
+  /// has no equivalent in the API taxonomy — see docs/OPEN_ISSUES.md.
+  final List<String> slugs;
 }
 
 Widget _svg(String asset) => SvgPicture.asset(
@@ -31,14 +33,14 @@ Widget _svg(String asset) => SvgPicture.asset(
 final _interests = <Interest>[
   Interest(
     AppStrings.interestPreaching,
-    icon: () => _svg(AppAssets.iconCatMicrophone),
+    icon: () => _svg(AppAssets.iconCatMicrophone, slugs: ['sermons']),
   ),
-  Interest(AppStrings.interestWorship, icon: () => _svg(AppAssets.iconCatDove)),
+  Interest(AppStrings.interestWorship, icon: () => _svg(AppAssets.iconCatDove, slugs: ['worship'])),
   Interest(
     AppStrings.interestBibleStudy,
-    icon: () => _svg(AppAssets.iconCatBible),
+    icon: () => _svg(AppAssets.iconCatBible, slugs: ['bible-study']),
   ),
-  Interest(AppStrings.interestYouthFamily, icon: () => const FamilyGlyph()),
+  Interest(AppStrings.interestYouthFamily, icon: () => const FamilyGlyph(, slugs: ['youth', 'family'])),
   Interest(
     AppStrings.interestMission,
     icon: () => _svg(AppAssets.iconCatGlobe),
@@ -49,7 +51,7 @@ final _interests = <Interest>[
   ),
   Interest(
     AppStrings.interestMarriageFamilyRelationships,
-    icon: () => _svg(AppAssets.iconCatRings),
+    icon: () => _svg(AppAssets.iconCatRings, slugs: ['family']),
   ),
   Interest(
     AppStrings.interestLeadership,
@@ -58,11 +60,10 @@ final _interests = <Interest>[
   Interest(AppStrings.interestFaith, icon: () => _svg(AppAssets.iconCatCoins)),
   Interest(
     AppStrings.interestGospelArtist,
-    icon: () => _svg(AppAssets.iconCatMusicNote),
+    icon: () => _svg(AppAssets.iconCatMusicNote, slugs: ['gospel-music']),
   ),
 ];
 
-/// "What would you like to see?"
 class InterestsScreen extends StatefulWidget {
   const InterestsScreen({super.key});
 
@@ -73,12 +74,10 @@ class InterestsScreen extends StatefulWidget {
 class _InterestsScreenState extends State<InterestsScreen> {
   final _selected = <String>{};
 
-  /// The design draws the fill at 236 of a 350-wide track.
   static const _progress = 236 / 350;
 
   void _continue() {
     // TODO(onboarding): persist the picks once the onboarding-state enums are
-    // confirmed; the design treats this step as skippable either way.
     context.go(AppRouter.discoverySource);
   }
 
@@ -88,6 +87,7 @@ class _InterestsScreenState extends State<InterestsScreen> {
       backgroundColor: AppColors.brandSecondary,
       backgroundAsset: AppAssets.worshipBg,
       topBar: _TopBar(progress: _progress, onSkip: _continue),
+      // The chip grid scrolls itself; the heading stays put.
       scrollable: false,
       footer: Column(
         mainAxisSize: MainAxisSize.min,

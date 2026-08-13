@@ -9,8 +9,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Floating blurred pill nav. The selected item sits on a translucent lozenge
-/// that slides between slots.
 class GTubeNavBar extends StatelessWidget {
   const GTubeNavBar({
     super.key,
@@ -97,7 +95,6 @@ class _NavSpec {
 
   final String label;
 
-  /// Null for the profile slot, which draws the viewer's avatar instead.
   final String? asset;
   final double width;
   final double height;

@@ -38,7 +38,6 @@ class VideoScannerService {
     );
     if (state.isAuth) return ScanPermission.granted;
     if (Platform.isAndroid) {
-      // Android returns denied whether the user was never asked or denied once.
       return ScanPermission.denied;
     }
     if (state == PermissionState.notDetermined) return ScanPermission.denied;

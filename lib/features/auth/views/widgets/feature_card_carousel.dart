@@ -8,8 +8,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Looping welcome-screen carousel. Four cards share one 8s timeline, each
-/// owning a quarter: fade+scale in over 3.75%, hold to 21.25%, out by 25%.
 class FeatureCardCarousel extends StatefulWidget {
   const FeatureCardCarousel({super.key});
 
@@ -27,7 +25,6 @@ class _FeatureCardCarouselState extends State<FeatureCardCarousel>
     duration: const Duration(seconds: 8),
   )..repeat();
 
-  // Keyframe offsets within a single card's quarter of the timeline.
   static const _fadeIn = 0.0375;
   static const _holdEnd = 0.2125;
   static const _slot = 0.25;
@@ -42,7 +39,6 @@ class _FeatureCardCarouselState extends State<FeatureCardCarousel>
     super.dispose();
   }
 
-  /// Progress of [index]'s card through its own slot, or null when idle.
   double? _localTime(int index, double t) {
     final start = index * _slot;
     final local = t - start;
@@ -99,8 +95,6 @@ class _FeatureCardCarouselState extends State<FeatureCardCarousel>
   }
 }
 
-/// Converts a CSS `linear-gradient` angle (0deg = up, clockwise) into the
-/// begin/end alignment pair Flutter expects.
 ({Alignment begin, Alignment end}) _gradientAxis(double degrees) {
   final radians = degrees * math.pi / 180;
   final x = math.sin(radians);
@@ -205,7 +199,6 @@ Widget _centredGlyph(String asset, double size, double padding) => Padding(
 );
 
 final _cards = <_FeatureCardData>[
-  // Purple — The Audio Bible
   _FeatureCardData(
     size: const Size(262.176, 166.154),
     radius: 24.615,
@@ -220,7 +213,6 @@ final _cards = <_FeatureCardData>[
     captionRotation: -7.04,
     content: _centredGlyph(AppAssets.iconPlay, 36.923, 24.615),
   ),
-  // Red — live Sunday service
   _FeatureCardData(
     size: Size(262, 174.179),
     radius: 25.335,
@@ -240,7 +232,6 @@ final _cards = <_FeatureCardData>[
       ],
     ),
   ),
-  // Olive — daily devotional pull-quote
   _FeatureCardData(
     size: Size(262, 177.382),
     radius: 25.34,
@@ -286,7 +277,6 @@ final _cards = <_FeatureCardData>[
       ],
     ),
   ),
-  // Green — worship at midnight
   _FeatureCardData(
     size: const Size(262, 172.069),
     radius: 25.492,

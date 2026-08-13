@@ -3,12 +3,8 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Loads the real bundled fonts into the test binding.
-///
-/// Without this the test framework substitutes a font whose every glyph is one
-/// em wide, which inflates text by roughly half again and invents overflows
-/// that do not happen on a device. Any test that asserts on layout needs the
-/// real metrics.
+/// Loads the real fonts. Without this the test font makes every glyph one em
+/// wide, inflating text and inventing overflows. Required by layout tests.
 Future<void> loadAppFonts() async {
   TestWidgetsFlutterBinding.ensureInitialized();
   const families = <String, List<String>>{

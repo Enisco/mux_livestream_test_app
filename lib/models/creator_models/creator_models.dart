@@ -1,5 +1,5 @@
 class CreatorChannel {
-  final String id; // saved locally as creatorId
+  final String id;
   final String type;
   final String handle;
   final String displayName;
@@ -123,7 +123,6 @@ class PlaybackToken {
   String get hlsUrl => 'https://stream.mux.com/$playbackId.m3u8?token=$token';
 }
 
-/// `GET /v1/creator/handle/{handle}/availability`.
 class HandleAvailability {
   const HandleAvailability({
     required this.handle,
@@ -148,7 +147,6 @@ class HandleAvailability {
   }
 }
 
-/// One option from `GET /v1/user/categories`.
 class ContentCategory {
   const ContentCategory({required this.slug, required this.name});
 
@@ -162,8 +160,6 @@ class ContentCategory {
       );
 }
 
-/// Which price list a plan belongs to. The plans API spells this
-/// **organisation**, `OnboardCreatorDto.type` spells it **organization**.
 enum BillingSubject {
   individual('individual'),
   organisation('organisation');
@@ -172,14 +168,12 @@ enum BillingSubject {
 
   final String value;
 
-  /// Maps the creator type stored at onboarding onto the billing spelling.
   static BillingSubject fromCreatorType(String? creatorType) =>
       creatorType == 'organization'
       ? BillingSubject.organisation
       : BillingSubject.individual;
 }
 
-/// One row from `GET /v1/payment/saas/plans`.
 class SaasPlan {
   const SaasPlan({
     required this.id,
@@ -194,12 +188,10 @@ class SaasPlan {
   final String planTier;
   final String billingSubject;
 
-  /// "month" or "year".
   final String billingInterval;
   final String currency;
   final int amountMinor;
 
-  /// Major units, e.g. 1900 minor -> 19.
   int get amountMajor => amountMinor ~/ 100;
 
   factory SaasPlan.fromJson(Map<String, dynamic> json) => SaasPlan(
@@ -212,7 +204,6 @@ class SaasPlan {
   );
 }
 
-/// `GET /v1/payment/saas/currency-hint`.
 class CurrencyHint {
   const CurrencyHint({
     required this.recommendedCurrency,
@@ -231,8 +222,6 @@ class CurrencyHint {
   }
 }
 
-/// `POST /v1/payment/saas/checkout`. Untyped in the spec, so absent fields stay
-/// null rather than throwing.
 class SaasCheckout {
   const SaasCheckout({this.checkoutUrl, this.reference, this.provider});
 

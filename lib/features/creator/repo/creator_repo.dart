@@ -12,8 +12,6 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 class CreatorRepo {
-  /// Falls back to a handle built from the channel name when the user never
-  /// settled on an available one.
   static String deriveHandle(String source) {
     final clean = source.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
     if (clean.isEmpty) return 'creator${_uuid.v4().substring(0, 8)}';
@@ -22,10 +20,6 @@ class CreatorRepo {
 
   static const _uuid = Uuid();
 
-  /// Creates the channel on first run of the creator setup screens, or patches
-  /// it if the user has come back through. Returns the creator id, or null if
-  /// the call failed — the caller continues either way, since nothing further
-  /// in onboarding hard-depends on the channel existing.
   Future<String?> saveCreatorProfile({
     required String handle,
     required String displayName,
@@ -41,8 +35,6 @@ class CreatorRepo {
           type: type,
           categorySlugs: categorySlugs,
         );
-        // Every channel gets ingest credentials up front so "Go live" never
-        // has to provision mid-flow.
         unawaited(_provisionQuietly(channel.id));
         return channel.id;
       }
@@ -67,8 +59,6 @@ class CreatorRepo {
     }
   }
 
-  /// `PATCH /v1/creator/{id}`. Every DTO field is optional, so only what the
-  /// user filled in is sent.
   Future<void> updateCreatorProfile({
     required String creatorId,
     String? handle,
@@ -88,8 +78,6 @@ class CreatorRepo {
     await _api.patch(ApiEndpoints.creatorById(creatorId), data: body);
   }
 
-  /// `POST /v1/payment/saas/checkout`. `preferredProvider` accepts
-  /// stripe | paystack | flutterwave.
   Future<SaasCheckout> createCheckout({
     required String creatorId,
     required String planTier,
@@ -112,7 +100,6 @@ class CreatorRepo {
     return SaasCheckout.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// `GET /v1/payment/saas/plans` — requires both query params or it 400s.
   Future<List<SaasPlan>> fetchPlans({
     required BillingSubject billingSubject,
     required String currency,
@@ -131,13 +118,11 @@ class CreatorRepo {
         .toList();
   }
 
-  /// `GET /v1/payment/saas/currency-hint` — drives the currency pill.
   Future<CurrencyHint> fetchCurrencyHint() async {
     final response = await _api.get(ApiEndpoints.saasCurrencyHint);
     return CurrencyHint.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// `GET /v1/creator/handle/{handle}/availability` — public, no auth needed.
   Future<HandleAvailability> checkHandleAvailability(String handle) async {
     final response = await _api.get(
       ApiEndpoints.creatorHandleAvailability(handle),
@@ -145,7 +130,6 @@ class CreatorRepo {
     return HandleAvailability.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// `GET /v1/user/categories`. Response nests the list: `{data: {data: [...]}}`.
   Future<List<ContentCategory>> fetchCategories() async {
     final response = await _api.get(ApiEndpoints.userCategories);
     final payload = (response.data as Map<String, dynamic>)['data'];
@@ -159,7 +143,6 @@ class CreatorRepo {
 
   String? get cachedCreatorId => LocalStorage.creatorId;
 
-  /// Caches the creatorId. Null when the user has no creator channel yet.
   Future<String?> fetchAndCacheCreatorId() async {
     try {
       final response = await _api.get(ApiEndpoints.creatorProfile);
@@ -231,7 +214,6 @@ class CreatorRepo {
       final body = e.response?.data;
       final errorMsg = (body is Map ? body['error']?.toString() : null) ?? '';
       if (status == 409 || errorMsg.toLowerCase().contains('already live')) {
-        // Backend may include the existing stream object in the 409 body.
         final existingId = (body is Map && body['data'] is Map)
             ? (body['data'] as Map<String, dynamic>)['id'] as String?
             : null;

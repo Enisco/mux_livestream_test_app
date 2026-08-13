@@ -26,8 +26,6 @@ Future<void> main() async {
   await setupLocator();
   setupSessionExpiredCallback();
 
-  // Pre-warm the vertical feed immediately after auth is confirmed so the first
-  // video has the maximum lead time to buffer before the user opens the screen.
   if (await getIt<TokenStorageService>().hasSession) {
     unawaited(getIt<VerticalFeedPreloader>().warmUp());
   }

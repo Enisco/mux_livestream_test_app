@@ -142,7 +142,6 @@ void main() {
       final afterFirstRun = clock.seconds;
       expect(afterFirstRun, greaterThan(0.03));
 
-      // Paused: the clock must not advance.
       await Future<void>.delayed(const Duration(milliseconds: 60));
       expect(clock.seconds, afterFirstRun);
 

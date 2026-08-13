@@ -38,7 +38,6 @@ class DiscoveryRepo {
       if (includeSuggestions) 'suggestionsLimit': 10,
     };
     if (clientSessionId != null) params['clientSessionId'] = clientSessionId;
-    // Required for unlisted media opened from a share link.
     if (shareToken != null) params['shareToken'] = shareToken;
 
     final response = await _api.get(
@@ -59,7 +58,6 @@ class DiscoveryRepo {
     bool includeServerContinueWatching = false,
   }) async {
     final body = <String, dynamic>{
-      // Contract: 10–20, defaults to 15.
       'limit': limit.clamp(10, 20),
       'mode': mode,
       'excludeMediaIds': excludeMediaIds,

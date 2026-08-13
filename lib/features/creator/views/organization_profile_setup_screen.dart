@@ -21,7 +21,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Organisation variant of "Setup your profile in seconds".
 class OrganizationProfileSetupScreen extends StatefulWidget {
   const OrganizationProfileSetupScreen({super.key});
 
@@ -43,7 +42,6 @@ class _OrganizationProfileSetupScreenState
   List<ContentCategory> _categories = const [];
   final Set<String> _selectedSlugs = {};
 
-  /// The design draws the fill at 236 of a 350-wide track.
   static const _progress = 236 / 350;
 
   static const _handleDebounce = Duration(milliseconds: 400);
@@ -135,8 +133,6 @@ class _OrganizationProfileSetupScreenState
     return names.join(', ');
   }
 
-  /// Creates the channel. "Type of organization" has no field on either creator
-  /// DTO — see docs/OPEN_ISSUES.md.
   Future<void> _continue() async {
     final displayName = _orgNameCtrl.text.trim();
     if (displayName.isEmpty) {

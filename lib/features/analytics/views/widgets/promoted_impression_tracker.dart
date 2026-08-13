@@ -6,9 +6,6 @@ import 'package:get_it/get_it.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 
-/// Emits one `promoted_qualified_impression` once [minVisibleFraction] of the
-/// unit has been on screen, foregrounded, for a continuous [dwell]. Scrolling
-/// away resets the window. A no-op on organic items.
 class PromotedImpressionTracker extends StatefulWidget {
   const PromotedImpressionTracker({
     super.key,
@@ -23,14 +20,12 @@ class PromotedImpressionTracker extends StatefulWidget {
     this.dwell = const Duration(milliseconds: 1500),
   });
 
-  /// Null for organic items — the tracker then does nothing at all.
   final PromotionAttribution? promotion;
   final String mediaId;
   final String creatorId;
   final String? mediaType;
   final String source;
 
-  /// Extra gate the geometry can't express, e.g. "this is the active feed page".
   final bool enabled;
 
   final double minVisibleFraction;
@@ -75,7 +70,6 @@ class _PromotedImpressionTrackerState extends State<PromotedImpressionTracker> {
   void _syncTicker() {
     final shouldRun = widget.promotion != null && widget.enabled && !_qualified;
     if (shouldRun) {
-      // Only promoted units poll, and each stops the moment it qualifies.
       _ticker ??= Timer.periodic(_tick, (_) => _onTick());
     } else {
       _ticker?.cancel();
@@ -108,8 +102,6 @@ class _PromotedImpressionTrackerState extends State<PromotedImpressionTracker> {
     );
   }
 
-  /// Fraction of this widget's box that intersects the view, 0 when it is not
-  /// laid out, not attached, or fully off-screen.
   double _visibleFraction() {
     final renderObject = context.findRenderObject();
     if (renderObject is! RenderBox) return 0;
@@ -123,7 +115,6 @@ class _PromotedImpressionTrackerState extends State<PromotedImpressionTracker> {
     try {
       bounds = renderObject.localToGlobal(Offset.zero) & size;
     } catch (_) {
-      // Not currently painted (e.g. an offscreen keep-alive page).
       return 0;
     }
 

@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 class LocalStorage {
   static late SharedPreferences _prefs;
 
-  // Storage keys
   static const cachedUserKey = 'gtube_cached_user';
   static const creatorIdKey = 'gtube_creator_id';
   static const muxLiveStreamIdKey = 'gtube_mux_live_stream_id';
@@ -14,17 +13,14 @@ class LocalStorage {
   static const streamRtmpUrlKey = 'gtube_rtmp_ingest_url';
   static const liveMediaIdKey = 'gtube_live_media_id';
 
-  /// Which onboarding path the user picked ("watch" / "ministry").
   static const onboardingIntentKey = 'gtube_onboarding_intent';
 
-  /// Creator type picked in the ministry branch ("individual" / "organization").
   static const creatorTypeKey = 'gtube_creator_type';
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
 
-  // Generic
   static Future<bool> setString(String key, String value) =>
       _prefs.setString(key, value);
 
@@ -32,7 +28,6 @@ class LocalStorage {
 
   static Future<bool> remove(String key) => _prefs.remove(key);
 
-  // Typed getters
   static String? get creatorId => getString(creatorIdKey);
 
   static String? get cachedFirstName {
@@ -59,7 +54,6 @@ class LocalStorage {
     }
   }
 
-  /// Derives a display handle from the cached user's email (e.g. "@johndoe").
   static String? get cachedHandle {
     final raw = getString(cachedUserKey);
     if (raw == null) return null;
@@ -83,7 +77,6 @@ class LocalStorage {
   static String? get streamRtmpUrl => getString(streamRtmpUrlKey);
   static String? get liveMediaId => getString(liveMediaIdKey);
 
-  // Batch save for stream credentials returned by provision endpoint
   static Future<void> saveStreamCredentials({
     required String creatorId,
     required String muxLiveStreamId,

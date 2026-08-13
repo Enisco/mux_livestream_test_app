@@ -32,8 +32,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final tokenStorage = getIt<TokenStorageService>();
     if (!await tokenStorage.hasSession) {
-      // No account yet: the welcome screen offers sign-up, sign-in, or browsing
-      // as a guest.
       if (mounted) context.go(AppRouter.welcome);
       return;
     }
@@ -46,15 +44,11 @@ class _SplashScreenState extends State<SplashScreen> {
       return;
     }
 
-    // Re-provision ingest credentials each launch; idempotent, and only
-    // meaningful for users who have a channel.
     final creatorId = LocalStorage.creatorId;
     if (creatorId != null) {
       try {
         await getIt<CreatorRepo>().provisionLivestream(creatorId);
-      } catch (_) {
-        // Non-fatal.
-      }
+      } catch (_) {}
     }
 
     if (mounted) context.go(AppRouter.home);
@@ -68,12 +62,12 @@ class _SplashScreenState extends State<SplashScreen> {
         body: DecoratedBox(
           decoration: const BoxDecoration(gradient: AppStyles.splashBackground),
           child: SafeArea(
+            // Full width, or the Column shrink-wraps and the gradient paints
+            // only a strip.
             child: SizedBox(
               width: 1.w,
               child: Column(
                 children: [
-                  // The lockup sits in the lower third, expressed as flex so it
-                  // lands in the same place on any screen.
                   const Spacer(flex: 5),
                   Column(
                     mainAxisSize: MainAxisSize.min,

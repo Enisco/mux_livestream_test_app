@@ -16,9 +16,6 @@ class VerticalFeedItem {
   final int? likeCount;
   final int? commentCount;
 
-  /// Server-issued attribution, present only on promoted placements. Held just
-  /// long enough to emit source-surface analytics — never forwarded to a
-  /// destination screen or route.
   final PromotionAttribution? promotion;
 
   const VerticalFeedItem({
@@ -41,8 +38,6 @@ class VerticalFeedItem {
 
   bool get isPromoted => promotion != null;
 
-  /// `mediaType` for analytics beacons; null when the server sent something we
-  /// don't recognise, rather than guessing.
   String? get mediaType => MediaTypes.normalize(type);
 
   factory VerticalFeedItem.fromJson(Map<String, dynamic> json) {

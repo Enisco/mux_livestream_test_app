@@ -4,9 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The chip glyphs are hand-authored rather than exported from Figma, so this
-/// guards the thing that would otherwise fail silently: flutter_svg refusing a
-/// path and drawing nothing.
 void main() {
   final files = Directory(
     'assets/icons',

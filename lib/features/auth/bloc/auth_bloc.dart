@@ -21,8 +21,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogoutRequested>(_onLogout);
   }
 
-  // ── Sign in ────────────────────────────────────────────────────────────────
-
   Future<void> _onSignIn(
     AuthSignInRequested event,
     Emitter<AuthState> emit,
@@ -34,7 +32,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
       );
 
-      // Ensure stream credentials are fresh for this device/session.
       final creatorId = await _provisionIfNeeded(response.user.id);
       emit(AuthSuccess(response.user, creatorId: creatorId));
     } on DioException catch (e) {
@@ -44,12 +41,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(AuthFailure('Something went wrong. Please try again.'));
     }
   }
-
-  // ── Sign up → auto-login ──────────────────────────────────────────────────
-  //
-  // No creator channel is created here: the onboarding flow only creates one if
-  // the user picks "share my ministry" and completes the setup screens. Email
-  // verification is skipped for now — see docs/OPEN_ISSUES.md.
 
   Future<void> _onSignUp(
     AuthSignUpRequested event,
@@ -67,7 +58,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         countryCode: event.countryCode,
       );
 
-      // Register returns the user but no tokens, so log in for a session.
       final loginResp = await _authRepo.login(
         email: event.email,
         password: event.password,
@@ -82,8 +72,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  // ── Logout ────────────────────────────────────────────────────────────────
-
   Future<void> _onLogout(
     AuthLogoutRequested event,
     Emitter<AuthState> emit,
@@ -92,9 +80,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoggedOut());
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  /// Idempotent — safe to call on every login.
   Future<String?> _provisionIfNeeded(String userId) async {
     try {
       final creatorRepo = GetIt.instance<CreatorRepo>();
@@ -110,7 +95,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<String?> _resolveCreatorId(String userId) async {
     final creatorRepo = GetIt.instance<CreatorRepo>();
-    // Cache miss happens on a fresh device or after re-login.
     return creatorRepo.cachedCreatorId ??
         await creatorRepo.fetchAndCacheCreatorId();
   }

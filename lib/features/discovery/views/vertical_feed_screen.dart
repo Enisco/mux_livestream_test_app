@@ -60,7 +60,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     if (preloader.hasData) {
       _usePreloaderData(preloader);
     } else if (preloader.isWarmingUp) {
-      // Warmup is in flight — wait for it rather than duplicating the fetch.
       unawaited(_waitForWarmup(preloader));
     } else {
       _load();
@@ -71,13 +70,11 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     _items.addAll(preloader.items);
     _nextCursor = preloader.nextCursor;
     _loading = false;
-    // 0-2 are already initialising; warm the URL cache for 3 & 4.
     _prefetch(3);
     _prefetch(4);
   }
 
   Future<void> _waitForWarmup(VerticalFeedPreloader preloader) async {
-    // Ceiling on the wait; fall back to our own load if the network is slow.
     await preloader.whenWarmedUp.timeout(
       const Duration(seconds: 8),
       onTimeout: () {},
@@ -92,7 +89,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
       _prefetch(3);
       _prefetch(4);
     } else if (_items.isEmpty) {
-      // Warmup timed out or failed — fetch independently.
       _load();
     }
   }
@@ -101,7 +97,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   void dispose() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pageController.dispose();
-    // Dispose held players and immediately re-warm for the next visit.
     GetIt.instance<VerticalFeedPreloader>().reset();
     super.dispose();
   }
@@ -180,11 +175,8 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     if (index >= _items.length - 3) {
       _loadMore();
     }
-    // Advance the rolling player window: initialise N+1 & N+2, dispose stale ones.
     GetIt.instance<VerticalFeedPreloader>().advance(index, _items);
   }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +215,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
               key: ValueKey(_items[i].mediaId),
               item: _items[i],
               isActive: i == _currentIndex,
-              // Keep -1 alive for back-scroll; pre-init +1 and +2.
               preload:
                   i != _currentIndex &&
                   i >= _currentIndex - 1 &&
@@ -340,8 +331,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   }
 }
 
-// ── Individual feed page ───────────────────────────────────────────────────────
-
 enum _PagePhase { idle, loading, playing, error }
 
 class _VerticalFeedPage extends StatefulWidget {
@@ -380,14 +369,12 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
-  // Creator info fetched from media detail endpoint (not in feed response)
   String? _creatorHandle;
   String? _creatorDisplayName;
 
   bool get _isPlaying => _player?.state.playing ?? false;
   bool get _isBuffering => _player?.state.buffering ?? false;
 
-  // Analytics
   bool _analyticsViewStarted = false;
   double _lastProgressPos = 0;
   bool? _wasPlaying;
@@ -418,7 +405,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     } else if (widget.preload && !old.preload && !widget.isActive) {
       _preloadPlayer();
     }
-    // Free native decoder slots once the page leaves the preload window.
     if (!widget.isActive && !widget.preload && (old.isActive || old.preload)) {
       _disposePlayer();
     }
@@ -426,7 +412,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   @override
   void dispose() {
-    // Close the session first — trackViewEnded flushes immediately.
     _trackViewEndedAnalytics();
     for (final s in _subs) {
       s.cancel();
@@ -435,8 +420,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     _player?.dispose();
     super.dispose();
   }
-
-  // ── Playback ──────────────────────────────────────────────────────────────
 
   Future<void> _activate() async {
     if (_player != null) {
@@ -447,16 +430,14 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
     final preloader = GetIt.instance<VerticalFeedPreloader>();
 
-    // Try an immediate claim first.
     var preloaded = preloader.takePlayer(widget.item.mediaId);
 
-    // Still opening — wait rather than spawning a duplicate.
     if (preloaded == null && preloader.isInitializing(widget.item.mediaId)) {
       setState(() => _phase = _PagePhase.loading);
       preloaded = await preloader.awaitPlayer(widget.item.mediaId);
       if (!mounted || _player != null) return;
       if (_phase != _PagePhase.loading) {
-        return; // _disposePlayer() ran while waiting
+        return;
       }
     }
 
@@ -477,12 +458,10 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       await _attachPreloaded(preloaded, play: false);
       return;
     }
-    // Don't race the preloader; leave the player for _activate() to claim.
     if (preloader.isInitializing(widget.item.mediaId)) return;
     await _resolveAndStart(play: false);
   }
 
-  /// Attaches an already-open preloader player, skipping the loading phase.
   Future<void> _attachPreloaded(
     PreloadedPlayer preloaded, {
     required bool play,
@@ -492,7 +471,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     _player = player;
     _videoController = controller;
 
-    // Sync whatever state the player already accumulated while preloading.
     _position = player.state.position;
     _duration = player.state.duration;
 
@@ -540,15 +518,12 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     if (play) {
       await player.play();
     } else if (widget.isActive) {
-      // Preload→activate race: page became active while attaching with play:false.
       await _player?.play();
     }
   }
 
   void _deactivate() {
     _player?.pause();
-    // The viewer swiped away: this playback session is over even though the
-    // page stays alive for a fast scroll-back.
     _trackViewEndedAnalytics();
   }
 
@@ -573,7 +548,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   Future<String?> _resolveUrl() async {
     final cached = widget.cache.get(widget.item.mediaId);
     if (cached != null) {
-      // URL is cached but creator info may not be — fetch it now without blocking.
       unawaited(_fetchCreatorInfo());
       return cached.playbackUrl;
     }
@@ -621,13 +595,11 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     try {
       final url = await _resolveUrl();
       if (!mounted) return;
-      // _disposePlayer() may have run during the fetch — it resets _phase.
       if (_phase != _PagePhase.loading) return;
       if (url == null || url.isEmpty) {
         setState(() => _phase = _PagePhase.error);
         return;
       }
-      // Re-derive play intent after the async gap.
       await _startPlayer(url, play: widget.isActive);
     } catch (e) {
       logger.e(
@@ -678,12 +650,10 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       await player.open(Media(url), play: play);
       await player.setPlaylistMode(PlaylistMode.single);
       await player.setVolume(_isMuted ? 0 : 100);
-      // _disposePlayer() ran during open() and already cleaned up.
       if (!mounted || _player != player) {
         return;
       }
       setState(() => _phase = _PagePhase.playing);
-      // Became active mid-init with play: false — start now.
       if (!play && widget.isActive) {
         await _player?.play();
       }
@@ -713,8 +683,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     setState(() => _isMuted = !_isMuted);
     _player?.setVolume(_isMuted ? 0 : 100);
   }
-
-  // ── Analytics ─────────────────────────────────────────────────────────────
 
   void _trackPlayAnalytics({required bool playing}) {
     final analytics = GetIt.instance<AnalyticsService>();
@@ -789,8 +757,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     );
   }
 
-  /// Closes this tile's playback session. Scrolling back re-arms
-  /// `view_started` — each visit is its own view.
   void _trackViewEndedAnalytics() {
     if (!_analyticsViewStarted) return;
     _analyticsViewStarted = false;
@@ -808,12 +774,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     _lastProgressPos = 0;
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // Only the tile the viewer is on accrues dwell for the paid impression.
     return PromotedImpressionTracker(
       promotion: widget.item.promotion,
       mediaId: widget.item.mediaId,
@@ -833,7 +796,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
         children: [
           const ColoredBox(color: Colors.black),
           _buildMedia(),
-          // Bottom-heavy gradient for text readability
           const Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -846,7 +808,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
               ),
             ),
           ),
-          // Loading / buffering spinner
           if (_phase == _PagePhase.loading ||
               (_phase == _PagePhase.playing && _isBuffering))
             const Center(
@@ -855,7 +816,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                 strokeWidth: 2.5,
               ),
             ),
-          // Error state
           if (_phase == _PagePhase.error)
             const Center(
               child: Column(
@@ -874,7 +834,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                 ],
               ),
             ),
-          // Only on a manual pause, not while buffering.
           if (_phase == _PagePhase.playing && !_isPlaying && !_isBuffering)
             Center(
               child: Container(
@@ -912,7 +871,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
       }
       return const SizedBox.shrink();
     }
-    // contain: portrait fills, landscape letterboxes.
     return Video(
       controller: _videoController!,
       controls: NoVideoControls,
@@ -971,9 +929,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
               _FeedActionButton(
                 icon: IconsaxPlusLinear.send_2,
                 label: 'Share',
-                onTap: () {
-                  // Share is available to all users
-                },
+                onTap: () {},
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
@@ -1012,7 +968,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                   padding: EdgeInsets.only(bottom: 6),
                   child: _LiveBadge(),
                 ),
-              // Ad disclosure for promoted placements.
               if (item.isPromoted)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 6),
@@ -1095,8 +1050,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     return '$count';
   }
 }
-
-// ── Supporting widgets ────────────────────────────────────────────────────────
 
 class _AvatarButton extends StatelessWidget {
   final String displayName;

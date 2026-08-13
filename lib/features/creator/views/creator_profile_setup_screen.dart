@@ -20,8 +20,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// "Setup your profile in seconds" — the individual creator's profile setup.
-/// The design frame is misleadingly named "How will you share your ministry".
 class CreatorProfileSetupScreen extends StatefulWidget {
   const CreatorProfileSetupScreen({super.key});
 
@@ -41,7 +39,6 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
   List<ContentCategory> _categories = const [];
   ContentCategory? _category;
 
-  /// The design draws the fill at 236 of a 350-wide track.
   static const _progress = 236 / 350;
 
   static const _handleDebounce = Duration(milliseconds: 400);
@@ -109,8 +106,6 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
     if (picked != null && mounted) setState(() => _category = picked);
   }
 
-  /// Creates the channel — this screen is where a viewer becomes a creator.
-  /// Skipping leaves them without one; the studio provisions it later.
   Future<void> _continue() async {
     final displayName = _channelCtrl.text.trim();
     if (displayName.isEmpty) {
@@ -126,8 +121,6 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
     if (mounted) context.go(AppRouter.planSelection);
   }
 
-  /// The typed handle once availability confirms it, else one derived from the
-  /// channel name so the channel is still creatable.
   String _resolvedHandle(String displayName) {
     if (_handleState == HandleState.available) return _handleCtrl.text.trim();
     return CreatorRepo.deriveHandle(displayName);
@@ -275,6 +268,3 @@ class _TopBar extends StatelessWidget {
     );
   }
 }
-
-/// Field caption. The design uses three variants: 12 medium, 13 medium and
-/// 12 bold — see docs/OPEN_ISSUES.md on inconsistent tokens.

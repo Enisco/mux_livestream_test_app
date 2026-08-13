@@ -8,7 +8,6 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 class EngagementRepo {
   final ApiService _api = GetIt.instance<ApiService>();
 
-  /// Returns true if the interaction was added, false if it was removed (toggle).
   Future<bool> toggleInteraction({
     required String targetType,
     required String targetId,

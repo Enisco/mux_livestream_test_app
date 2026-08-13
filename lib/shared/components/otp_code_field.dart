@@ -4,9 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Segmented one-time-code entry. An invisible [TextField] over the slots owns
-/// the text, so paste and autofill behave normally; the slots just render its
-/// value. The next slot to fill carries the brand border and lifted shadow.
 class OtpCodeField extends StatefulWidget {
   const OtpCodeField({
     super.key,
@@ -72,7 +69,6 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
             ],
           ],
         ),
-        // Invisible, full-bleed so a tap anywhere on the row starts editing.
         Positioned.fill(
           child: TextField(
             controller: widget.controller,

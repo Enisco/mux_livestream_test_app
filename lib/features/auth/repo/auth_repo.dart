@@ -13,8 +13,6 @@ class AuthRepo {
   final TokenStorageService _tokenStorage =
       GetIt.instance<TokenStorageService>();
 
-  /// Only firstName/lastName/email/password are required by `RegisterUserDto`;
-  /// blank optionals are omitted from the payload rather than sent empty.
   Future<RegisterResponse> register({
     required String firstName,
     required String lastName,
@@ -40,7 +38,6 @@ class AuthRepo {
     return RegisterResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// `POST /v1/auth/password/forgot` — emails a reset link.
   Future<void> requestPasswordReset({required String email}) async {
     await _api.post(
       ApiEndpoints.forgotPassword,
@@ -48,7 +45,6 @@ class AuthRepo {
     );
   }
 
-  /// Confirms a one-time code against an open 2FA/email-verification challenge.
   Future<void> verifyChallenge({
     required String challengeId,
     required String code,
@@ -59,7 +55,6 @@ class AuthRepo {
     );
   }
 
-  /// Asks the server to send a fresh one-time code for the same challenge.
   Future<void> resendChallengeOtp({required String challengeId}) async {
     await _api.post(
       ApiEndpoints.resend2faOtp,
@@ -95,9 +90,6 @@ class AuthRepo {
     return result;
   }
 
-  /// Called on every app launch. Clears the session only when the server
-  /// actually rejects the token — a launch with no connectivity keeps the user
-  /// signed in on the cached session.
   Future<bool> tryRefreshSession() async {
     if (!await _tokenStorage.hasSession) return false;
     try {
@@ -105,11 +97,7 @@ class AuthRepo {
       final response = await _api.post(
         ApiEndpoints.refresh,
         data: {'refreshToken': refresh},
-        options: Options(
-          // Skip the auth interceptor adding the expired access token here —
-          // the interceptor won't loop because this path contains 'sessions/refresh'.
-          headers: {},
-        ),
+        options: Options(headers: {}),
       );
       final result = RefreshSessionResponse.fromJson(
         response.data as Map<String, dynamic>,

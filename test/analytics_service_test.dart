@@ -11,14 +11,12 @@ import 'package:test_app/shared/services/device_info_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-/// Records every beacon POST and replays a scripted status code per path.
 class _FakeApi extends ApiService {
   _FakeApi({required super.tokenStorage, required super.deviceInfo});
 
   final List<String> paths = [];
   final List<List<Map<String, dynamic>>> batches = [];
 
-  /// path fragment -> status code to fail with (null = succeed).
   final Map<String, int> failures = {};
 
   List<Map<String, dynamic>> get allEvents =>
@@ -149,7 +147,6 @@ void main() {
     test(
       'falls back to the optional-auth route without losing events',
       () async {
-        // The gateway rejects the /auth route for want of a browser CSRF token.
         api.failures['/beacons/auth'] = 403;
 
         analytics.trackViewStarted(mediaId: 'm1', creatorId: 'c1');
@@ -159,10 +156,8 @@ void main() {
           '/v1/analytics/beacons/auth',
           '/v1/analytics/beacons',
         ]);
-        // Same batch delivered on the fallback route — nothing dropped.
         expect(api.batches.last.single['mediaId'], 'm1');
 
-        // And it does not keep re-probing the rejected route.
         analytics.trackPlay(mediaId: 'm2', creatorId: 'c1');
         await analytics.flushNow();
         expect(api.paths.where((p) => p.endsWith('/auth')).length, 1);
@@ -221,7 +216,6 @@ void main() {
       expect(paid['promotionCampaignId'], 'camp_1');
       expect(paid['promotionPlacement'], 'vertical_feed');
       expect(paid['promotionDeliveryId'], 'signed_token');
-      // The non-billable click must not carry attribution.
       expect(api.batches.single[0].containsKey('promotionDeliveryId'), isFalse);
     });
 
@@ -250,7 +244,6 @@ void main() {
         (e) => e['eventType'] == 'promotion_click',
       );
       expect(paid.length, 1);
-      // Every tap is still a real click for CTR purposes.
       expect(api.allEvents.where((e) => e['eventType'] == 'click').length, 3);
     });
 
@@ -290,8 +283,6 @@ void main() {
         await analytics.flushNow();
         final firstId = api.allEvents.single['eventId'] as String;
 
-        // A second service instance sharing the same analytics session must
-        // derive the same ID for the same delivery.
         final twin = AnalyticsService(
           api: api,
           deviceInfo: _FakeDeviceInfo(),
@@ -337,7 +328,6 @@ void main() {
       api.failures.clear();
       await analytics.flushNow();
 
-      // Only the original attempt — nothing was requeued.
       expect(api.batches.length, 1);
     });
   });

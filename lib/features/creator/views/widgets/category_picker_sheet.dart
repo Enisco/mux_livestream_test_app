@@ -5,8 +5,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Picker behind "What do you mostly share?". Follows the gender sheet's
-/// design; options come from `GET /v1/user/categories`.
 class CategoryPickerSheet extends StatelessWidget {
   const CategoryPickerSheet({super.key, required this.categories});
 

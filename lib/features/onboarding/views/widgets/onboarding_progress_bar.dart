@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:test_app/utils/app_constants/app_colors.dart';
 
-/// Thin step indicator at the top of the onboarding questions.
 class OnboardingProgressBar extends StatelessWidget {
   const OnboardingProgressBar({super.key, required this.progress});
 
-  /// 0..1 — the discovery-source step sits at 316/350 of the track.
   final double progress;
 
   static const _height = 2.0;

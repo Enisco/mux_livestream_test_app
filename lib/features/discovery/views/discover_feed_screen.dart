@@ -236,8 +236,6 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
           );
         }
         final item = _items[i];
-        // Promoted cards accrue dwell here, on the surface that served them.
-        // Organic cards make this a pass-through wrapper.
         return PromotedImpressionTracker(
           promotion: item.promotion,
           mediaId: item.entityId,
@@ -250,9 +248,6 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
     );
   }
 
-  /// Primary content navigation from a home-feed card. Emits `click`, plus
-  /// `promotion_click` when the card carries server-issued attribution. The
-  /// attribution stops here — the detail screen is never told about it.
   void _openItem(WebFeedItem item) {
     GetIt.instance<AnalyticsService>().trackContentClick(
       mediaId: item.entityId,
@@ -270,8 +265,6 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
     );
   }
 }
-
-// ── Feed item card ─────────────────────────────────────────────────────────────
 
 class _FeedItemCard extends StatelessWidget {
   const _FeedItemCard({required this.item, required this.onTap});
@@ -321,7 +314,6 @@ class _FeedItemCard extends StatelessWidget {
             )
           else
             const _ThumbnailPlaceholder(),
-          // Ad disclosure — a promoted placement must be visibly labelled.
           if (item.isPromoted)
             Positioned(
               top: 8,
@@ -343,7 +335,6 @@ class _FeedItemCard extends StatelessWidget {
                 ),
               ),
             ),
-          // Duration badge
           if (item.meta.durationSeconds != null)
             Positioned(
               bottom: 8,

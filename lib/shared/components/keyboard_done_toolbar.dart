@@ -5,8 +5,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Adds a "Done" strip above the keyboard so numeric and email fields — which
-/// have no return key that dismisses — can still be closed.
 class KeyboardDoneToolbar extends StatelessWidget {
   const KeyboardDoneToolbar({super.key, required this.child});
 
@@ -21,7 +19,6 @@ class KeyboardDoneToolbar extends StatelessWidget {
 
     return Stack(
       children: [
-        // The toolbar sits on top of the keyboard, so content has to clear both.
         visible
             ? MediaQuery(
                 data: media.copyWith(

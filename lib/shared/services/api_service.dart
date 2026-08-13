@@ -13,7 +13,6 @@ class ApiService {
   final TokenStorageService _tokenStorage;
   final DeviceInfoService _deviceInfo;
 
-  // Set by locator once the router exists — avoids circular dependency.
   static void Function()? onSessionExpired;
 
   ApiService({
@@ -66,11 +65,6 @@ class ApiService {
           '${responseBody != null ? '\n  response: $responseBody' : ''}',
         );
 
-        // Silent token refresh on 401, but never for auth endpoints themselves,
-        // and never for the authenticated analytics batch: that route can reject
-        // us for a missing browser CSRF token rather than a bad session, and a
-        // beacon must never be able to sign the user out. AnalyticsService
-        // handles that 401 itself by falling back to the optional-auth route.
         if (statusCode == 401 &&
             !path.contains(ApiEndpoints.refresh) &&
             !path.contains(ApiEndpoints.login) &&
@@ -99,7 +93,6 @@ class ApiService {
       final refresh = await _tokenStorage.refreshToken;
       if (refresh == null || refresh.isEmpty) return false;
 
-      // Refresh endpoint: POST with JSON body {"refreshToken": "..."}
       final response = await _dio.post(
         ApiEndpoints.refresh,
         data: {'refreshToken': refresh},
@@ -130,8 +123,6 @@ class ApiService {
       _isHandlingExpiry = false;
     }
   }
-
-  // HTTP helpers --------------------------------------------------------
 
   Future<Response<T>> get<T>(
     String path, {
