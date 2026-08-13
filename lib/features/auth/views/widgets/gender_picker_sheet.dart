@@ -4,7 +4,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Gender options as the API expects them, paired with their display copy.
 enum Gender {
   male('male', AppStrings.genderMale),
   female('female', AppStrings.genderFemale),

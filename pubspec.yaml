@@ -22,41 +22,29 @@ dependencies:
   apivideo_live_stream: ^1.2.0
   permission_handler: ^11.3.1
   shared_preferences: ^2.5.5
-
-  # API & networking
   dio: ^5.8.0+1
   flutter_dotenv: ^5.2.1
-
-  # Auth & secure storage
   flutter_secure_storage: ^9.2.1
-
-  # State management & DI
   flutter_bloc: ^9.1.0
   get_it: ^8.0.3
   equatable: ^2.0.7
-
-  # Navigation
   go_router: ^14.8.1
-
-  # Device info
   device_info_plus: ^12.4.0
   package_info_plus: ^9.0.1
   uuid: ^4.5.3
-
-  # Logging
   logger: ^2.5.0
-
-  # Icons
   iconsax_plus: ^1.0.0
   flutter_svg: ^2.0.17
   connectivity_plus: ^7.3.1
   sizing: ^2.0.1
+  country_flags: ^4.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  analyzer: ^13.0.0
 
 flutter:
   uses-material-design: true

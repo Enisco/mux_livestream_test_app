@@ -43,6 +43,26 @@ abstract final class AppAssets {
   static const iconCatBible = '$_icons/cat_bible.svg';
   static const iconCatGlobe = '$_icons/cat_globe.svg';
   static const iconCatCoins = '$_icons/cat_coins.svg';
+
+  // Chip glyphs the design leaves without one. Drawn to match the exported
+  // cat_* icons: square 18.3333 viewBox, solid white fill, no strokes — detail
+  // finer than ~1.5 units disappears at the 12px chip size.
+
+  /// Interlocking rings for "Marriage, family & relationships". That chip is a
+  /// merge of two the design listed separately.
+  static const iconCatRings = '$_icons/cat_rings.svg';
+
+  /// Dove for "Worship".
+  static const iconCatDove = '$_icons/cat_dove.svg';
+
+  /// Heart above an open palm for "Grief & comfort".
+  static const iconCatHeartHand = '$_icons/cat_heart_hand.svg';
+
+  /// Crown for "Leadership".
+  static const iconCatCrown = '$_icons/cat_crown.svg';
+
+  /// Beamed quavers for "Gospel artist".
+  static const iconCatMusicNote = '$_icons/cat_music_note.svg';
   // The "Youth & family" glyph is three overlaid vector layers.
   static const iconCatFamilyA = '$_icons/cat_family_a.svg';
   static const iconCatFamilyB = '$_icons/cat_family_b.svg';

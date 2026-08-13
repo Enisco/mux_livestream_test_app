@@ -85,6 +85,9 @@ class _DiscoverySourceScreenState extends State<DiscoverySourceScreen> {
       backgroundColor: AppColors.brandSecondary,
       backgroundAsset: AppAssets.worshipBg,
       topBar: const _TopBar(progress: _progress),
+      // The option list scrolls inside [_content]; the heading above it stays
+      // put. A scrolling scaffold would leave that list unbounded.
+      scrollable: false,
       footer: PrimaryButton(
         label: AppStrings.continueLabel,
         height: 54,

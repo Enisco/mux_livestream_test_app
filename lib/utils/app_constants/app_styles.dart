@@ -142,6 +142,19 @@ class AppStyles {
     letterSpacing: letterSpacing,
   );
 
+  /// System emoji faces, tried in turn when the brand fonts have no glyph.
+  ///
+  /// The bundled brand fonts carry no emoji, and naming no fallback leaves the
+  /// engine to guess — which it gets wrong on some platforms. Listing the faces
+  /// explicitly is what makes emoji resolve on Android and on physical iOS
+  /// devices. It does **not** rescue the iOS simulator, where the system emoji
+  /// font is unreachable entirely; see docs/OPEN_ISSUES.md.
+  static const List<String> emojiFallback = [
+    'Apple Color Emoji',
+    'Noto Color Emoji',
+    'Segoe UI Emoji',
+  ];
+
   // ── Internal ───────────────────────────────────────────────────────────────
 
   static TextStyle _base({
@@ -156,6 +169,7 @@ class AppStyles {
     final resolvedWeight = fontWeight ?? regular;
     return TextStyle(
       fontFamily: fontFamily ?? primaryFont,
+      fontFamilyFallback: emojiFallback,
       fontSize: fontSize,
       fontWeight: resolvedWeight,
       fontStyle: fontStyle,

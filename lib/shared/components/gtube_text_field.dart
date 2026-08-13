@@ -21,6 +21,7 @@ class GTubeTextField extends StatefulWidget {
     this.textInputAction,
     this.autofillHints,
     this.autofocus = false,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -33,6 +34,7 @@ class GTubeTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
   final bool autofocus;
+  final TextCapitalization textCapitalization;
 
   static const radius = 8.0;
   static const horizontalPadding = 16.0;
@@ -79,6 +81,7 @@ class _GTubeTextFieldState extends State<GTubeTextField> {
       focusNode: _focusNode,
       autofocus: widget.autofocus,
       keyboardType: widget.keyboardType,
+      textCapitalization: widget.textCapitalization,
       inputFormatters: widget.inputFormatters,
       obscureText: widget.obscureText,
       validator: widget.validator,

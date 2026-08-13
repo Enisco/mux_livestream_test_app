@@ -137,6 +137,32 @@ class LowerCaseInputFormatter extends TextInputFormatter {
   ) => newValue.copyWith(text: newValue.text.toLowerCase());
 }
 
+/// Capitalises the first letter of every word. Use on name fields.
+///
+/// Only word starts are touched — the rest of each word is left as typed, so
+/// names like "McDonald" and "O'Brien" survive. The text length never changes,
+/// which keeps the caret where the user put it.
+class WordCapitalizationInputFormatter extends TextInputFormatter {
+  const WordCapitalizationInputFormatter();
+
+  static final _wordStart = RegExp(r"(^|[\s'\-])(\p{Ll})", unicode: true);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final capitalized = newValue.text.replaceAllMapped(
+      _wordStart,
+      (m) => '${m[1]}${m[2]!.toUpperCase()}',
+    );
+    // A few letters grow when uppercased (ß → SS); leaving those alone beats
+    // moving the caret out from under the user.
+    if (capitalized.length != newValue.text.length) return newValue;
+    return newValue.copyWith(text: capitalized);
+  }
+}
+
 class AuthLogoHeader extends StatelessWidget {
   const AuthLogoHeader({super.key});
 

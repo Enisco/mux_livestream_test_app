@@ -6,9 +6,12 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 abstract final class AppTheme {
   static ThemeData get dark => ThemeData.dark().copyWith(
     // Everything falls back to Satoshi, including the legacy screens whose
-    // styles predate AppStyles and set no family of their own.
+    // styles predate AppStyles and set no family of their own. The emoji
+    // fallback rides along so text that never goes through AppStyles — Material
+    // widgets, plain Text — can still render emoji.
     textTheme: ThemeData.dark().textTheme.apply(
       fontFamily: AppStyles.primaryFont,
+      fontFamilyFallback: AppStyles.emojiFallback,
     ),
     colorScheme: const ColorScheme.dark(
       primary: AppColors.primary,

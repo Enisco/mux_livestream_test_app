@@ -15,8 +15,8 @@ class AuthSignUpRequested extends AuthEvent {
   final String email;
   final String password;
 
-  // Optional per RegisterUserDto — the design marks phone and gender optional
-  // and has no country field, so countryCode comes from the device locale.
+  // Optional per RegisterUserDto. Gender still is in the UI; phone is now
+  // required and arrives in E.164, with countryCode from the same picker.
   final String? phone;
   final String? gender;
   final String? countryCode;

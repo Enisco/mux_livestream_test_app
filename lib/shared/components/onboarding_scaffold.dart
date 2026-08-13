@@ -47,6 +47,11 @@ class OnboardingScaffold extends StatelessWidget {
 
   /// Scrolls [child] when it overflows. Turn off for screens that manage their
   /// own scrolling.
+  ///
+  /// While this is on, [child] is laid out with an unbounded height, so it must
+  /// not contain an [Expanded], [Flexible] or [Spacer] on the vertical axis —
+  /// that combination throws. A screen that pins a header and scrolls a list
+  /// below it wants `scrollable: false` and its own scroll view inside.
   final bool scrollable;
 
   /// Centres [child] in the space left over, for short screens like the

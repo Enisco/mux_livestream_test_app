@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/onboarding/views/widgets/interest_chip.dart';
 import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
@@ -34,9 +33,7 @@ final _interests = <Interest>[
     AppStrings.interestPreaching,
     icon: () => _svg(AppAssets.iconCatMicrophone),
   ),
-  // The design only shows Worship and "Marriage & family" in their selected
-  // state, so their unselected glyphs are unknown — see docs/CLAUDE.md.
-  const Interest(AppStrings.interestWorship),
+  Interest(AppStrings.interestWorship, icon: () => _svg(AppAssets.iconCatDove)),
   Interest(
     AppStrings.interestBibleStudy,
     icon: () => _svg(AppAssets.iconCatBible),
@@ -46,12 +43,23 @@ final _interests = <Interest>[
     AppStrings.interestMission,
     icon: () => _svg(AppAssets.iconCatGlobe),
   ),
-  const Interest(AppStrings.interestGrief),
-  const Interest(AppStrings.interestMarriageFamily),
-  const Interest(AppStrings.interestLeadership),
+  Interest(
+    AppStrings.interestGrief,
+    icon: () => _svg(AppAssets.iconCatHeartHand),
+  ),
+  Interest(
+    AppStrings.interestMarriageFamilyRelationships,
+    icon: () => _svg(AppAssets.iconCatRings),
+  ),
+  Interest(
+    AppStrings.interestLeadership,
+    icon: () => _svg(AppAssets.iconCatCrown),
+  ),
   Interest(AppStrings.interestFaith, icon: () => _svg(AppAssets.iconCatCoins)),
-  const Interest(AppStrings.interestMarriageRelationships),
-  const Interest(AppStrings.interestGospelArtist),
+  Interest(
+    AppStrings.interestGospelArtist,
+    icon: () => _svg(AppAssets.iconCatMusicNote),
+  ),
 ];
 
 /// "What would you like to see?"

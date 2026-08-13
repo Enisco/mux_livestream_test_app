@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-/// Multi-select interest chip. Selecting one swaps its fill to
-/// `Button Primary/Active` and replaces the category glyph with a check.
 class InterestChip extends StatelessWidget {
   const InterestChip({
     super.key,
@@ -20,7 +17,6 @@ class InterestChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  /// Category glyph shown when unselected. Some chips have none in the design.
   final Widget? icon;
 
   static const _radius = 12.0;
@@ -33,11 +29,12 @@ class InterestChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final leading = selected
-        ? SvgPicture.asset(
-            AppAssets.iconCheck,
-            width: iconSize,
-            height: iconSize,
-          )
+        ? Icon(Icons.check, size: iconSize, color: AppColors.textPrimary)
+        // SvgPicture.asset(
+        //     AppAssets.iconCheck,
+        //     width: iconSize,
+        //     height: iconSize,
+        //   )
         : icon;
 
     return Material(
@@ -71,8 +68,6 @@ class InterestChip extends StatelessWidget {
   }
 }
 
-/// The "Youth & family" glyph — three vector layers laid out by percentage
-/// inside a 20x20 box.
 class FamilyGlyph extends StatelessWidget {
   const FamilyGlyph({super.key});
 

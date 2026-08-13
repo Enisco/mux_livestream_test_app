@@ -1,22 +1,22 @@
-import 'dart:ui' show PlatformDispatcher;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/auth/views/widgets/auth_widgets.dart';
 import 'package:test_app/features/auth/views/widgets/gender_picker_sheet.dart';
+import 'package:test_app/shared/components/gtube_phone_field.dart';
 import 'package:test_app/shared/components/gtube_text_field.dart';
-import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
+import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/data/countries.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/phone_number.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -34,6 +34,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
   Gender? _gender;
+  Country _country = Countries.fallback;
 
   static const _sideInset = 20.0;
   static const _contentInset = 4.0;
@@ -59,10 +60,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         lastName: _lastNameCtrl.text.trim(),
         email: _emailCtrl.text.trim().toLowerCase(),
         password: _passwordCtrl.text,
-        phone: _phoneCtrl.text.trim(),
+        phone: PhoneNumber.e164(_phoneCtrl.text, _country.dialCode),
         gender: _gender?.value,
-        // The design has no country field, so fall back to the device locale.
-        countryCode: PlatformDispatcher.instance.locale.countryCode,
+        countryCode: _country.isoCode,
       ),
     );
   }
@@ -90,6 +90,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           gradient: AppStyles.splashBackground,
           backgroundAsset: AppAssets.onboardingBg,
           horizontalPadding: _sideInset + _contentInset,
+          topBar: _Header(),
           child: _content(),
         ),
       ),
@@ -100,7 +101,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _Header(),
         const SizedBox(height: _headerGap),
         _form(),
         const SizedBox(height: 32),
@@ -124,8 +124,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
           GTubeTextField(
             controller: _firstNameCtrl,
-            hint: AppStrings.fieldName,
+            hint: AppStrings.fieldFirstName,
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: const [WordCapitalizationInputFormatter()],
             autofillHints: const [AutofillHints.givenName],
             validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Required' : null,
@@ -135,17 +137,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
             controller: _lastNameCtrl,
             hint: AppStrings.fieldLastName,
             textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: const [WordCapitalizationInputFormatter()],
             autofillHints: const [AutofillHints.familyName],
             validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
           const SizedBox(height: _fieldGap),
-          GTubeTextField(
+          GTubePhoneField(
             controller: _phoneCtrl,
-            hint: AppStrings.fieldPhoneOptional,
-            keyboardType: TextInputType.phone,
+            hint: AppStrings.fieldPhone,
+            country: _country,
+            onCountryChanged: (country) => setState(() => _country = country),
             textInputAction: TextInputAction.next,
-            autofillHints: const [AutofillHints.telephoneNumber],
           ),
           const SizedBox(height: _fieldGap),
           GTubeSelectField(

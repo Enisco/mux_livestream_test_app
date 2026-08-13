@@ -24,10 +24,13 @@ abstract final class AppStrings {
   static const createAccountTitle = 'Create your account';
   static const createAccountSubtitle =
       'One account for watching, giving, and any ministry you serve.';
-  static const fieldName = 'Name';
+  static const fieldFirstName = 'First name';
   static const fieldLastName = 'Last name';
-  static const fieldPhoneOptional = 'Phone number (optional)';
+  static const fieldPhone = 'Phone number';
   static const fieldGenderOptional = 'Gender (optional)';
+  static const selectACountry = 'Select your country';
+  static const searchCountryHint = 'Search country or code';
+  static const noCountriesFound = 'No matching country';
   static const fieldEmail = 'Email';
   static const fieldPassword = 'Password';
   static const show = 'Show';
@@ -83,10 +86,10 @@ abstract final class AppStrings {
   static const interestYouthFamily = 'Youth & family';
   static const interestMission = 'Mission';
   static const interestGrief = 'Grief & comfort';
-  static const interestMarriageFamily = 'Marriage & family';
+  static const interestMarriageFamilyRelationships =
+      'Marriage, family & relationships';
   static const interestLeadership = 'Leadership';
   static const interestFaith = 'Faith';
-  static const interestMarriageRelationships = 'Marriage & relationships';
   static const interestGospelArtist = 'Gospel artist';
 
   // Creator profile setup
