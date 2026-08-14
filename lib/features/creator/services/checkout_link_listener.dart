@@ -67,12 +67,9 @@ class _CheckoutLinkWatcherState extends State<CheckoutLinkWatcher> {
       return;
     }
 
-    // The browser sits above the app on iOS; it has to come down first.
-    try {
-      await closeInAppWebView();
-    } catch (e) {
-      logger.d('No in-app browser to close: $e');
-    }
+    // Dismissing the browser is cosmetic, and the call never completes when
+    // there is none open — so it must not gate the handoff.
+    unawaited(closeInAppWebView().catchError((Object _) {}));
 
     appRouter.push(AppRouter.checkoutStatus, extra: incoming);
   }

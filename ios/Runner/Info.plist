@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- app_links handles the checkout return; Flutter must not feed the URL
+	     to go_router, which has no route for it. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Required to pick video files from your photo library.</string>
 	<key>NSCameraUsageDescription</key>

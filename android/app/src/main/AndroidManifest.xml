@@ -29,6 +29,12 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- app_links handles the checkout return, so Flutter must not feed
+                 the URL to go_router — it has no route for it and would land on
+                 "Page Not Found". -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
             <!-- Return leg of the mobile subscription checkout. autoVerify means
                  an unverified host opens the browser instead of this app, so
                  nothing is hijacked before assetlinks.json is published. -->
