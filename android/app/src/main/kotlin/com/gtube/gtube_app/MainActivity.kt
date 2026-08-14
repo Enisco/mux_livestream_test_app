@@ -1,4 +1,4 @@
-package com.example.test_app
+package com.gtube.gtube_app
 
 import io.flutter.embedding.android.FlutterActivity
 

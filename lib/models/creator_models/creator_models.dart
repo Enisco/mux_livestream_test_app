@@ -222,22 +222,176 @@ class CurrencyHint {
   }
 }
 
-class SaasCheckout {
-  const SaasCheckout({this.checkoutUrl, this.reference, this.provider});
+enum MobileCheckoutStatus {
+  created,
+  inProgress,
+  processing,
+  succeeded,
+  failed,
+  canceled,
+  expired,
+  unknown;
 
-  final String? checkoutUrl;
-  final String? reference;
-  final String? provider;
+  static MobileCheckoutStatus fromApi(String? value) => switch (value) {
+    'created' => created,
+    'in_progress' => inProgress,
+    'processing' => processing,
+    'succeeded' => succeeded,
+    'failed' => failed,
+    'canceled' => canceled,
+    'expired' => expired,
+    _ => unknown,
+  };
 
-  factory SaasCheckout.fromJson(Map<String, dynamic> json) {
+  /// Nothing more will happen without a new attempt.
+  bool get isTerminal => switch (this) {
+    succeeded || failed || canceled || expired => true,
+    _ => false,
+  };
+}
+
+/// Whether a storefront may sell a given product. Fail-closed in production.
+class CheckoutCapabilities {
+  const CheckoutCapabilities({
+    required this.subscriptionAvailable,
+    this.subscriptionReason,
+  });
+
+  final bool subscriptionAvailable;
+  final String? subscriptionReason;
+
+  factory CheckoutCapabilities.fromJson(Map<String, dynamic> json) {
     final data = json['data'];
     final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
-    return SaasCheckout(
-      checkoutUrl:
-          (map['checkoutUrl'] ?? map['authorizationUrl'] ?? map['url'])
-              as String?,
-      reference: (map['reference'] ?? map['id']) as String?,
-      provider: map['provider'] as String?,
+    final sub = map['platformSubscription'];
+    final subMap = sub is Map<String, dynamic>
+        ? sub
+        : const <String, dynamic>{};
+    return CheckoutCapabilities(
+      subscriptionAvailable: subMap['available'] as bool? ?? false,
+      subscriptionReason: subMap['reason'] as String?,
+    );
+  }
+}
+
+/// A single-use, short-lived ticket into the web checkout. Never log or persist
+/// it — the guide treats the ticket as a credential.
+class MobileCheckoutLaunch {
+  const MobileCheckoutLaunch({required this.launchUrl, this.expiresAt});
+
+  final String launchUrl;
+  final DateTime? expiresAt;
+
+  bool get isUsable => launchUrl.isNotEmpty && !_expired;
+
+  bool get _expired {
+    final at = expiresAt;
+    return at != null && DateTime.now().toUtc().isAfter(at);
+  }
+
+  factory MobileCheckoutLaunch.fromMap(Map<String, dynamic> map) =>
+      MobileCheckoutLaunch(
+        launchUrl: map['launchUrl'] as String? ?? '',
+        expiresAt: DateTime.tryParse(
+          map['launchExpiresAt'] as String? ?? '',
+        )?.toUtc(),
+      );
+
+  factory MobileCheckoutLaunch.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    return MobileCheckoutLaunch.fromMap(
+      data is Map<String, dynamic> ? data : const <String, dynamic>{},
+    );
+  }
+}
+
+/// The entitlements a checkout is granting. Server truth — the client never
+/// infers a plan from a PSP result.
+class CheckoutEntitlement {
+  const CheckoutEntitlement({this.planTier, this.status});
+
+  final String? planTier;
+  final String? status;
+
+  factory CheckoutEntitlement.fromJson(Map<String, dynamic> json) =>
+      CheckoutEntitlement(
+        planTier: json['planTier'] as String?,
+        status: json['status'] as String?,
+      );
+}
+
+/// Canonical state of a mobile→web checkout attempt. The only thing the app
+/// trusts; return-link query parameters are navigation, not proof.
+class MobileCheckoutSession {
+  const MobileCheckoutSession({
+    required this.id,
+    required this.status,
+    this.paymentProvider,
+    this.mobileReturnUrl,
+    this.targetPlanTier,
+    this.entitlementsReady = false,
+    this.scheduled = false,
+    this.entitlement,
+  });
+
+  final String id;
+  final MobileCheckoutStatus status;
+  final String? paymentProvider;
+  final String? mobileReturnUrl;
+  final String? targetPlanTier;
+  final bool entitlementsReady;
+  final bool scheduled;
+  final CheckoutEntitlement? entitlement;
+
+  /// Provider confirmation alone is not completion — entitlements must agree.
+  bool get isSettled =>
+      status == MobileCheckoutStatus.succeeded && entitlementsReady;
+
+  bool get isTerminal => status.isTerminal;
+
+  factory MobileCheckoutSession.fromMap(Map<String, dynamic> map) {
+    final sub = map['subscription'];
+    final subMap = sub is Map<String, dynamic>
+        ? sub
+        : const <String, dynamic>{};
+    final ent = subMap['entitlement'];
+    return MobileCheckoutSession(
+      id: map['id'] as String? ?? '',
+      status: MobileCheckoutStatus.fromApi(map['status'] as String?),
+      paymentProvider: map['paymentProvider'] as String?,
+      mobileReturnUrl: map['mobileReturnUrl'] as String?,
+      targetPlanTier: subMap['targetPlanTier'] as String?,
+      entitlementsReady: subMap['entitlementsReady'] as bool? ?? false,
+      scheduled: subMap['scheduled'] as bool? ?? false,
+      entitlement: ent is Map<String, dynamic>
+          ? CheckoutEntitlement.fromJson(ent)
+          : null,
+    );
+  }
+
+  factory MobileCheckoutSession.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    final session = map['session'];
+    return MobileCheckoutSession.fromMap(
+      session is Map<String, dynamic> ? session : map,
+    );
+  }
+}
+
+/// A freshly created session paired with its first launch ticket.
+class MobileCheckoutHandoff {
+  const MobileCheckoutHandoff({required this.session, required this.launch});
+
+  final MobileCheckoutSession session;
+  final MobileCheckoutLaunch launch;
+
+  factory MobileCheckoutHandoff.fromJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return MobileCheckoutHandoff(
+      session: MobileCheckoutSession.fromJson(json),
+      launch: MobileCheckoutLaunch.fromMap(map),
     );
   }
 }

@@ -84,6 +84,7 @@ class FeedCardData {
   final String? subtitle;
 
   String viewsNoun(int n) => switch ((kind, n)) {
+    (FeedCardKind.live, _) => 'Watching',
     (FeedCardKind.blog, 1) => 'Open',
     (FeedCardKind.blog, _) => 'Opens',
     (_, 1) => 'View',
@@ -233,6 +234,11 @@ class _CreatorRow extends StatelessWidget {
         _Avatar(
           url: data.avatarUrl,
           verified: data.verified,
+          ringColor: switch (data) {
+            _ when data.kind == FeedCardKind.live => AppColors.red500,
+            _ when data.following => AppColors.cyan400,
+            _ => AppColors.purple400,
+          },
           onTap: data.following ? null : onFollow,
         ),
         SizedBox(width: 10.s),
@@ -262,6 +268,10 @@ class _CreatorRow extends StatelessWidget {
                         height: 13.311.s,
                         box: 16,
                       ),
+                    ],
+                    if (data.kind == FeedCardKind.live) ...[
+                      SizedBox(width: 4.s),
+                      const _LivePill(),
                     ],
                   ],
                 ),
@@ -338,12 +348,21 @@ class _MetaRow extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({this.url, this.verified = false, this.onTap, this.size = 32});
+  const _Avatar({
+    this.url,
+    this.verified = false,
+    this.onTap,
+    this.size = 32,
+    this.ringColor,
+  });
 
   final String? url;
   final bool verified;
   final VoidCallback? onTap;
   final double size;
+
+  /// Red while live, cyan once following, purple when still followable.
+  final Color? ringColor;
 
   @override
   Widget build(BuildContext context) {
@@ -362,9 +381,9 @@ class _Avatar extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.brandPrimary,
-                border: verified
-                    ? Border.all(color: AppColors.purple400, width: 2.s)
-                    : null,
+                border: ringColor == null
+                    ? null
+                    : Border.all(color: ringColor!, width: 2.s),
                 image: url == null || url!.isEmpty
                     ? null
                     : DecorationImage(
@@ -442,8 +461,6 @@ class _MediaBlock extends StatelessWidget {
                       errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
             ),
-            if (data.kind == FeedCardKind.live)
-              Positioned(top: 9.s, left: 9.s, child: _LivePill()),
             if (data.duration case final duration?)
               Positioned(
                 left: 9.s,
@@ -477,10 +494,11 @@ class _MediaBlock extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.label, this.color = AppColors.brandSecondary});
+  const _Pill({required this.label});
 
   final String label;
-  final Color color;
+
+  static const color = AppColors.brandSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -508,7 +526,22 @@ class _LivePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Pill(label: 'LIVE', color: AppColors.liveBadge);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7.109.s, vertical: 1.777.s),
+      decoration: BoxDecoration(
+        color: AppColors.livePillFill,
+        borderRadius: BorderRadius.circular(10.663.s),
+        border: Border.all(color: AppColors.red500, width: 1.185.s),
+      ),
+      child: Text(
+        AppStrings.liveBadge,
+        style: AppStyles.label(
+          5.924,
+          weight: AppStyles.bold,
+          lineHeight: 9.478 / 5.924,
+        ),
+      ),
+    );
   }
 }
 
@@ -527,6 +560,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final live = data.kind == FeedCardKind.live;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -547,31 +581,49 @@ class _ActionRow extends StatelessWidget {
           active: data.saved,
           onTap: onSave,
         ),
-        SizedBox(width: 20.s),
-        _ActionButton(
-          asset: AppAssets.iconFeedChat,
-          width: 13.333.s,
-          height: 13.333.s,
-          count: data.comments,
-          onTap: onComment,
-        ),
+        // The design's post card carries no comment action.
+        if (data.kind != FeedCardKind.post) ...[
+          SizedBox(width: 20.s),
+          _ActionButton(
+            asset: AppAssets.iconFeedChat,
+            width: 13.333.s,
+            height: 13.333.s,
+            count: data.comments,
+            onTap: onComment,
+          ),
+        ],
         const Spacer(),
         if (data.views case final views?) ...[
           Text(
             '$views ${data.viewsNoun(data.viewCount)}',
-            style: AppStyles.label(
-              10,
-              weight: AppStyles.bold,
-              lineHeight: 16 / 10,
-            ),
+            style: live
+                ? AppStyles.label(
+                    12,
+                    color: AppColors.neutral300,
+                    weight: AppStyles.bold,
+                    lineHeight: 16 / 12,
+                  )
+                : AppStyles.label(
+                    10,
+                    weight: AppStyles.bold,
+                    lineHeight: 16 / 10,
+                  ),
           ),
           SizedBox(width: 4.s),
-          DesignIcon(
-            AppAssets.iconFeedUsers,
-            width: 12.926.s,
-            height: 12.s,
-            box: 16,
-          ),
+          if (live)
+            DesignIcon(
+              AppAssets.iconFeedEye,
+              width: 13.885.s,
+              height: 9.s,
+              box: 16,
+            )
+          else
+            DesignIcon(
+              AppAssets.iconFeedUsers,
+              width: 12.926.s,
+              height: 12.s,
+              box: 16,
+            ),
         ],
       ],
     );
@@ -666,11 +718,17 @@ class _MediaAndTitle extends StatelessWidget {
           _MediaBlock(data: data),
           SizedBox(height: 16.s),
         ],
-        if (data.title case final title?) _Headline(title),
-        if (data.body case final body?) ...[
-          if (data.title != null) SizedBox(height: 6.s),
-          _Excerpt(body),
-        ],
+        if (data.kind == FeedCardKind.post)
+          // A post is body-only, set in the headline face.
+          if (data.body ?? data.title case final text?)
+            _Headline(text)
+          else ...[
+            if (data.title case final title?) _Headline(title),
+            if (data.body case final body?) ...[
+              if (data.title != null) SizedBox(height: 6.s),
+              _Excerpt(body),
+            ],
+          ],
       ],
     );
   }

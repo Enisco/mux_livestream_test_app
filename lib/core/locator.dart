@@ -2,6 +2,8 @@ import 'package:get_it/get_it.dart';
 
 import 'package:test_app/features/auth/repo/auth_repo.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/features/creator/repo/mobile_checkout_repo.dart';
+import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
@@ -41,6 +43,10 @@ Future<void> setupLocator() async {
   );
   getIt.registerLazySingleton<AuthRepo>(() => AuthRepo());
   getIt.registerLazySingleton<CreatorRepo>(() => CreatorRepo());
+  getIt.registerLazySingleton<MobileCheckoutRepo>(() => MobileCheckoutRepo());
+  getIt.registerLazySingleton<CheckoutHandoffService>(
+    () => CheckoutHandoffService(repo: getIt<MobileCheckoutRepo>()),
+  );
   getIt.registerLazySingleton<DiscoveryRepo>(() => DiscoveryRepo());
   getIt.registerLazySingleton<OnboardingRepo>(() => OnboardingRepo());
   getIt.registerLazySingleton<EngagementRepo>(() => EngagementRepo());

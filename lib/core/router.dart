@@ -25,6 +25,7 @@ class AppRouter {
   static const String creatorSetup = '/creator-setup';
   static const String orgSetup = '/org-setup';
   static const String planSelection = '/plan-selection';
+  static const String checkoutStatus = '/checkout-status';
 
   static const String home = '/home';
 }

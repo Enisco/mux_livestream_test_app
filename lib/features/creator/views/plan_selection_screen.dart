@@ -7,8 +7,8 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
 import 'package:test_app/features/creator/views/widgets/plan_card.dart';
-import 'package:test_app/features/creator/views/widgets/payment_provider_sheet.dart';
 import 'package:test_app/features/creator/views/widgets/plan_comparison_sheet.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
@@ -68,8 +68,8 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
 
   List<SaasPlan> _plans = const [];
   String _currency = 'USD';
-  PaymentProvider? _recommendedProvider;
   bool _yearly = true;
+  bool _starting = false;
   String? _selectedTier;
 
   @override
@@ -92,9 +92,6 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
       setState(() {
         _currency = hint.recommendedCurrency;
         _plans = plans;
-        _recommendedProvider = PaymentProvider.fromApi(
-          hint.recommendedProvider,
-        );
       });
     } catch (e) {
       logger.e('Failed to load plans', error: e);
@@ -120,39 +117,39 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
     return null;
   }
 
+  /// Hands off to the web checkout. Plan, provider and payment are all chosen
+  /// there; this screen only starts the attempt and then watches it.
   Future<void> _continue() async {
-    final tier = _selectedTier ?? 'pro';
-    final provider = await PaymentProviderSheet.show(
-      context,
-      planLabel: tier,
-      yearly: _yearly,
-      recommended: _recommendedProvider,
-    );
-    if (provider == null || !mounted) return;
-
+    if (_starting) return;
     final creatorId = LocalStorage.creatorId;
     if (creatorId == null) {
       logger.w('Skipping checkout: no cached creatorId');
-      if (mounted) context.go(AppRouter.home);
+      context.go(AppRouter.home);
       return;
     }
 
-    try {
-      final checkout = await _repo.createCheckout(
-        creatorId: creatorId,
-        planTier: tier,
-        yearly: _yearly,
-        provider: provider.value,
-        currency: _currency,
-      );
-      // TODO(creator): open checkout.checkoutUrl in a browser/webview once the
-      // payment flow is agreed.
-      logger.i('Checkout created: ${checkout.reference}');
-    } catch (e) {
-      logger.e('Checkout failed', error: e);
+    setState(() => _starting = true);
+    final result = await getIt<CheckoutHandoffService>().start(
+      creatorId: creatorId,
+      planTier: _selectedTier ?? 'pro',
+    );
+    if (!mounted) return;
+    setState(() => _starting = false);
+
+    switch (result.outcome) {
+      case HandoffOutcome.launched:
+      case HandoffOutcome.alreadyActive:
+        context.push(AppRouter.checkoutStatus, extra: result.sessionId);
+      case HandoffOutcome.unavailable:
+        _tell(AppStrings.checkoutUnavailable);
+      case HandoffOutcome.failed:
+        _tell(AppStrings.checkoutFailed);
     }
-    if (mounted) context.go(AppRouter.home);
   }
+
+  void _tell(String message) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) {
@@ -160,55 +157,58 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: AppColors.brandSecondary,
-        body: SafeArea(
-          child: Column(
+        body: SafeArea(child: _body()),
+      ),
+    );
+  }
+
+  Widget _body() {
+    return Column(
+      children: [
+        _Header(
+          currency: _currency,
+          yearly: _yearly,
+          onIntervalChanged: (yearly) => setState(() => _yearly = yearly),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(23, 0, 23, 24),
             children: [
-              _Header(
-                currency: _currency,
-                yearly: _yearly,
-                onIntervalChanged: (yearly) => setState(() => _yearly = yearly),
+              PlanCard(
+                copy: _basicCopy,
+                selected: _selectedTier == 'basic',
+                price: _priceFor('basic'),
+                onTap: () => setState(() => _selectedTier = 'basic'),
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(23, 0, 23, 24),
-                  children: [
-                    PlanCard(
-                      copy: _basicCopy,
-                      selected: _selectedTier == 'basic',
-                      price: _priceFor('basic'),
-                      onTap: () => setState(() => _selectedTier = 'basic'),
-                    ),
-                    const SizedBox(height: 18),
-                    PlanCard(
-                      copy: _proCopy,
-                      selected: _selectedTier == 'pro' || _selectedTier == null,
-                      price: _priceFor('pro'),
-                      onTap: () => setState(() => _selectedTier = 'pro'),
-                    ),
-                    const SizedBox(height: 18),
-                    PlanCard(
-                      copy: _enterpriseCopy,
-                      selected: _selectedTier == 'enterprise',
-                      customPrice: AppStrings.planEnterprisePrice,
-                      mutedInheritsLine: true,
-                      onTap: () => setState(() => _selectedTier = 'enterprise'),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 18),
+              PlanCard(
+                copy: _proCopy,
+                selected: _selectedTier == 'pro' || _selectedTier == null,
+                price: _priceFor('pro'),
+                onTap: () => setState(() => _selectedTier = 'pro'),
               ),
-              _BottomBar(
-                onContinue: _continue,
-                onCompare: () => PlanComparisonSheet.show(
-                  context,
-                  currency: _currency,
-                  basicPrice: _monthlyPriceFor('basic'),
-                  proPrice: _monthlyPriceFor('pro'),
-                ),
+              const SizedBox(height: 18),
+              PlanCard(
+                copy: _enterpriseCopy,
+                selected: _selectedTier == 'enterprise',
+                customPrice: AppStrings.planEnterprisePrice,
+                mutedInheritsLine: true,
+                onTap: () => setState(() => _selectedTier = 'enterprise'),
               ),
             ],
           ),
         ),
-      ),
+        _BottomBar(
+          busy: _starting,
+          onContinue: _continue,
+          onCompare: () => PlanComparisonSheet.show(
+            context,
+            currency: _currency,
+            basicPrice: _monthlyPriceFor('basic'),
+            proPrice: _monthlyPriceFor('pro'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -379,10 +379,15 @@ class _Segment extends StatelessWidget {
 }
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.onContinue, required this.onCompare});
+  const _BottomBar({
+    required this.onContinue,
+    required this.onCompare,
+    this.busy = false,
+  });
 
   final VoidCallback onContinue;
   final VoidCallback onCompare;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -412,6 +417,7 @@ class _BottomBar extends StatelessWidget {
                 PrimaryButton(
                   label: AppStrings.continueWithFree,
                   height: 54,
+                  loading: busy,
                   onPressed: onContinue,
                 ),
               ],

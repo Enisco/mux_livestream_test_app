@@ -7,9 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final files = Directory(
     'assets/icons',
-  ).listSync().whereType<File>().where((f) => f.path.contains('cat_')).toList();
+  ).listSync().whereType<File>().where((f) => f.path.endsWith('.svg')).toList();
 
-  test('the chip glyph set is present', () {
+  test('the icon set is present', () {
     expect(files, isNotEmpty);
   });
 

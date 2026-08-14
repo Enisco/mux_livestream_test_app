@@ -30,7 +30,17 @@ abstract final class ApiEndpoints {
 
   static const saasPlans = '/v1/payment/saas/plans';
   static const saasCurrencyHint = '/v1/payment/saas/currency-hint';
-  static const saasCheckout = '/v1/payment/saas/checkout';
+
+  static const mobileCheckouts = '/v1/payment/mobile-web-checkouts';
+  static const mobileCheckoutCapabilities = '$mobileCheckouts/capabilities';
+
+  static String mobileCheckout(String id) => '$mobileCheckouts/$id';
+
+  static String mobileCheckoutLaunch(String id) =>
+      '$mobileCheckouts/$id/launch';
+
+  static String mobileCheckoutCancel(String id) =>
+      '$mobileCheckouts/$id/cancel';
 
   static String provisionLivestream(String creatorId) =>
       '$_media/live/creator/$creatorId/provision';

@@ -52,12 +52,6 @@ abstract final class AppAssets {
 
   static const iconCheckbox = '$_icons/checkbox.svg';
 
-  static const iconFlutterwave = '$_icons/flutterwave.svg';
-  static const iconPaystack = '$_icons/paystack.svg';
-  static const iconStripe = '$_icons/stripe.svg';
-  static const iconRadioSelected = '$_icons/radio_selected.svg';
-  static const iconRadioUnselected = '$_icons/radio_unselected.svg';
-
   static const iconCheckGreen = '$_icons/check_green.svg';
   static const iconDollar = '$_icons/dollar.svg';
 
@@ -76,6 +70,7 @@ abstract final class AppAssets {
   static const iconFeedBookmark = '$_icons/feed_bookmark.svg';
   static const iconFeedChat = '$_icons/feed_chat.svg';
   static const iconFeedUsers = '$_icons/feed_users.svg';
+  static const iconFeedEye = '$_icons/feed_eye.svg';
   static const iconFeedMore = '$_icons/feed_more.svg';
   static const iconFeedVerified = '$_icons/feed_verified.svg';
   static const iconFeedLoudspeaker = '$_icons/feed_loudspeaker.svg';

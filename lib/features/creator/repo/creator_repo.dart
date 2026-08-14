@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
@@ -78,28 +77,6 @@ class CreatorRepo {
     await _api.patch(ApiEndpoints.creatorById(creatorId), data: body);
   }
 
-  Future<SaasCheckout> createCheckout({
-    required String creatorId,
-    required String planTier,
-    required bool yearly,
-    required String provider,
-    required String currency,
-  }) async {
-    final response = await _api.post(
-      ApiEndpoints.saasCheckout,
-      data: {
-        'creatorId': creatorId,
-        'planTier': planTier,
-        'billingInterval': yearly ? 'year' : 'month',
-        'preferredProvider': provider,
-        'billingCurrency': currency,
-        'checkoutFlow': 'hosted_checkout',
-        'checkoutSurface': Platform.isIOS ? 'ios' : 'android',
-      },
-    );
-    return SaasCheckout.fromJson(response.data as Map<String, dynamic>);
-  }
-
   Future<List<SaasPlan>> fetchPlans({
     required BillingSubject billingSubject,
     required String currency,
@@ -139,7 +116,9 @@ class CreatorRepo {
         .toList();
   }
 
-  final ApiService _api = GetIt.instance<ApiService>();
+  CreatorRepo({ApiService? api}) : _api = api ?? GetIt.instance<ApiService>();
+
+  final ApiService _api;
 
   String? get cachedCreatorId => LocalStorage.creatorId;
 
@@ -157,6 +136,49 @@ class CreatorRepo {
       return id;
     } catch (e) {
       logger.w('fetchAndCacheCreatorId failed', error: e);
+      return null;
+    }
+  }
+
+  /// Re-reads the profile after checkout. Entitlements land from the PSP
+  /// webhook, so this is the only trustworthy confirmation — never the client.
+  /// Returns the plan tier once it matches [expectedTier], retrying while the
+  /// webhook settles.
+  Future<String?> awaitPlanTier(String expectedTier) async {
+    const delays = [
+      Duration(seconds: 1),
+      Duration(seconds: 2),
+      Duration(seconds: 3),
+      Duration(seconds: 5),
+    ];
+    String? tier;
+    for (final delay in delays) {
+      await Future<void>.delayed(delay);
+      tier = await fetchPlanTier();
+      if (tier != null && tier.toLowerCase() == expectedTier.toLowerCase()) {
+        return tier;
+      }
+    }
+    return tier;
+  }
+
+  /// Current SaaS tier, or null when the response does not carry one.
+  Future<String?> fetchPlanTier() async {
+    try {
+      final response = await _api.get(ApiEndpoints.creatorProfile);
+      final data = response.data as Map<String, dynamic>;
+      final creator =
+          (data['data'] as Map<String, dynamic>)['creator']
+              as Map<String, dynamic>?;
+      if (creator == null) return null;
+      final saas = creator['platformSaas'];
+      if (saas is Map<String, dynamic>) {
+        final tier = (saas['planTier'] ?? saas['tier']) as String?;
+        if (tier != null) return tier;
+      }
+      return creator['planTier'] as String?;
+    } catch (e) {
+      logger.w('fetchPlanTier failed', error: e);
       return null;
     }
   }

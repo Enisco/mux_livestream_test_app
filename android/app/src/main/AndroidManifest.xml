@@ -29,6 +29,20 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Return leg of the mobile subscription checkout. autoVerify means
+                 an unverified host opens the browser instead of this app, so
+                 nothing is hijacked before assetlinks.json is published. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="app.gospeltube.tv"
+                      android:pathPrefix="/mobile/payments/return"/>
+                <data android:scheme="https"
+                      android:host="app.staging.gospeltube.tv"
+                      android:pathPrefix="/mobile/payments/return"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

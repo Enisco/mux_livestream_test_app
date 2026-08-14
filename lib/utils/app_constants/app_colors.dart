@@ -63,6 +63,7 @@ abstract final class AppColors {
 
   static const tableBorder = Color(0xFF1F1F24);
 
+  static const cyan400 = Color(0xFF00D3F2);
   static const cyan500 = Color(0xFF00B8DB);
 
   static const brandAccentLow = Color(0xFFFFDB99);
@@ -81,6 +82,8 @@ abstract final class AppColors {
   static const cardGreenTo = Color(0xFF172F1F);
 
   static const liveBadge = Color(0xFFFF3B30);
+  static const red500 = Color(0xFFFB2C36);
+  static const livePillFill = Color(0xFF94423F);
 
   static const neutral500 = Color(0xFF737373);
 

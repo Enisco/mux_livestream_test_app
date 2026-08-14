@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
+import 'package:test_app/features/creator/services/checkout_link_listener.dart';
 import 'package:test_app/shared/components/keyboard_done_toolbar.dart';
 import 'package:test_app/shared/components/network_banner.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -31,15 +32,17 @@ class GTubeApp extends StatelessWidget {
             data: MediaQuery.of(
               context,
             ).copyWith(textScaler: TextScaler.noScaling),
-            child: GTubeNetworkBanner(
-              child: KeyboardDoneToolbar(
-                child: BlocListener<AuthBloc, AuthState>(
-                  listener: (context, state) {
-                    if (state is AuthLoggedOut) {
-                      appRouter.go(AppRouter.home);
-                    }
-                  },
-                  child: child!,
+            child: CheckoutLinkWatcher(
+              child: GTubeNetworkBanner(
+                child: KeyboardDoneToolbar(
+                  child: BlocListener<AuthBloc, AuthState>(
+                    listener: (context, state) {
+                      if (state is AuthLoggedOut) {
+                        appRouter.go(AppRouter.home);
+                      }
+                    },
+                    child: child!,
+                  ),
                 ),
               ),
             ),

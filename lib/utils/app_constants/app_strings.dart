@@ -148,25 +148,27 @@ abstract final class AppStrings {
   static const tierFree = 'Free';
   static const rowPricePerMonth = 'Price /month';
 
-  static const choosePaymentProvider = 'Choose payment provider';
-  static const payWith = 'Pay with';
-  static const payWithSubtitle = "Choose how you'd like to complete payment.";
-  static const providerPaystack = 'Paystack';
-  static const providerPaystackDesc =
-      'Cards, bank transfer & USSD · best for Nigeria & West Africa';
-  static const providerFlutterwave = 'Flutterwave';
-  static const providerFlutterwaveDesc =
-      'Cards, bank transfer & mobile money · best for Africa';
-  static const providerStripe = 'Stripe';
-  static const providerStripeDesc =
-      'International cards · best for global payments';
-  static const recommended = 'RECOMMENDED';
-  static const continueWith = 'Continue with ';
-  static const providerFootnote =
-      "You'll complete payment securely with your chosen provider";
-  static const billedMonthly = 'Billed monthly · for ';
-  static const billedYearly = 'Billed yearly · for ';
-  static const planSuffix = ' plan';
+  static const checkoutTitle = 'Your subscription';
+  static const checkoutOpening = 'Opening secure checkout…';
+  static const checkoutInBrowser =
+      'Finish your payment in the browser, then come back here.';
+  static const checkoutConfirming = 'Confirming your payment…';
+  static const checkoutConfirmed = 'Payment confirmed. Welcome aboard.';
+  static const checkoutPending =
+      "Payment received. We're still confirming it — your plan will update "
+      'shortly.';
+  static const checkoutFailed = 'That payment did not go through.';
+  static const checkoutCanceled = 'Checkout was cancelled.';
+  static const checkoutExpired =
+      'That checkout attempt expired. Start a new one when you are ready.';
+  static const checkoutUnavailable =
+      'Subscriptions are not available in your region yet.';
+  static const checkoutStillProcessing =
+      "Your previous attempt is still processing. We'll update your plan as "
+      'soon as it settles.';
+  static const checkAgain = 'Check again';
+  static const tryAgain = 'Try again';
+  static const notNow = 'Not now';
 
   static const selectAGender = 'Select a gender';
   static const genderMale = 'Male';
