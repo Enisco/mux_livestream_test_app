@@ -6,7 +6,10 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
+import 'package:test_app/features/home/data/feed_card_mapper.dart';
+import 'package:test_app/features/home/views/widgets/empty_tab_views.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
+import 'package:test_app/features/home/views/widgets/home_loader.dart';
 import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
@@ -42,13 +45,22 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   bool _failed = false;
   bool _authed = false;
 
-  static const _topics = [
-    'Trending',
-    'Worship',
-    'Preaching',
-    'Bible Study',
-    'Youth',
-  ];
+  /// Empty-tab companions. Fetched lazily, only when a tab comes up empty.
+  List<RecommendedCreator> _suggestions = const [];
+  List<WebFeedItem> _upcoming = const [];
+  final Set<String> _followPending = {};
+
+  /// Chip label → the category slugs the API knows. 'Trending' is a sort, not
+  /// a category, so it carries no slugs.
+  static const _topicSlugs = <String, List<String>>{
+    'Trending': [],
+    'Worship': ['worship'],
+    'Preaching': ['sermons'],
+    'Bible Study': ['bible-study'],
+    'Youth': ['youth'],
+  };
+
+  static final _topics = _topicSlugs.keys.toList();
 
   @override
   void initState() {
@@ -74,8 +86,21 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
-  /// Guests get the public-only feed; 'mixed' needs a session.
-  String get _mode => _authed ? 'mixed' : 'explore_only';
+  /// Following needs a session; guests only ever get the public feed.
+  String get _mode => switch (_tab) {
+    HomeTab.following => 'following_only',
+    _ => _authed ? 'mixed' : 'explore_only',
+  };
+
+  /// The Live tab is the same feed restricted to what is broadcasting now.
+  bool get _liveOnly => _tab == HomeTab.live;
+
+  String get _sort => _topic == 'Trending' ? 'trending' : 'recent';
+
+  List<String> get _categorySlugs => _topicSlugs[_topic] ?? const [];
+
+  /// With no chip picked, let the server lean on the viewer's saved interests.
+  bool get _usePrefs => _authed && _topic == null;
 
   Future<void> _load() async {
     if (_loading) return;
@@ -84,13 +109,20 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       _failed = false;
     });
     try {
-      final result = await _repo.fetchWebFeed(mode: _mode);
+      final result = await _repo.fetchWebFeed(
+        mode: _mode,
+        sort: _sort,
+        categorySlugs: _categorySlugs,
+        liveOnly: _liveOnly,
+        useViewerCategoryPrefs: _usePrefs,
+      );
       if (!mounted) return;
       setState(() {
         _items = result.items;
         _cursor = result.nextCursor;
         _loading = false;
       });
+      if (result.items.isEmpty) await _loadEmptyCompanions();
     } catch (e) {
       logger.e('Home feed load failed', error: e);
       if (!mounted) return;
@@ -101,11 +133,34 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
+  /// The designed empty states are not blank slates — Following offers
+  /// ministries to follow, Live lists what is coming up.
+  Future<void> _loadEmptyCompanions() async {
+    try {
+      if (_tab == HomeTab.following && _authed && _suggestions.isEmpty) {
+        final creators = await _repo.fetchRecommendedCreators();
+        if (mounted) setState(() => _suggestions = creators);
+      } else if (_tab == HomeTab.live && _upcoming.isEmpty) {
+        final events = await _repo.fetchUpcomingEvents();
+        if (mounted) setState(() => _upcoming = events);
+      }
+    } catch (e) {
+      logger.w('Empty-tab companions failed', error: e);
+    }
+  }
+
   Future<void> _loadMore() async {
     if (_loadingMore || _loading || _cursor == null) return;
     _loadingMore = true;
     try {
-      final result = await _repo.fetchWebFeed(cursor: _cursor, mode: _mode);
+      final result = await _repo.fetchWebFeed(
+        cursor: _cursor,
+        mode: _mode,
+        sort: _sort,
+        categorySlugs: _categorySlugs,
+        liveOnly: _liveOnly,
+        useViewerCategoryPrefs: _usePrefs,
+      );
       if (!mounted) return;
       setState(() {
         _items = [..._items, ...result.items];
@@ -118,9 +173,48 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     }
   }
 
+  /// Each tab is a different query, so switching has to refetch — otherwise
+  /// Following and Live just re-show Discover's results.
   void _onTabChanged(HomeTab tab) {
     if (tab == _tab) return;
-    setState(() => _tab = tab);
+    setState(() {
+      _tab = tab;
+      _items = const [];
+      _cursor = null;
+    });
+    _load();
+  }
+
+  void _onTopicChanged(String? topic) {
+    if (topic == _topic) return;
+    setState(() {
+      _topic = topic;
+      _items = const [];
+      _cursor = null;
+    });
+    _load();
+  }
+
+  Future<void> _toggleFollow(RecommendedCreator creator) async {
+    if (!_requireAccount('follow creators')) return;
+    setState(() => _followPending.add(creator.creatorId));
+    try {
+      await _repo.setFollowing(creator.creatorId, follow: !creator.isFollowing);
+      if (!mounted) return;
+      // Following someone means the tab has content now.
+      setState(() {
+        _suggestions = _suggestions
+            .where((c) => c.creatorId != creator.creatorId)
+            .toList();
+      });
+      await _load();
+    } catch (e) {
+      logger.w('Follow failed', error: e);
+    } finally {
+      if (mounted) {
+        setState(() => _followPending.remove(creator.creatorId));
+      }
+    }
   }
 
   bool _requireAccount(String feature) {
@@ -157,7 +251,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             onTabChanged: _onTabChanged,
             topics: _topics,
             selectedTopic: _topic,
-            onTopicChanged: (t) => setState(() => _topic = t),
+            onTopicChanged: _onTopicChanged,
             onEditTopics: () {
               if (_requireAccount('edit your topics')) {
                 context.push(AppRouter.interests);
@@ -174,11 +268,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     if (_tab == HomeTab.following && !_authed) {
       return const _FollowingAuthWall();
     }
-    if (_loading && _items.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.brandPrimary),
-      );
-    }
+    if (_loading && _items.isEmpty) return const HomeLoader();
     if (_failed && _items.isEmpty) {
       return _Empty(
         title: AppStrings.failedToLoad,
@@ -187,12 +277,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         onAction: _load,
       );
     }
-    if (_items.isEmpty) {
-      return const _Empty(
-        title: AppStrings.feedEmptyTitle,
-        body: AppStrings.feedEmptyBody,
-      );
-    }
+    if (_items.isEmpty) return _emptyForTab();
 
     return RefreshIndicator(
       color: AppColors.brandPrimary,
@@ -215,7 +300,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           }
           final item = _items[index];
           final card = FeedCard(
-            data: _toCardData(item),
+            data: FeedCardMapper.toCardData(item),
             onTap: () => _openItem(item),
             onCreatorTap: () => _openItem(item),
             onFollow: () => _requireAccount('follow creators'),
@@ -238,111 +323,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     );
   }
 
-  FeedCardData _toCardData(WebFeedItem item) {
-    final meta = item.meta;
-    final facets = item.facets;
-    final creator = item.creator;
-    final kind = _kindOf(item);
-    final isChannel = kind == FeedCardKind.channel;
-    final name = isChannel
-        ? item.title
-        : creator?.displayName ?? AppStrings.brandName;
-    final handle = isChannel
-        ? (item.subtitle ?? '').replaceFirst('@', '')
-        : creator?.handle ?? '';
-    return FeedCardData(
-      id: item.entityId,
-      kind: kind,
-      creatorName: name.isEmpty ? AppStrings.brandName : name,
-      handle: handle,
-      age: relativeAge(meta.publishedAt),
-      title: isChannel || item.title.isEmpty ? null : item.title,
-      body: kind == FeedCardKind.blog ? _excerpt(item.subtitle) : null,
-      subtitle: kind == FeedCardKind.devotional
-          ? _excerpt(item.subtitle)
-          : null,
-      planLabel: kind == FeedCardKind.devotional
-          ? _planLabel(facets.categorySlugs)
-          : null,
-      category: facets.categorySlugs.isEmpty
-          ? null
-          : _titleCase(facets.categorySlugs.first),
-      eventStart: meta.scheduledAt,
-      thumbnailUrl: meta.thumbnailUrl,
-      duration: _duration(meta.durationSeconds),
-      verified: creator?.isVerified ?? false,
-      avatarUrl: meta.thumbnailUrl != null && isChannel
-          ? meta.thumbnailUrl
-          : null,
-      sponsored: item.isPromoted,
-      likes: facets.likes,
-      saves: facets.favorites,
-      comments: facets.comments,
-      views: facets.views > 0 ? formatCount(facets.views) : null,
-      viewCount: facets.views,
-      following: item.isFollowingCreator || (creator?.isFollowing ?? false),
-      subscribers: creator?.subscriberCount ?? 0,
-    );
-  }
-
-  FeedCardKind _kindOf(WebFeedItem item) {
-    if (item.isLiveNow) return FeedCardKind.live;
-    return switch (item.entityType) {
-      'creator' => FeedCardKind.channel,
-      'event' => FeedCardKind.event,
-      'post' => FeedCardKind.post,
-      'blog' || 'devotional_entry' => FeedCardKind.blog,
-      'devotional_series' => FeedCardKind.devotional,
-      'media_series' => FeedCardKind.series,
-      _ => switch (item.mediaType) {
-        MediaTypes.music => FeedCardKind.audio,
-        MediaTypes.livestream => FeedCardKind.live,
-        _ => FeedCardKind.video,
+  Widget _emptyForTab() => switch (_tab) {
+    HomeTab.following => FollowingEmptyView(
+      suggestions: _suggestions,
+      pending: _followPending,
+      onFollow: _toggleFollow,
+      onEditTopics: () {
+        if (_requireAccount('edit your topics')) {
+          context.push(AppRouter.interests);
+        }
       },
-    };
-  }
-
-  static const _statusWords = {
-    'public',
-    'private',
-    'unlisted',
-    'draft',
-    'active',
-    'inactive',
-    'archived',
-    'published',
-    'scheduled',
-    'video',
-    'music',
-    'livestream',
+    ),
+    HomeTab.live => LiveEmptyView(
+      events: _upcoming,
+      onOpenEvent: _openItem,
+      onMore: (_) => _requireAccount('use that'),
+    ),
+    HomeTab.discover => const _Empty(
+      title: AppStrings.feedEmptyTitle,
+      body: AppStrings.feedEmptyBody,
+    ),
   };
-
-  static String? _excerpt(String? subtitle) {
-    if (subtitle == null || subtitle.trim().isEmpty) return null;
-    final parts = subtitle
-        .split(RegExp(r'[·•|]'))
-        .map((p) => p.trim().toLowerCase())
-        .where((p) => p.isNotEmpty);
-    if (parts.isNotEmpty && parts.every(_statusWords.contains)) return null;
-    return subtitle;
-  }
-
-  static String? _planLabel(List<String> slugs) =>
-      slugs.isEmpty ? null : '${_titleCase(slugs.first)} plan';
-
-  static String _titleCase(String slug) => slug
-      .split(RegExp(r'[-_ ]'))
-      .where((w) => w.isNotEmpty)
-      .map((w) => w[0].toUpperCase() + w.substring(1))
-      .join(' ');
-
-  String? _duration(double? seconds) {
-    if (seconds == null || seconds <= 0) return null;
-    final total = seconds.round();
-    final m = total ~/ 60;
-    final s = total % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
 }
 
 class _FollowingAuthWall extends StatelessWidget {

@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:sizing/sizing.dart';
-
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -77,7 +76,7 @@ class _Tabs extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _TabLabel(
-          label: AppStrings.tabDiscover,
+          label: AppStrings.discover,
           active: tab == HomeTab.discover,
           onTap: () => onChanged(HomeTab.discover),
         ),

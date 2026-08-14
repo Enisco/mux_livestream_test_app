@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sizing/sizing.dart';
-
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -123,7 +122,10 @@ class FeedCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.base1,
           border: Border(
-            bottom: BorderSide(color: AppColors.neutral700, width: 1.5.s),
+            bottom: BorderSide(
+              color: AppColors.neutral400.withValues(alpha: 0.3),
+              width: 1.5.s,
+            ),
           ),
         ),
         child: Padding(
@@ -380,7 +382,7 @@ class _Avatar extends StatelessWidget {
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.brandPrimary,
+                color: AppColors.neutral500,
                 border: ringColor == null
                     ? null
                     : Border.all(color: ringColor!, width: 2.s),

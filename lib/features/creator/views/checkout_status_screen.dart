@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/mobile_checkout_repo.dart';
@@ -129,27 +128,29 @@ class _CheckoutStatusScreenState extends State<CheckoutStatusScreen>
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_polling)
-                  const CircularProgressIndicator(
-                    color: AppColors.brandPrimary,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_polling)
+                    const CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  if (_polling) const SizedBox(height: 24),
+                  Text(
+                    AppStrings.checkoutTitle,
+                    style: AppStyles.heading(20, letterSpacing: -0.8),
                   ),
-                if (_polling) const SizedBox(height: 24),
-                Text(
-                  AppStrings.checkoutTitle,
-                  style: AppStyles.heading(20, letterSpacing: -0.8),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _message,
-                  textAlign: TextAlign.center,
-                  style: AppStyles.body(14, color: AppColors.neutral300),
-                ),
-                const SizedBox(height: 32),
-                ..._actions(),
-              ],
+                  const SizedBox(height: 12),
+                  Text(
+                    _message,
+                    textAlign: TextAlign.center,
+                    style: AppStyles.body(14, color: AppColors.neutral300),
+                  ),
+                  const SizedBox(height: 32),
+                  ..._actions(),
+                ],
+              ),
             ),
           ),
         ),

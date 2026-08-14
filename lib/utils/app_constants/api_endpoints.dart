@@ -28,6 +28,12 @@ abstract final class ApiEndpoints {
   static const viewerPreferences = '/v1/user/me/viewer-preferences';
   static const onboardingState = '/v1/user/me/onboarding-state';
 
+  static const recommendedCreators = '/v1/discovery/recommended-creators';
+  static const upcomingEvents = '/v1/discovery/upcoming-events';
+
+  static String creatorSubscribe(String creatorId) =>
+      '/v1/creator/$creatorId/subscribe';
+
   static const saasPlans = '/v1/payment/saas/plans';
   static const saasCurrencyHint = '/v1/payment/saas/currency-hint';
 

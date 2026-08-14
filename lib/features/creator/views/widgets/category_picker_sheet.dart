@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -50,7 +49,7 @@ class CategoryPickerSheet extends StatelessWidget {
             child: SizedBox(
               width: double.infinity,
               child: Text(
-                AppStrings.selectACategory,
+                AppStrings.mostlyShare,
                 style: AppStyles.body(16, color: AppColors.neutral400),
               ),
             ),
@@ -61,7 +60,7 @@ class CategoryPickerSheet extends StatelessWidget {
               shrinkWrap: true,
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
               itemCount: categories.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 15),
+              separatorBuilder: (_, _) => const SizedBox(height: 20),
               itemBuilder: (context, index) {
                 final category = categories[index];
                 return GestureDetector(

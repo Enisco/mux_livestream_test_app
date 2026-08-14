@@ -1,6 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
+import 'package:sizing/sizing.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -211,12 +212,12 @@ class CreatorHandleField extends StatelessWidget {
           Row(
             children: [
               if (resolved) ...[
-                SvgPicture.asset(
-                  AppAssets.iconCheckSmallGreen,
-                  width: 16,
-                  height: 16,
+                Icon(
+                  CupertinoIcons.check_mark,
+                  color: AppColors.green500,
+                  size: 16,
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: 3.s),
               ],
               Flexible(
                 child: Text(

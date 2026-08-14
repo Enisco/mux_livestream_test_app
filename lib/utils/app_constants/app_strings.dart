@@ -88,12 +88,11 @@ abstract final class AppStrings {
   static const handlePrefix = '@';
   static const mostlyShare = 'What do you mostly share?';
   static const mostlyShareHint = 'e.g Preaching';
-  static const handleAvailable = 'Available — gospeltube.tv/@';
+  static const handleAvailable = 'Available: gospeltube.tv/@';
   static const handleTaken = 'That handle is taken';
   static const handleInvalid = 'That handle is not valid';
   static const creatorSetupFootnote =
       "You can polish your channel later. Let's get you set up first";
-  static const selectACategory = 'What do you mostly share?';
 
   static const creatorTypeTitle = 'How will you share your ministry?';
   static const creatorTypeSubtitle = 'This sets up your channel.';
@@ -198,7 +197,6 @@ abstract final class AppStrings {
   static const navFollowing = 'Following';
   static const navYou = 'You';
 
-  static const tabDiscover = 'Discover';
   static const tabFollowing = 'Following';
   static const tabLive = 'Live';
   static const topicAll = 'All';
@@ -206,6 +204,19 @@ abstract final class AppStrings {
   static const feedEmptyTitle = 'Nothing here yet';
   static const feedEmptyBody =
       'New messages, worship and live services will\nshow up here.';
+  static const followingEmptyTitle = "You're not following anyone yet";
+  static const followingEmptyBody =
+      'Follow ministries and their latest videos, posts and livestreams show '
+      'up here.';
+  static const ministriesToFollow = 'Ministries to follow';
+  static const alreadyKnowWhatYouLike = 'Already know what you like? ';
+  static const editYourTopics = 'Edit your topics';
+
+  static const liveEmptyTitle = "No one's live right now";
+  static const liveEmptyBody =
+      "Live services will appear here. Here's what's coming up";
+  static const upcomingEvents = 'Upcoming events';
+
   static const feedFollowingGuestTitle = 'Follow your favourites';
   static const feedFollowingGuestBody =
       'Create an account to follow creators and build\nyour own feed.';
