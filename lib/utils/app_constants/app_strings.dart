@@ -269,6 +269,13 @@ abstract final class AppStrings {
   static const tabLive = 'Live';
   static const topicAll = 'All';
   static const editTopics = 'Edit topics';
+  static const feedErrorTitle = "That didn't load";
+  static const feedErrorBody =
+      'Something went wrong on our side. Give it another try.';
+  static const offlineTitle = "You're offline";
+  static const offlineBody =
+      'Check your connection and try again — your feed is waiting.';
+
   static const feedEmptyTitle = 'Nothing here yet';
   static const feedEmptyBody =
       'New messages, worship and live services will\nshow up here.';

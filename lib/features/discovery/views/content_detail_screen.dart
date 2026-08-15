@@ -19,7 +19,7 @@ import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/content_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
-import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -206,32 +206,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
         child: CircularProgressIndicator(color: AppColors.brandPrimary),
       );
     }
-    if (_failed) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 40.s),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                AppStrings.failedToLoad,
-                textAlign: TextAlign.center,
-                style: AppStyles.heading(16),
-              ),
-              SizedBox(height: 16.s),
-              SizedBox(
-                width: 200.s,
-                child: PrimaryButton(
-                  label: AppStrings.feedRetry,
-                  height: 44,
-                  onPressed: _load,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    if (_failed) return ErrorStateView(onRetry: _load);
 
     return SingleChildScrollView(
       child: Column(

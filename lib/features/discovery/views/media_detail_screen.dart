@@ -1,29 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
-
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
-import 'package:test_app/features/discovery/repo/discovery_repo.dart';
-import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/player/views/player_screen.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/components/design_icon.dart';
-import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
-import 'package:test_app/utils/app_constants/app_styles.dart';
 
 class MediaDetailScreen extends StatefulWidget {
   const MediaDetailScreen({
@@ -467,29 +465,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     return '${months[local.month - 1]} ${local.day}, ${local.year}';
   }
 
-  Widget _buildError() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 40.s, vertical: 64.s),
-      child: Column(
-        children: [
-          Text(
-            AppStrings.failedToLoad,
-            textAlign: TextAlign.center,
-            style: AppStyles.heading(16),
-          ),
-          SizedBox(height: 16.s),
-          SizedBox(
-            width: 200.s,
-            child: PrimaryButton(
-              label: AppStrings.feedRetry,
-              height: 44,
-              onPressed: _fetchDetail,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildError() => ErrorStateView(onRetry: _fetchDetail);
 
   Widget _buildUpNext(MediaDetailData detail) {
     return Padding(

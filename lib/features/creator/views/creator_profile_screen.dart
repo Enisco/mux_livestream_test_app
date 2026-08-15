@@ -17,11 +17,9 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
-import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
-import 'package:test_app/utils/app_constants/app_strings.dart';
-import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Opens the creator profile. Every creator affordance in the app routes here —
 /// feed card avatars and names, following suggestions, event and livestream
@@ -216,32 +214,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     if (_loading) return const HomeLoader();
     final profile = _profile;
     if (_failed || profile == null) {
-      return SafeArea(
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40.s),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  AppStrings.failedToLoad,
-                  textAlign: TextAlign.center,
-                  style: AppStyles.heading(16),
-                ),
-                SizedBox(height: 16.s),
-                SizedBox(
-                  width: 200.s,
-                  child: PrimaryButton(
-                    label: AppStrings.feedRetry,
-                    height: 44,
-                    onPressed: _loadProfile,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      return SafeArea(child: ErrorStateView(onRetry: _loadProfile));
     }
 
     return RefreshIndicator(

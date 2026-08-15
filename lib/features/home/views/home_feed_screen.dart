@@ -17,6 +17,7 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
@@ -264,14 +265,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       return const _FollowingAuthWall();
     }
     if (_loading && _items.isEmpty) return const HomeLoader();
-    if (_failed && _items.isEmpty) {
-      return _Empty(
-        title: AppStrings.failedToLoad,
-        body: AppStrings.feedEmptyBody,
-        actionLabel: AppStrings.feedRetry,
-        onAction: _load,
-      );
-    }
+    if (_failed && _items.isEmpty) return ErrorStateView(onRetry: _load);
     if (_items.isEmpty) return _emptyForTab();
 
     return RefreshIndicator(

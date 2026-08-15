@@ -76,6 +76,7 @@ abstract final class AppAssets {
   static const iconFeedVerified = '$_icons/feed_verified.svg';
   static const iconFeedLoudspeaker = '$_icons/feed_loudspeaker.svg';
   static const iconFeedPlusCircle = '$_icons/feed_plus_circle.svg';
+  static const iconAlert = '$_icons/alert.svg';
   static const iconEmptyFollow = '$_icons/empty_follow.svg';
   static const iconEmptyLiveOff = '$_icons/empty_live_off.svg';
   static const iconPin = '$_icons/pin.svg';
