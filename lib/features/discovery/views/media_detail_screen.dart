@@ -5,8 +5,8 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
-import 'package:test_app/features/home/views/widgets/feed_card.dart'
-    show formatCount;
+import 'package:test_app/features/home/data/feed_card_mapper.dart';
+import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/player/views/player_screen.dart';
@@ -14,9 +14,11 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
+import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
+import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -271,40 +273,32 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = _detail?.media.title.isNotEmpty == true
-        ? _detail!.media.title
-        : widget.item.title;
-
+    // The design has no app bar — the back arrow floats over the hero.
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        title: _loading
-            ? null
-            : Text(
-                title,
-                style: AppStyles.appBarTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHero(),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 64),
-                child: Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              )
-            else if (_error != null)
-              _buildError()
-            else
-              _buildInfo(),
-          ],
+      backgroundColor: AppColors.base1,
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHero(),
+              if (_loading)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 64.s),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                )
+              else if (_error != null)
+                _buildError()
+              else
+                _buildInfo(),
+            ],
+          ),
         ),
       ),
     );
@@ -336,6 +330,26 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 end: Alignment.bottomCenter,
                 stops: [0.5, 1.0],
                 colors: [Colors.transparent, Colors.black54],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 15.s,
+            top: MediaQuery.paddingOf(context).top + 12.s,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).maybePop(),
+              child: SizedBox(
+                width: 32.s,
+                height: 32.s,
+                child: Center(
+                  child: DesignIcon(
+                    AppAssets.iconArrowLeft,
+                    width: 20.s,
+                    height: 14.s,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
             ),
           ),
@@ -494,9 +508,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 creatorId: s.creator?.creatorId ?? '',
                 mediaType: s.mediaType,
                 source: AnalyticsSource.suggestedContent,
-                child: _SuggestionCard(
-                  item: s,
+                // The design's "Up next" rows are the same mobile card the
+                // feed uses, not a compact thumbnail row.
+                child: FeedCard(
+                  data: FeedCardMapper.toCardData(s),
                   onTap: () => _openSuggestion(s),
+                  onCreatorTap: () => _openSuggestion(s),
                 ),
               ),
             ),
@@ -504,79 +521,4 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       ),
     );
   }
-}
-
-class _SuggestionCard extends StatelessWidget {
-  const _SuggestionCard({required this.item, required this.onTap});
-
-  final WebFeedItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              width: 108,
-              height: 60,
-              child: item.meta.thumbnailUrl != null
-                  ? Image.network(
-                      item.meta.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const _SuggestionPlaceholder(),
-                      loadingBuilder: (_, child, progress) => progress == null
-                          ? child
-                          : const _SuggestionPlaceholder(),
-                    )
-                  : const _SuggestionPlaceholder(),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: AppStyles.videoTitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (item.creator != null) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    item.creator!.displayName,
-                    style: AppStyles.videoPath,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SuggestionPlaceholder extends StatelessWidget {
-  const _SuggestionPlaceholder();
-
-  @override
-  Widget build(BuildContext context) => const ColoredBox(
-    color: AppColors.surfaceVariant,
-    child: Center(
-      child: Icon(
-        Icons.play_circle_outline_rounded,
-        color: AppColors.textTertiary,
-        size: 22,
-      ),
-    ),
-  );
 }
