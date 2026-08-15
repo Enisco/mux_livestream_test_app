@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
+import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
+import 'package:test_app/features/home/views/widgets/feed_card.dart'
+    show formatCount;
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/player/views/player_screen.dart';
@@ -11,6 +14,7 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
+import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -39,11 +43,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   MediaDetailData? _detail;
   bool _loading = true;
   String? _error;
-  bool _descExpanded = false;
 
   bool _hasLiked = false;
-  bool _hasDisliked = false;
+  bool _hasSaved = false;
   bool _interactionLoading = false;
+
+  int _likes = 0;
+  int _saves = 0;
+  bool _following = false;
+  bool _followBusy = false;
 
   final List<MediaComment> _comments = [];
   bool _commentsLoading = false;
@@ -76,7 +84,13 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         _detail = detail;
         _loading = false;
         _hasLiked = detail.viewer?.hasLiked ?? false;
-        _hasDisliked = detail.viewer?.hasDisliked ?? false;
+        _hasSaved = detail.viewer?.hasSaved ?? false;
+        _likes = detail.media.likes;
+        _saves = detail.media.favorites;
+        _following =
+            detail.viewer?.isFollowingCreator ??
+            detail.creator?.isFollowing ??
+            false;
       });
       _trackOrganicImpression();
       if (!_commentsLoaded) _fetchComments();
@@ -127,49 +141,64 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  Future<void> _toggleLike() async {
+  Future<void> _toggleLike() => _toggleInteraction(
+    type: 'like',
+    active: _hasLiked,
+    apply: (on) => setState(() {
+      _hasLiked = on;
+      _likes = (_likes + (on ? 1 : -1)).clamp(0, 1 << 31);
+    }),
+  );
+
+  Future<void> _toggleSave() => _toggleInteraction(
+    type: 'favorite',
+    active: _hasSaved,
+    apply: (on) => setState(() {
+      _hasSaved = on;
+      _saves = (_saves + (on ? 1 : -1)).clamp(0, 1 << 31);
+    }),
+  );
+
+  /// Optimistic toggle: flip locally, roll back if the server refuses. The API
+  /// only knows like/favorite/amen/share — there is no dislike.
+  Future<void> _toggleInteraction({
+    required String type,
+    required bool active,
+    required void Function(bool on) apply,
+  }) async {
     if (_interactionLoading) return;
     final mediaId = _detail?.media.id ?? widget.item.entityId;
-    final wasLiked = _hasLiked;
-    setState(() {
-      _hasLiked = !_hasLiked;
-      if (_hasLiked) _hasDisliked = false;
-      _interactionLoading = true;
-    });
+    apply(!active);
+    setState(() => _interactionLoading = true);
     try {
       await _engagementRepo.toggleInteraction(
         targetType: 'media',
         targetId: mediaId,
-        interactionType: 'like',
+        interactionType: type,
       );
     } catch (e) {
-      logger.e('toggleLike failed', error: e);
-      if (mounted) setState(() => _hasLiked = wasLiked);
+      logger.e('toggle $type failed', error: e);
+      if (mounted) apply(active);
     } finally {
       if (mounted) setState(() => _interactionLoading = false);
     }
   }
 
-  Future<void> _toggleDislike() async {
-    if (_interactionLoading) return;
-    final mediaId = _detail?.media.id ?? widget.item.entityId;
-    final wasDisliked = _hasDisliked;
+  Future<void> _toggleFollow() async {
+    final creatorId = _detail?.creator?.creatorId;
+    if (creatorId == null || _followBusy) return;
+    final was = _following;
     setState(() {
-      _hasDisliked = !_hasDisliked;
-      if (_hasDisliked) _hasLiked = false;
-      _interactionLoading = true;
+      _following = !was;
+      _followBusy = true;
     });
     try {
-      await _engagementRepo.toggleInteraction(
-        targetType: 'media',
-        targetId: mediaId,
-        interactionType: 'dislike',
-      );
+      await _repo.setFollowing(creatorId, follow: !was);
     } catch (e) {
-      logger.e('toggleDislike failed', error: e);
-      if (mounted) setState(() => _hasDisliked = wasDisliked);
+      logger.w('follow failed', error: e);
+      if (mounted) setState(() => _following = was);
     } finally {
-      if (mounted) setState(() => _interactionLoading = false);
+      if (mounted) setState(() => _followBusy = false);
     }
   }
 
@@ -337,340 +366,110 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
   Widget _buildInfo() {
     final detail = _detail!;
-    final title = detail.media.title.isNotEmpty
-        ? detail.media.title
-        : widget.item.title;
+    final media = detail.media;
+    final creator = detail.creator;
+    final title = media.title.isNotEmpty ? media.title : widget.item.title;
+    final description = media.description?.trim();
+    final top = _comments.isEmpty ? null : _comments.first;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              if (detail.playback?.durationSeconds != null) ...[
-                const SizedBox(width: 12),
-                Text(
-                  _formatDuration(detail.playback!.durationSeconds!),
-                  style: const TextStyle(
-                    color: AppColors.textTertiary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          if (detail.creator != null) ...[
-            const SizedBox(height: 14),
-            _buildCreatorRow(detail.creator!),
-          ],
-
-          if (detail.media.description?.isNotEmpty == true) ...[
-            const SizedBox(height: 14),
-            _buildDescription(detail.media.description!),
-          ],
-
-          const SizedBox(height: 20),
-          if (detail.playback?.playbackUrl.isNotEmpty == true)
-            FilledButton.icon(
-              onPressed: _openPlayer,
-              icon: const Icon(IconsaxPlusLinear.play_circle),
-              label: const Text(AppStrings.watchNow),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.black,
-                minimumSize: const Size.fromHeight(48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.block_rounded,
-                    color: AppColors.textTertiary,
-                    size: 18,
-                  ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Playback not available',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 16),
-          _buildEngagementRow(),
-
-          const SizedBox(height: 28),
-          _buildComments(),
-
-          if (detail.suggestions.isNotEmpty) ...[
-            const SizedBox(height: 28),
-            const Text(
-              'MORE LIKE THIS',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                color: AppColors.textTertiary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...detail.suggestions.map(
-              (s) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: PromotedImpressionTracker(
-                  promotion: s.promotion,
-                  mediaId: s.entityId,
-                  creatorId: s.creator?.creatorId ?? '',
-                  mediaType: s.mediaType,
-                  source: AnalyticsSource.suggestedContent,
-                  child: _SuggestionCard(
-                    item: s,
-                    onTap: () => _openSuggestion(s),
-                  ),
-                ),
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCreatorRow(MediaCreatorInfo creator) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 19,
-          backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-          child: Text(
-            creator.displayName.isNotEmpty
-                ? creator.displayName[0].toUpperCase()
-                : '?',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      creator.displayName,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (creator.isVerified) ...[
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.verified_rounded,
-                      color: AppColors.primary,
-                      size: 15,
-                    ),
-                  ],
-                ],
-              ),
-              Text('@${creator.handle}', style: AppStyles.videoPath),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescription(String description) {
-    return GestureDetector(
-      onTap: () => setState(() => _descExpanded = !_descExpanded),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            description,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-              height: 1.55,
-            ),
-            maxLines: _descExpanded ? null : 3,
-            overflow: _descExpanded
-                ? TextOverflow.visible
-                : TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            _descExpanded ? 'Show less' : 'more',
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEngagementRow() {
-    return Row(
-      children: [
-        _InteractionButton(
-          icon: _hasLiked ? Icons.thumb_up_rounded : Icons.thumb_up_outlined,
-          label: 'Like',
-          active: _hasLiked,
-          onTap: _interactionLoading ? null : _toggleLike,
-        ),
-        const SizedBox(width: 8),
-        _InteractionButton(
-          icon: _hasDisliked
-              ? Icons.thumb_down_rounded
-              : Icons.thumb_down_outlined,
-          label: 'Dislike',
-          active: _hasDisliked,
-          onTap: _interactionLoading ? null : _toggleDislike,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildComments() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'COMMENTS',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-            color: AppColors.textTertiary,
+        Padding(
+          padding: EdgeInsets.fromLTRB(16.s, 16.s, 16.s, 13.s),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DetailTitleBlock(
+                title: title,
+                viewsLabel: media.views > 0
+                    ? '${formatCount(media.views)} Views'
+                    : null,
+                dateLabel: _publishedLabel(media.publishedAt),
+              ),
+              if (creator != null) ...[
+                SizedBox(height: 23.s),
+                DetailCreatorRow(
+                  name: creator.displayName,
+                  subscribersLabel:
+                      '${formatCount(creator.subscriberCount)} Subscribers',
+                  verified: creator.isVerified,
+                  isOrganization: creator.isOrganization,
+                  following: _following,
+                  busy: _followBusy,
+                  onFollow: _toggleFollow,
+                ),
+              ],
+              SizedBox(height: 23.s),
+              const DetailDivider(),
+              SizedBox(height: 13.s),
+              DetailImpactActions(
+                likes: formatCount(_likes),
+                saves: formatCount(_saves),
+                liked: _hasLiked,
+                saved: _hasSaved,
+                onLike: _interactionLoading ? null : _toggleLike,
+                onSave: _interactionLoading ? null : _toggleSave,
+              ),
+              const DetailDivider(),
+              if (description != null && description.isNotEmpty) ...[
+                SizedBox(height: 23.s),
+                DetailDescriptionCard(body: description),
+              ],
+              SizedBox(height: 23.s),
+              DetailCommentsPreview(
+                count: media.comments,
+                topComment: top?.body,
+                topCommentAuthor: top?.author?.displayName,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-        if (_commentsLoading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-                strokeWidth: 2,
-              ),
-            ),
-          )
-        else if (_comments.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text(
-              'No comments yet',
-              style: TextStyle(color: AppColors.textTertiary, fontSize: 14),
-            ),
-          )
-        else ...[
-          ..._comments.map((c) => _CommentCard(comment: c)),
-          if (_commentsCursor != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: TextButton(
-                onPressed: _commentsLoadingMore
-                    ? null
-                    : () => _fetchComments(loadMore: true),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  padding: EdgeInsets.zero,
-                ),
-                child: _commentsLoadingMore
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primary,
-                        ),
-                      )
-                    : const Text('Load more comments'),
-              ),
-            ),
-        ],
+        const DetailDivider(),
+        if (detail.suggestions.isNotEmpty) _buildUpNext(detail),
+        SizedBox(height: 32.s),
       ],
     );
+  }
+
+  /// "June 12, 2026" under the title.
+  static String? _publishedLabel(DateTime? at) {
+    if (at == null) return null;
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final local = at.toLocal();
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
   }
 
   Widget _buildError() {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.symmetric(horizontal: 40.s, vertical: 64.s),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 32),
-          const Icon(
-            Icons.error_outline_rounded,
-            size: 52,
-            color: AppColors.textTertiary,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Could not load content',
-            style: AppStyles.emptyTitle,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
           Text(
-            _error!,
-            style: AppStyles.emptySubtitle,
+            AppStrings.failedToLoad,
             textAlign: TextAlign.center,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
+            style: AppStyles.heading(16),
           ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _fetchDetail,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Retry'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.black,
+          SizedBox(height: 16.s),
+          SizedBox(
+            width: 200.s,
+            child: PrimaryButton(
+              label: AppStrings.feedRetry,
+              height: 44,
+              onPressed: _fetchDetail,
             ),
           ),
         ],
@@ -678,169 +477,29 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     );
   }
 
-  String _formatDuration(double seconds) {
-    final total = seconds.toInt();
-    final h = total ~/ 3600;
-    final m = (total % 3600) ~/ 60;
-    final s = total % 60;
-    if (h > 0) {
-      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-    }
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-}
-
-class _InteractionButton extends StatelessWidget {
-  const _InteractionButton({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.primary.withValues(alpha: 0.12)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: active
-                ? AppColors.primary
-                : AppColors.textTertiary.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: active ? AppColors.primary : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: active ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CommentCard extends StatelessWidget {
-  const _CommentCard({required this.comment});
-
-  final MediaComment comment;
-
-  @override
-  Widget build(BuildContext context) {
-    final author = comment.author;
-    final initial = author?.displayName.isNotEmpty == true
-        ? author!.displayName[0].toUpperCase()
-        : '?';
-
+  Widget _buildUpNext(MediaDetailData detail) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(16.s, 18.s, 16.s, 0),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
+          const DetailSectionHeading(AppStrings.upNext),
+          SizedBox(height: 18.s),
+          for (final s in detail.suggestions)
+            Padding(
+              padding: EdgeInsets.only(bottom: 18.s),
+              child: PromotedImpressionTracker(
+                promotion: s.promotion,
+                mediaId: s.entityId,
+                creatorId: s.creator?.creatorId ?? '',
+                mediaType: s.mediaType,
+                source: AnalyticsSource.suggestedContent,
+                child: _SuggestionCard(
+                  item: s,
+                  onTap: () => _openSuggestion(s),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      author?.displayName ?? 'Anonymous',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    if (author?.isVerified == true) ...[
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.verified_rounded,
-                        color: AppColors.primary,
-                        size: 13,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  comment.body,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-                if (comment.likeCount > 0 || comment.replyCount > 0) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (comment.likeCount > 0) ...[
-                        const Icon(
-                          Icons.thumb_up_outlined,
-                          size: 12,
-                          color: AppColors.textTertiary,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${comment.likeCount}',
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                      ],
-                      if (comment.replyCount > 0)
-                        Text(
-                          '${comment.replyCount} ${comment.replyCount == 1 ? 'reply' : 'replies'}',
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
         ],
       ),
     );

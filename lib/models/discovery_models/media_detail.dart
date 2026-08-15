@@ -56,7 +56,7 @@ class ViewerInfo {
   });
 
   bool get hasLiked => interactionTypes.contains('like');
-  bool get hasDisliked => interactionTypes.contains('dislike');
+  bool get hasSaved => interactionTypes.contains('favorite');
 
   factory ViewerInfo.fromJson(Map<String, dynamic> json) => ViewerInfo(
     interactionTypes: (json['interactionTypes'] as List<dynamic>? ?? [])
@@ -75,6 +75,16 @@ class MediaInfo {
   final String visibility;
   final String status;
 
+  /// The detail header needs these; the feed row carries its own copies.
+  final int views;
+  final int likes;
+  final int favorites;
+  final int comments;
+  final int shares;
+  final DateTime? publishedAt;
+  final bool isLiveNow;
+  final List<String> categorySlugs;
+
   const MediaInfo({
     this.id = '',
     this.type = 'video',
@@ -82,6 +92,14 @@ class MediaInfo {
     this.description,
     this.visibility = 'public',
     this.status = '',
+    this.views = 0,
+    this.likes = 0,
+    this.favorites = 0,
+    this.comments = 0,
+    this.shares = 0,
+    this.publishedAt,
+    this.isLiveNow = false,
+    this.categorySlugs = const [],
   });
 
   factory MediaInfo.fromJson(Map<String, dynamic> json) => MediaInfo(
@@ -91,6 +109,16 @@ class MediaInfo {
     description: json['description'] as String?,
     visibility: json['visibility'] as String? ?? 'public',
     status: json['status'] as String? ?? '',
+    views: (json['analyticsViews'] as num?)?.toInt() ?? 0,
+    likes: (json['engagementLikeCount'] as num?)?.toInt() ?? 0,
+    favorites: (json['engagementFavoriteCount'] as num?)?.toInt() ?? 0,
+    comments: (json['engagementCommentCount'] as num?)?.toInt() ?? 0,
+    shares: (json['engagementShareCount'] as num?)?.toInt() ?? 0,
+    publishedAt: DateTime.tryParse(json['publishedAt'] as String? ?? ''),
+    isLiveNow: json['isLiveNow'] as bool? ?? false,
+    categorySlugs: (json['categorySlugs'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList(),
   );
 }
 
@@ -137,6 +165,15 @@ class MediaCreatorInfo {
   final bool isVerified;
   final bool isOwnedByViewer;
 
+  /// Drives the "N Subscribers" line and the Follow button's initial state.
+  final int subscriberCount;
+  final bool isFollowing;
+
+  /// 'individual' or 'organization' — decides the avatar ring colour.
+  final String type;
+
+  bool get isOrganization => type == 'organization';
+
   const MediaCreatorInfo({
     required this.creatorId,
     required this.displayName,
@@ -144,6 +181,9 @@ class MediaCreatorInfo {
     this.avatarKey,
     this.isVerified = false,
     this.isOwnedByViewer = false,
+    this.subscriberCount = 0,
+    this.isFollowing = false,
+    this.type = 'individual',
   });
 
   factory MediaCreatorInfo.fromJson(Map<String, dynamic> json) =>
@@ -152,7 +192,10 @@ class MediaCreatorInfo {
         displayName: json['displayName'] as String? ?? '',
         handle: json['handle'] as String? ?? '',
         avatarKey: json['avatarKey'] as String?,
-        isVerified: json['isVerified'] as bool? ?? false,
+        isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
         isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
+        subscriberCount: (json['subscriberCount'] as num?)?.toInt() ?? 0,
+        isFollowing: json['isFollowing'] as bool? ?? false,
+        type: json['type'] as String? ?? 'individual',
       );
 }

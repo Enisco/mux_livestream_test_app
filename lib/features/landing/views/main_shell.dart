@@ -5,13 +5,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-
+import 'package:sizing/sizing.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
 import 'package:test_app/features/home/views/home_feed_screen.dart';
-import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/home/views/home_screen.dart';
+import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/landing/views/widgets/gtube_nav_bar.dart';
 import 'package:test_app/features/livestream/views/join_livestream_screen.dart';
 import 'package:test_app/features/livestream/views/start_livestream_screen.dart';
@@ -81,7 +81,7 @@ class _MainShellState extends State<MainShell> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: EdgeInsets.only(bottom: 10.s),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [GTubeNavBar(index: _selectedIndex, onChanged: _onNavTap)],

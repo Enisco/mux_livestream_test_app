@@ -147,6 +147,14 @@ abstract final class AppStrings {
   static const tierFree = 'Free';
   static const rowPricePerMonth = 'Price /month';
 
+  static const followingLabel = 'Following';
+  static const share = 'Share';
+  static const descriptionLabel = 'Description';
+  static const showMore = 'Show more';
+  static const showLess = 'Show less';
+  static const comments = 'Comments';
+  static const upNext = 'Up next';
+
   static const checkoutTitle = 'Your subscription';
   static const checkoutOpening = 'Opening secure checkout…';
   static const checkoutInBrowser =

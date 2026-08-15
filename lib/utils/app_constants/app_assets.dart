@@ -71,6 +71,7 @@ abstract final class AppAssets {
   static const iconFeedChat = '$_icons/feed_chat.svg';
   static const iconFeedUsers = '$_icons/feed_users.svg';
   static const iconFeedEye = '$_icons/feed_eye.svg';
+  static const iconShare = '$_icons/share.svg';
   static const iconFeedMore = '$_icons/feed_more.svg';
   static const iconFeedVerified = '$_icons/feed_verified.svg';
   static const iconFeedLoudspeaker = '$_icons/feed_loudspeaker.svg';
