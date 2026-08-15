@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 
+import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -65,6 +66,64 @@ class DiscoveryRepo {
     return items
         .whereType<Map<String, dynamic>>()
         .map(WebFeedItem.fromJson)
+        .toList();
+  }
+
+  Future<CreatorProfile> fetchCreatorById(String creatorId) async {
+    final response = await _api.get(ApiEndpoints.creatorById(creatorId));
+    return CreatorProfile.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<CreatorProfile> fetchCreatorByHandle(String handle) async {
+    final response = await _api.get(
+      ApiEndpoints.creatorByHandle(handle.replaceFirst('@', '')),
+    );
+    return CreatorProfile.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// The profile's Latest tab — same row shape as the home feed.
+  Future<WebFeedResponse> fetchCreatorFeed(
+    String creatorId, {
+    String? cursor,
+    int limit = 8,
+  }) async {
+    final response = await _api.get(
+      ApiEndpoints.creatorFeed(creatorId),
+      queryParameters: {'limit': limit, 'cursor': ?cursor},
+    );
+    return WebFeedResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// One Library section. Valid sections are series, videos, music,
+  /// devotionals, posts and events — the server rejects anything else.
+  Future<WebFeedResponse> fetchCreatorLibrary(
+    String creatorId,
+    String section, {
+    String? cursor,
+    int limit = 16,
+  }) async {
+    final response = await _api.get(
+      ApiEndpoints.creatorLibrary(creatorId, section),
+      queryParameters: {'limit': limit, 'cursor': ?cursor},
+    );
+    return WebFeedResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<CreatorTestimony>> fetchCreatorTestimonies(
+    String creatorId, {
+    int limit = 20,
+  }) async {
+    final response = await _api.get(
+      ApiEndpoints.publicTestimonies,
+      queryParameters: {'creatorId': creatorId, 'limit': limit},
+    );
+    final data = (response.data as Map<String, dynamic>)['data'];
+    final items = data is Map<String, dynamic>
+        ? data['items'] as List<dynamic>? ?? const []
+        : const [];
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(CreatorTestimony.fromJson)
         .toList();
   }
 

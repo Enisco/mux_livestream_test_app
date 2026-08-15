@@ -26,6 +26,9 @@ abstract final class AnalyticsEventType {
 
 abstract final class AnalyticsSource {
   static const creatorChannel = 'creator_channel';
+
+  /// Alias used by the viewer-facing creator profile.
+  static const creatorProfile = creatorChannel;
   static const homeFeed = 'home_feed';
   static const suggestedContent = 'suggested_content';
   static const search = 'search';

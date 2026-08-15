@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
+import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -411,6 +412,8 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   isOrganization: creator.isOrganization,
                   following: _following,
                   busy: _followBusy,
+                  onTap: () =>
+                      openCreatorProfile(context, creatorId: creator.creatorId),
                   onFollow: _toggleFollow,
                 ),
               ],
@@ -513,7 +516,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 child: FeedCard(
                   data: FeedCardMapper.toCardData(s),
                   onTap: () => _openSuggestion(s),
-                  onCreatorTap: () => _openSuggestion(s),
+                  onCreatorTap: () => openCreatorProfile(
+                    context,
+                    creatorId: s.profileCreatorId,
+                  ),
                 ),
               ),
             ),

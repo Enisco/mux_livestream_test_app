@@ -28,6 +28,16 @@ abstract final class ApiEndpoints {
   static const viewerPreferences = '/v1/user/me/viewer-preferences';
   static const onboardingState = '/v1/user/me/onboarding-state';
 
+  static String creatorByHandle(String handle) => '/v1/creator/handle/$handle';
+
+  static String creatorFeed(String creatorId) =>
+      '/v1/discovery/creator/$creatorId/feed';
+
+  static String creatorLibrary(String creatorId, String section) =>
+      '/v1/discovery/creator/$creatorId/library/$section';
+
+  static const publicTestimonies = '/v1/public/engagement/testimonies';
+
   static const recommendedCreators = '/v1/discovery/recommended-creators';
   static const upcomingEvents = '/v1/discovery/upcoming-events';
 

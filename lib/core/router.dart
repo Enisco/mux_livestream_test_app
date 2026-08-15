@@ -26,6 +26,13 @@ class AppRouter {
   static const String orgSetup = '/org-setup';
   static const String planSelection = '/plan-selection';
   static const String checkoutStatus = '/checkout-status';
+  static const String creatorProfile = '/creator';
+
+  /// Profile by id — the form every in-app creator affordance uses.
+  static String creatorProfileById(String id) => '/creator?id=$id';
+
+  static String creatorProfileByHandle(String handle) =>
+      '/creator?handle=${handle.replaceFirst('@', '')}';
 
   static const String home = '/home';
 }

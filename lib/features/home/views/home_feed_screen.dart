@@ -6,6 +6,7 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
+import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/empty_tab_views.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -301,8 +302,12 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           final item = _items[index];
           final card = FeedCard(
             data: FeedCardMapper.toCardData(item),
-            onTap: () => _openItem(item),
-            onCreatorTap: () => _openItem(item),
+            // A channel row IS the creator, so its body opens the profile.
+            onTap: () => item.isCreatorRow
+                ? openCreatorProfile(context, creatorId: item.profileCreatorId)
+                : _openItem(item),
+            onCreatorTap: () =>
+                openCreatorProfile(context, creatorId: item.profileCreatorId),
             onFollow: () => _requireAccount('follow creators'),
             onLike: () => _requireAccount('like this'),
             onSave: () => _requireAccount('save this'),
@@ -328,6 +333,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       suggestions: _suggestions,
       pending: _followPending,
       onFollow: _toggleFollow,
+      onOpenCreator: (c) => openCreatorProfile(context, creatorId: c.creatorId),
       onEditTopics: () {
         if (_requireAccount('edit your topics')) {
           context.push(AppRouter.interests);
@@ -337,6 +343,8 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
     HomeTab.live => LiveEmptyView(
       events: _upcoming,
       onOpenEvent: _openItem,
+      onOpenCreator: (e) =>
+          openCreatorProfile(context, creatorId: e.profileCreatorId),
       onMore: (_) => _requireAccount('use that'),
     ),
     HomeTab.discover => const _Empty(

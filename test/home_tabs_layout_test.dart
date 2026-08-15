@@ -86,6 +86,7 @@ void main() {
           suggestions: _creators,
           pending: const {'c2'},
           onFollow: (_) {},
+          onOpenCreator: (_) {},
           onEditTopics: () {},
         ),
       );
@@ -115,6 +116,7 @@ void main() {
         suggestions: const [],
         pending: const {},
         onFollow: (_) {},
+        onOpenCreator: (_) {},
         onEditTopics: () {},
       ),
     );
@@ -140,6 +142,7 @@ void main() {
         suggestions: _creators,
         pending: const {'c2'},
         onFollow: (_) {},
+        onOpenCreator: (_) {},
         onEditTopics: () {},
       ),
     );
@@ -152,5 +155,62 @@ void main() {
     await _pump(tester, const Size(393, 852), const HomeLoader());
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
+  });
+
+  _creatorTapTests();
+}
+
+void _creatorTapTests() {
+  group('creator affordances are wired', () {
+    testWidgets('a suggestion row opens the creator', (tester) async {
+      String? opened;
+      await _pump(
+        tester,
+        const Size(393, 852),
+        FollowingEmptyView(
+          suggestions: _creators,
+          pending: const {},
+          onFollow: (_) {},
+          onOpenCreator: (c) => opened = c.creatorId,
+          onEditTopics: () {},
+        ),
+      );
+      await tester.tap(find.text('Pastor Luke Cage'));
+      expect(opened, 'c1');
+    });
+
+    testWidgets('following a row does not open the creator', (tester) async {
+      String? opened;
+      String? followed;
+      await _pump(
+        tester,
+        const Size(393, 852),
+        FollowingEmptyView(
+          suggestions: _creators,
+          pending: const {},
+          onFollow: (c) => followed = c.creatorId,
+          onOpenCreator: (c) => opened = c.creatorId,
+          onEditTopics: () {},
+        ),
+      );
+      await tester.tap(find.text('Follow').first);
+      expect(followed, 'c1');
+      expect(opened, isNull);
+    });
+
+    testWidgets('an event row opens its creator', (tester) async {
+      String? opened;
+      await _pump(
+        tester,
+        const Size(393, 852),
+        LiveEmptyView(
+          events: _events,
+          onOpenEvent: (_) {},
+          onOpenCreator: (e) => opened = e.entityId,
+        ),
+      );
+      await tester.tap(find.text('CCI International'));
+      expect(opened, 'e1');
+    });
   });
 }

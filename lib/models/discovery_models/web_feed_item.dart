@@ -49,6 +49,14 @@ class WebFeedItem {
       (isCreatorRow ? meta.handle ?? subtitle ?? '' : creator?.handle ?? '')
           .replaceFirst('@', '');
 
+  /// The creator this row belongs to — for a creator row that is the row
+  /// itself, for content it is the nested creator.
+  String? get profileCreatorId {
+    if (isCreatorRow) return entityId.isEmpty ? null : entityId;
+    final id = creator?.creatorId;
+    return id == null || id.isEmpty ? null : id;
+  }
+
   bool get creatorVerified =>
       isCreatorRow ? meta.isVerified : creator?.isVerified ?? false;
 

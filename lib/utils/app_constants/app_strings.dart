@@ -155,6 +155,46 @@ abstract final class AppStrings {
   static const comments = 'Comments';
   static const upNext = 'Up next';
 
+  static const tabLatest = 'Latest';
+  static const tabLibrary = 'Library';
+  static const tabTestimonies = 'Testimonies';
+  static const tabAbout = 'About';
+
+  static const unfollow = 'Unfollow';
+  static const giveNow = 'Give Now';
+  static const subscribers = 'Subscribers';
+  static const subscribeFollow = 'Subscribe/follow';
+  static const notifyMeWhenLive = 'Notify me when live';
+  static const shareYourTestimony = 'Share your testimony';
+
+  static const creatorEmptyLatestTitle = 'Nothing posted yet';
+  static const creatorEmptyLatestBody =
+      "When a sermon, song, or content is shared, it'll show up here first.";
+  static const creatorEmptyLibraryTitle = 'The library is empty for now';
+  static const creatorEmptyLibraryBody =
+      'Videos, audios, series, and devotionals will be collected here as this '
+      'ministry shares them.';
+  static const creatorEmptyLiveTitle = 'Not live right now';
+  static const creatorEmptyLiveBody =
+      "When this ministry goes live, you'll be able to watch and join the "
+      'conversation here.';
+  static const creatorEmptyTestimoniesTitle = 'No testimonies yet';
+  static const creatorEmptyTestimoniesBody =
+      'This is where the community shares what God has done. Be the first to '
+      'share your story.';
+
+  static const aboutLabel = 'About';
+  static const detailsLabel = 'Details';
+  static const reachLabel = 'Reach & Stewardship';
+  static const typeLabel = 'Type';
+  static const onGospelTube = 'On GospelTube';
+  static const sincePrefix = 'Since ';
+  static const totalViewsLabel = 'Total views';
+  static const notAvailable = 'N/A';
+  static const anonymousTestimony = 'Shared anonymously';
+  static const creatorTypeOrganisationValue = 'Organisation';
+  static const creatorTypeIndividualValue = 'Individual';
+
   static const checkoutTitle = 'Your subscription';
   static const checkoutOpening = 'Opening secure checkout…';
   static const checkoutInBrowser =

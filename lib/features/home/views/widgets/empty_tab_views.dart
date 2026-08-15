@@ -95,6 +95,7 @@ class FollowingEmptyView extends StatelessWidget {
     required this.suggestions,
     required this.pending,
     required this.onFollow,
+    required this.onOpenCreator,
     required this.onEditTopics,
   });
 
@@ -103,6 +104,7 @@ class FollowingEmptyView extends StatelessWidget {
   /// Creator ids with a follow request in flight.
   final Set<String> pending;
   final ValueChanged<RecommendedCreator> onFollow;
+  final ValueChanged<RecommendedCreator> onOpenCreator;
   final VoidCallback onEditTopics;
 
   @override
@@ -121,12 +123,11 @@ class FollowingEmptyView extends StatelessWidget {
         if (suggestions.isNotEmpty) ...[
           _SectionLabel(AppStrings.ministriesToFollow),
           for (final creator in suggestions)
-            // TODO(profile): make the row open the creator profile once that
-            // screen exists; for now only the Follow button acts.
             _SuggestionRow(
               creator: creator,
               busy: pending.contains(creator.creatorId),
               onFollow: () => onFollow(creator),
+              onTap: () => onOpenCreator(creator),
             ),
         ],
         Padding(
@@ -159,70 +160,76 @@ class _SuggestionRow extends StatelessWidget {
     required this.creator,
     required this.busy,
     required this.onFollow,
+    required this.onTap,
   });
 
   final RecommendedCreator creator;
   final bool busy;
   final VoidCallback onFollow;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.neutral400.withValues(alpha: 0.3),
-            width: 1.5.s,
-          ),
-        ),
-      ),
-      padding: EdgeInsets.symmetric(horizontal: 16.s, vertical: 12.s),
-      child: Row(
-        children: [
-          _Avatar(name: creator.displayName),
-          SizedBox(width: 12.s),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        creator.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppStyles.heading(14, letterSpacing: -0.3),
-                      ),
-                    ),
-                    if (creator.isVerified) ...[
-                      SizedBox(width: 4.s),
-                      DesignIcon(
-                        AppAssets.iconFeedVerified,
-                        width: 13.s,
-                        height: 13.s,
-                      ),
-                    ],
-                  ],
-                ),
-                SizedBox(height: 2.s),
-                Text(
-                  '@${creator.handle}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppStyles.body(12, color: AppColors.neutral400),
-                ),
-              ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: AppColors.neutral400.withValues(alpha: 0.3),
+              width: 1.5.s,
             ),
           ),
-          SizedBox(width: 12.s),
-          _FollowButton(
-            following: creator.isFollowing,
-            busy: busy,
-            onTap: onFollow,
-          ),
-        ],
+        ),
+        padding: EdgeInsets.symmetric(horizontal: 16.s, vertical: 12.s),
+        child: Row(
+          children: [
+            _Avatar(name: creator.displayName),
+            SizedBox(width: 12.s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          creator.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppStyles.heading(14, letterSpacing: -0.3),
+                        ),
+                      ),
+                      if (creator.isVerified) ...[
+                        SizedBox(width: 4.s),
+                        DesignIcon(
+                          AppAssets.iconFeedVerified,
+                          width: 13.s,
+                          height: 13.s,
+                        ),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: 2.s),
+                  Text(
+                    '@${creator.handle}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppStyles.body(12, color: AppColors.neutral400),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 12.s),
+            _FollowButton(
+              following: creator.isFollowing,
+              busy: busy,
+              onTap: onFollow,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -280,11 +287,13 @@ class LiveEmptyView extends StatelessWidget {
     super.key,
     required this.events,
     required this.onOpenEvent,
+    this.onOpenCreator,
     this.onMore,
   });
 
   final List<WebFeedItem> events;
   final ValueChanged<WebFeedItem> onOpenEvent;
+  final ValueChanged<WebFeedItem>? onOpenCreator;
   final ValueChanged<WebFeedItem>? onMore;
 
   @override
@@ -306,6 +315,9 @@ class LiveEmptyView extends StatelessWidget {
             _EventRow(
               event: event,
               onTap: () => onOpenEvent(event),
+              onCreatorTap: onOpenCreator == null
+                  ? null
+                  : () => onOpenCreator!(event),
               onMore: onMore == null ? null : () => onMore!(event),
             ),
         ],
@@ -315,10 +327,16 @@ class LiveEmptyView extends StatelessWidget {
 }
 
 class _EventRow extends StatelessWidget {
-  const _EventRow({required this.event, required this.onTap, this.onMore});
+  const _EventRow({
+    required this.event,
+    required this.onTap,
+    this.onCreatorTap,
+    this.onMore,
+  });
 
   final WebFeedItem event;
   final VoidCallback onTap;
+  final VoidCallback? onCreatorTap;
   final VoidCallback? onMore;
 
   static const _months = [
@@ -389,28 +407,32 @@ class _EventRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              event.creatorDisplayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppStyles.body(
-                                12,
-                                color: AppColors.neutral300,
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onCreatorTap,
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                event.creatorDisplayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppStyles.body(
+                                  12,
+                                  color: AppColors.neutral300,
+                                ),
                               ),
                             ),
-                          ),
-                          if (event.creatorVerified) ...[
-                            SizedBox(width: 4.s),
-                            DesignIcon(
-                              AppAssets.iconFeedVerified,
-                              width: 12.s,
-                              height: 12.s,
-                            ),
+                            if (event.creatorVerified) ...[
+                              SizedBox(width: 4.s),
+                              DesignIcon(
+                                AppAssets.iconFeedVerified,
+                                width: 12.s,
+                                height: 12.s,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                       SizedBox(height: 3.s),
                       Text(
