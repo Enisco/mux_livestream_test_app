@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:sizing/sizing.dart';
-import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
@@ -118,10 +118,10 @@ class CreatorSelectField extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              SvgPicture.asset(
-                AppAssets.iconChevronDown,
-                width: 7.072,
-                height: 4.713,
+              const Icon(
+                AppIcons.chevronDown,
+                size: 12,
+                color: AppColors.neutral400,
               ),
             ],
           ),
@@ -189,10 +189,10 @@ class CreatorHandleField extends StatelessWidget {
               suffixIcon: resolved
                   ? Padding(
                       padding: const EdgeInsets.only(right: 16),
-                      child: SvgPicture.asset(
-                        AppAssets.iconCheckCircle,
-                        width: 20,
-                        height: 20,
+                      child: const HugeIcon(
+                        icon: AppIcons.tickCircle,
+                        color: AppColors.green500,
+                        size: 20,
                       ),
                     )
                   : null,

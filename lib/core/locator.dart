@@ -12,6 +12,7 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/connectivity_service.dart';
 import 'package:test_app/shared/services/device_info_service.dart';
+import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/shared/services/playback_info_cache.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/services/vertical_feed_preloader.dart';
@@ -59,6 +60,7 @@ Future<void> setupLocator() async {
       connectivity: getIt<ConnectivityService>(),
     ),
   );
+  getIt.registerLazySingleton<PlaybackController>(() => PlaybackController());
   getIt.registerLazySingleton<PlaybackInfoCache>(() => PlaybackInfoCache());
   getIt.registerLazySingleton<VerticalFeedPreloader>(
     () => VerticalFeedPreloader(

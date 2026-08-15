@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -155,7 +157,11 @@ class _FeatureColumn extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SvgPicture.asset(AppAssets.iconCheckGreen, width: 18, height: 18),
+              const HugeIcon(
+                icon: AppIcons.tick,
+                color: AppColors.green500,
+                size: 18,
+              ),
               const SizedBox(width: 7),
               Expanded(
                 child: Text(

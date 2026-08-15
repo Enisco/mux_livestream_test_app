@@ -15,11 +15,11 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
-import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
-import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
@@ -338,12 +338,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               child: SizedBox(
                 width: 32.s,
                 height: 32.s,
-                child: Center(
-                  child: DesignIcon(
-                    AppAssets.iconArrowLeft,
-                    width: 20.s,
-                    height: 14.s,
+                child: const Center(
+                  child: HugeIcon(
+                    icon: AppIcons.back,
                     color: AppColors.textPrimary,
+                    size: 18,
                   ),
                 ),
               ),

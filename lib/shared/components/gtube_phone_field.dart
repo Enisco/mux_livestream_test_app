@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:test_app/shared/components/country_flag_icon.dart';
 import 'package:test_app/shared/components/country_picker_sheet.dart';
 import 'package:test_app/shared/components/gtube_text_field.dart';
 import 'package:test_app/shared/data/countries.dart';
-import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/phone_number.dart';
@@ -159,10 +158,10 @@ class _GTubePhoneFieldState extends State<GTubePhoneField> {
               style: AppStyles.body(16, color: AppColors.textPrimary),
             ),
             const SizedBox(width: 6),
-            SvgPicture.asset(
-              AppAssets.iconChevronDown,
-              width: 7.072,
-              height: 4.713,
+            const Icon(
+              AppIcons.chevronDown,
+              size: 12,
+              color: AppColors.neutral400,
             ),
           ],
         ),

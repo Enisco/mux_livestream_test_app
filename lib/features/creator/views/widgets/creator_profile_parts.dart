@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
@@ -9,6 +10,7 @@ import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -122,10 +124,12 @@ class CreatorProfileHeader extends StatelessWidget {
                 left: 15.s,
                 top: topInset + 12.s,
                 child: _CircleButton(
-                  icon: AppAssets.iconArrowLeft,
-                  width: 20,
-                  height: 14,
                   onTap: onBack,
+                  child: const HugeIcon(
+                    icon: AppIcons.back,
+                    color: AppColors.textPrimary,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -262,11 +266,14 @@ class _Actions extends StatelessWidget {
         ),
         SizedBox(width: 10.s),
         _CircleButton(
-          icon: AppAssets.iconFeedMore,
-          width: 16,
-          height: 4,
           square: true,
           onTap: onMore,
+          child: DesignIcon(
+            AppAssets.iconFeedMore,
+            width: 16.s,
+            height: 4.s,
+            color: AppColors.textPrimary,
+          ),
         ),
       ],
     );
@@ -317,17 +324,9 @@ class _OutlineButton extends StatelessWidget {
 }
 
 class _CircleButton extends StatelessWidget {
-  const _CircleButton({
-    required this.icon,
-    required this.width,
-    required this.height,
-    this.square = false,
-    this.onTap,
-  });
+  const _CircleButton({required this.child, this.square = false, this.onTap});
 
-  final String icon;
-  final double width;
-  final double height;
+  final Widget child;
   final bool square;
   final VoidCallback? onTap;
 
@@ -344,14 +343,7 @@ class _CircleButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(square ? 8.s : 999.s),
           border: Border.all(color: AppColors.neutral800, width: 1.5.s),
         ),
-        child: Center(
-          child: DesignIcon(
-            icon,
-            width: width.s,
-            height: height.s,
-            color: AppColors.textPrimary,
-          ),
-        ),
+        child: Center(child: child),
       ),
     );
   }
@@ -758,14 +750,10 @@ class CreatorLibraryTab extends StatelessWidget {
                       style: AppStyles.heading(15, letterSpacing: -0.3),
                     ),
                   ),
-                  Transform.rotate(
-                    angle: -1.5708,
-                    child: DesignIcon(
-                      AppAssets.iconChevronDown,
-                      width: 11.s,
-                      height: 7.s,
-                      color: AppColors.neutral400,
-                    ),
+                  const Icon(
+                    AppIcons.chevronRight,
+                    size: 14,
+                    color: AppColors.neutral400,
                   ),
                 ],
               ),

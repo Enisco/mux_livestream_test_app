@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/locator.dart';
@@ -12,7 +11,7 @@ import 'package:test_app/features/creator/views/widgets/plan_card.dart';
 import 'package:test_app/features/creator/views/widgets/plan_comparison_sheet.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
-import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -238,21 +237,7 @@ class _Header extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => context.pop(),
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: Center(
-                          child: SvgPicture.asset(
-                            AppAssets.iconArrowLeft,
-                            width: 20,
-                            height: 10,
-                          ),
-                        ),
-                      ),
-                    ),
+                    GTubeBackButton(onTap: () => context.pop()),
                     const SizedBox(width: 10),
                     Text(
                       AppStrings.yourPlan,
@@ -302,10 +287,10 @@ class _CurrencyPill extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          SvgPicture.asset(
-            AppAssets.iconChevronDown,
-            width: 7.072,
-            height: 4.713,
+          const Icon(
+            AppIcons.chevronDown,
+            size: 12,
+            color: AppColors.neutral400,
           ),
         ],
       ),

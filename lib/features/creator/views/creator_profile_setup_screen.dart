@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/locator.dart';
@@ -15,6 +14,7 @@ import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -233,21 +233,7 @@ class _TopBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => context.pop(),
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Center(
-                    child: SvgPicture.asset(
-                      AppAssets.iconArrowLeft,
-                      width: 20,
-                      height: 10,
-                    ),
-                  ),
-                ),
-              ),
+              GTubeBackButton(onTap: () => context.pop()),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onSkip,

@@ -14,6 +14,7 @@ import 'package:test_app/features/auth/views/widgets/auth_widgets.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/otp_code_field.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -204,21 +205,7 @@ class _BackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: 24,
-        height: 24,
-        child: Center(
-          child: SvgPicture.asset(
-            AppAssets.iconArrowLeft,
-            width: 20,
-            height: 10,
-          ),
-        ),
-      ),
-    );
+    return GTubeBackButton(onTap: onTap);
   }
 }
 

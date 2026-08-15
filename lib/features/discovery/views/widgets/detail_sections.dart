@@ -3,6 +3,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -492,14 +493,10 @@ class DetailCommentsPreview extends StatelessWidget {
                   style: AppStyles.label(14, weight: AppStyles.bold),
                 ),
               ),
-              Transform.rotate(
-                angle: -1.5708,
-                child: DesignIcon(
-                  AppAssets.iconChevronDown,
-                  width: 12.s,
-                  height: 8.s,
-                  color: AppColors.textPrimary,
-                ),
+              const Icon(
+                AppIcons.chevronRight,
+                size: 16,
+                color: AppColors.textPrimary,
               ),
             ],
           ),

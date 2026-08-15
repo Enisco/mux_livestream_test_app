@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/views/widgets/feature_card_carousel.dart';
@@ -8,6 +7,8 @@ import 'package:test_app/features/auth/views/widgets/social_auth_button.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/shared/components/onboarding_background.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -138,20 +139,16 @@ class _BrowseRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          const SizedBox(
-            width: 20,
-            height: 20,
-            child: Center(
-              child: SvgPicture(_arrowRight, width: 16.667, height: 8.333),
-            ),
+          const HugeIcon(
+            icon: AppIcons.forward,
+            color: AppColors.brandPrimary,
+            size: 16,
           ),
         ],
       ),
     );
   }
 }
-
-const _arrowRight = SvgAssetLoader(AppAssets.iconArrowRight);
 
 class _SignInRow extends StatelessWidget {
   const _SignInRow();

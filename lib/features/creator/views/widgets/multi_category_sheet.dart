@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/app_icons.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -133,10 +135,10 @@ class _Row extends StatelessWidget {
                     height: 20,
                   ),
                   if (checked)
-                    SvgPicture.asset(
-                      AppAssets.iconCheck,
-                      width: 14,
-                      height: 14,
+                    const HugeIcon(
+                      icon: AppIcons.tick,
+                      color: AppColors.textPrimary,
+                      size: 14,
                     ),
                 ],
               ),

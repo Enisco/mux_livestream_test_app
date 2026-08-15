@@ -40,6 +40,7 @@ dependencies:
   country_flags: ^4.1.2
   url_launcher: ^6.3.2
   app_links: ^7.2.1
+  hugeicons: ^1.1.7
 
 dev_dependencies:
   flutter_test:

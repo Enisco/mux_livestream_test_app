@@ -10,10 +10,6 @@ abstract final class AppAssets {
   static const iconApple = '$_icons/apple.svg';
   static const iconMail = '$_icons/mail.svg';
 
-  static const iconArrowLeft = '$_icons/arrow_left.svg';
-  static const iconArrowRight = '$_icons/arrow_right.svg';
-  static const iconChevronDown = '$_icons/chevron_down.svg';
-
   static const iconMailBadge = '$_icons/mail_badge.svg';
 
   static const worshipBg = '$_images/worship_bg.png';
@@ -26,10 +22,6 @@ abstract final class AppAssets {
   static const iconSourceSearch = '$_icons/src_search.svg';
   static const iconSourcePodcast = '$_icons/src_podcast.svg';
 
-  static const iconCheckCircle = '$_icons/check_circle.svg';
-  static const iconCheckSmallGreen = '$_icons/check_small_green.svg';
-
-  static const iconCheck = '$_icons/check.svg';
   static const iconCatMicrophone = '$_icons/cat_microphone.svg';
   static const iconCatBible = '$_icons/cat_bible.svg';
   static const iconCatGlobe = '$_icons/cat_globe.svg';
@@ -52,7 +44,6 @@ abstract final class AppAssets {
 
   static const iconCheckbox = '$_icons/checkbox.svg';
 
-  static const iconCheckGreen = '$_icons/check_green.svg';
   static const iconDollar = '$_icons/dollar.svg';
 
   static const iconPerson = '$_icons/person.svg';
