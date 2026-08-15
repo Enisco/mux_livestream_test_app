@@ -15,7 +15,7 @@ import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
-import 'package:test_app/features/discovery/views/media_detail_screen.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
@@ -232,13 +232,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       source: AnalyticsSource.homeFeed,
       promotion: item.promotion,
     );
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            MediaDetailScreen(item: item, source: AnalyticsSource.homeFeed),
-      ),
-    );
+    openContentDetail(context, item, source: AnalyticsSource.homeFeed);
   }
 
   @override

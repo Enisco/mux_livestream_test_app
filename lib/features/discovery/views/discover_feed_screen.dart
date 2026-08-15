@@ -7,7 +7,7 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
-import 'package:test_app/features/discovery/views/media_detail_screen.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
@@ -256,13 +256,7 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
       source: AnalyticsSource.homeFeed,
       promotion: item.promotion,
     );
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            MediaDetailScreen(item: item, source: AnalyticsSource.homeFeed),
-      ),
-    );
+    openContentDetail(context, item, source: AnalyticsSource.homeFeed);
   }
 }
 

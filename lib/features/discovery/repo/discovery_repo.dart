@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 
 import 'package:test_app/models/creator_models/creator_profile.dart';
+import 'package:test_app/models/discovery_models/content_detail.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -125,6 +126,47 @@ class DiscoveryRepo {
         .whereType<Map<String, dynamic>>()
         .map(CreatorTestimony.fromJson)
         .toList();
+  }
+
+  Future<ContentPost> fetchPost(String id) async {
+    final response = await _api.get(ApiEndpoints.publicPost(id));
+    return ContentPost.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<DevotionalSeriesDetail> fetchDevotionalSeries(String id) async {
+    final response = await _api.get(ApiEndpoints.publicDevotionalSeries(id));
+    return DevotionalSeriesDetail.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  Future<EventDetail> fetchEvent(String id) async {
+    final response = await _api.get(ApiEndpoints.publicEvent(id));
+    return EventDetail.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Paginates the "Up next" list beyond what the detail aggregate inlines.
+  /// Only `popular` and `recent` are supported here — not `trending`.
+  Future<WebFeedResponse> fetchContentSuggestions({
+    required String targetType,
+    required String targetId,
+    String sort = 'popular',
+    int limit = 10,
+    String? cursor,
+    List<String> excludeEntityIds = const [],
+  }) async {
+    final response = await _api.post(
+      ApiEndpoints.contentSuggestions,
+      data: {
+        'targetType': targetType,
+        'targetId': targetId,
+        'limit': limit,
+        'sort': sort,
+        'cursor': ?cursor,
+        if (excludeEntityIds.isNotEmpty) 'excludeEntityIds': excludeEntityIds,
+      },
+    );
+    return WebFeedResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Follow / unfollow a ministry.

@@ -9,7 +9,7 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/views/widgets/creator_profile_parts.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
-import 'package:test_app/features/discovery/views/media_detail_screen.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/features/home/views/widgets/home_loader.dart';
@@ -201,15 +201,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   }
 
   void _openItem(WebFeedItem item) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MediaDetailScreen(
-          item: item,
-          source: AnalyticsSource.creatorProfile,
-        ),
-      ),
-    );
+    openContentDetail(context, item, source: AnalyticsSource.creatorProfile);
   }
 
   @override

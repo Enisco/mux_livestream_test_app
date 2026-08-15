@@ -5,6 +5,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -235,14 +236,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       source: AnalyticsSource.suggestedContent,
       promotion: suggestion.promotion,
     );
-    Navigator.push(
+    openContentDetail(
       context,
-      MaterialPageRoute(
-        builder: (_) => MediaDetailScreen(
-          item: suggestion,
-          source: AnalyticsSource.suggestedContent,
-        ),
-      ),
+      suggestion,
+      source: AnalyticsSource.suggestedContent,
     );
   }
 

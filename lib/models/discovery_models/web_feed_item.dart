@@ -174,6 +174,7 @@ class WebFeedItemMeta {
   /// Devotional entries.
   final int? dayNumber;
   final String? seriesTitle;
+  final String? seriesId;
 
   /// Media series.
   final int? videoCount;
@@ -199,6 +200,7 @@ class WebFeedItemMeta {
     this.publishedEntryCount,
     this.dayNumber,
     this.seriesTitle,
+    this.seriesId,
     this.videoCount,
     this.musicCount,
   });
@@ -229,6 +231,7 @@ class WebFeedItemMeta {
         publishedEntryCount: (json['publishedEntryCount'] as num?)?.toInt(),
         dayNumber: (json['dayNumber'] as num?)?.toInt(),
         seriesTitle: json['seriesTitle'] as String?,
+        seriesId: json['seriesId'] as String?,
         videoCount: (json['videoCount'] as num?)?.toInt(),
         musicCount: (json['musicCount'] as num?)?.toInt(),
       );

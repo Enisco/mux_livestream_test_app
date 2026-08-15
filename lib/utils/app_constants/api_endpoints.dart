@@ -36,6 +36,15 @@ abstract final class ApiEndpoints {
   static String creatorLibrary(String creatorId, String section) =>
       '/v1/discovery/creator/$creatorId/library/$section';
 
+  static String publicPost(String id) => '/v1/public/content/posts/$id';
+
+  static String publicDevotionalSeries(String id) =>
+      '/v1/public/content/devotionals/series/$id';
+
+  static String publicEvent(String id) => '/v1/public/content/events/$id';
+
+  static const contentSuggestions = '/v1/discovery/content-suggestions';
+
   static const publicTestimonies = '/v1/public/engagement/testimonies';
 
   static const recommendedCreators = '/v1/discovery/recommended-creators';
