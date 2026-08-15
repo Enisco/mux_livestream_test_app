@@ -44,13 +44,20 @@ class GTubeNavBar extends StatelessWidget {
             ],
           ),
           child: Stack(
+            // The pill overlaps the container's top padding.
+            clipBehavior: Clip.none,
             alignment: Alignment.centerLeft,
             children: [
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                left: index * (_itemWidth + _gap) - 1,
-                width: 60.s,
+                // Centred on the item, but pulled up so it sits around the
+                // icon rather than straddling the icon and its label.
+                left:
+                    index * (_itemWidth + _gap) +
+                    (_itemWidth - _items[index].pillWidth.s) / 2,
+                top: -5.s,
+                width: _items[index].pillWidth.s,
                 height: 31.s,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -90,19 +97,60 @@ class GTubeNavBar extends StatelessWidget {
 }
 
 class _NavSpec {
-  const _NavSpec(this.label, this.asset, this.width, this.height);
+  const _NavSpec(
+    this.label,
+    this.asset,
+    this.width,
+    this.height, {
+    this.activeAsset,
+    this.activeWidth,
+    this.activeHeight,
+    this.pillWidth = 60,
+  });
 
   final String label;
 
   final String? asset;
   final double width;
   final double height;
+
+  /// The design swaps to a filled glyph on selection; Home reuses one drawing
+  /// and only changes colour.
+  final String? activeAsset;
+  final double? activeWidth;
+  final double? activeHeight;
+
+  /// Following's pill is wider than the rest in the design.
+  final double pillWidth;
+
+  String? assetFor(bool active) => active ? (activeAsset ?? asset) : asset;
+
+  double widthFor(bool active) => active ? (activeWidth ?? width) : width;
+
+  double heightFor(bool active) => active ? (activeHeight ?? height) : height;
 }
 
 const _items = <_NavSpec>[
   _NavSpec(AppStrings.navHome, AppAssets.iconNavHome, 16.463, 15.881),
-  _NavSpec(AppStrings.navExplore, AppAssets.iconNavExplore, 18.333, 18.333),
-  _NavSpec(AppStrings.navFollowing, AppAssets.iconNavFollowing, 17.917, 17.5),
+  _NavSpec(
+    AppStrings.navExplore,
+    AppAssets.iconNavExplore,
+    18.333,
+    18.333,
+    activeAsset: AppAssets.iconNavExploreBold,
+    activeWidth: 16.667,
+    activeHeight: 16.667,
+  ),
+  _NavSpec(
+    AppStrings.navFollowing,
+    AppAssets.iconNavFollowing,
+    17.917,
+    17.5,
+    activeAsset: AppAssets.iconNavFollowingBold,
+    activeWidth: 16.25,
+    activeHeight: 15.833,
+    pillWidth: 80,
+  ),
   _NavSpec(AppStrings.navYou, null, 20, 20),
 ];
 
@@ -130,11 +178,11 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (spec.asset case final asset?)
+            if (spec.assetFor(active) case final asset?)
               DesignIcon(
                 asset,
-                width: spec.width.s,
-                height: spec.height.s,
+                width: spec.widthFor(active).s,
+                height: spec.heightFor(active).s,
                 box: 20.s,
                 color: tint,
               )

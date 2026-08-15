@@ -83,6 +83,8 @@ abstract final class AppAssets {
 
   static const iconNavHome = '$_icons/nav_home.svg';
   static const iconNavExplore = '$_icons/nav_explore.svg';
+  static const iconNavExploreBold = '$_icons/nav_explore_bold.svg';
   static const iconNavFollowing = '$_icons/nav_following.svg';
+  static const iconNavFollowingBold = '$_icons/nav_following_bold.svg';
   static const iconFeedLiveDot = '$_icons/feed_live_dot.svg';
 }
