@@ -75,6 +75,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   final Set<CreatorTab> _loaded = {};
   bool _tabLoading = false;
   List<CreatorTestimony> _testimonies = const [];
+  List<LibrarySection> _library = const [];
 
   @override
   void initState() {
@@ -122,20 +123,30 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
           final result = await _repo.fetchCreatorFeed(id);
           _rows[tab] = result.items;
         case CreatorTab.library:
-          // The API splits the library by section; the tab shows them merged in
-          // the order the design lists them.
-          final sections = await Future.wait(
-            CreatorTab.librarySections.map(
-              (s) => _repo
-                  .fetchCreatorLibrary(id, s)
-                  .then((r) => r.items)
+          // The design groups the library by section, so they stay separate.
+          final results = await Future.wait(
+            LibrarySection.order.keys.map(
+              (key) => _repo
+                  .fetchCreatorLibrary(id, key)
+                  .then(
+                    (r) => LibrarySection(
+                      key: key,
+                      title: LibrarySection.order[key]!,
+                      items: r.items,
+                      total: r.total ?? r.items.length,
+                    ),
+                  )
                   .catchError((Object e) {
-                    logger.w('library/$s failed', error: e);
-                    return <WebFeedItem>[];
+                    logger.w('library/$key failed', error: e);
+                    return LibrarySection(
+                      key: key,
+                      title: LibrarySection.order[key]!,
+                      items: const <WebFeedItem>[],
+                    );
                   }),
             ),
           );
-          _rows[tab] = sections.expand((e) => e).toList();
+          _library = results.where((s) => s.items.isNotEmpty).toList();
         case CreatorTab.live:
           final result = await _repo.fetchCreatorFeed(id, limit: 20);
           _rows[tab] = result.items.where((i) => i.isLiveNow).toList();
@@ -247,6 +258,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
       onRefresh: () async {
         _loaded.clear();
         _rows.clear();
+        _library = const [];
         await _loadProfile();
       },
       child: CustomScrollView(
@@ -291,6 +303,19 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
 
     if (_tab == CreatorTab.about) {
       return [SliverToBoxAdapter(child: CreatorAboutTab(profile: profile))];
+    }
+
+    if (_tab == CreatorTab.library) {
+      if (_library.isEmpty) return [_emptySliver()];
+      return [
+        SliverToBoxAdapter(
+          child: CreatorLibraryTab(
+            sections: _library,
+            onOpen: _openItem,
+            onMore: (_) => _requireAccount('use that'),
+          ),
+        ),
+      ];
     }
 
     if (_tab == CreatorTab.testimonies) {

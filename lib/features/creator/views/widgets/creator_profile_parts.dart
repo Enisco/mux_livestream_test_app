@@ -4,7 +4,9 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount, relativeAge;
+import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/creator_models/creator_profile.dart';
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -693,6 +695,242 @@ class CreatorTestimonyCard extends StatelessWidget {
             style: AppStyles.label(11, color: AppColors.neutral500),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One Library section as the design groups them.
+class LibrarySection {
+  const LibrarySection({
+    required this.key,
+    required this.title,
+    required this.items,
+    this.total = 0,
+  });
+
+  final String key;
+  final String title;
+  final List<WebFeedItem> items;
+  final int total;
+
+  static const order = <String, String>{
+    'series': AppStrings.sectionSeries,
+    'videos': AppStrings.sectionVideos,
+    'music': AppStrings.sectionAudios,
+    'devotionals': AppStrings.sectionDevotions,
+    'posts': AppStrings.sectionArticles,
+    'events': AppStrings.sectionEvents,
+  };
+}
+
+/// Library tab — sections of compact rows, not the full feed card.
+class CreatorLibraryTab extends StatelessWidget {
+  const CreatorLibraryTab({
+    super.key,
+    required this.sections,
+    required this.onOpen,
+    this.onMore,
+    this.onSeeAll,
+  });
+
+  final List<LibrarySection> sections;
+  final ValueChanged<WebFeedItem> onOpen;
+  final ValueChanged<WebFeedItem>? onMore;
+  final ValueChanged<LibrarySection>? onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final section in sections) ...[
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.s, 20.s, 16.s, 12.s),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onSeeAll == null ? null : () => onSeeAll!(section),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      section.title,
+                      style: AppStyles.heading(15, letterSpacing: -0.3),
+                    ),
+                  ),
+                  Transform.rotate(
+                    angle: -1.5708,
+                    child: DesignIcon(
+                      AppAssets.iconChevronDown,
+                      width: 11.s,
+                      height: 7.s,
+                      color: AppColors.neutral400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          for (final item in section.items)
+            LibraryRow(
+              item: item,
+              onTap: () => onOpen(item),
+              onMore: onMore == null ? null : () => onMore!(item),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class LibraryRow extends StatelessWidget {
+  const LibraryRow({
+    super.key,
+    required this.item,
+    required this.onTap,
+    this.onMore,
+  });
+
+  final WebFeedItem item;
+  final VoidCallback onTap;
+  final VoidCallback? onMore;
+
+  /// "Devotional · 12 views · 6d"
+  String get _typeLabel => switch (item.entityType) {
+    'post' => AppStrings.typeArticle,
+    'event' => AppStrings.typeEvent,
+    'devotional_series' => AppStrings.typeDevotional,
+    'devotional_entry' => AppStrings.typeDevotional,
+    'media_series' => AppStrings.typeSeries,
+    _ => switch (item.mediaType) {
+      MediaTypes.music => AppStrings.typeAudio,
+      MediaTypes.livestream => AppStrings.tabLive,
+      _ => AppStrings.typeVideo,
+    },
+  };
+
+  /// Collections are called out in brand colour; content types stay quiet.
+  bool get _isCollection =>
+      item.entityType == 'media_series' ||
+      item.entityType == 'devotional_series';
+
+  @override
+  Widget build(BuildContext context) {
+    final views = item.facets.views;
+    final meta = [
+      _typeLabel,
+      if (views > 0)
+        '${formatCount(views)} '
+            '${views == 1 ? AppStrings.viewLower : AppStrings.viewsLower}',
+      relativeAge(item.meta.publishedAt),
+    ].where((e) => e.isNotEmpty).join('  ·  ');
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 14.s),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Thumb(item: item),
+            SizedBox(width: 12.s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppStyles.heading(15, letterSpacing: -0.3),
+                  ),
+                  SizedBox(height: 4.s),
+                  Text(
+                    meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppStyles.body(
+                      12,
+                      color: _isCollection
+                          ? AppColors.brandPrimary
+                          : AppColors.neutral400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onMore != null)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onMore,
+                child: SizedBox(
+                  width: 28.s,
+                  height: 40.s,
+                  child: Center(
+                    child: RotatedBox(
+                      quarterTurns: 1,
+                      child: DesignIcon(
+                        AppAssets.iconFeedMore,
+                        width: 14.s,
+                        height: 3.5.s,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Thumb extends StatelessWidget {
+  const _Thumb({required this.item});
+
+  final WebFeedItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = item.meta.thumbnailUrl;
+    final glyph = switch (item.entityType) {
+      'post' => AppAssets.iconBookOpen,
+      'event' => AppAssets.iconCatGlobe,
+      'devotional_series' || 'devotional_entry' => AppAssets.iconCatBible,
+      _ =>
+        item.mediaType == MediaTypes.music
+            ? AppAssets.iconCatMusicNote
+            : AppAssets.iconPlay,
+    };
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8.s),
+      child: SizedBox(
+        width: 136.s,
+        height: 76.s,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: AppColors.fieldBg),
+            if (url != null && url.isNotEmpty)
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : const SizedBox.shrink(),
+              ),
+            Center(
+              child: DesignIcon(
+                glyph,
+                width: 20.s,
+                height: 20.s,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

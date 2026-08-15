@@ -238,12 +238,19 @@ class WebFeedResponse {
   final List<WebFeedItem> items;
   final String? nextCursor;
 
-  const WebFeedResponse({required this.items, this.nextCursor});
+  /// Only the library search reports a total.
+  final int? total;
 
+  const WebFeedResponse({required this.items, this.nextCursor, this.total});
+
+  /// Feeds return `data.items`; the creator-library search returns `data.hits`
+  /// with a `total`. Same row shape either way.
   factory WebFeedResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? {};
+    final rows = data['items'] ?? data['hits'];
     return WebFeedResponse(
-      items: (data['items'] as List<dynamic>? ?? [])
+      total: (data['total'] as num?)?.toInt(),
+      items: (rows as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(WebFeedItem.fromJson)
           .toList(),

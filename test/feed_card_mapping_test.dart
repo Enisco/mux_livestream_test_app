@@ -256,4 +256,61 @@ void main() {
       expect(creator.isFollowing, isFalse);
     });
   });
+
+  _libraryShapeTests();
+}
+
+void _libraryShapeTests() {
+  group('creator library search shape', () {
+    // The library route answers with data.hits + data.total, not data.items.
+    // Reading only `items` silently produced an empty Library for creators who
+    // clearly had content.
+    const libraryResponse = {
+      'success': true,
+      'data': {
+        'total': 8,
+        'hits': [
+          {
+            'entityType': 'media',
+            'entityId': 'm1',
+            'title': 'Big Buck',
+            'subtitle': 'video · public',
+            'facets': {'mediaType': 'video', 'analyticsViews': 59},
+            'meta': {
+              'thumbnailUrl':
+                  'https://api.staging.gospeltube.tv/v1/public/media/m1/assets/thumbnail',
+              'durationSeconds': 10,
+            },
+          },
+        ],
+        'nextCursor': null,
+      },
+    };
+
+    test('parses hits', () {
+      final result = WebFeedResponse.fromJson(libraryResponse);
+      expect(result.items, hasLength(1));
+      expect(result.total, 8);
+      expect(result.items.first.title, 'Big Buck');
+    });
+
+    test('still parses feed-shaped items', () {
+      final result = WebFeedResponse.fromJson(const {
+        'data': {
+          'items': [
+            {'entityType': 'media', 'entityId': 'm2', 'title': 'Worship'},
+          ],
+          'nextCursor': 'abc',
+        },
+      });
+      expect(result.items, hasLength(1));
+      expect(result.nextCursor, 'abc');
+      expect(result.total, isNull);
+    });
+
+    test('the proxy thumbnail url is used as-is', () {
+      final item = WebFeedResponse.fromJson(libraryResponse).items.first;
+      expect(item.meta.thumbnailUrl, contains('/assets/thumbnail'));
+    });
+  });
 }

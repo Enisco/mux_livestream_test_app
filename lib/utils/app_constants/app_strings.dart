@@ -157,6 +157,22 @@ abstract final class AppStrings {
 
   static const tabLatest = 'Latest';
   static const tabLibrary = 'Library';
+  static const sectionSeries = 'Series';
+  static const sectionVideos = 'Videos';
+  static const sectionAudios = 'Audios';
+  static const sectionDevotions = 'Devotions';
+  static const sectionArticles = 'Articles';
+  static const sectionEvents = 'Events';
+
+  static const typeVideo = 'Video';
+  static const typeAudio = 'Audio';
+  static const typeArticle = 'Article';
+  static const typeEvent = 'Event';
+  static const typeDevotional = 'Devotional';
+  static const typeSeries = 'Series';
+  static const viewsLower = 'views';
+  static const viewLower = 'view';
+
   static const tabTestimonies = 'Testimonies';
   static const tabAbout = 'About';
 
