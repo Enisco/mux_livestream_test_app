@@ -17,6 +17,7 @@ class DiscoveryRepo {
     String mode = 'mixed',
     String sort = 'recent',
     List<String>? categorySlugs,
+    List<String>? entityTypes,
     bool? liveOnly,
     bool? useViewerCategoryPrefs,
   }) async {
@@ -27,6 +28,8 @@ class DiscoveryRepo {
       'excludeEntityIds': <String>[],
       if (categorySlugs != null && categorySlugs.isNotEmpty)
         'categorySlugs': categorySlugs,
+      if (entityTypes != null && entityTypes.isNotEmpty)
+        'entityTypes': entityTypes,
       if (liveOnly ?? false) 'liveOnly': true,
       if (useViewerCategoryPrefs ?? false) 'useViewerCategoryPrefs': true,
     };
@@ -137,6 +140,20 @@ class DiscoveryRepo {
     final response = await _api.get(ApiEndpoints.publicDevotionalSeries(id));
     return DevotionalSeriesDetail.fromJson(
       response.data as Map<String, dynamic>,
+    );
+  }
+
+  /// Records a devotional day as read.
+  ///
+  /// The series detail carries `viewerProgress` but nothing wrote to it, so a
+  /// reader's place was lost the moment they left the screen.
+  Future<void> setDevotionalEntryProgress(
+    String entryId, {
+    String status = 'completed',
+  }) async {
+    await _api.post(
+      ApiEndpoints.devotionalEntryProgress(entryId),
+      data: {'status': status},
     );
   }
 

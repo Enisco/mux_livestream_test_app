@@ -16,6 +16,7 @@ import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
+import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/shared/services/playback_info_cache.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/services/vertical_feed_preloader.dart';
@@ -55,6 +56,10 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     super.initState();
     _checkAuth();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // This screen still runs its own players. Whatever the shared controller
+    // was playing has to stop, or two engines fight over the audio session.
+    unawaited(GetIt.instance<PlaybackController>().stop());
 
     final preloader = GetIt.instance<VerticalFeedPreloader>();
     if (preloader.hasData) {

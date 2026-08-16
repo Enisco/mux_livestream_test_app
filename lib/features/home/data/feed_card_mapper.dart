@@ -1,6 +1,7 @@
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
+import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Turns a web-feed row into card data.
@@ -11,7 +12,13 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 /// object, and post/devotional bodies live in different keys again. Kept out of
 /// the screen so the whole table can be tested against real payloads.
 abstract final class FeedCardMapper {
-  static FeedCardData toCardData(WebFeedItem item) {
+  /// [interactions] is the viewer's own like/save state, keyed by entity id,
+  /// as returned by the engagement batch route. Empty for guests.
+  static FeedCardData toCardData(
+    WebFeedItem item, {
+    Map<String, Set<String>> interactions = const {},
+  }) {
+    final mine = interactions[item.entityId] ?? const <String>{};
     final meta = item.meta;
     final facets = item.facets;
     final creator = item.creator;
@@ -20,6 +27,7 @@ abstract final class FeedCardMapper {
     final name = item.creatorDisplayName;
     return FeedCardData(
       id: item.entityId,
+      creatorId: item.creator?.creatorId ?? '',
       kind: kind,
       creatorName: name.isEmpty ? AppStrings.brandName : name,
       handle: item.creatorHandle,
@@ -47,6 +55,8 @@ abstract final class FeedCardMapper {
       viewCount: facets.views,
       following: item.isFollowingCreator || (creator?.isFollowing ?? false),
       subscribers: creator?.subscriberCount ?? 0,
+      liked: mine.contains(InteractionTypes.like),
+      saved: mine.contains(InteractionTypes.favorite),
     );
   }
 

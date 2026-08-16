@@ -41,6 +41,10 @@ abstract final class ApiEndpoints {
   static String publicDevotionalSeries(String id) =>
       '/v1/public/content/devotionals/series/$id';
 
+  /// Marks a day read. Optional auth on the read routes, required here.
+  static String devotionalEntryProgress(String entryId) =>
+      '/v1/public/content/devotionals/entries/$entryId/progress';
+
   static String publicEvent(String id) => '/v1/public/content/events/$id';
 
   static const contentSuggestions = '/v1/discovery/content-suggestions';
@@ -83,7 +87,23 @@ abstract final class ApiEndpoints {
       '$_media/live/streams/$mediaId/playback-token';
 
   static const interactions = '/v1/engagement/interactions';
+
+  /// GET with `targetType` and a comma-separated `targetIds`. The integration
+  /// guide lists this as a POST; staging only answers GET.
+  static const myInteractionsBatch = '/v1/engagement/interactions/me/batch';
   static const publicComments = '/v1/public/engagement/comments';
+
+  static String publicCommentReplies(String commentId) =>
+      '/v1/public/engagement/comments/$commentId/replies';
+
+  /// Writing needs a session; reading does not.
+  static const comments = '/v1/engagement/comments';
+
+  static String commentVote(String commentId) =>
+      '/v1/engagement/comments/$commentId/vote';
+
+  static String comment(String commentId) =>
+      '/v1/engagement/comments/$commentId';
 
   static const beacons = '/v1/analytics/beacons';
   static const beaconsAuth = '/v1/analytics/beacons/auth';

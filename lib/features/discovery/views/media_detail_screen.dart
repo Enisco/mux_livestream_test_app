@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
+import 'package:test_app/core/locator.dart';
+import 'package:test_app/features/discovery/views/widgets/audio_hero.dart';
+import 'package:test_app/features/engagement/views/comments_sheet.dart';
+import 'package:test_app/features/discovery/views/widgets/video_hero.dart';
+import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
@@ -10,7 +15,6 @@ import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
-import 'package:test_app/features/player/views/player_screen.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -18,10 +22,9 @@ import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
-import 'package:test_app/shared/components/app_icons.dart';
-import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/utils/app_constants/app_styles.dart';
 
 class MediaDetailScreen extends StatefulWidget {
   const MediaDetailScreen({
@@ -39,6 +42,16 @@ class MediaDetailScreen extends StatefulWidget {
 }
 
 class _MediaDetailScreenState extends State<MediaDetailScreen> {
+  final _playback = getIt<PlaybackController>();
+
+  /// Measures the hero so the comments sheet can stop exactly below it. Video
+  /// and audio heroes are different heights, so this is measured, not assumed.
+  final _heroKey = GlobalKey();
+
+  /// Starts from the detail aggregate's inline batch, then grows by page.
+  List<WebFeedItem> _suggestions = const [];
+  String? _suggestionsCursor;
+  bool _loadingSuggestions = false;
   final _repo = GetIt.instance<DiscoveryRepo>();
   final _engagementRepo = GetIt.instance<EngagementRepo>();
 
@@ -84,6 +97,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       if (!mounted) return;
       setState(() {
         _detail = detail;
+        _suggestions = detail.suggestions;
+        // The aggregate carries no cursor, so a full page inline means there is
+        // probably more; the route itself confirms when asked.
+        _suggestionsCursor = detail.suggestions.isEmpty ? null : 'start';
         _loading = false;
         _hasLiked = detail.viewer?.hasLiked ?? false;
         _hasSaved = detail.viewer?.hasSaved ?? false;
@@ -221,6 +238,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       ? _detail!.media.id
       : widget.item.entityId;
 
+  /// Everything a playback beacon needs about what is on this screen.
+  PlaybackTarget get _target => PlaybackTarget(
+    mediaId: _mediaId,
+    creatorId:
+        _detail?.creator?.creatorId ?? widget.item.creator?.creatorId ?? '',
+    mediaType: _mediaType,
+    source: widget.source,
+  );
+
   String? get _mediaType =>
       _detail?.playback?.mediaType ??
       MediaTypes.normalize(_detail?.media.type) ??
@@ -229,6 +255,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   void _openSuggestion(WebFeedItem suggestion) {
     GetIt.instance<AnalyticsService>().trackContentClick(
       mediaId: suggestion.entityId,
+      contentType: ContentTypes.fromEntityType(suggestion.entityType),
       creatorId: suggestion.creator?.creatorId ?? '',
       mediaType: suggestion.mediaType,
       source: AnalyticsSource.suggestedContent,
@@ -241,32 +268,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     );
   }
 
-  void _openPlayer() {
-    final url = _detail?.playback?.playbackUrl;
-    if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Playback not available')));
-      return;
-    }
-    final title = _detail?.media.title.isNotEmpty == true
-        ? _detail!.media.title
-        : widget.item.title;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PlayerScreen.network(
-          networkUrl: url,
-          title: title,
-          mediaId: _mediaId,
-          creatorId: _detail?.creator?.creatorId,
-          mediaType: _mediaType,
-          source: widget.source,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // The design has no app bar — the back arrow floats over the hero.
@@ -275,101 +276,67 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHero(),
-              if (_loading)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: 64.s),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.brandPrimary,
-                    ),
-                  ),
-                )
-              else if (_error != null)
-                _buildError()
-              else
-                _buildInfo(),
-            ],
-          ),
+        // The hero sits outside the scroll view so the page slides beneath it
+        // and playback is never interrupted by the reader reading on.
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            KeyedSubtree(key: _heroKey, child: _buildHero()),
+            Expanded(
+              child: SingleChildScrollView(
+                child: _loading
+                    ? Padding(
+                        padding: EdgeInsets.symmetric(vertical: 64.s),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.brandPrimary,
+                          ),
+                        ),
+                      )
+                    : _error != null
+                    ? _buildError()
+                    : _buildInfo(),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHero() {
-    final thumbnailUrl =
-        _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl;
-    final canPlay = _detail?.playback?.playbackUrl.isNotEmpty == true;
+  /// The hero's laid-out height, or null before it has been measured.
+  double? get _heroHeight {
+    final box = _heroKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return null;
+    return box.size.height;
+  }
 
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(color: AppColors.surfaceVariant),
-          if (thumbnailUrl != null)
-            Image.network(
-              thumbnailUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              loadingBuilder: (_, child, progress) =>
-                  progress == null ? child : const SizedBox.shrink(),
-            ),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0.5, 1.0],
-                colors: [Colors.transparent, Colors.black54],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 15.s,
-            top: MediaQuery.paddingOf(context).top + 12.s,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).maybePop(),
-              child: SizedBox(
-                width: 32.s,
-                height: 32.s,
-                child: const Center(
-                  child: HugeIcon(
-                    icon: AppIcons.back,
-                    color: AppColors.textPrimary,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (canPlay)
-            Center(
-              child: GestureDetector(
-                onTap: _openPlayer,
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white30, width: 1.5),
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 38,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+  Widget _buildHero() {
+    // Audio gets its own listening layout — a 16:9 frame with a play overlay
+    // would be a video screen wearing a track's name.
+    if (_mediaType == MediaTypes.music) {
+      return AudioHero(
+        playback: _playback,
+        target: _target,
+        title: _detail?.media.title.isNotEmpty == true
+            ? _detail!.media.title
+            : widget.item.title,
+        creatorName:
+            _detail?.creator?.displayName ?? widget.item.creatorDisplayName,
+        artworkUrl:
+            _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
+        playbackUrl: _detail?.playback?.playbackUrl,
+      );
+    }
+
+    return VideoHero(
+      playback: _playback,
+      target: _target,
+      videoController: _playback.videoController,
+      playbackUrl: _detail?.playback?.playbackUrl,
+      thumbnailUrl:
+          _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
+      onBack: () => Navigator.of(context).maybePop(),
     );
   }
 
@@ -432,12 +399,20 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 count: media.comments,
                 topComment: top?.body,
                 topCommentAuthor: top?.author?.displayName,
+                topCommentCreatedAt: top?.createdAt,
+                onOpen: () => openComments(
+                  context,
+                  targetType: InteractionTargets.media,
+                  targetId: _mediaId,
+                  initialCount: media.comments,
+                  topInset: _heroHeight,
+                ),
               ),
             ],
           ),
         ),
         const DetailDivider(),
-        if (detail.suggestions.isNotEmpty) _buildUpNext(detail),
+        if (_suggestions.isNotEmpty) _buildUpNext(),
         SizedBox(height: 32.s),
       ],
     );
@@ -466,7 +441,35 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
   Widget _buildError() => ErrorStateView(onRetry: _fetchDetail);
 
-  Widget _buildUpNext(MediaDetailData detail) {
+  /// Pulls another page of "Up next".
+  ///
+  /// The detail aggregate returns a first batch inline; anything past that comes
+  /// from the suggestions route, which is the only way to see more than ten.
+  Future<void> _loadMoreSuggestions() async {
+    if (_loadingSuggestions || _suggestionsCursor == null) return;
+    setState(() => _loadingSuggestions = true);
+    try {
+      final page = await _repo.fetchContentSuggestions(
+        targetType: 'media',
+        targetId: _mediaId,
+        // 'start' is our own marker for "inline batch only, never paged yet".
+        cursor: _suggestionsCursor == 'start' ? null : _suggestionsCursor,
+        // Never re-offer something already on the list, or the media itself.
+        excludeEntityIds: [_mediaId, ..._suggestions.map((s) => s.entityId)],
+      );
+      if (!mounted) return;
+      setState(() {
+        _suggestions = [..._suggestions, ...page.items];
+        _suggestionsCursor = page.nextCursor;
+        _loadingSuggestions = false;
+      });
+    } catch (e) {
+      logger.w('Up next page failed', error: e);
+      if (mounted) setState(() => _loadingSuggestions = false);
+    }
+  }
+
+  Widget _buildUpNext() {
     return Padding(
       padding: EdgeInsets.fromLTRB(16.s, 18.s, 16.s, 0),
       child: Column(
@@ -474,12 +477,13 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         children: [
           const DetailSectionHeading(AppStrings.upNext),
           SizedBox(height: 18.s),
-          for (final s in detail.suggestions)
+          for (final s in _suggestions)
             Padding(
               padding: EdgeInsets.only(bottom: 18.s),
               child: PromotedImpressionTracker(
                 promotion: s.promotion,
                 mediaId: s.entityId,
+                contentType: ContentTypes.fromEntityType(s.entityType),
                 creatorId: s.creator?.creatorId ?? '',
                 mediaType: s.mediaType,
                 source: AnalyticsSource.suggestedContent,
@@ -492,9 +496,36 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                     context,
                     creatorId: s.profileCreatorId,
                   ),
+                  playback: _playback,
+                  source: AnalyticsSource.suggestedContent,
                 ),
               ),
             ),
+          if (_suggestionsCursor != null) ...[
+            SizedBox(height: 8.s),
+            Center(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _loadMoreSuggestions,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 22.s,
+                    vertical: 11.s,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22.s),
+                    border: Border.all(color: AppColors.neutral700),
+                  ),
+                  child: Text(
+                    _loadingSuggestions
+                        ? AppStrings.loading
+                        : AppStrings.showMore,
+                    style: AppStyles.label(13),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

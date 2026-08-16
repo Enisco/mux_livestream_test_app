@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/empty_tab_views.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -15,6 +20,7 @@ import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
+import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
@@ -34,13 +40,20 @@ class HomeFeedScreen extends StatefulWidget {
   State<HomeFeedScreen> createState() => _HomeFeedScreenState();
 }
 
-class _HomeFeedScreenState extends State<HomeFeedScreen> {
+class _HomeFeedScreenState extends State<HomeFeedScreen>
+    with WidgetsBindingObserver {
   final _repo = getIt<DiscoveryRepo>();
+  final _playback = getIt<PlaybackController>();
+  final _engagement = getIt<EngagementRepo>();
   final _scroll = ScrollController();
+  late final _autoplay = FeedAutoplayCoordinator(playback: _playback);
 
   late HomeTab _tab = widget.initialTab;
   String? _topic;
   List<WebFeedItem> _items = const [];
+
+  /// The viewer's own like/save state, keyed by entity id. Empty for guests.
+  Map<String, Set<String>> _interactions = const {};
   String? _cursor;
   bool _loading = false;
   bool _loadingMore = false;
@@ -67,19 +80,61 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_onScroll);
     _init();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autoplay.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Nothing should autoplay behind a locked screen or another app; audio the
+    // reader started is left alone, since that is the one thing meant to keep
+    // going in the background.
+    if (state == AppLifecycleState.resumed) {
+      _autoplay.resume();
+    } else {
+      _autoplay.suspend();
+    }
   }
 
   Future<void> _init() async {
     _authed = await getIt<TokenStorageService>().hasSession;
     if (mounted) await _load();
+  }
+
+  /// Fills in like/save state for rows just loaded.
+  ///
+  /// The feed payload does not carry the viewer's own interactions, so without
+  /// this every card renders unliked until its detail screen is opened.
+  Future<void> _hydrateInteractions(List<WebFeedItem> rows) async {
+    if (!_authed || rows.isEmpty) return;
+
+    final byType = <String, List<String>>{};
+    for (final row in rows) {
+      final target = InteractionTargets.fromEntityType(row.entityType);
+      if (target == null) continue;
+      (byType[target] ??= []).add(row.entityId);
+    }
+    if (byType.isEmpty) return;
+
+    final merged = <String, Set<String>>{..._interactions};
+    for (final entry in byType.entries) {
+      merged.addAll(
+        await _engagement.fetchMyInteractions(
+          targetType: entry.key,
+          targetIds: entry.value,
+        ),
+      );
+    }
+    if (mounted) setState(() => _interactions = merged);
   }
 
   void _onScroll() {
@@ -89,10 +144,17 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   /// Following needs a session; guests only ever get the public feed.
+  ///
+  /// `following_only` is rejected outright without auth ("Following feed
+  /// requires authentication"), so it is never sent for a guest — the tab shows
+  /// its empty state instead, which is where signing in is offered.
   String get _mode => switch (_tab) {
-    HomeTab.following => 'following_only',
+    HomeTab.following when _authed => 'following_only',
     _ => _authed ? 'mixed' : 'explore_only',
   };
+
+  /// Whether this tab has anything to ask the API for.
+  bool get _canQueryTab => _tab != HomeTab.following || _authed;
 
   /// The Live tab is the same feed restricted to what is broadcasting now.
   bool get _liveOnly => _tab == HomeTab.live;
@@ -110,6 +172,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
       _loading = true;
       _failed = false;
     });
+    if (!_canQueryTab) {
+      setState(() {
+        _items = const [];
+        _cursor = null;
+        _loading = false;
+      });
+      await _loadEmptyCompanions();
+      return;
+    }
     try {
       final result = await _repo.fetchWebFeed(
         mode: _mode,
@@ -125,6 +196,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         _loading = false;
       });
       if (result.items.isEmpty) await _loadEmptyCompanions();
+      unawaited(_hydrateInteractions(result.items));
     } catch (e) {
       logger.e('Home feed load failed', error: e);
       if (!mounted) return;
@@ -139,7 +211,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   /// ministries to follow, Live lists what is coming up.
   Future<void> _loadEmptyCompanions() async {
     try {
-      if (_tab == HomeTab.following && _authed && _suggestions.isEmpty) {
+      if (_tab == HomeTab.following && _suggestions.isEmpty) {
         final creators = await _repo.fetchRecommendedCreators();
         if (mounted) setState(() => _suggestions = creators);
       } else if (_tab == HomeTab.live && _upcoming.isEmpty) {
@@ -152,7 +224,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || _loading || _cursor == null) return;
+    if (_loadingMore || _loading || _cursor == null || !_canQueryTab) return;
     _loadingMore = true;
     try {
       final result = await _repo.fetchWebFeed(
@@ -168,6 +240,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
         _items = [..._items, ...result.items];
         _cursor = result.nextCursor;
       });
+      unawaited(_hydrateInteractions(result.items));
     } catch (e) {
       logger.w('Home feed page failed', error: e);
     } finally {
@@ -228,6 +301,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
   void _openItem(WebFeedItem item) {
     GetIt.instance<AnalyticsService>().trackContentClick(
       mediaId: item.entityId,
+      contentType: ContentTypes.fromEntityType(item.entityType),
       creatorId: item.creator?.creatorId ?? '',
       mediaType: item.mediaType,
       source: AnalyticsSource.homeFeed,
@@ -289,7 +363,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
           }
           final item = _items[index];
           final card = FeedCard(
-            data: FeedCardMapper.toCardData(item),
+            data: FeedCardMapper.toCardData(item, interactions: _interactions),
             // A channel row IS the creator, so its body opens the profile.
             onTap: () => item.isCreatorRow
                 ? openCreatorProfile(context, creatorId: item.profileCreatorId)
@@ -301,10 +375,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> {
             onSave: () => _requireAccount('save this'),
             onComment: () => _openItem(item),
             onMore: () => _requireAccount('use that'),
+            playback: _playback,
+            coordinator: _autoplay,
+            videoController: _playback.videoController,
+            source: AnalyticsSource.homeFeed,
           );
 
           return PromotedImpressionTracker(
             mediaId: item.entityId,
+            contentType: ContentTypes.fromEntityType(item.entityType),
             creatorId: item.creator?.creatorId ?? '',
             mediaType: item.mediaType,
             source: AnalyticsSource.homeFeed,

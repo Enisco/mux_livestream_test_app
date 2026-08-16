@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/models/auth_models/auth_models.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/connectivity_service.dart';
@@ -82,6 +84,7 @@ class AnalyticsService with WidgetsBindingObserver {
   void trackViewStarted({
     required String mediaId,
     required String creatorId,
+    String? contentType,
     String? mediaType,
     String source = AnalyticsSource.unknown,
     double positionSeconds = 0,
@@ -90,6 +93,7 @@ class AnalyticsService with WidgetsBindingObserver {
       eventType: AnalyticsEventType.viewStarted,
       mediaId: mediaId,
       creatorId: creatorId,
+      contentType: contentType,
       mediaType: mediaType,
       source: source,
       positionSeconds: positionSeconds,
@@ -192,6 +196,7 @@ class AnalyticsService with WidgetsBindingObserver {
   void trackCompletion({
     required String mediaId,
     required String creatorId,
+    String? contentType,
     String? mediaType,
     double positionSeconds = 0,
     double? watchDurationSeconds,
@@ -202,6 +207,7 @@ class AnalyticsService with WidgetsBindingObserver {
         eventType: AnalyticsEventType.completion,
         mediaId: mediaId,
         creatorId: creatorId,
+        contentType: contentType,
         mediaType: mediaType,
         source: source,
         positionSeconds: positionSeconds,
@@ -213,6 +219,7 @@ class AnalyticsService with WidgetsBindingObserver {
   void trackImpression({
     required String mediaId,
     required String creatorId,
+    String? contentType,
     String? mediaType,
     String source = AnalyticsSource.unknown,
   }) => _enqueue(
@@ -220,6 +227,7 @@ class AnalyticsService with WidgetsBindingObserver {
       eventType: AnalyticsEventType.impression,
       mediaId: mediaId,
       creatorId: creatorId,
+      contentType: contentType,
       mediaType: mediaType,
       source: source,
     ),
@@ -228,6 +236,7 @@ class AnalyticsService with WidgetsBindingObserver {
   void trackContentClick({
     required String mediaId,
     required String creatorId,
+    String? contentType,
     String? mediaType,
     required String source,
     PromotionAttribution? promotion,
@@ -237,6 +246,7 @@ class AnalyticsService with WidgetsBindingObserver {
         eventType: AnalyticsEventType.click,
         mediaId: mediaId,
         creatorId: creatorId,
+        contentType: contentType,
         mediaType: mediaType,
         source: source,
       ),
@@ -249,6 +259,7 @@ class AnalyticsService with WidgetsBindingObserver {
           eventType: AnalyticsEventType.promotionClick,
           mediaId: mediaId,
           creatorId: creatorId,
+          contentType: contentType,
           mediaType: mediaType,
           source: source,
           promotion: promotion,
@@ -441,6 +452,7 @@ class AnalyticsService with WidgetsBindingObserver {
     required String eventType,
     required String mediaId,
     required String creatorId,
+    String? contentType,
     String? mediaType,
     required String source,
     double? positionSeconds,
@@ -450,10 +462,19 @@ class AnalyticsService with WidgetsBindingObserver {
     String? eventId,
   }) {
     final normalizedType = MediaTypes.normalize(mediaType);
+    // Exactly one target. A post id sent as `mediaId` is not just mislabelled —
+    // it attaches the event to whatever media happens to share that id.
+    final isContent =
+        contentType != null && ContentTypes.all.contains(contentType);
     return {
       'eventId': eventId ?? _uuid.v4(),
-      'mediaId': mediaId,
-      'mediaType': ?normalizedType,
+      if (isContent) ...{
+        'contentType': contentType,
+        'contentId': mediaId,
+      } else ...{
+        'mediaId': mediaId,
+        'mediaType': ?normalizedType,
+      },
       'creatorId': creatorId,
       'eventType': eventType,
       'occurredAt': DateTime.now().toUtc().toIso8601String(),
@@ -462,9 +483,14 @@ class AnalyticsService with WidgetsBindingObserver {
       'source': AnalyticsSource.normalize(source),
       if (promotion != null) ...promotion.toBeaconFields(),
       'visibleDurationMs': ?visibleDurationMs,
+      // A viewer is authenticated or anonymous, never both. A signed-in viewer
+      // must not be labelled anonymous, but the client cannot name them either:
+      // ingest validates `authenticatedUserId` as a UUID and this platform's
+      // user ids are ObjectIds (see docs/OPEN_ISSUES.md). The authenticated
+      // ingest route carries the bearer token, so the server attributes them.
       'identity': {
         'sessionId': _session.analyticsSessionId,
-        'anonymousViewerId': _session.anonymousViewerId,
+        if (!_isSignedIn) 'anonymousViewerId': _session.anonymousViewerId,
       },
       'client': {
         'platform': _deviceInfo.platform,
@@ -474,6 +500,13 @@ class AnalyticsService with WidgetsBindingObserver {
       },
     };
   }
+
+  /// Whether a viewer is signed in, read from the cached user.
+  bool get _isSignedIn =>
+      GtubeUser.fromJsonString(
+        LocalStorage.getString(LocalStorage.cachedUserKey),
+      )?.id.isNotEmpty ??
+      false;
 
   String _deterministicEventId(String name) =>
       _uuid.v5(Namespace.url.value, name);

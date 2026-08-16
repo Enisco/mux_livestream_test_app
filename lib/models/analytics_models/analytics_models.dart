@@ -63,6 +63,46 @@ abstract final class MediaTypes {
       raw != null && all.contains(raw) ? raw : null;
 }
 
+/// What a beacon points at.
+///
+/// The contract allows exactly one target: media beacons carry `mediaId`, and
+/// everything else carries `contentType` + `contentId`. Sending both, or the
+/// wrong one, is rejected at ingest.
+abstract final class ContentTypes {
+  static const creator = 'creator';
+  static const mediaSeries = 'media_series';
+  static const post = 'post';
+  static const devotionalSeries = 'devotional_series';
+  static const devotionalEntry = 'devotional_entry';
+  static const calendarEvent = 'calendar_event';
+
+  /// The gateway's enum, verified against staging. Anything outside it is
+  /// rejected for the whole batch, so unknown rows must not be guessed at.
+  static const all = {
+    creator,
+    mediaSeries,
+    post,
+    devotionalSeries,
+    devotionalEntry,
+    calendarEvent,
+  };
+
+  /// Maps a discovery feed `entityType` onto a beacon content type.
+  ///
+  /// Returns null for `media`, which is targeted by `mediaId` instead, and for
+  /// anything unrecognised.
+  static String? fromEntityType(String? entityType) => switch (entityType) {
+    'creator' || 'user' => creator,
+    'media_series' => mediaSeries,
+    'post' => post,
+    'devotional_series' => devotionalSeries,
+    'devotional_entry' => devotionalEntry,
+    // The feed says `event`; the beacon enum says `calendar_event`.
+    'event' || 'calendar_event' => calendarEvent,
+    _ => null,
+  };
+}
+
 abstract final class PromotionPlacement {
   static const catalogue = 'catalogue';
   static const verticalFeed = 'vertical_feed';

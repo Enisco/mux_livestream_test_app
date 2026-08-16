@@ -12,6 +12,7 @@ import 'package:test_app/features/discovery/views/media_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/discovery/views/widgets/markdown_body.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount, relativeAge;
 import 'package:test_app/models/analytics_models/analytics_models.dart';
@@ -19,6 +20,8 @@ import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/content_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/services/analytics_service.dart';
+import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/shared/components/app_icons.dart';
@@ -40,19 +43,23 @@ void openContentDetail(
     'post' => (BuildContext _) => ContentDetailScreen(
       item: item,
       kind: ContentDetailKind.post,
+      source: source,
     ),
     'devotional_series' => (BuildContext _) => ContentDetailScreen(
       item: item,
       kind: ContentDetailKind.devotional,
+      source: source,
     ),
     'event' => (BuildContext _) => ContentDetailScreen(
       item: item,
       kind: ContentDetailKind.event,
+      source: source,
     ),
     // A devotional entry belongs to its series; open the series.
     'devotional_entry' => (BuildContext _) => ContentDetailScreen(
       item: item,
       kind: ContentDetailKind.devotional,
+      source: source,
       overrideId: item.meta.seriesId,
     ),
     _ => (BuildContext _) => MediaDetailScreen(item: item, source: source),
@@ -71,10 +78,14 @@ class ContentDetailScreen extends StatefulWidget {
     required this.item,
     required this.kind,
     this.overrideId,
+    this.source = AnalyticsSource.unknown,
   });
 
   final WebFeedItem item;
   final ContentDetailKind kind;
+
+  /// Where the reader came from, carried into this page's beacons.
+  final String source;
 
   /// A devotional entry opens its parent series.
   final String? overrideId;
@@ -103,6 +114,13 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
 
   String get _id => widget.overrideId ?? widget.item.entityId;
 
+  bool _reported = false;
+  bool _authed = false;
+
+  /// Mirrors `viewerProgress.completedEntryIds`, updated as days are marked.
+  Set<String> _completedEntryIds = const {};
+  String? _markingEntryId;
+
   /// The interaction API names these differently from the feed's entityType.
   String get _targetType => switch (widget.kind) {
     ContentDetailKind.post => 'post',
@@ -113,7 +131,56 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _init();
+  }
+
+  Future<void> _init() async {
+    _authed = await GetIt.instance<TokenStorageService>().hasSession;
+    if (mounted) await _load();
+  }
+
+  /// Marks a devotional day read.
+  ///
+  /// The API records completion but has no route to undo it, so an already-read
+  /// day is left alone rather than pretending it can be cleared.
+  Future<void> _markDayRead(
+    DevotionalSeriesDetail series,
+    DevotionalEntry entry,
+  ) async {
+    if (_markingEntryId != null || _completedEntryIds.contains(entry.id)) {
+      return;
+    }
+    setState(() => _markingEntryId = entry.id);
+    try {
+      await _repo.setDevotionalEntryProgress(entry.id);
+      if (!mounted) return;
+      final next = {..._completedEntryIds, entry.id};
+      setState(() {
+        _completedEntryIds = next;
+        _markingEntryId = null;
+      });
+
+      final analytics = GetIt.instance<AnalyticsService>();
+      final creatorId = _creator?.id ?? widget.item.profileCreatorId ?? '';
+      analytics.trackCompletion(
+        mediaId: entry.id,
+        creatorId: creatorId,
+        contentType: ContentTypes.devotionalEntry,
+        source: widget.source,
+      );
+      // Finishing the last published day completes the series too.
+      if (next.length >= series.entryCount) {
+        analytics.trackCompletion(
+          mediaId: series.id,
+          creatorId: creatorId,
+          contentType: ContentTypes.devotionalSeries,
+          source: widget.source,
+        );
+      }
+    } catch (e) {
+      logger.w('Marking devotional day read failed', error: e);
+      if (mounted) setState(() => _markingEntryId = null);
+    }
   }
 
   Future<void> _load() async {
@@ -130,6 +197,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           _saves = post.engagement.favorites;
         case ContentDetailKind.devotional:
           final series = await _repo.fetchDevotionalSeries(_id);
+          _completedEntryIds = series.completedEntryIds.toSet();
           _devotional = series;
           _likes = series.engagement.likes;
           _saves = series.engagement.favorites;
@@ -140,6 +208,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           _saves = event.engagement.favorites;
       }
       if (mounted) setState(() => _loading = false);
+      _reportOpened();
       unawaited(_resolveCreator());
     } catch (e) {
       logger.e('Content detail (${widget.kind.name}) failed', error: e);
@@ -149,6 +218,33 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
         _failed = true;
       });
     }
+  }
+
+  /// Reader-side beacons: the page is on screen (`impression`), and the body
+  /// it was opened for is available to read (`view_started`).
+  ///
+  /// Content entities are targeted by `contentType` + `contentId`; sending a
+  /// post id as `mediaId` would attach the event to unrelated media.
+  void _reportOpened() {
+    if (_reported) return;
+    final contentType = ContentTypes.fromEntityType(widget.item.entityType);
+    if (contentType == null) return;
+    _reported = true;
+
+    final analytics = GetIt.instance<AnalyticsService>();
+    final creatorId = _creator?.id ?? widget.item.profileCreatorId ?? '';
+    analytics.trackImpression(
+      mediaId: _id,
+      creatorId: creatorId,
+      contentType: contentType,
+      source: widget.source,
+    );
+    analytics.trackViewStarted(
+      mediaId: _id,
+      creatorId: creatorId,
+      contentType: contentType,
+      source: widget.source,
+    );
   }
 
   /// Library rows carry only a creatorId, so the header would otherwise show
@@ -270,7 +366,15 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                 SizedBox(height: 20.s),
                 ..._typeBody(),
                 SizedBox(height: 24.s),
-                DetailCommentsPreview(count: _comments),
+                DetailCommentsPreview(
+                  count: _comments,
+                  onOpen: () => openComments(
+                    context,
+                    targetType: _targetType,
+                    targetId: _id,
+                    initialCount: _comments,
+                  ),
+                ),
                 SizedBox(height: 40.s),
               ],
             ),
@@ -369,8 +473,10 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
       for (final entry in series.entries)
         _DayRow(
           entry: entry,
-          completed: series.isCompleted(entry.id),
+          completed: _completedEntryIds.contains(entry.id),
           current: series.currentEntryId == entry.id,
+          busy: _markingEntryId == entry.id,
+          onToggle: _authed ? () => _markDayRead(series, entry) : null,
         ),
     ];
   }
@@ -449,11 +555,18 @@ class _DayRow extends StatelessWidget {
     required this.entry,
     required this.completed,
     required this.current,
+    this.onToggle,
+    this.busy = false,
   });
 
   final DevotionalEntry entry;
   final bool completed;
   final bool current;
+
+  /// Marks the day read. Null for signed-out readers, whose progress the API
+  /// will not store.
+  final VoidCallback? onToggle;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +619,73 @@ class _DayRow extends StatelessWidget {
               ],
             ),
           ),
+          if (onToggle != null) ...[
+            SizedBox(width: 8.s),
+            _DayCheck(completed: completed, busy: busy, onTap: onToggle!),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// The read/unread control on a devotional day.
+///
+/// Deliberately a small tick rather than a button: the row already carries the
+/// day number and title, and the design keeps the list quiet.
+class _DayCheck extends StatelessWidget {
+  const _DayCheck({
+    required this.completed,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final bool completed;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: busy ? null : onTap,
+      child: SizedBox(
+        width: 32.s,
+        height: 32.s,
+        child: Center(
+          child: busy
+              ? SizedBox(
+                  width: 16.s,
+                  height: 16.s,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.brandPrimary,
+                  ),
+                )
+              : Container(
+                  width: 22.s,
+                  height: 22.s,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: completed ? AppColors.green500 : Colors.transparent,
+                    border: Border.all(
+                      color: completed
+                          ? AppColors.green500
+                          : AppColors.neutral700,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: completed
+                      ? const Center(
+                          child: HugeIcon(
+                            icon: AppIcons.tick,
+                            size: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        )
+                      : null,
+                ),
+        ),
       ),
     );
   }

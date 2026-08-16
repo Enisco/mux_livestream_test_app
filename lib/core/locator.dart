@@ -7,11 +7,13 @@ import 'package:test_app/features/creator/services/checkout_handoff_service.dart
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
+import 'package:test_app/shared/services/analytics_playback_reporter.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/connectivity_service.dart';
 import 'package:test_app/shared/services/device_info_service.dart';
+import 'package:test_app/shared/services/media_url_resolver.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/shared/services/playback_info_cache.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
@@ -60,7 +62,28 @@ Future<void> setupLocator() async {
       connectivity: getIt<ConnectivityService>(),
     ),
   );
-  getIt.registerLazySingleton<PlaybackController>(() => PlaybackController());
+  getIt.registerLazySingleton<MediaUrlResolver>(
+    () => MediaUrlResolver(
+      cache: getIt<PlaybackInfoCache>(),
+      fetch: (id) async {
+        // The authenticated playback route 401s for a guest; the public one
+        // serves the same signed URL without a session.
+        final authed = await getIt<TokenStorageService>().hasSession;
+        return getIt<DiscoveryRepo>().fetchPlaybackInfo(
+          id,
+          clientSessionId: getIt<AppSessionService>().clientSessionId,
+          usePublicRoute: !authed,
+        );
+      },
+    ),
+  );
+
+  getIt.registerLazySingleton<PlaybackController>(
+    () => PlaybackController(
+      resolveUrl: getIt<MediaUrlResolver>().call,
+      reporter: AnalyticsPlaybackReporter(getIt<AnalyticsService>()),
+    ),
+  );
   getIt.registerLazySingleton<PlaybackInfoCache>(() => PlaybackInfoCache());
   getIt.registerLazySingleton<VerticalFeedPreloader>(
     () => VerticalFeedPreloader(

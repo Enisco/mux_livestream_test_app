@@ -8,7 +8,7 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
-import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
+import 'package:test_app/features/discovery/views/search_screen.dart';
 import 'package:test_app/features/home/views/home_feed_screen.dart';
 import 'package:test_app/features/home/views/home_screen.dart';
 import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
@@ -43,10 +43,7 @@ class _MainShellState extends State<MainShell> {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          fullscreenDialog: true,
-          builder: (_) => const VerticalFeedScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const SearchScreen()),
       );
       return;
     }

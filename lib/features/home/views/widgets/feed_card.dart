@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:sizing/sizing.dart';
+import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/features/home/views/widgets/feed_video_surface.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/duration_format.dart';
 
 enum FeedCardKind {
   video,
@@ -23,6 +29,7 @@ class FeedCardData {
     required this.id,
     required this.kind,
     required this.creatorName,
+    this.creatorId = '',
     required this.handle,
     required this.age,
     this.title,
@@ -51,6 +58,9 @@ class FeedCardData {
   final String id;
   final FeedCardKind kind;
   final String creatorName;
+
+  /// Needed by analytics beacons; blank when the row does not carry one.
+  final String creatorId;
   final String handle;
 
   final String age;
@@ -102,6 +112,10 @@ class FeedCard extends StatelessWidget {
     this.onSave,
     this.onComment,
     this.onMore,
+    this.playback,
+    this.coordinator,
+    this.videoController,
+    this.source = AnalyticsSource.unknown,
   });
 
   final FeedCardData data;
@@ -112,6 +126,21 @@ class FeedCard extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onComment;
   final VoidCallback? onMore;
+
+  /// Supplied by the screen so audio cards can play in place. Left null in
+  /// surfaces that only show cards (search results, previews).
+  final PlaybackHandle? playback;
+
+  /// Decides whether this card is the one on screen enough to autoplay. Left
+  /// null outside the home feeds, where nothing autoplays.
+  final FeedAutoplayCoordinator? coordinator;
+
+  /// Renders video frames. Only the concrete controller can, so this stays off
+  /// [PlaybackHandle].
+  final VideoController? videoController;
+
+  /// The surface this card lives on, carried into every playback beacon.
+  final String source;
 
   @override
   Widget build(BuildContext context) {
@@ -146,6 +175,10 @@ class FeedCard extends StatelessWidget {
                   onComment: onComment,
                   onMore: onMore,
                   onOpen: onTap,
+                  playback: playback,
+                  coordinator: coordinator,
+                  videoController: videoController,
+                  source: source,
                 ),
         ),
       ),
@@ -163,6 +196,10 @@ class _StandardBody extends StatelessWidget {
     this.onComment,
     this.onMore,
     this.onOpen,
+    this.playback,
+    this.coordinator,
+    this.videoController,
+    this.source = AnalyticsSource.unknown,
   });
 
   final FeedCardData data;
@@ -173,6 +210,10 @@ class _StandardBody extends StatelessWidget {
   final VoidCallback? onComment;
   final VoidCallback? onMore;
   final VoidCallback? onOpen;
+  final PlaybackHandle? playback;
+  final FeedAutoplayCoordinator? coordinator;
+  final VideoController? videoController;
+  final String source;
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +233,11 @@ class _StandardBody extends StatelessWidget {
             border: Border(bottom: BorderSide(color: AppColors.neutral800)),
           ),
           child: switch (data.kind) {
-            FeedCardKind.audio => _AudioStrip(data: data),
+            FeedCardKind.audio => _AudioStrip(
+              data: data,
+              playback: playback,
+              source: source,
+            ),
             FeedCardKind.event => _EventBody(data: data, onRsvp: onOpen),
             FeedCardKind.blog => _BlogBody(data: data, onOpen: onOpen),
             FeedCardKind.devotional => _DevotionalBody(
@@ -200,7 +245,13 @@ class _StandardBody extends StatelessWidget {
               onStart: onOpen,
             ),
             FeedCardKind.series => _MediaBlock(data: data),
-            _ => _MediaAndTitle(data: data),
+            _ => _MediaAndTitle(
+              data: data,
+              playback: playback,
+              coordinator: coordinator,
+              videoController: videoController,
+              source: source,
+            ),
           },
         ),
         SizedBox(height: 12.s),
@@ -438,9 +489,19 @@ class _MoreButton extends StatelessWidget {
 }
 
 class _MediaBlock extends StatelessWidget {
-  const _MediaBlock({required this.data});
+  const _MediaBlock({
+    required this.data,
+    this.playback,
+    this.coordinator,
+    this.videoController,
+    this.source = AnalyticsSource.unknown,
+  });
 
   final FeedCardData data;
+  final PlaybackHandle? playback;
+  final FeedAutoplayCoordinator? coordinator;
+  final VideoController? videoController;
+  final String source;
 
   static const _aspect = 338 / 195;
 
@@ -453,21 +514,32 @@ class _MediaBlock extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            ColoredBox(
-              color: AppColors.neutral900,
-              child: data.thumbnailUrl == null || data.thumbnailUrl!.isEmpty
-                  ? null
-                  : Image.network(
-                      data.thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    ),
-            ),
+            // Only true video autoplays; a live card has its own flow and the
+            // rest are stills.
+            if (data.kind == FeedCardKind.video)
+              FeedVideoSurface(
+                target: PlaybackTarget(
+                  mediaId: data.id,
+                  creatorId: data.creatorId,
+                  mediaType: MediaTypes.video,
+                  source: source,
+                ),
+                playback: playback,
+                coordinator: coordinator,
+                videoController: videoController,
+                child: _Thumbnail(url: data.thumbnailUrl),
+              )
+            else
+              _Thumbnail(url: data.thumbnailUrl),
             if (data.duration case final duration?)
               Positioned(
                 left: 9.s,
                 bottom: 9.s,
-                child: _Pill(label: duration),
+                child: _DurationPill(
+                  mediaId: data.id,
+                  fallback: duration,
+                  playback: playback,
+                ),
               ),
             if (data.planLabel case final plan?)
               Positioned(
@@ -493,6 +565,62 @@ class _MediaBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shows how far into the video the card has got, once it is the one playing.
+///
+/// A card can be playing and still look like a still — some clips render black
+/// on the way in — so the running clock is what tells the reader it is live.
+class _DurationPill extends StatelessWidget {
+  const _DurationPill({
+    required this.mediaId,
+    required this.fallback,
+    this.playback,
+  });
+
+  final String mediaId;
+
+  /// The catalogue's duration, shown whenever this card is not playing.
+  final String fallback;
+
+  final PlaybackHandle? playback;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PlaybackScope(
+      playback: playback,
+      mediaId: mediaId,
+      builder: (context, state) {
+        if (!state.isActive(mediaId) || state.duration <= Duration.zero) {
+          return _Pill(label: fallback);
+        }
+        // The player's own duration wins here — it is the one the position is
+        // measured against, so the two halves cannot disagree.
+        return _Pill(
+          label:
+              '${formatClock(state.position)} / ${formatClock(state.duration)}',
+        );
+      },
+    );
+  }
+}
+
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({this.url});
+
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: AppColors.neutral900,
+    child: url == null || url!.isEmpty
+        ? null
+        : Image.network(
+            url!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+  );
 }
 
 class _Pill extends StatelessWidget {
@@ -707,9 +835,19 @@ String _trim(double v) {
 }
 
 class _MediaAndTitle extends StatelessWidget {
-  const _MediaAndTitle({required this.data});
+  const _MediaAndTitle({
+    required this.data,
+    this.playback,
+    this.coordinator,
+    this.videoController,
+    this.source = AnalyticsSource.unknown,
+  });
 
   final FeedCardData data;
+  final PlaybackHandle? playback;
+  final FeedAutoplayCoordinator? coordinator;
+  final VideoController? videoController;
+  final String source;
 
   @override
   Widget build(BuildContext context) {
@@ -717,7 +855,13 @@ class _MediaAndTitle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (data.kind != FeedCardKind.post) ...[
-          _MediaBlock(data: data),
+          _MediaBlock(
+            data: data,
+            playback: playback,
+            coordinator: coordinator,
+            videoController: videoController,
+            source: source,
+          ),
           SizedBox(height: 16.s),
         ],
         if (data.kind == FeedCardKind.post)
@@ -765,9 +909,15 @@ class _Excerpt extends StatelessWidget {
 }
 
 class _AudioStrip extends StatelessWidget {
-  const _AudioStrip({required this.data});
+  const _AudioStrip({
+    required this.data,
+    this.playback,
+    this.source = AnalyticsSource.unknown,
+  });
 
   final FeedCardData data;
+  final PlaybackHandle? playback;
+  final String source;
 
   @override
   Widget build(BuildContext context) {
@@ -833,7 +983,15 @@ class _AudioStrip extends StatelessWidget {
                           style: AppStyles.heading(14, lineHeight: 20 / 14),
                         ),
                       SizedBox(height: 8.s),
-                      const _Waveform(),
+                      _PlaybackScope(
+                        playback: playback,
+                        mediaId: data.id,
+                        builder: (_, state) => _Waveform(
+                          progress: state.isActive(data.id)
+                              ? state.progress
+                              : 0,
+                        ),
+                      ),
                       if (data.duration case final duration?) ...[
                         SizedBox(height: 6.s),
                         Text(
@@ -849,19 +1007,14 @@ class _AudioStrip extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 10.s),
-                Container(
-                  width: 40.s,
-                  height: 40.s,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.base1.withValues(alpha: 0.6),
-                    border: Border.all(color: AppColors.neutral700),
+                _AudioPlayButton(
+                  target: PlaybackTarget(
+                    mediaId: data.id,
+                    creatorId: data.creatorId,
+                    mediaType: MediaTypes.music,
+                    source: source,
                   ),
-                  child: Icon(
-                    Icons.play_arrow_rounded,
-                    color: AppColors.textPrimary,
-                    size: 22.s,
-                  ),
+                  playback: playback,
                 ),
               ],
             ),
@@ -872,8 +1025,98 @@ class _AudioStrip extends StatelessWidget {
   }
 }
 
+/// Rebuilds its child on playback ticks without touching the rest of the card.
+///
+/// The list itself must not rebuild as the position advances, so the listener
+/// lives here, at the smallest widget that actually shows the change.
+class _PlaybackScope extends StatelessWidget {
+  const _PlaybackScope({
+    required this.playback,
+    required this.mediaId,
+    required this.builder,
+  });
+
+  final PlaybackHandle? playback;
+  final String mediaId;
+  final Widget Function(BuildContext, PlaybackState) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = playback;
+    if (controller == null) return builder(context, const PlaybackState());
+    return ValueListenableBuilder<PlaybackState>(
+      valueListenable: controller.state,
+      builder: (context, state, _) => builder(context, state),
+    );
+  }
+}
+
+/// Plays the track in place. Tapping it must never open the detail screen,
+/// so it swallows the gesture before the card's own tap handler sees it.
+class _AudioPlayButton extends StatelessWidget {
+  const _AudioPlayButton({required this.target, this.playback});
+
+  final PlaybackTarget target;
+  final PlaybackHandle? playback;
+
+  String get mediaId => target.mediaId;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PlaybackScope(
+      playback: playback,
+      mediaId: mediaId,
+      builder: (context, state) {
+        final active = state.isActive(mediaId);
+        final loading = active && state.buffering && !state.playing;
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: playback == null
+              ? null
+              : () => playback!.playMedia(
+                  target: target,
+                  kind: PlaybackKind.audio,
+                ),
+          child: Container(
+            width: 40.s,
+            height: 40.s,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: active
+                  ? AppColors.brandPrimary
+                  : AppColors.base1.withValues(alpha: 0.6),
+              border: Border.all(
+                color: active ? AppColors.brandPrimary : AppColors.neutral700,
+              ),
+            ),
+            child: loading
+                ? Padding(
+                    padding: EdgeInsets.all(11.s),
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.textPrimary,
+                    ),
+                  )
+                : Icon(
+                    state.isPlaying(mediaId)
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: AppColors.textPrimary,
+                    size: 22.s,
+                  ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _Waveform extends StatelessWidget {
-  const _Waveform();
+  const _Waveform({this.progress = 0});
+
+  /// 0 when this track is not the one playing, so an untouched card keeps the
+  /// designed all-brand bars.
+  final double progress;
 
   static const _bars = <double>[
     6,
@@ -910,17 +1153,22 @@ class _Waveform extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Bars left of the playhead stay brand-coloured; the rest dim, so the strip
+    // doubles as a progress bar once something is playing.
+    final played = progress <= 0 ? _bars.length : (_bars.length * progress);
     return SizedBox(
       height: 24.s,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          for (final h in _bars) ...[
+          for (final (i, h) in _bars.indexed) ...[
             Container(
               width: 2.5.s,
               height: h,
               decoration: BoxDecoration(
-                color: AppColors.brandPrimary,
+                color: i < played
+                    ? AppColors.brandPrimary
+                    : AppColors.neutral700,
                 borderRadius: BorderRadius.circular(2.s),
               ),
             ),

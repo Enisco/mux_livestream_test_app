@@ -251,6 +251,7 @@ class _DiscoverFeedScreenState extends State<DiscoverFeedScreen> {
   void _openItem(WebFeedItem item) {
     GetIt.instance<AnalyticsService>().trackContentClick(
       mediaId: item.entityId,
+      contentType: ContentTypes.fromEntityType(item.entityType),
       creatorId: item.creator?.creatorId ?? '',
       mediaType: item.mediaType,
       source: AnalyticsSource.homeFeed,

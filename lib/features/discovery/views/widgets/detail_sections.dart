@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:sizing/sizing.dart';
-
+import 'package:test_app/features/home/views/widgets/feed_card.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
-import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -467,12 +467,14 @@ class DetailCommentsPreview extends StatelessWidget {
     super.key,
     required this.count,
     this.topComment,
+    this.topCommentCreatedAt,
     this.topCommentAuthor,
     this.onOpen,
   });
 
   final int count;
   final String? topComment;
+  final DateTime? topCommentCreatedAt;
   final String? topCommentAuthor;
   final VoidCallback? onOpen;
 
@@ -485,20 +487,22 @@ class DetailCommentsPreview extends StatelessWidget {
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onOpen,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${AppStrings.comments} · $count',
-                  style: AppStyles.label(14, weight: AppStyles.bold),
+          child: SizedBox(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${AppStrings.comments} · $count',
+                    style: AppStyles.label(14, weight: AppStyles.bold),
+                  ),
                 ),
-              ),
-              const Icon(
-                AppIcons.chevronRight,
-                size: 16,
-                color: AppColors.textPrimary,
-              ),
-            ],
+                const Icon(
+                  AppIcons.chevronRight,
+                  size: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ],
+            ),
           ),
         ),
         if (topComment != null) ...[
@@ -509,11 +513,23 @@ class DetailCommentsPreview extends StatelessWidget {
               DetailAvatar(name: topCommentAuthor ?? '?', size: 32),
               SizedBox(width: 12.s),
               Expanded(
-                child: Text(
-                  topComment!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppStyles.body(12, lineHeight: 16 / 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      topComment!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppStyles.body(12, lineHeight: 16 / 12),
+                    ),
+                    Text(
+                      topCommentCreatedAt != null
+                          ? relativeAge(topCommentCreatedAt!)
+                          : '',
+                      style: AppStyles.label(11, color: AppColors.neutral400),
+                    ),
+                  ],
                 ),
               ),
             ],

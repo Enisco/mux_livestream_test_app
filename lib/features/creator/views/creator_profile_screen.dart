@@ -1,21 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:go_router/go_router.dart';
 
+import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/widgets/creator_profile_parts.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/features/home/views/widgets/home_loader.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
+import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
@@ -59,6 +65,9 @@ class CreatorProfileScreen extends StatefulWidget {
 
 class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   final _repo = getIt<DiscoveryRepo>();
+  final _playback = getIt<PlaybackController>();
+  final _engagement = getIt<EngagementRepo>();
+  Map<String, Set<String>> _interactions = const {};
 
   CreatorProfile? _profile;
   bool _loading = true;
@@ -154,6 +163,12 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
           break;
       }
       _loaded.add(tab);
+      unawaited(
+        _hydrateInteractions([
+          ...?_rows[tab],
+          ..._library.expand((section) => section.items),
+        ]),
+      );
     } catch (e) {
       logger.w('Creator tab ${tab.label} failed', error: e);
     } finally {
@@ -298,18 +313,57 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     return [
       SliverList.builder(
         itemCount: rows.length,
-        itemBuilder: (_, i) => FeedCard(
-          data: FeedCardMapper.toCardData(rows[i]),
-          onTap: () => _openItem(rows[i]),
-          onCreatorTap: () =>
-              openCreatorProfile(context, creatorId: rows[i].profileCreatorId),
-          onLike: () => _requireAccount('like this'),
-          onSave: () => _requireAccount('save this'),
-          onComment: () => _openItem(rows[i]),
-          onMore: () => _requireAccount('use that'),
+        itemBuilder: (_, i) => PromotedImpressionTracker(
+          promotion: rows[i].promotion,
+          mediaId: rows[i].entityId,
+          contentType: ContentTypes.fromEntityType(rows[i].entityType),
+          creatorId: rows[i].creator?.creatorId ?? widget.creatorId ?? '',
+          mediaType: rows[i].mediaType,
+          source: AnalyticsSource.creatorProfile,
+          child: FeedCard(
+            data: FeedCardMapper.toCardData(
+              rows[i],
+              interactions: _interactions,
+            ),
+            onTap: () => _openItem(rows[i]),
+            onCreatorTap: () => openCreatorProfile(
+              context,
+              creatorId: rows[i].profileCreatorId,
+            ),
+            onLike: () => _requireAccount('like this'),
+            onSave: () => _requireAccount('save this'),
+            onComment: () => _openItem(rows[i]),
+            onMore: () => _requireAccount('use that'),
+            playback: _playback,
+            source: AnalyticsSource.creatorProfile,
+          ),
         ),
       ),
     ];
+  }
+
+  /// Fills in the viewer's own like/save state for rows just loaded.
+  Future<void> _hydrateInteractions(List<WebFeedItem> rows) async {
+    if (!_authed || rows.isEmpty) return;
+
+    final byType = <String, List<String>>{};
+    for (final row in rows) {
+      final target = InteractionTargets.fromEntityType(row.entityType);
+      if (target == null) continue;
+      (byType[target] ??= []).add(row.entityId);
+    }
+    if (byType.isEmpty) return;
+
+    final merged = <String, Set<String>>{..._interactions};
+    for (final entry in byType.entries) {
+      merged.addAll(
+        await _engagement.fetchMyInteractions(
+          targetType: entry.key,
+          targetIds: entry.value,
+        ),
+      );
+    }
+    if (mounted) setState(() => _interactions = merged);
   }
 
   Widget _emptySliver() => SliverToBoxAdapter(

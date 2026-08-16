@@ -151,6 +151,21 @@ abstract final class AppStrings {
   static const share = 'Share';
   static const descriptionLabel = 'Description';
   static const showMore = 'Show more';
+  static const addAComment = 'Add a comment';
+  static const reply = 'Reply';
+  static const showReplies = 'Show replies';
+  static const hideReplies = 'Hide';
+  static const repliesWord = 'replies';
+  static const replyWord = 'reply';
+  static const replyingTo = 'Replying to';
+  static const creatorBadge = 'Creator';
+  static const someone = 'Someone';
+  static const noCommentsYet = 'No comments yet';
+  static const beTheFirstToComment =
+      'Be the first to share what this meant to you.';
+  static const commentFeature = 'comment';
+  static const commentFailed = 'Your comment did not send. Try again.';
+  static const loading = 'Loading…';
   static const showLess = 'Show less';
   static const comments = 'Comments';
   static const upNext = 'Up next';
