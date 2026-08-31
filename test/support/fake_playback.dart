@@ -33,16 +33,21 @@ class FakePlayback implements PlaybackHandle {
     bool buffering = false,
     Duration position = Duration.zero,
     Duration duration = const Duration(minutes: 4),
+    PlaybackTarget? target,
   }) {
     state.value = PlaybackState(
       mediaId: mediaId,
       kind: kind,
+      target: target,
       playing: playing,
       buffering: buffering,
       position: position,
       duration: duration,
     );
   }
+
+  /// Back to nothing loaded.
+  void clear() => state.value = const PlaybackState();
 
   @override
   bool isActive(String mediaId) => state.value.isActive(mediaId);

@@ -291,7 +291,12 @@ class _Controls extends StatelessWidget {
           if (!compact)
             Positioned(
               left: 12.s,
-              top: MediaQuery.paddingOf(context).top + 8.s,
+              // Just inside the frame's corner. It used to add the status bar
+              // height on top of this, from when the hero ran under the notch;
+              // the screen now keeps the frame clear of system chrome, so
+              // counting that inset here again pushed the arrow down into the
+              // middle of the picture.
+              top: 8.s,
               child: GTubeBackButton(onTap: onBack, size: 20, box: 32),
             ),
           Center(

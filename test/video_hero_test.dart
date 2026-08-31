@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:test_app/features/discovery/views/widgets/video_hero.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'helpers/load_app_fonts.dart';
 import 'support/fake_playback.dart';
@@ -23,6 +24,37 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pump();
 }
 
+/// Pumps the hero under a screen that reserves room for a notch, the way the
+/// detail screen does.
+Future<void> _pumpUnderNotch(
+  WidgetTester tester,
+  Widget child, {
+  double topInset = 60,
+}) async {
+  tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    SizingBuilder(
+      baseSize: const Size(390, 844),
+      builder: (context) => MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(padding: EdgeInsets.only(top: topInset)),
+          child: Scaffold(
+            body: Column(
+              children: [
+                SizedBox(height: topInset),
+                child,
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
 VideoHero _hero(FakePlayback playback, {String? url = _url}) => VideoHero(
   playback: playback,
   target: const PlaybackTarget(mediaId: 'm-video-1', creatorId: 'c1'),
@@ -36,6 +68,20 @@ void main() {
   });
 
   group('video detail hero', () {
+    testWidgets('the back arrow sits at the top of the frame', (tester) async {
+      // The screen already holds the frame clear of the status bar, so the
+      // arrow must not reserve room for it a second time — that dropped it
+      // into the middle of the picture.
+      final playback = FakePlayback();
+      await _pumpUnderNotch(tester, _hero(playback));
+
+      final frame = tester.getRect(find.byType(VideoHero));
+      final back = tester.getRect(find.byType(GTubeBackButton));
+
+      expect(back.top - frame.top, lessThan(24));
+      expect(back.left - frame.left, lessThan(24));
+    });
+
     testWidgets('opening a video starts it without another tap', (
       tester,
     ) async {

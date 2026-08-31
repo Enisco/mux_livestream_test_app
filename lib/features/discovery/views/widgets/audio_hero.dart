@@ -71,12 +71,10 @@ class AudioHero extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(
-              20.s,
-              MediaQuery.paddingOf(context).top + 12.s,
-              20.s,
-              24.s,
-            ),
+            // No status-bar inset here: the screen holds this hero clear of
+            // system chrome, so adding it again pushed the whole layout —
+            // back arrow, artwork, title — a notch's height down the screen.
+            padding: EdgeInsets.fromLTRB(20.s, 12.s, 20.s, 24.s),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

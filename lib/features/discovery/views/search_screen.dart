@@ -10,6 +10,8 @@ import 'package:test_app/features/analytics/views/widgets/promoted_impression_tr
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/data/search_query.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
@@ -18,6 +20,7 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
+import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
@@ -57,7 +60,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
 
   List<WebFeedItem> _items = const [];
-  Map<String, Set<String>> _interactions = const {};
+  final _store = getIt<EngagementStore>();
+  late final _actions = FeedCardActions(
+    store: _store,
+    requireAccount: _requireAccount,
+  );
   bool _authed = false;
   String? _cursor;
   bool _loading = false;
@@ -92,16 +99,20 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     if (byType.isEmpty) return;
 
-    final merged = <String, Set<String>>{..._interactions};
     for (final entry in byType.entries) {
-      merged.addAll(
-        await getIt<EngagementRepo>().fetchMyInteractions(
-          targetType: entry.key,
-          targetIds: entry.value,
-        ),
+      final mine = await getIt<EngagementRepo>().fetchMyInteractions(
+        targetType: entry.key,
+        targetIds: entry.value,
       );
+      if (!mounted) return;
+      _store.seedInteractions(entry.key, mine);
     }
-    if (mounted) setState(() => _interactions = merged);
+  }
+
+  bool _requireAccount(String feature) {
+    if (_authed) return true;
+    showAuthSheet(context, feature);
+    return false;
   }
 
   @override
@@ -146,6 +157,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _cursor = page.nextCursor;
         _loading = false;
       });
+      FeedCardActions.seedRows(_store, page.items);
       unawaited(_hydrateInteractions(page.items));
     } catch (e) {
       logger.w('Search feed failed', error: e);
@@ -170,6 +182,7 @@ class _SearchScreenState extends State<SearchScreen> {
         categorySlugs: _topic == null ? null : [_topic!],
       );
       if (!mounted) return;
+      FeedCardActions.seedRows(_store, page.items);
       setState(() {
         _items = [..._items, ...page.items];
         _cursor = page.nextCursor;
@@ -382,12 +395,18 @@ class _SearchScreenState extends State<SearchScreen> {
           mediaType: item.mediaType,
           source: AnalyticsSource.search,
           child: FeedCard(
-            data: FeedCardMapper.toCardData(item, interactions: _interactions),
+            data: FeedCardMapper.toCardData(item),
             playback: _playback,
+            engagement: _store,
             source: AnalyticsSource.search,
             onTap: () => _open(item),
             onCreatorTap: () =>
                 openCreatorProfile(context, creatorId: item.profileCreatorId),
+            onFollow: _actions.follow(item),
+            onLike: _actions.like(item),
+            onSave: _actions.save(item),
+            onComment: _actions.comment(context, item),
+            onMore: () => _requireAccount('use that'),
           ),
         );
       },

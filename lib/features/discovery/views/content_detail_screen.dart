@@ -11,6 +11,7 @@ import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/media_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/discovery/views/widgets/markdown_body.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
@@ -22,6 +23,7 @@ import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
+import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/shared/components/app_icons.dart';
@@ -106,11 +108,10 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   bool _loading = true;
   bool _failed = false;
 
-  bool _liked = false;
-  bool _saved = false;
-  bool _busy = false;
-  int _likes = 0;
-  int _saves = 0;
+  final _store = GetIt.instance<EngagementStore>();
+
+  /// What the payload said, before the store has anything newer.
+  EngagementState _baseline = const EngagementState();
 
   String get _id => widget.overrideId ?? widget.item.entityId;
 
@@ -193,23 +194,28 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
         case ContentDetailKind.post:
           final post = await _repo.fetchPost(_id);
           _post = post;
-          _likes = post.engagement.likes;
-          _saves = post.engagement.favorites;
+          _baseline = _countsOf(post.engagement);
         case ContentDetailKind.devotional:
           final series = await _repo.fetchDevotionalSeries(_id);
           _completedEntryIds = series.completedEntryIds.toSet();
           _devotional = series;
-          _likes = series.engagement.likes;
-          _saves = series.engagement.favorites;
+          _baseline = _countsOf(series.engagement);
         case ContentDetailKind.event:
           final event = await _repo.fetchEvent(_id);
           _event = event;
-          _likes = event.engagement.likes;
-          _saves = event.engagement.favorites;
+          _baseline = _countsOf(event.engagement);
       }
       if (mounted) setState(() => _loading = false);
+      _store.seed(
+        targetType: _targetType,
+        targetId: _id,
+        likes: _baseline.likes,
+        saves: _baseline.saves,
+        comments: _baseline.comments,
+      );
       _reportOpened();
       unawaited(_resolveCreator());
+      unawaited(_hydrateInteraction());
     } catch (e) {
       logger.e('Content detail (${widget.kind.name}) failed', error: e);
       if (!mounted) return;
@@ -265,26 +271,32 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
     }
   }
 
-  Future<void> _toggle({
-    required String type,
-    required bool active,
-    required void Function(bool on) apply,
-  }) async {
-    if (_busy) return;
-    apply(!active);
-    setState(() => _busy = true);
+  /// These payloads carry counts but not the viewer's own state, so an already
+  /// liked post opened cold showed an empty heart — and tapping it un-liked.
+  Future<void> _hydrateInteraction() async {
+    if (!_authed) return;
     try {
-      await _engagement.toggleInteraction(
+      final mine = await _engagement.fetchMyInteractions(
         targetType: _targetType,
-        targetId: _id,
-        interactionType: type,
+        targetIds: [_id],
       );
+      if (mounted) _store.seedInteractions(_targetType, mine);
     } catch (e) {
-      logger.w('toggle $type failed', error: e);
-      if (mounted) apply(active);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      logger.w('interaction state for $_id failed', error: e);
     }
+  }
+
+  /// Live state for this content: the store's, falling back to the payload's.
+  EngagementState get _engagementState =>
+      _store.resolve(_targetType, _id, _baseline);
+
+  static EngagementState _countsOf(ContentEngagement e) =>
+      EngagementState(likes: e.likes, saves: e.favorites, comments: e.comments);
+
+  bool _requireAccount(String feature) {
+    if (_authed) return true;
+    showAuthSheet(context, feature);
+    return false;
   }
 
   @override
@@ -293,7 +305,14 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor: AppColors.base1,
-        body: SafeArea(child: _body()),
+        // Rebuilt on any engagement change, wherever it was made — the card
+        // this page was opened from, or the comments sheet over it.
+        body: SafeArea(
+          child: ListenableBuilder(
+            listenable: _store,
+            builder: (context, _) => _body(),
+          ),
+        ),
       ),
     );
   }
@@ -341,38 +360,38 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                 const DetailDivider(),
                 SizedBox(height: 13.s),
                 DetailImpactActions(
-                  likes: formatCount(_likes),
-                  saves: formatCount(_saves),
-                  liked: _liked,
-                  saved: _saved,
-                  onLike: () => _toggle(
-                    type: 'like',
-                    active: _liked,
-                    apply: (on) => setState(() {
-                      _liked = on;
-                      _likes = (_likes + (on ? 1 : -1)).clamp(0, 1 << 31);
-                    }),
-                  ),
-                  onSave: () => _toggle(
-                    type: 'favorite',
-                    active: _saved,
-                    apply: (on) => setState(() {
-                      _saved = on;
-                      _saves = (_saves + (on ? 1 : -1)).clamp(0, 1 << 31);
-                    }),
-                  ),
+                  likes: formatCount(_engagementState.likes),
+                  saves: formatCount(_engagementState.saves),
+                  liked: _engagementState.liked,
+                  saved: _engagementState.saved,
+                  onLike: () {
+                    if (!_requireAccount('like this')) return;
+                    _store.toggleLike(
+                      targetType: _targetType,
+                      targetId: _id,
+                      fallback: _baseline,
+                    );
+                  },
+                  onSave: () {
+                    if (!_requireAccount('save this')) return;
+                    _store.toggleSave(
+                      targetType: _targetType,
+                      targetId: _id,
+                      fallback: _baseline,
+                    );
+                  },
                 ),
                 const DetailDivider(),
                 SizedBox(height: 20.s),
                 ..._typeBody(),
                 SizedBox(height: 24.s),
                 DetailCommentsPreview(
-                  count: _comments,
+                  count: _engagementState.comments,
                   onOpen: () => openComments(
                     context,
                     targetType: _targetType,
                     targetId: _id,
-                    initialCount: _comments,
+                    initialCount: _engagementState.comments,
                   ),
                 ),
                 SizedBox(height: 40.s),
@@ -402,12 +421,6 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
     ContentDetailKind.post => _post?.engagement.views ?? 0,
     ContentDetailKind.devotional => _devotional?.engagement.views ?? 0,
     ContentDetailKind.event => _event?.engagement.views ?? 0,
-  };
-
-  int get _comments => switch (widget.kind) {
-    ContentDetailKind.post => _post?.engagement.comments ?? 0,
-    ContentDetailKind.devotional => _devotional?.engagement.comments ?? 0,
-    ContentDetailKind.event => _event?.engagement.comments ?? 0,
   };
 
   String? get _dateLabel {

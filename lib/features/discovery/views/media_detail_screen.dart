@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/locator.dart';
@@ -12,6 +13,8 @@ import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -19,9 +22,11 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
+import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
+import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -54,18 +59,18 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   bool _loadingSuggestions = false;
   final _repo = GetIt.instance<DiscoveryRepo>();
   final _engagementRepo = GetIt.instance<EngagementRepo>();
+  final _store = getIt<EngagementStore>();
+  late final _actions = FeedCardActions(
+    store: _store,
+    requireAccount: _requireAccount,
+  );
 
   MediaDetailData? _detail;
   bool _loading = true;
   String? _error;
 
-  bool _hasLiked = false;
-  bool _hasSaved = false;
-  bool _interactionLoading = false;
-
-  int _likes = 0;
-  int _saves = 0;
-  bool _following = false;
+  /// What the payload said, before the store has anything newer.
+  EngagementState _baseline = const EngagementState();
   bool _followBusy = false;
 
   final List<MediaComment> _comments = [];
@@ -78,10 +83,24 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   String get _clientSessionId =>
       GetIt.instance<AppSessionService>().clientSessionId;
 
+  bool _authed = false;
+
+  bool _requireAccount(String feature) {
+    if (_authed) return true;
+    showAuthSheet(context, feature);
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
+    _resolveSession();
     _fetchDetail();
+  }
+
+  Future<void> _resolveSession() async {
+    final authed = await GetIt.instance<TokenStorageService>().hasSession;
+    if (mounted) setState(() => _authed = authed);
   }
 
   Future<void> _fetchDetail() async {
@@ -102,15 +121,35 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         // probably more; the route itself confirms when asked.
         _suggestionsCursor = detail.suggestions.isEmpty ? null : 'start';
         _loading = false;
-        _hasLiked = detail.viewer?.hasLiked ?? false;
-        _hasSaved = detail.viewer?.hasSaved ?? false;
-        _likes = detail.media.likes;
-        _saves = detail.media.favorites;
-        _following =
-            detail.viewer?.isFollowingCreator ??
-            detail.creator?.isFollowing ??
-            false;
+        _baseline = EngagementState(
+          liked: detail.viewer?.hasLiked ?? false,
+          saved: detail.viewer?.hasSaved ?? false,
+          likes: detail.media.likes,
+          saves: detail.media.favorites,
+          comments: detail.media.comments,
+        );
       });
+      // Published to the store so the card this was opened from — and every
+      // other surface showing this media — reads the same numbers.
+      _store.seed(
+        targetType: InteractionTargets.media,
+        targetId: _mediaId,
+        liked: detail.viewer?.hasLiked,
+        saved: detail.viewer?.hasSaved,
+        likes: detail.media.likes,
+        saves: detail.media.favorites,
+        comments: detail.media.comments,
+      );
+      final creatorId = detail.creator?.creatorId;
+      if (creatorId != null && creatorId.isNotEmpty) {
+        _store.seedFollowing(
+          creatorId,
+          detail.viewer?.isFollowingCreator ??
+              detail.creator?.isFollowing ??
+              false,
+        );
+      }
+      FeedCardActions.seedRows(_store, detail.suggestions);
       _trackOrganicImpression();
       if (!_commentsLoaded) _fetchComments();
     } catch (e) {
@@ -160,65 +199,28 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  Future<void> _toggleLike() => _toggleInteraction(
-    type: 'like',
-    active: _hasLiked,
-    apply: (on) => setState(() {
-      _hasLiked = on;
-      _likes = (_likes + (on ? 1 : -1)).clamp(0, 1 << 31);
-    }),
+  /// Live state for this media: the store's, falling back to the payload's.
+  EngagementState get _engagement =>
+      _store.resolve(InteractionTargets.media, _mediaId, _baseline);
+
+  void _toggleLike() => _store.toggleLike(
+    targetType: InteractionTargets.media,
+    targetId: _mediaId,
+    fallback: _baseline,
   );
 
-  Future<void> _toggleSave() => _toggleInteraction(
-    type: 'favorite',
-    active: _hasSaved,
-    apply: (on) => setState(() {
-      _hasSaved = on;
-      _saves = (_saves + (on ? 1 : -1)).clamp(0, 1 << 31);
-    }),
+  void _toggleSave() => _store.toggleSave(
+    targetType: InteractionTargets.media,
+    targetId: _mediaId,
+    fallback: _baseline,
   );
-
-  /// Optimistic toggle: flip locally, roll back if the server refuses. The API
-  /// only knows like/favorite/amen/share — there is no dislike.
-  Future<void> _toggleInteraction({
-    required String type,
-    required bool active,
-    required void Function(bool on) apply,
-  }) async {
-    if (_interactionLoading) return;
-    final mediaId = _detail?.media.id ?? widget.item.entityId;
-    apply(!active);
-    setState(() => _interactionLoading = true);
-    try {
-      await _engagementRepo.toggleInteraction(
-        targetType: 'media',
-        targetId: mediaId,
-        interactionType: type,
-      );
-    } catch (e) {
-      logger.e('toggle $type failed', error: e);
-      if (mounted) apply(active);
-    } finally {
-      if (mounted) setState(() => _interactionLoading = false);
-    }
-  }
 
   Future<void> _toggleFollow() async {
     final creatorId = _detail?.creator?.creatorId;
     if (creatorId == null || _followBusy) return;
-    final was = _following;
-    setState(() {
-      _following = !was;
-      _followBusy = true;
-    });
-    try {
-      await _repo.setFollowing(creatorId, follow: !was);
-    } catch (e) {
-      logger.w('follow failed', error: e);
-      if (mounted) setState(() => _following = was);
-    } finally {
-      if (mounted) setState(() => _followBusy = false);
-    }
+    setState(() => _followBusy = true);
+    await _store.toggleFollow(creatorId);
+    if (mounted) setState(() => _followBusy = false);
   }
 
   void _trackOrganicImpression() {
@@ -238,13 +240,20 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       ? _detail!.media.id
       : widget.item.entityId;
 
-  /// Everything a playback beacon needs about what is on this screen.
+  /// Everything a playback beacon needs about what is on this screen, plus
+  /// what the system notification shows while a track plays in the background.
   PlaybackTarget get _target => PlaybackTarget(
     mediaId: _mediaId,
     creatorId:
         _detail?.creator?.creatorId ?? widget.item.creator?.creatorId ?? '',
     mediaType: _mediaType,
     source: widget.source,
+    title: _detail?.media.title.isNotEmpty == true
+        ? _detail!.media.title
+        : widget.item.title,
+    artist: _detail?.creator?.displayName ?? widget.item.creatorDisplayName,
+    artworkUrl:
+        _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
   );
 
   String? get _mediaType =>
@@ -271,34 +280,62 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   @override
   Widget build(BuildContext context) {
     // The design has no app bar — the back arrow floats over the hero.
-    return Scaffold(
-      backgroundColor: AppColors.base1,
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        // The hero sits outside the scroll view so the page slides beneath it
-        // and playback is never interrupted by the reader reading on.
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            KeyedSubtree(key: _heroKey, child: _buildHero()),
-            Expanded(
-              child: SingleChildScrollView(
-                child: _loading
-                    ? Padding(
-                        padding: EdgeInsets.symmetric(vertical: 64.s),
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.brandPrimary,
-                          ),
-                        ),
-                      )
-                    : _error != null
-                    ? _buildError()
-                    : _buildInfo(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.base1,
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          // The hero sits outside the scroll view so the page slides beneath it
+          // and playback is never interrupted by the reader reading on.
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Measured together, so the comments sheet lands on the bottom
+              // edge of what is actually visible rather than under the notch.
+              KeyedSubtree(
+                key: _heroKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // The status bar and any notch sit above the media, never
+                    // over it — nothing in the frame is worth losing to a cutout.
+                    ColoredBox(
+                      color: AppColors.base1,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: MediaQuery.paddingOf(context).top,
+                      ),
+                    ),
+                    _buildHero(),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _loading
+                      ? Padding(
+                          padding: EdgeInsets.symmetric(vertical: 64.s),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.brandPrimary,
+                            ),
+                          ),
+                        )
+                      : _error != null
+                      ? _buildError()
+                      // Rebuilt on any engagement change, wherever it was made —
+                      // a like on the card behind this page, a comment posted in
+                      // the sheet over it.
+                      : ListenableBuilder(
+                          listenable: _store,
+                          builder: (context, _) => _buildInfo(),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -371,7 +408,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                       '${formatCount(creator.subscriberCount)} Subscribers',
                   verified: creator.isVerified,
                   isOrganization: creator.isOrganization,
-                  following: _following,
+                  following: _store.isFollowing(creator.creatorId),
                   busy: _followBusy,
                   onTap: () =>
                       openCreatorProfile(context, creatorId: creator.creatorId),
@@ -382,12 +419,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               const DetailDivider(),
               SizedBox(height: 13.s),
               DetailImpactActions(
-                likes: formatCount(_likes),
-                saves: formatCount(_saves),
-                liked: _hasLiked,
-                saved: _hasSaved,
-                onLike: _interactionLoading ? null : _toggleLike,
-                onSave: _interactionLoading ? null : _toggleSave,
+                likes: formatCount(_engagement.likes),
+                saves: formatCount(_engagement.saves),
+                liked: _engagement.liked,
+                saved: _engagement.saved,
+                onLike: _toggleLike,
+                onSave: _toggleSave,
               ),
               const DetailDivider(),
               if (description != null && description.isNotEmpty) ...[
@@ -396,7 +433,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
               ],
               SizedBox(height: 23.s),
               DetailCommentsPreview(
-                count: media.comments,
+                count: _engagement.comments,
                 topComment: top?.body,
                 topCommentAuthor: top?.author?.displayName,
                 topCommentCreatedAt: top?.createdAt,
@@ -404,7 +441,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   context,
                   targetType: InteractionTargets.media,
                   targetId: _mediaId,
-                  initialCount: media.comments,
+                  initialCount: _engagement.comments,
                   topInset: _heroHeight,
                 ),
               ),
@@ -458,6 +495,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         excludeEntityIds: [_mediaId, ..._suggestions.map((s) => s.entityId)],
       );
       if (!mounted) return;
+      FeedCardActions.seedRows(_store, page.items);
       setState(() {
         _suggestions = [..._suggestions, ...page.items];
         _suggestionsCursor = page.nextCursor;
@@ -496,7 +534,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                     context,
                     creatorId: s.profileCreatorId,
                   ),
+                  onFollow: _actions.follow(s),
+                  onLike: _actions.like(s),
+                  onSave: _actions.save(s),
+                  onComment: _actions.comment(context, s),
                   playback: _playback,
+                  engagement: _store,
                   source: AnalyticsSource.suggestedContent,
                 ),
               ),

@@ -14,6 +14,8 @@ import 'package:test_app/features/analytics/views/widgets/promoted_impression_tr
 import 'package:test_app/features/creator/views/widgets/creator_profile_parts.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -67,7 +69,11 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   final _repo = getIt<DiscoveryRepo>();
   final _playback = getIt<PlaybackController>();
   final _engagement = getIt<EngagementRepo>();
-  Map<String, Set<String>> _interactions = const {};
+  final _store = getIt<EngagementStore>();
+  late final _actions = FeedCardActions(
+    store: _store,
+    requireAccount: _requireAccount,
+  );
 
   CreatorProfile? _profile;
   bool _loading = true;
@@ -105,6 +111,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
           ? await _repo.fetchCreatorById(widget.creatorId!)
           : await _repo.fetchCreatorByHandle(widget.handle!);
       if (!mounted) return;
+      _store.seedFollowing(profile.id, profile.isFollowing);
       setState(() {
         _profile = profile;
         _loading = false;
@@ -163,12 +170,12 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
           break;
       }
       _loaded.add(tab);
-      unawaited(
-        _hydrateInteractions([
-          ...?_rows[tab],
-          ..._library.expand((section) => section.items),
-        ]),
-      );
+      final rows = [
+        ...?_rows[tab],
+        ..._library.expand((section) => section.items),
+      ];
+      FeedCardActions.seedRows(_store, rows);
+      unawaited(_hydrateInteractions(rows));
     } catch (e) {
       logger.w('Creator tab ${tab.label} failed', error: e);
     } finally {
@@ -188,14 +195,17 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     return false;
   }
 
+  /// The header's own follow button.
+  ///
+  /// The subscriber count is this screen's to keep — the store tracks the flag,
+  /// which is what the cards below and every other surface read.
   Future<void> _toggleFollow() async {
     final profile = _profile;
     if (profile == null || _followBusy) return;
     if (!_requireAccount('follow creators')) return;
-    final was = profile.isFollowing;
+    final was = _store.isFollowing(profile.id, fallback: profile.isFollowing);
     setState(() {
       _profile = profile.copyWith(
-        isFollowing: !was,
         subscriberCount: (profile.subscriberCount + (was ? -1 : 1)).clamp(
           0,
           1 << 31,
@@ -203,14 +213,13 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
       );
       _followBusy = true;
     });
-    try {
-      await _repo.setFollowing(profile.id, follow: !was);
-    } catch (e) {
-      logger.w('follow failed', error: e);
-      if (mounted) setState(() => _profile = profile);
-    } finally {
-      if (mounted) setState(() => _followBusy = false);
+    await _store.toggleFollow(profile.id, fallback: profile.isFollowing);
+    if (!mounted) return;
+    // Rolled back by the store if the server refused, so the count follows it.
+    if (_store.isFollowing(profile.id, fallback: profile.isFollowing) == was) {
+      setState(() => _profile = profile);
     }
+    setState(() => _followBusy = false);
   }
 
   void _openItem(WebFeedItem item) {
@@ -227,11 +236,26 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
 
   Widget _body() {
     if (_loading) return const HomeLoader();
-    final profile = _profile;
-    if (_failed || profile == null) {
+    final loaded = _profile;
+    if (_failed || loaded == null) {
       return SafeArea(child: ErrorStateView(onRetry: _loadProfile));
     }
+    // The header's follow state comes from the store, so following from one of
+    // the cards below — or from anywhere else in the session — shows here too.
+    return ListenableBuilder(
+      listenable: _store,
+      builder: (context, _) => _content(
+        loaded.copyWith(
+          isFollowing: _store.isFollowing(
+            loaded.id,
+            fallback: loaded.isFollowing,
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _content(CreatorProfile profile) {
     return RefreshIndicator(
       color: AppColors.brandPrimary,
       backgroundColor: AppColors.base1,
@@ -321,20 +345,19 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
           mediaType: rows[i].mediaType,
           source: AnalyticsSource.creatorProfile,
           child: FeedCard(
-            data: FeedCardMapper.toCardData(
-              rows[i],
-              interactions: _interactions,
-            ),
+            data: FeedCardMapper.toCardData(rows[i]),
             onTap: () => _openItem(rows[i]),
             onCreatorTap: () => openCreatorProfile(
               context,
               creatorId: rows[i].profileCreatorId,
             ),
-            onLike: () => _requireAccount('like this'),
-            onSave: () => _requireAccount('save this'),
-            onComment: () => _openItem(rows[i]),
+            onFollow: _actions.follow(rows[i]),
+            onLike: _actions.like(rows[i]),
+            onSave: _actions.save(rows[i]),
+            onComment: _actions.comment(context, rows[i]),
             onMore: () => _requireAccount('use that'),
             playback: _playback,
+            engagement: _store,
             source: AnalyticsSource.creatorProfile,
           ),
         ),
@@ -354,16 +377,14 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     }
     if (byType.isEmpty) return;
 
-    final merged = <String, Set<String>>{..._interactions};
     for (final entry in byType.entries) {
-      merged.addAll(
-        await _engagement.fetchMyInteractions(
-          targetType: entry.key,
-          targetIds: entry.value,
-        ),
+      final mine = await _engagement.fetchMyInteractions(
+        targetType: entry.key,
+        targetIds: entry.value,
       );
+      if (!mounted) return;
+      _store.seedInteractions(entry.key, mine);
     }
-    if (mounted) setState(() => _interactions = merged);
   }
 
   Widget _emptySliver() => SliverToBoxAdapter(

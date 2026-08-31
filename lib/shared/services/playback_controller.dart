@@ -25,6 +25,9 @@ class PlaybackTarget {
     this.creatorId = '',
     this.mediaType,
     this.source = 'unknown',
+    this.title,
+    this.artist,
+    this.artworkUrl,
   });
 
   final String mediaId;
@@ -36,6 +39,12 @@ class PlaybackTarget {
   /// Where the play was started from — `home_feed`, `creator_channel`,
   /// `search`, `suggested_content`…
   final String source;
+
+  /// What the system's notification and lock screen show. Only audio surfaces
+  /// need to fill these in; a feed video is never published to a media session.
+  final String? title;
+  final String? artist;
+  final String? artworkUrl;
 }
 
 /// Bookkeeping for the media now playing: what has already been reported, and
@@ -117,6 +126,7 @@ class PlaybackState {
   const PlaybackState({
     this.mediaId,
     this.kind,
+    this.target,
     this.playing = false,
     this.buffering = false,
     this.position = Duration.zero,
@@ -125,6 +135,10 @@ class PlaybackState {
 
   final String? mediaId;
   final PlaybackKind? kind;
+
+  /// What is playing, for anything that needs more than its id — the media
+  /// session's title and artwork, for one.
+  final PlaybackTarget? target;
   final bool playing;
   final bool buffering;
   final Duration position;
@@ -142,6 +156,7 @@ class PlaybackState {
   PlaybackState copyWith({
     String? mediaId,
     PlaybackKind? kind,
+    PlaybackTarget? target,
     bool? playing,
     bool? buffering,
     Duration? position,
@@ -149,6 +164,7 @@ class PlaybackState {
   }) => PlaybackState(
     mediaId: mediaId ?? this.mediaId,
     kind: kind ?? this.kind,
+    target: target ?? this.target,
     playing: playing ?? this.playing,
     buffering: buffering ?? this.buffering,
     position: position ?? this.position,
@@ -381,7 +397,12 @@ class PlaybackController implements PlaybackHandle {
     // Whatever was playing is over as far as analytics is concerned.
     _endSession();
 
-    state.value = PlaybackState(mediaId: mediaId, kind: kind, buffering: true);
+    state.value = PlaybackState(
+      mediaId: mediaId,
+      kind: kind,
+      target: target,
+      buffering: true,
+    );
     try {
       await _player.open(Media(url), play: false);
       await _applyVolume(kind);
@@ -495,7 +516,12 @@ class PlaybackController implements PlaybackHandle {
       return;
     }
     // Show the card as busy while the URL is fetched, or a tap feels dead.
-    state.value = PlaybackState(mediaId: mediaId, kind: kind, buffering: true);
+    state.value = PlaybackState(
+      mediaId: mediaId,
+      kind: kind,
+      target: target,
+      buffering: true,
+    );
     final url = await resolve(mediaId);
     if (url == null || url.isEmpty) {
       logger.w('No playable URL for $mediaId');

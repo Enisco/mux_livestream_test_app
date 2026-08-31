@@ -328,6 +328,7 @@ class DetailImpactActions extends StatelessWidget {
         children: [
           _Action(
             icon: AppAssets.iconFeedHeart,
+            activeIcon: AppAssets.iconFeedHeartFilled,
             size: 20,
             label: likes,
             active: liked,
@@ -358,12 +359,17 @@ class _Action extends StatelessWidget {
     required this.icon,
     required this.size,
     required this.label,
+    this.activeIcon,
     this.active = false,
     this.labelColor,
     this.onTap,
   });
 
   final String icon;
+
+  /// Drawn instead of [icon] while [active]. Null leaves the same glyph, only
+  /// recoloured — which is all the actions without a solid variant can do.
+  final String? activeIcon;
   final double size;
   final String label;
   final bool active;
@@ -380,7 +386,7 @@ class _Action extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             DesignIcon(
-              icon,
+              active ? (activeIcon ?? icon) : icon,
               width: size.s,
               height: size.s,
               color: active ? AppColors.brandPrimary : null,

@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show relativeAge, formatCount;
@@ -65,6 +66,7 @@ class CommentsSheet extends StatefulWidget {
 
 class _CommentsSheetState extends State<CommentsSheet> {
   final _repo = GetIt.instance<EngagementRepo>();
+  final _store = GetIt.instance<EngagementStore>();
   final _composer = TextEditingController();
   final _composerFocus = FocusNode();
   final _scroll = ScrollController();
@@ -252,6 +254,15 @@ class _CommentsSheetState extends State<CommentsSheet> {
       if (!mounted) return;
       _composer.clear();
       _composerFocus.unfocus();
+      // Only a top-level comment moves the count the rest of the app shows;
+      // a reply is counted inside its parent thread.
+      if (parent == null) {
+        _store.bumpComments(
+          targetType: widget.targetType,
+          targetId: widget.targetId,
+          fallbackCount: _count,
+        );
+      }
       setState(() {
         _posting = false;
         _replyingTo = null;

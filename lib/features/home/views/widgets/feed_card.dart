@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:sizing/sizing.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/features/home/views/widgets/feed_video_surface.dart';
@@ -53,6 +54,7 @@ class FeedCardData {
     this.location,
     this.planLabel,
     this.subtitle,
+    this.targetType,
   });
 
   final String id;
@@ -92,6 +94,19 @@ class FeedCardData {
 
   final String? subtitle;
 
+  /// What the interactions API calls this row, when it can carry any. Null for
+  /// creators and media series, which have nothing to like.
+  final String? targetType;
+
+  /// The counts this row arrived with, before the store has anything newer.
+  EngagementState get engagementBaseline => EngagementState(
+    liked: liked,
+    saved: saved,
+    likes: likes,
+    saves: saves,
+    comments: comments,
+  );
+
   String viewsNoun(int n) => switch ((kind, n)) {
     (FeedCardKind.live, _) => 'Watching',
     (FeedCardKind.blog, 1) => 'Open',
@@ -115,6 +130,7 @@ class FeedCard extends StatelessWidget {
     this.playback,
     this.coordinator,
     this.videoController,
+    this.engagement,
     this.source = AnalyticsSource.unknown,
   });
 
@@ -126,6 +142,11 @@ class FeedCard extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onComment;
   final VoidCallback? onMore;
+
+  /// Keeps this card's counts level with every other surface showing the same
+  /// row, including the detail screen it opens. Left null where there is no
+  /// locator to read it from — the card then shows [data] as it arrived.
+  final EngagementStore? engagement;
 
   /// Supplied by the screen so audio cards can play in place. Left null in
   /// surfaces that only show cards (search results, previews).
@@ -162,6 +183,7 @@ class FeedCard extends StatelessWidget {
           child: data.kind == FeedCardKind.channel
               ? _ChannelBody(
                   data: data,
+                  engagement: engagement,
                   onFollow: onFollow,
                   onOpen: onTap,
                   onMore: onMore,
@@ -178,6 +200,7 @@ class FeedCard extends StatelessWidget {
                   playback: playback,
                   coordinator: coordinator,
                   videoController: videoController,
+                  engagement: engagement,
                   source: source,
                 ),
         ),
@@ -199,6 +222,7 @@ class _StandardBody extends StatelessWidget {
     this.playback,
     this.coordinator,
     this.videoController,
+    this.engagement,
     this.source = AnalyticsSource.unknown,
   });
 
@@ -213,6 +237,7 @@ class _StandardBody extends StatelessWidget {
   final PlaybackHandle? playback;
   final FeedAutoplayCoordinator? coordinator;
   final VideoController? videoController;
+  final EngagementStore? engagement;
   final String source;
 
   @override
@@ -222,6 +247,7 @@ class _StandardBody extends StatelessWidget {
       children: [
         _CreatorRow(
           data: data,
+          engagement: engagement,
           onCreatorTap: onCreatorTap,
           onFollow: onFollow,
           onMore: onMore,
@@ -257,6 +283,7 @@ class _StandardBody extends StatelessWidget {
         SizedBox(height: 12.s),
         _ActionRow(
           data: data,
+          engagement: engagement,
           onLike: onLike,
           onSave: onSave,
           onComment: onComment,
@@ -269,30 +296,46 @@ class _StandardBody extends StatelessWidget {
 class _CreatorRow extends StatelessWidget {
   const _CreatorRow({
     required this.data,
+    this.engagement,
     this.onCreatorTap,
     this.onFollow,
     this.onMore,
   });
 
   final FeedCardData data;
+  final EngagementStore? engagement;
   final VoidCallback? onCreatorTap;
   final VoidCallback? onFollow;
   final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
+    final store = engagement;
+    if (store == null) return _row(data.following);
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) =>
+          _row(store.isFollowing(data.creatorId, fallback: data.following)),
+    );
+  }
+
+  Widget _row(bool following) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _Avatar(
           url: data.avatarUrl,
           verified: data.verified,
-          ringColor: switch (data) {
-            _ when data.kind == FeedCardKind.live => AppColors.red500,
-            _ when data.following => AppColors.cyan400,
+          ringColor: switch (data.kind) {
+            FeedCardKind.live => AppColors.red500,
+            _ when following => AppColors.cyan400,
             _ => AppColors.purple400,
           },
-          onTap: data.following ? null : onFollow,
+          // The face opens the creator; the badge on it is the follow control.
+          // Wiring both to follow left the avatar dead once following, which
+          // is the one state where opening the profile matters most.
+          onTap: onCreatorTap,
+          onFollow: following ? null : onFollow,
         ),
         SizedBox(width: 10.s),
         Expanded(
@@ -405,6 +448,7 @@ class _Avatar extends StatelessWidget {
     this.url,
     this.verified = false,
     this.onTap,
+    this.onFollow,
     this.size = 32,
     this.ringColor,
   });
@@ -412,6 +456,10 @@ class _Avatar extends StatelessWidget {
   final String? url;
   final bool verified;
   final VoidCallback? onTap;
+
+  /// Draws the ⊕ badge and handles its tap. Null once there is nothing to
+  /// follow, which is also what hides the badge.
+  final VoidCallback? onFollow;
   final double size;
 
   /// Red while live, cyan once following, purple when still followable.
@@ -445,14 +493,18 @@ class _Avatar extends StatelessWidget {
                       ),
               ),
             ),
-            if (onTap != null)
+            if (onFollow != null)
               Positioned(
                 top: size - 9,
-                child: DesignIcon(
-                  AppAssets.iconFeedPlusCircle,
-                  width: 12.s,
-                  height: 12.s,
-                  box: 16,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onFollow,
+                  child: DesignIcon(
+                    AppAssets.iconFeedPlusCircle,
+                    width: 12.s,
+                    height: 12.s,
+                    box: 16,
+                  ),
                 ),
               ),
           ],
@@ -678,28 +730,44 @@ class _LivePill extends StatelessWidget {
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.data,
+    this.engagement,
     this.onLike,
     this.onSave,
     this.onComment,
   });
 
   final FeedCardData data;
+  final EngagementStore? engagement;
   final VoidCallback? onLike;
   final VoidCallback? onSave;
   final VoidCallback? onComment;
 
   @override
   Widget build(BuildContext context) {
+    final store = engagement;
+    if (store == null) return _row(data.engagementBaseline);
+    // Only this row rebuilds on a change, so a like landing elsewhere cannot
+    // disturb a video playing in the card above it.
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) => _row(
+        store.resolve(data.targetType, data.id, data.engagementBaseline),
+      ),
+    );
+  }
+
+  Widget _row(EngagementState state) {
     final live = data.kind == FeedCardKind.live;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         _ActionButton(
           asset: AppAssets.iconFeedHeart,
+          activeAsset: AppAssets.iconFeedHeartFilled,
           width: 14.667.s,
           height: 13.334.s,
-          count: data.likes,
-          active: data.liked,
+          count: state.likes,
+          active: state.liked,
           onTap: onLike,
         ),
         SizedBox(width: 20.s),
@@ -707,8 +775,8 @@ class _ActionRow extends StatelessWidget {
           asset: AppAssets.iconFeedBookmark,
           width: 12.667.s,
           height: 14.663.s,
-          count: data.saves,
-          active: data.saved,
+          count: state.saves,
+          active: state.saved,
           onTap: onSave,
         ),
         // The design's post card carries no comment action.
@@ -718,7 +786,7 @@ class _ActionRow extends StatelessWidget {
             asset: AppAssets.iconFeedChat,
             width: 13.333.s,
             height: 13.333.s,
-            count: data.comments,
+            count: state.comments,
             onTap: onComment,
           ),
         ],
@@ -766,11 +834,16 @@ class _ActionButton extends StatelessWidget {
     required this.width,
     required this.height,
     required this.count,
+    this.activeAsset,
     this.active = false,
     this.onTap,
   });
 
   final String asset;
+
+  /// Drawn instead of [asset] while [active]. Null leaves the same glyph, only
+  /// recoloured — which is all the actions without a solid variant can do.
+  final String? activeAsset;
   final double width;
   final double height;
   final int count;
@@ -786,7 +859,7 @@ class _ActionButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           DesignIcon(
-            asset,
+            active ? (activeAsset ?? asset) : asset,
             width: width,
             height: height,
             box: 16,
@@ -1013,6 +1086,11 @@ class _AudioStrip extends StatelessWidget {
                     creatorId: data.creatorId,
                     mediaType: MediaTypes.music,
                     source: source,
+                    // Carried so the system notification can name the track
+                    // once it is playing in the background.
+                    title: data.title,
+                    artist: data.creatorName,
+                    artworkUrl: data.thumbnailUrl,
                   ),
                   playback: playback,
                 ),
@@ -1339,18 +1417,30 @@ class _BlogBody extends StatelessWidget {
 class _ChannelBody extends StatelessWidget {
   const _ChannelBody({
     required this.data,
+    this.engagement,
     this.onFollow,
     this.onOpen,
     this.onMore,
   });
 
   final FeedCardData data;
+  final EngagementStore? engagement;
   final VoidCallback? onFollow;
   final VoidCallback? onOpen;
   final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
+    final store = engagement;
+    if (store == null) return _body(data.following);
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) =>
+          _body(store.isFollowing(data.creatorId, fallback: data.following)),
+    );
+  }
+
+  Widget _body(bool following) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1366,7 +1456,8 @@ class _ChannelBody extends StatelessWidget {
           url: data.avatarUrl,
           verified: data.verified,
           size: 48.s,
-          onTap: data.following ? null : onFollow,
+          onTap: onOpen,
+          onFollow: following ? null : onFollow,
         ),
         SizedBox(height: 12.s),
         Row(
@@ -1416,9 +1507,7 @@ class _ChannelBody extends StatelessWidget {
           children: [
             Expanded(
               child: _OutlineButton(
-                label: data.following
-                    ? AppStrings.following
-                    : AppStrings.follow,
+                label: following ? AppStrings.following : AppStrings.follow,
                 onTap: onFollow,
                 expand: true,
               ),

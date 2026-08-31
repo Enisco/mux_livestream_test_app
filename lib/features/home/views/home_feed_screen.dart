@@ -10,6 +10,8 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
@@ -45,15 +47,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   final _repo = getIt<DiscoveryRepo>();
   final _playback = getIt<PlaybackController>();
   final _engagement = getIt<EngagementRepo>();
+  final _store = getIt<EngagementStore>();
   final _scroll = ScrollController();
+  late final _actions = FeedCardActions(
+    store: _store,
+    requireAccount: _requireAccount,
+  );
   late final _autoplay = FeedAutoplayCoordinator(playback: _playback);
 
   late HomeTab _tab = widget.initialTab;
   String? _topic;
   List<WebFeedItem> _items = const [];
 
-  /// The viewer's own like/save state, keyed by entity id. Empty for guests.
-  Map<String, Set<String>> _interactions = const {};
   String? _cursor;
   bool _loading = false;
   bool _loadingMore = false;
@@ -125,16 +130,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
     }
     if (byType.isEmpty) return;
 
-    final merged = <String, Set<String>>{..._interactions};
     for (final entry in byType.entries) {
-      merged.addAll(
-        await _engagement.fetchMyInteractions(
-          targetType: entry.key,
-          targetIds: entry.value,
-        ),
+      final mine = await _engagement.fetchMyInteractions(
+        targetType: entry.key,
+        targetIds: entry.value,
       );
+      if (!mounted) return;
+      _store.seedInteractions(entry.key, mine);
     }
-    if (mounted) setState(() => _interactions = merged);
   }
 
   void _onScroll() {
@@ -195,6 +198,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
         _cursor = result.nextCursor;
         _loading = false;
       });
+      FeedCardActions.seedRows(_store, result.items);
       if (result.items.isEmpty) await _loadEmptyCompanions();
       unawaited(_hydrateInteractions(result.items));
     } catch (e) {
@@ -240,6 +244,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
         _items = [..._items, ...result.items];
         _cursor = result.nextCursor;
       });
+      FeedCardActions.seedRows(_store, result.items);
       unawaited(_hydrateInteractions(result.items));
     } catch (e) {
       logger.w('Home feed page failed', error: e);
@@ -363,21 +368,24 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
           }
           final item = _items[index];
           final card = FeedCard(
-            data: FeedCardMapper.toCardData(item, interactions: _interactions),
+            data: FeedCardMapper.toCardData(item),
             // A channel row IS the creator, so its body opens the profile.
             onTap: () => item.isCreatorRow
                 ? openCreatorProfile(context, creatorId: item.profileCreatorId)
                 : _openItem(item),
             onCreatorTap: () =>
                 openCreatorProfile(context, creatorId: item.profileCreatorId),
-            onFollow: () => _requireAccount('follow creators'),
-            onLike: () => _requireAccount('like this'),
-            onSave: () => _requireAccount('save this'),
-            onComment: () => _openItem(item),
+            onFollow: _actions.follow(item),
+            onLike: _actions.like(item),
+            onSave: _actions.save(item),
+            // Straight to the thread rather than the detail page behind it:
+            // the tap was on the comment count, not on the content.
+            onComment: _actions.comment(context, item),
             onMore: () => _requireAccount('use that'),
             playback: _playback,
             coordinator: _autoplay,
             videoController: _playback.videoController,
+            engagement: _store,
             source: AnalyticsSource.homeFeed,
           );
 

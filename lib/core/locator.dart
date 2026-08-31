@@ -5,6 +5,7 @@ import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/repo/mobile_checkout_repo.dart';
 import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/shared/services/analytics_playback_reporter.dart';
@@ -53,6 +54,9 @@ Future<void> setupLocator() async {
   getIt.registerLazySingleton<DiscoveryRepo>(() => DiscoveryRepo());
   getIt.registerLazySingleton<OnboardingRepo>(() => OnboardingRepo());
   getIt.registerLazySingleton<EngagementRepo>(() => EngagementRepo());
+  // App-scoped on purpose: a like made on one screen has to be the like every
+  // other screen shows, so there is exactly one of these for the whole session.
+  getIt.registerLazySingleton<EngagementStore>(() => EngagementStore());
   getIt.registerLazySingleton<AnalyticsService>(
     () => AnalyticsService(
       api: getIt<ApiService>(),

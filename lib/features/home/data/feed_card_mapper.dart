@@ -27,7 +27,8 @@ abstract final class FeedCardMapper {
     final name = item.creatorDisplayName;
     return FeedCardData(
       id: item.entityId,
-      creatorId: item.creator?.creatorId ?? '',
+      // A creator row IS the creator, so its own id is the one to follow.
+      creatorId: item.profileCreatorId ?? '',
       kind: kind,
       creatorName: name.isEmpty ? AppStrings.brandName : name,
       handle: item.creatorHandle,
@@ -57,6 +58,9 @@ abstract final class FeedCardMapper {
       subscribers: creator?.subscriberCount ?? 0,
       liked: mine.contains(InteractionTypes.like),
       saved: mine.contains(InteractionTypes.favorite),
+      // Lets the card find itself in the shared engagement store; null for the
+      // row types the interactions API will not accept.
+      targetType: InteractionTargets.fromEntityType(item.entityType),
     );
   }
 

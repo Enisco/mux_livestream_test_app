@@ -58,6 +58,10 @@ abstract final class AppAssets {
   static const iconHeadphones = '$_icons/headphones.svg';
 
   static const iconFeedHeart = '$_icons/feed_heart.svg';
+
+  /// The same silhouette as [iconFeedHeart] with the middle solid — what a
+  /// like reads as once it is the viewer's own.
+  static const iconFeedHeartFilled = '$_icons/feed_heart_filled.svg';
   static const iconFeedBookmark = '$_icons/feed_bookmark.svg';
   static const iconFeedChat = '$_icons/feed_chat.svg';
   static const iconFeedUsers = '$_icons/feed_users.svg';

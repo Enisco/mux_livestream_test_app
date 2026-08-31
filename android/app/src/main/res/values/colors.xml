@@ -2,4 +2,5 @@
 <resources>
     <!-- Matches AppColors.base1, the splash gradient's floor. -->
     <color name="launch_background">#0D0D0D</color>
+	<color name="ic_launcher_background">#0D0D0D</color>
 </resources>
