@@ -280,6 +280,24 @@ abstract final class AppStrings {
   static const navFollowing = 'Following';
   static const navYou = 'You';
 
+  // History — what the reader has watched and read.
+  static const historyTitle = 'History';
+  static const historyClearAll = 'Clear all';
+  static const historySearchHint = 'Search history...';
+  static const historyResume = 'Continue watching';
+  static const historyEmptyTitle = 'Nothing here yet';
+  static const historyEmptyBody =
+      'The videos, messages, and devotionals you watch and read will show '
+      'up here.';
+  static const historyNoMatchTitle = 'Nothing matched';
+  static const historyNoMatchBody =
+      'Try a different word, or clear the search to see everything.';
+  static const historyClearTitle = 'Clear your history?';
+  static const historyClearBody =
+      'This removes everything you have watched and read. It cannot be '
+      'undone.';
+  static const historyClearConfirm = 'Clear all';
+
   // Search — the three states of the Explore search field.
   static const searchFieldHint = 'Search...';
   static const searchRecent = 'RECENT';
