@@ -90,6 +90,7 @@ abstract final class AppColors {
   static const neutral100 = Color(0xFFF5F5F5);
 
   static const purple400 = Color(0xFFC27AFF);
+  static const purple500 = Color(0xFFAD46FF);
 
   static const offWhite = Color(0xFFFBFBFB);
 
@@ -98,6 +99,22 @@ abstract final class AppColors {
 
   static const logoGlowOuter = Color(0x1AF8F8FF);
   static const logoGlowInner = Color(0x0DFAFAFF);
+
+  // Explore — browse chips and the cards that sit on the dark plate.
+  static const chipBg = Color(0xFF0B0F14);
+  static const chipBorder = Color(0xFF374151);
+  static const chipText = Color(0xFFF9FAFB);
+  static const cardBorder = Color(0xFF2A2F3A);
+
+  /// Watch progress on a "Continue watching" poster.
+  static const progressTrack = Color(0x994D4D4D);
+  static const progressFill = Color(0xFFFF3333);
+
+  /// The date tile on an event row.
+  static const dateTileFrom = Color(0xFF2E2E33);
+  static const dateTileTo = Color(0xFF0F0F12);
+  static const dateTileDay = Color(0xFFF2F2F2);
+  static const dateTileMonth = Color(0xFF99999E);
 
   static const fmtMp4 = Color(0xFFF59300);
   static const fmtMkv = Color(0xFFD4950A);

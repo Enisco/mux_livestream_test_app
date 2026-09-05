@@ -59,6 +59,9 @@ flutter:
   assets:
     - .env
     - assets/images/
+    # TEMPORARY: placeholder artwork for the Explore tab. Delete this line
+    # with lib/features/explore/data/explore_dummy_data.dart.
+    - assets/images/explore_dummy/
     - assets/icons/
 
   fonts:

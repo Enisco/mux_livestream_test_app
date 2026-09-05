@@ -280,6 +280,22 @@ abstract final class AppStrings {
   static const navFollowing = 'Following';
   static const navYou = 'You';
 
+  // Explore tab — section headers and the copy on its hero.
+  static const exploreSearchHint = 'Search ministries, sermon, series...';
+  static const exploreLive = 'Live';
+  static const exploreContinueWatching = 'Continue watching';
+  static const exploreTrendingToday = 'Trending today';
+  static const exploreDevotionals = 'Devotionals';
+  static const exploreArticles = 'Articles this week';
+  static const exploreMinistries = 'Ministries to follow';
+  static const exploreUpcomingEvent = 'Upcoming event';
+  static const exploreBrowse = 'Browse';
+  static const exploreWatch = 'Watch';
+  static const exploreAddToPlaylist = 'Add to playlist';
+  static const exploreSponsored = 'Sponsored';
+  static const exploreLiveBadge = 'LIVE';
+  static const exploreSubscribers = 'Subscribers';
+
   static const tabFollowing = 'Following';
   static const tabLive = 'Live';
   static const topicAll = 'All';
