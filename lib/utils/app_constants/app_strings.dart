@@ -280,6 +280,28 @@ abstract final class AppStrings {
   static const navFollowing = 'Following';
   static const navYou = 'You';
 
+  // Settings — the account menu.
+  static const settingsTitle = 'Account';
+  static const settingsProfile = 'PROFILE';
+  static const settingsPreferences = 'PREFERENCES';
+  static const settingsSecurity = 'SECURITY';
+  static const settingsEdit = 'Edit';
+  static const settingsChange = 'Change';
+  static const settingsDisplayNamePhoto = 'Display name & photo';
+  static const settingsEmail = 'Email';
+  static const settingsPhone = 'Phone number';
+  static const settingsPassword = 'Password';
+  static const settingsLanguage = 'Language';
+  static const settingsLanguageValue = 'English';
+  static const settingsTopics = 'Your topics';
+  static const settingsEventReminders = 'Event reminders';
+  static const settingsTwoFactor = 'Two-factor authentication';
+  static const settingsLogOutAll = 'Log out all devices';
+  static const settingsLogOutAllSub = 'Ends every active session';
+  static const settingsDeactivate = 'Deactivate account';
+  static const settingsNotSet = 'Not set';
+  static const accountFallbackName = 'User';
+
   // History — what the reader has watched and read.
   static const historyTitle = 'History';
   static const historyClearAll = 'Clear all';

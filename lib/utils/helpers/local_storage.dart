@@ -54,6 +54,18 @@ class LocalStorage {
     }
   }
 
+  static String? get cachedEmail {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final email =
+          (jsonDecode(raw) as Map<String, dynamic>)['email'] as String?;
+      return email == null || email.isEmpty ? null : email;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String? get cachedHandle {
     final raw = getString(cachedUserKey);
     if (raw == null) return null;

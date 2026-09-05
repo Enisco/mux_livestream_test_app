@@ -15,6 +15,12 @@ abstract final class AppColors {
 
   static const error = Color(0xFFE74C3C);
 
+  /// The red a destructive settings row is written in.
+  static const destructive = Color(0xFFFF4D4F);
+
+  /// The amber a count pill and a settings action are written in.
+  static const yellow600 = Color(0xFFD08700);
+
   static const overlayDark = Color(0xBB000000);
   static const overlayMid = Color(0x80000000);
   static const overlayLight = Color(0x33000000);
