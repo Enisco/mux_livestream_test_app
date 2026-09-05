@@ -4,6 +4,8 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/settings/data/settings_dummy_data.dart';
 import 'package:test_app/features/settings/views/account_forms.dart';
+import 'package:test_app/features/settings/data/two_factor_dummy_data.dart';
+import 'package:test_app/features/settings/views/two_factor_screens.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -158,8 +160,16 @@ class SettingsScreen extends StatelessWidget {
                         title: AppStrings.settingsTwoFactor,
                         subtitle: SettingsDummyData.twoFactorStatus,
                         showChevron: true,
-                        onTap: () =>
-                            _todo(context, AppStrings.settingsTwoFactor),
+                        // Someone already enrolled lands on the manage
+                        // screen; everyone else starts the walkthrough.
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => TwoFactorDummyData.enabled
+                                ? const TwoFactorManageScreen()
+                                : const TwoFactorIntroScreen(),
+                          ),
+                        ),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedComputerPhoneSync,

@@ -350,6 +350,41 @@ abstract final class AppStrings {
   static const settingsPasswordSame =
       'Your new password must differ from the current one.';
 
+  // Two-factor authentication — the enrolment flow.
+  static const twoFactorTitle = 'Two-factor authentication';
+  static const twoFactorHeading = 'Add a second lock';
+  static const twoFactorBody =
+      "When you sign in, you'll also enter a 6-digit code from an "
+      'authenticator app on your phone.';
+  static const twoFactorApps =
+      'Works with Google Authenticator, Authy, 1Password or any TOTP app. '
+      'No SMS needed.';
+  static const twoFactorSetup = 'Setup';
+  static const twoFactorScanTitle = 'Scan this code';
+  static const twoFactorScanBody =
+      'Open your authenticator app and scan — or add the key by hand.';
+  static const twoFactorAdded = "I've added it";
+  static const twoFactorKeyCopied = 'Key copied';
+  static const twoFactorCodeTitle = 'Enter the code';
+  static const twoFactorCodeBody =
+      'Type the 6-digit code your app shows right now, so we know '
+      "it's connected.";
+  static const twoFactorTurnOn = 'Turn on 2FA';
+  static const twoFactorOn = '2FA is on';
+  static const twoFactorOff = '2FA is off';
+  static const twoFactorOffSub = 'Not set up on this account yet';
+  static const twoFactorRescan = 'Rescan / new device';
+  static const twoFactorRescanSub = 'Re-enroll with a fresh code';
+  static const twoFactorBeginSetup = 'Begin Setup';
+  static const twoFactorLostPhoneLead = 'Lose your phone?';
+  static const twoFactorLostPhoneBody =
+      ' Reset your password by email to get back in, that signs out every '
+      'device.';
+  static const twoFactorNotWired =
+      'Turning on 2FA is not wired to the API yet.';
+  static const twoFactorResendNotWired =
+      'There is no route to issue a fresh secret yet.';
+
   // History — what the reader has watched and read.
   static const historyTitle = 'History';
   static const historyClearAll = 'Clear all';

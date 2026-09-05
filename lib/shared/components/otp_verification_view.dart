@@ -194,7 +194,7 @@ class _OtpVerificationViewState extends State<OtpVerificationView> {
           AuthErrorBanner(message: message),
           const SizedBox(height: 12),
         ],
-        _ResendRow(secondsLeft: _secondsLeft, onResend: _resend),
+        OtpResendRow(secondsLeft: _secondsLeft, onResend: _resend),
       ],
     );
   }
@@ -223,8 +223,14 @@ class _MailBadge extends StatelessWidget {
   }
 }
 
-class _ResendRow extends StatelessWidget {
-  const _ResendRow({required this.secondsLeft, required this.onResend});
+/// "Didn't get it? Send again · 0:42" — the resend, locked until its
+/// countdown runs out. Shared with the two-factor code step.
+class OtpResendRow extends StatelessWidget {
+  const OtpResendRow({
+    super.key,
+    required this.secondsLeft,
+    required this.onResend,
+  });
 
   final int secondsLeft;
   final VoidCallback onResend;
