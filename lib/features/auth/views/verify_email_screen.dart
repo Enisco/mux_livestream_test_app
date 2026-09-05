@@ -47,8 +47,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   static const _codeLength = 6;
   static const _resendCooldown = 60;
 
+  /// The copy and the code slots.
   static const _contentInset = 46.0;
-  static const _sideInset = 20.0;
+
+  /// The Verify button, which the design runs wider than the content.
+  ///
+  /// These used to be applied the other way round — the scaffold inset
+  /// everything to 46 and the footer subtracted its way back out with
+  /// `20 + 4 - 46`, a negative EdgeInsets that asserts in Padding. The screen
+  /// could not render at all.
+  static const _footerInset = 24.0;
 
   @override
   void initState() {
@@ -125,24 +133,25 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       value: SystemUiOverlayStyle.light,
       child: OnboardingScaffold(
         backgroundAsset: AppAssets.onboardingBg,
-        horizontalPadding: _contentInset,
+        horizontalPadding: _footerInset,
         topBar: Align(
           alignment: Alignment.centerLeft,
           child: _BackButton(onTap: () => context.pop()),
         ),
-        footer: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _sideInset + 4 - _contentInset,
-          ),
-          child: PrimaryButton(
+        footer: PrimaryButton(
             label: AppStrings.verify,
             enabled: complete && !_submitting,
             loading: _submitting,
-            labelStyle: AppStyles.button(16, lineHeight: 28 / 16),
-            onPressed: _verify,
-          ),
+          labelStyle: AppStyles.button(16, lineHeight: 28 / 16),
+          onPressed: _verify,
         ),
-        child: _content(complete),
+        // The copy and the code slots sit further in than the button does.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _contentInset - _footerInset,
+          ),
+          child: _content(complete),
+        ),
       ),
     );
   }
