@@ -327,6 +327,12 @@ abstract final class AppStrings {
   static const settingsConfirmPassword = 'Confirm new password';
   static const settingsPasswordRule =
       'At least 8 characters, with a number and a letter.';
+  static const settingsConfirmEmailTitle = 'Check your mail';
+  static const settingsConfirmPhoneTitle = 'Check your messages';
+  static const settingsOtpNotWired =
+      'Confirming this change is not wired to the API yet.';
+  static const settingsOtpResendNotWired =
+      'Sending another code is not wired to the API yet.';
   static const settingsShow = 'Show';
   static const settingsHide = 'Hide';
 

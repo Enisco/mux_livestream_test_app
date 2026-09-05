@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/settings/data/account_form_rules.dart';
 import 'package:test_app/features/settings/data/settings_dummy_data.dart';
+import 'package:test_app/features/settings/views/confirm_change_screen.dart';
 import 'package:test_app/features/settings/views/widgets/settings_form.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -170,7 +171,18 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       current: _current.text,
     );
     setState(() => _error = problem);
-    if (problem == null) _notWired(context, 'Changing your email address');
+    if (problem == null) {
+      // The designed flow posts the change and then asks for the code; only
+      // the second half of that exists, so this goes straight to it.
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConfirmChangeScreen.email(
+            destination: _next.text.trim(),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -235,7 +247,16 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
       current: _current.text,
     );
     setState(() => _error = problem);
-    if (problem == null) _notWired(context, 'Changing your phone number');
+    if (problem == null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConfirmChangeScreen.phone(
+            destination: _next.text.trim(),
+          ),
+        ),
+      );
+    }
   }
 
   @override
