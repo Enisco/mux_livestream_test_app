@@ -8,18 +8,17 @@ import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
-import 'package:test_app/features/discovery/views/search_screen.dart';
+import 'package:test_app/features/explore/views/explore_screen.dart';
 import 'package:test_app/features/home/views/home_feed_screen.dart';
-import 'package:test_app/features/home/views/home_screen.dart';
 import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/landing/views/widgets/gtube_nav_bar.dart';
+import 'package:test_app/features/profile/views/profile_screen.dart';
 import 'package:test_app/features/livestream/views/join_livestream_screen.dart';
 import 'package:test_app/features/livestream/views/start_livestream_screen.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/services/vertical_feed_preloader.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
-import 'package:test_app/utils/helpers/local_storage.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -31,7 +30,9 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  int get _bodyIndex => _selectedIndex == 0 ? 0 : _selectedIndex - 1;
+  /// Explore used to be pushed as a route rather than held as a tab, so the
+  /// body index had to skip over it. It is a tab now and the two line up.
+  int get _bodyIndex => _selectedIndex;
 
   @override
   void initState() {
@@ -40,13 +41,6 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _onNavTap(int index) {
-    if (index == 1) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SearchScreen()),
-      );
-      return;
-    }
     if (index != _selectedIndex) setState(() => _selectedIndex = index);
   }
 
@@ -67,7 +61,12 @@ class _MainShellState extends State<MainShell> {
         extendBody: true,
         body: IndexedStack(
           index: _bodyIndex,
-          children: const [_HomeTab(), _FollowingTab(), _ProfileTab()],
+          children: const [
+            _HomeTab(),
+            _ExploreTab(),
+            _FollowingTab(),
+            _ProfileTab(),
+          ],
         ),
         bottomNavigationBar: _buildNavBar(),
       ),
@@ -93,6 +92,13 @@ class _HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => const HomeFeedScreen();
+}
+
+class _ExploreTab extends StatelessWidget {
+  const _ExploreTab();
+
+  @override
+  Widget build(BuildContext context) => const ExploreScreen();
 }
 
 class _FollowingTab extends StatelessWidget {
@@ -433,7 +439,7 @@ class _ProfileTabState extends State<_ProfileTab> {
         duration: const Duration(milliseconds: 280),
         child: switch (_isLoggedIn) {
           null => _buildLoading(),
-          true => _buildProfile(context),
+          true => const ProfileScreen(),
           false => _buildAuthWall(context),
         },
       ),
@@ -661,295 +667,6 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildProfile(BuildContext ctx) {
-    final name =
-        LocalStorage.cachedFullName ?? LocalStorage.cachedFirstName ?? 'User';
-    final handle = LocalStorage.cachedHandle;
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-
-    return Scaffold(
-      key: const ValueKey('profile'),
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            scrolledUnderElevation: 0,
-            expandedHeight: 160,
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.pin,
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [AppColors.surface, AppColors.background],
-                  ),
-                ),
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 68,
-                          height: 68,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.primary,
-                                AppColors.primaryDark,
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.3),
-                                blurRadius: 16,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              initial,
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              if (handle != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  handle,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _MenuSection(
-                  title: 'Content',
-                  items: [
-                    _MenuItem(
-                      icon: IconsaxPlusLinear.gallery,
-                      label: 'My Gallery',
-                      subtitle: 'Videos stored on your device',
-                      onTap: () => Navigator.push(
-                        ctx,
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                      ),
-                    ),
-                    _MenuItem(
-                      icon: IconsaxPlusLinear.video,
-                      label: 'Go Live',
-                      subtitle: 'Start broadcasting via RTMP',
-                      accent: true,
-                      onTap: () => Navigator.push(
-                        ctx,
-                        MaterialPageRoute(
-                          builder: (_) => const StartLivestreamScreen(),
-                        ),
-                      ),
-                    ),
-                    _MenuItem(
-                      icon: IconsaxPlusLinear.screenmirroring,
-                      label: 'Join a Stream',
-                      subtitle: 'Watch a live creator',
-                      onTap: () => Navigator.push(
-                        ctx,
-                        MaterialPageRoute(
-                          builder: (_) => const JoinLivestreamScreen(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                _MenuSection(
-                  title: 'Account',
-                  items: [
-                    _MenuItem(
-                      icon: IconsaxPlusLinear.logout,
-                      label: 'Sign Out',
-                      isDestructive: true,
-                      onTap: () =>
-                          ctx.read<AuthBloc>().add(AuthLogoutRequested()),
-                    ),
-                  ],
-                ),
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MenuSection extends StatelessWidget {
-  final String title;
-  final List<_MenuItem> items;
-  const _MenuSection({required this.title, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            title.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textTertiary,
-              letterSpacing: 0.9,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < items.length; i++) ...[
-                items[i],
-                if (i < items.length - 1)
-                  const Divider(
-                    height: 1,
-                    indent: 58,
-                    color: AppColors.surfaceVariant,
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MenuItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final bool accent;
-  final bool isDestructive;
-  final VoidCallback onTap;
-
-  const _MenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.subtitle,
-    this.accent = false,
-    this.isDestructive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isDestructive
-        ? AppColors.error
-        : accent
-        ? AppColors.primary
-        : AppColors.textPrimary;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: isDestructive
-                    ? AppColors.error.withValues(alpha: 0.1)
-                    : accent
-                    ? AppColors.primary.withValues(alpha: 0.12)
-                    : AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 19),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle!,
-                      style: const TextStyle(
-                        color: AppColors.textTertiary,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (!isDestructive)
-              const Icon(
-                IconsaxPlusLinear.arrow_right_3,
-                color: AppColors.textTertiary,
-                size: 20,
-              ),
-          ],
-        ),
       ),
     );
   }
