@@ -280,6 +280,28 @@ abstract final class AppStrings {
   static const navFollowing = 'Following';
   static const navYou = 'You';
 
+  // Search — the three states of the Explore search field.
+  static const searchFieldHint = 'Search...';
+  static const searchRecent = 'RECENT';
+  static const searchClearRecent = 'clear';
+  static const searchBrowse = 'BROWSE';
+  static const searchGroupMinistries = 'MINISTRIES';
+  static const searchGroupVideos = 'VIDEOS';
+  static const searchGroupAudio = 'AUDIO';
+  static const searchGroupDevotionals = 'DEVOTIONALS';
+  static const searchGroupBlogs = 'BLOGS';
+  static const searchGroupSeries = 'SERIES';
+  static const searchGroupEvents = 'EVENTS';
+  static const searchFollow = 'Follow';
+  static const searchFollowing = 'Following';
+  static const searchRsvp = 'RSVP';
+  static const searchKindVideo = 'Video';
+  static const searchKindAudio = 'Audio';
+  static const searchKindDevotional = 'Devotional';
+  static const searchKindBlog = 'Blog';
+  static const searchKindSeries = 'Series';
+  static const searchViewsSuffix = 'views';
+
   // Explore tab — section headers and the copy on its hero.
   static const exploreSearchHint = 'Search ministries, sermon, series...';
   static const exploreLive = 'Live';

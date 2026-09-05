@@ -43,10 +43,10 @@ class ExploreScreen extends StatelessWidget {
     );
   }
 
-  static void openSearch(BuildContext context) {
+  static void openSearch(BuildContext context, {String? query}) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SearchScreen()),
+      MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: query)),
     );
   }
 }
@@ -192,7 +192,10 @@ class _Content extends StatelessWidget {
         ),
         SizedBox(height: gap.s),
 
-        ExploreCategoryChips(categories: ExploreDummyData.categories),
+        ExploreCategoryChips(
+          categories: ExploreDummyData.categories,
+          onSelected: (c) => ExploreScreen.openSearch(context, query: c.label),
+        ),
       ],
     );
   }
