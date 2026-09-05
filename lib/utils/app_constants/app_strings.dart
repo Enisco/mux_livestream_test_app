@@ -385,6 +385,50 @@ abstract final class AppStrings {
   static const twoFactorResendNotWired =
       'There is no route to issue a fresh secret yet.';
 
+  // Event reminders, topics, and the two destructive account actions.
+  static const remindersTitle = 'Event reminders';
+  static const remindersToggle = 'Remind me before events';
+  static const remindersToggleSub =
+      "For events you've said you're going to";
+  static const remindersWhen = 'WHEN';
+  static const remindersDefault = 'Default';
+  static const remindersNote =
+      'Reminders arrive as push and in-app notifications. Virtual events '
+      'include the meeting link; in-person ones include the venue.';
+  static const remindersNotWired =
+      'Saving your reminder choice is not wired to the API yet.';
+
+  static const topicsTitle = 'Edit your topics';
+  static const topicsSubtitle =
+      'Choose what shows on your feed. Drag to reorder.';
+  static const topicsCaption = 'Topics';
+  static const topicsDone = 'Done';
+  static const topicsNotWired =
+      'Saving your topics is not wired to the API yet.';
+
+  static const logOutAllTitle = 'Log out of all devices?';
+  static const logOutAllBody =
+      "You'll be signed out everywhere, including this one. You'll need to "
+      'log in again with your password.';
+  static const logOutAllNote =
+      'Useful if you lost a device or suspect someone else has access.';
+  static const logOutAllConfirm = 'Log out of all';
+  static const logOutAllNotWired =
+      'Logging out every device is not wired to the API yet.';
+
+  static const deactivateTitle = 'Deactivate your account?';
+  static const deactivateBody =
+      "Your profile and activity will be hidden, and you'll be logged out.";
+  static const deactivateKeeps = 'Your content and giving records are preserved';
+  static const deactivateReturn = 'You can reactivate anytime by logging back in';
+  static const deactivateHidden =
+      "Others won't see your profile while deactivated";
+  static const deactivateConfirm = 'Deactivate';
+  static const deactivateNotWired =
+      'Deactivating an account is not wired to the API yet.';
+
+  static const commonCancel = 'Cancel';
+
   // History — what the reader has watched and read.
   static const historyTitle = 'History';
   static const historyClearAll = 'Clear all';
