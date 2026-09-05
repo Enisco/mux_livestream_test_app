@@ -302,6 +302,48 @@ abstract final class AppStrings {
   static const settingsNotSet = 'Not set';
   static const accountFallbackName = 'User';
 
+  // Settings forms — the screens each account row leads to.
+  static const settingsUpdate = 'Update';
+  static const settingsProfileInfo = 'Profile info';
+  static const settingsChangePhoto = 'Change photo';
+  static const settingsDisplayName = 'Display name';
+  static const settingsFirstNameHint = 'First name';
+  static const settingsLastNameHint = 'Last name';
+  static const settingsChangeEmailTitle = 'Change email address';
+  static const settingsEmailNotice =
+      "We'll send a verification link to your new address. Your email "
+      'changes once you confirm it.';
+  static const settingsCurrentEmail = 'Current email';
+  static const settingsNewEmail = 'New email';
+  static const settingsChangePhoneTitle = 'Phone number';
+  static const settingsPhoneNotice =
+      "We'll send a verification code to your new number. Your number "
+      'changes once you confirm it.';
+  static const settingsCurrentPhone = 'Current phone number';
+  static const settingsNewPhone = 'New phone number';
+  static const settingsChangePasswordTitle = 'Change password';
+  static const settingsCurrentPassword = 'Current password';
+  static const settingsNewPassword = 'New password';
+  static const settingsConfirmPassword = 'Confirm new password';
+  static const settingsPasswordRule =
+      'At least 8 characters, with a number and a letter.';
+  static const settingsShow = 'Show';
+  static const settingsHide = 'Hide';
+
+  // Settings forms — what goes wrong.
+  static const settingsNameRequired = 'Enter your first and last name.';
+  static const settingsEmailRequired = 'Enter your new email address.';
+  static const settingsEmailInvalid = 'That does not look like an email address.';
+  static const settingsEmailUnchanged = 'That is already your email address.';
+  static const settingsPhoneRequired = 'Enter your new phone number.';
+  static const settingsPhoneInvalid = 'Enter a phone number with at least 7 digits.';
+  static const settingsPhoneUnchanged = 'That is already your phone number.';
+  static const settingsPasswordRequired = 'Enter your current password.';
+  static const settingsPasswordWeak = AppStrings.settingsPasswordRule;
+  static const settingsPasswordMismatch = 'Those passwords do not match.';
+  static const settingsPasswordSame =
+      'Your new password must differ from the current one.';
+
   // History — what the reader has watched and read.
   static const historyTitle = 'History';
   static const historyClearAll = 'Clear all';

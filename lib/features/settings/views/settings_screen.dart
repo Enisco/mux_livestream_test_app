@@ -3,6 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/settings/data/settings_dummy_data.dart';
+import 'package:test_app/features/settings/views/account_forms.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -74,7 +75,12 @@ class SettingsScreen extends StatelessWidget {
                         title: name,
                         subtitle: AppStrings.settingsDisplayNamePhoto,
                         action: AppStrings.settingsEdit,
-                        onTap: () => _todo(context, 'Editing your profile'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ProfileInfoScreen(),
+                          ),
+                        ),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedMail01,
@@ -82,23 +88,36 @@ class SettingsScreen extends StatelessWidget {
                         subtitle: email,
                         subtitleVerified: SettingsDummyData.emailVerified,
                         action: AppStrings.settingsChange,
-                        onTap: () =>
-                            _todo(context, 'Changing your email address'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangeEmailScreen(),
+                          ),
+                        ),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedCall,
                         title: AppStrings.settingsPhone,
                         subtitle: SettingsDummyData.phone,
                         action: AppStrings.settingsChange,
-                        onTap: () =>
-                            _todo(context, 'Changing your phone number'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangePhoneScreen(),
+                          ),
+                        ),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedSquareLock01,
                         title: AppStrings.settingsPassword,
                         subtitle: SettingsDummyData.passwordChanged,
                         action: AppStrings.settingsChange,
-                        onTap: () => _todo(context, 'Changing your password'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChangePasswordScreen(),
+                          ),
+                        ),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedFlag01,
