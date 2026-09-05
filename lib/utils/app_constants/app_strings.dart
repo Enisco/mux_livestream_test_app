@@ -320,6 +320,31 @@ abstract final class AppStrings {
       'undone.';
   static const historyClearConfirm = 'Clear all';
 
+  // You — the reader's own profile and its menu.
+  static const profileAccountInfo = 'Account info';
+  static const profileContinueWatching = 'CONTINUE WATCHING';
+  static const profileStudio = 'STUDIO';
+  static const profileYou = 'YOU';
+  static const profileAccount = 'ACCOUNT';
+  static const profileBecomeCreator = 'Become a creator';
+  static const profileStartChannel = 'Start your channel';
+  static const profileStreamerTag = 'Streamer';
+  static const profileHistory = 'History';
+  static const profilePlaylist = 'Playlist';
+  static const profileLiked = 'Liked';
+  static const profileSaved = 'Saved';
+  static const profileMyEvents = 'My events';
+  static const profilePrayerRequests = 'My prayer requests';
+  static const profileTestimonies = 'My testimonies';
+  static const profileGiving = 'My giving';
+  static const profileSettings = 'Settings';
+  static const profileSignOut = 'Sign out';
+  static const profileSignOutTitle = 'Sign out?';
+  static const profileSignOutBody =
+      'You will need to sign in again to follow, save or go live.';
+  static const profileRemainingSuffix = 'remaining';
+  static const profileUpcomingSuffix = 'Upcoming';
+
   // Search — the three states of the Explore search field.
   static const searchFieldHint = 'Search...';
   static const searchRecent = 'RECENT';

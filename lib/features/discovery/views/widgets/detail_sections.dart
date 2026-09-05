@@ -69,6 +69,7 @@ class DetailAvatar extends StatelessWidget {
     this.avatarUrl,
     this.isOrganization = false,
     this.size = 32,
+    this.ringColor,
   });
 
   final String name;
@@ -76,9 +77,15 @@ class DetailAvatar extends StatelessWidget {
   final bool isOrganization;
   final double size;
 
+  /// Overrides the kind-based ring. The reader's own avatar is ringed in
+  /// brand colour rather than by what sort of account it is.
+  final Color? ringColor;
+
   @override
   Widget build(BuildContext context) {
-    final ring = isOrganization ? AppColors.purple400 : AppColors.cyan400;
+    final ring =
+        ringColor ??
+        (isOrganization ? AppColors.purple400 : AppColors.cyan400);
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     final avatar = Container(
       width: size.s,
