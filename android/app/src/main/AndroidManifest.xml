@@ -13,7 +13,7 @@
     <!-- Android 13+ asks before a notification may be posted at all. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="GTube Test"
+        android:label="GospelTube"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
