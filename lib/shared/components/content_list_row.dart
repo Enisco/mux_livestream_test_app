@@ -30,6 +30,9 @@ class ContentListRow extends StatelessWidget {
     this.eventVenue,
     this.eventTime,
     this.titleMaxLines = 2,
+    this.compact = false,
+    this.moreKey,
+    this.trailing,
     this.onTap,
     this.onMore,
   });
@@ -59,6 +62,19 @@ class ContentListRow extends StatelessWidget {
   final String? eventTime;
 
   final int titleMaxLines;
+
+  /// Playlists draw the same row on a smaller still, with the runtime in the
+  /// bottom-left corner rather than the bottom-right.
+  final bool compact;
+
+  /// Names the overflow button, for screens that open different sheets from
+  /// different rows.
+  final Key? moreKey;
+
+  /// Replaces the overflow button — Liked and Saved put the thing that filed
+  /// the row here instead, so tapping it takes the row back out.
+  final Widget? trailing;
+
   final VoidCallback? onTap;
   final VoidCallback? onMore;
 
@@ -80,23 +96,26 @@ class ContentListRow extends StatelessWidget {
               glyph: glyph,
               badge: badge,
               progress: progress,
+              compact: compact,
             ),
             SizedBox(width: 8.s),
             Expanded(child: _Body(row: this)),
             SizedBox(width: 10.s),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onMore,
-              child: SizedBox(
-                width: 24.s,
-                height: 24.s,
-                child: HugeIcon(
-                  icon: HugeIcons.strokeRoundedMoreVertical,
-                  color: AppColors.neutral400,
-                  size: 20.s,
+            trailing ??
+                GestureDetector(
+                  key: moreKey,
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onMore,
+                  child: SizedBox(
+                    width: 24.s,
+                    height: 24.s,
+                    child: HugeIcon(
+                      icon: HugeIcons.strokeRoundedMoreVertical,
+                      color: AppColors.neutral400,
+                      size: 20.s,
+                    ),
+                  ),
                 ),
-              ),
-            ),
           ],
         ),
       ),
@@ -111,6 +130,7 @@ class _Still extends StatelessWidget {
     this.glyph,
     this.badge,
     this.progress,
+    this.compact = false,
   });
 
   final String? url;
@@ -118,14 +138,15 @@ class _Still extends StatelessWidget {
   final List<List<dynamic>>? glyph;
   final String? badge;
   final double? progress;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8.s),
       child: SizedBox(
-        width: 146.s,
-        height: 87.s,
+        width: compact ? 104.s : 146.s,
+        height: compact ? 58.s : 87.s,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -149,7 +170,8 @@ class _Still extends StatelessWidget {
             ),
             if (badge case final label?)
               Positioned(
-                right: 8.s,
+                left: compact ? 8.s : null,
+                right: compact ? null : 8.s,
                 bottom: 6.s,
                 child: Text(
                   label,
@@ -233,19 +255,19 @@ class _Body extends StatelessWidget {
             ),
             if (row.creatorVerified) ...[
               SizedBox(width: 4.s),
-              DesignIcon(
-                AppAssets.iconFeedVerified,
-                width: 14.s,
-                height: 14.s,
-              ),
+              DesignIcon(AppAssets.iconFeedVerified, width: 14.s, height: 14.s),
             ],
           ],
         ),
         SizedBox(height: 4.s),
         if (row._isEvent) ...[
           if (row.eventDate case final date?)
-            Text(date, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: muted),
+            Text(
+              date,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: muted,
+            ),
           if (row.eventVenue != null || row.eventTime != null) ...[
             SizedBox(height: 4.s),
             Row(
@@ -259,8 +281,12 @@ class _Body extends StatelessWidget {
                 SizedBox(width: 2.s),
                 if (row.eventVenue case final where?)
                   Flexible(
-                    child: Text(where, maxLines: 1,
-                        overflow: TextOverflow.ellipsis, style: muted),
+                    child: Text(
+                      where,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: muted,
+                    ),
                   ),
                 if (row.eventTime case final at?) ...[
                   SizedBox(width: 6.s),
@@ -270,7 +296,12 @@ class _Body extends StatelessWidget {
             ),
           ],
         ] else if (row.meta case final line?)
-          Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
+          Text(
+            line,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: muted,
+          ),
       ],
     );
   }
@@ -293,11 +324,7 @@ class _Avatar extends StatelessWidget {
         color: AppColors.buttonSecondaryActive,
         border: Border.all(color: AppColors.purple400, width: size / 16),
       ),
-      child: Icon(
-        Icons.person,
-        size: size * 0.6,
-        color: AppColors.neutral400,
-      ),
+      child: Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400),
     );
   }
 }

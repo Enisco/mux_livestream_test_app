@@ -53,6 +53,16 @@ abstract final class AppColors {
 
   static const green500 = Color(0xFF00C951);
 
+  /// Document links on the giving screen — receipts, invoices and vouchers
+  /// read as links rather than as brand actions.
+  static const linkBlue = Color(0xFF3B9EFF);
+
+  /// Status pills on prayer requests and testimonies: waiting, answered,
+  /// settled.
+  static const statusOpen = Color(0xFFD08700);
+  static const statusDone = Color(0xFF3FBF6E);
+  static const statusClosed = Color(0xFF6FA8DC);
+
   static const brandGold = Color(0xFFEDB021);
 
   static const brandSecondary = Color(0xFF0D0D0D);

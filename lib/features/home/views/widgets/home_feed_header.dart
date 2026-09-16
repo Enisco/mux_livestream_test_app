@@ -19,6 +19,7 @@ class HomeFeedHeader extends StatelessWidget {
     required this.selectedTopic,
     required this.onTopicChanged,
     this.onEditTopics,
+    this.onManage,
   });
 
   final HomeTab tab;
@@ -28,6 +29,10 @@ class HomeFeedHeader extends StatelessWidget {
   final String? selectedTopic;
   final ValueChanged<String?> onTopicChanged;
   final VoidCallback? onEditTopics;
+
+  /// Opens the list of everything followed. The design only offers it on the
+  /// Following tab, so the header hides it elsewhere.
+  final VoidCallback? onManage;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +52,17 @@ class HomeFeedHeader extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _Tabs(tab: tab, onChanged: onTabChanged),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    _Tabs(tab: tab, onChanged: onTabChanged),
+                    if (tab == HomeTab.following && onManage != null)
+                      Positioned(
+                        right: 16.s,
+                        child: _ManageAction(onTap: onManage!),
+                      ),
+                  ],
+                ),
                 SizedBox(height: 22.s),
                 _TopicRail(
                   topics: topics,
@@ -249,6 +264,41 @@ class _Chip extends StatelessWidget {
             lineHeight: 16 / 12,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// "⊕ Manage", top-right of the Following tab.
+class _ManageAction extends StatelessWidget {
+  const _ManageAction({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.add_circle_outline,
+            size: 14.s,
+            color: AppColors.brandPrimary,
+          ),
+          SizedBox(width: 5.s),
+          Text(
+            AppStrings.followingManage,
+            style: AppStyles.label(
+              13,
+              weight: AppStyles.bold,
+              color: AppColors.brandPrimary,
+              lineHeight: 18 / 13,
+            ),
+          ),
+        ],
       ),
     );
   }

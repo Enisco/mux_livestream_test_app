@@ -251,6 +251,8 @@ abstract final class AppStrings {
   static const checkAgain = 'Check again';
   static const tryAgain = 'Try again';
   static const notNow = 'Not now';
+  static const cancel = 'Cancel';
+  static const justNow = 'just now';
 
   static const selectAGender = 'Select a gender';
   static const genderMale = 'Male';
@@ -339,10 +341,12 @@ abstract final class AppStrings {
   // Settings forms — what goes wrong.
   static const settingsNameRequired = 'Enter your first and last name.';
   static const settingsEmailRequired = 'Enter your new email address.';
-  static const settingsEmailInvalid = 'That does not look like an email address.';
+  static const settingsEmailInvalid =
+      'That does not look like an email address.';
   static const settingsEmailUnchanged = 'That is already your email address.';
   static const settingsPhoneRequired = 'Enter your new phone number.';
-  static const settingsPhoneInvalid = 'Enter a phone number with at least 7 digits.';
+  static const settingsPhoneInvalid =
+      'Enter a phone number with at least 7 digits.';
   static const settingsPhoneUnchanged = 'That is already your phone number.';
   static const settingsPasswordRequired = 'Enter your current password.';
   static const settingsPasswordWeak = AppStrings.settingsPasswordRule;
@@ -388,8 +392,7 @@ abstract final class AppStrings {
   // Event reminders, topics, and the two destructive account actions.
   static const remindersTitle = 'Event reminders';
   static const remindersToggle = 'Remind me before events';
-  static const remindersToggleSub =
-      "For events you've said you're going to";
+  static const remindersToggleSub = "For events you've said you're going to";
   static const remindersWhen = 'WHEN';
   static const remindersDefault = 'Default';
   static const remindersNote =
@@ -419,8 +422,10 @@ abstract final class AppStrings {
   static const deactivateTitle = 'Deactivate your account?';
   static const deactivateBody =
       "Your profile and activity will be hidden, and you'll be logged out.";
-  static const deactivateKeeps = 'Your content and giving records are preserved';
-  static const deactivateReturn = 'You can reactivate anytime by logging back in';
+  static const deactivateKeeps =
+      'Your content and giving records are preserved';
+  static const deactivateReturn =
+      'You can reactivate anytime by logging back in';
   static const deactivateHidden =
       "Others won't see your profile while deactivated";
   static const deactivateConfirm = 'Deactivate';
@@ -428,6 +433,196 @@ abstract final class AppStrings {
       'Deactivating an account is not wired to the API yet.';
 
   static const commonCancel = 'Cancel';
+
+  // Liked and Saved — two libraries built on the History skeleton.
+  static const likedTitle = 'Liked';
+  static const likedSearchHint = 'Search...';
+  static const likedCountSuffix = "things you've appreciated";
+  static const likedEmptyTitle = 'Nothing liked yet';
+  static const likedEmptyBody =
+      "Tap the heart on a sermon, song, or message you appreciate, and it'll "
+      'gather here.';
+  static const likedClearTitle = 'Clear everything you have liked?';
+  static const likedClearBody =
+      'This empties the list. It does not unlike anything on the content '
+      'itself.';
+
+  static const savedTitle = 'Save';
+  static const savedCountSuffix = 'contents saved';
+  static const savedEmptyTitle = 'Nothing saved yet';
+  static const savedEmptyBody =
+      'Tap the bookmark on any sermon, song, article, devotional, or event '
+      'to keep it here for later.';
+  static const savedClearTitle = 'Clear everything you have saved?';
+  static const savedClearBody =
+      'This empties the list. It does not unsave anything on the content '
+      'itself.';
+
+  static const libraryFilterAll = 'All';
+  static const libraryFilterVideo = 'Video';
+  static const libraryFilterAudio = 'Audio';
+  static const libraryFilterDevotionals = 'Devotionals';
+  static const libraryFilterArticles = 'Articles/Blog';
+  static const libraryNoMatchTitle = 'Nothing matched';
+  static const libraryNoMatchBody =
+      'Try a different word, or clear the search to see everything.';
+
+  // My events, prayer requests and testimonies.
+  static const myEventsTitle = 'My events';
+  static const myEventsSort = 'Recent';
+  static const myEventsCountSuffix = 'events';
+  static const myEventsUpcoming = 'UPCOMING';
+  static const myEventsPast = 'PAST';
+  static const myEventsRsvp = 'RSVP';
+  static const myEventsGoing = 'Going';
+  static const myEventsAddToCalendar = 'Add to calendar';
+  static const myEventsEmptyTitle = 'No events yet';
+  static const myEventsEmptyBody =
+      "When you RSVP to a service, conference, or gathering, it'll show up "
+      "here with a reminder so you don't miss it.";
+
+  static const prayerTitle = 'My prayer requests';
+  static const prayerAboutPrefix = 'About:';
+  static const prayerGeneral = 'General';
+  static const prayerSharedPrefix = 'Shared';
+  static const prayerStatusOpen = 'Open';
+  static const prayerStatusPrayedFor = 'Prayed for';
+  static const prayerStatusClosed = 'Closed';
+  static const prayerFilterAll = 'All';
+  static const prayerFilterOpen = 'Open';
+  static const prayerFilterAudio = 'Audio';
+  static const prayerFilterPrayedFor = 'Prayed for';
+  static const prayerFilterClosed = 'Closed';
+  static const prayerActionEdit = 'Edit';
+  static const prayerActionPrayAgain = 'Pray again';
+  static const prayerActionGoToContent = 'Go to content';
+  static const prayerActionDelete = 'Delete';
+  static const prayerEmptyTitle = 'No request yet';
+  static const prayerEmptyBody =
+      "When something weighs on you, any ministry's page has a place to ask, "
+      'and what you send shows up here, between you and them.';
+
+  static const testimoniesTitle = 'Testimonies';
+  static const testimoniesSubmittedPrefix = 'Submitted';
+  static const testimonyPending = 'Pending review';
+  static const testimonyApproved = 'Approved';
+  static const testimonyRejected = 'Not approved';
+  static const testimonyPendingNote =
+      'A Leader at Grace chapel will review this before it appears on their '
+      'testimony wall';
+  static const testimonyLivePrefix = 'Live on';
+  static const testimonyLiveSuffix = "'s wall";
+  static const testimonyRejectedNote =
+      "This wasn't published to the wall. You can edit and resubmit, or reach "
+      'the ministry if you have questions.';
+  static const testimonyActionView = 'View on wall';
+  static const testimonyActionRemove = 'Remove testimony';
+  static const testimoniesEmptyTitle = 'No testimonies yet';
+  static const testimoniesEmptyBody =
+      'When you share what God has done with a ministry, your testimonies and '
+      'their status will be kept here. Each one is reviewed before it appears '
+      'on a wall.';
+
+  // Playlists — the reader's own running orders.
+  static const playlistsTitle = 'Playlists';
+  static const playlistsNew = 'New playlist';
+  static const playlistsSearchHint = 'Search playlist...';
+  static const playlistsItemsSuffix = 'items';
+  static const playlistsUpdatedPrefix = 'Updated';
+  static const playlistsVideosSuffix = 'Videos';
+  static const playlistsEmptyTitle = 'You have no playlist';
+  static const playlistsEmptyBody =
+      'Save sermons and worship into playlists to line them up and play them '
+      'back to back.';
+  static const playlistEditCover = 'Edit Cover Photo';
+  static const playlistItemsLabel = 'Items';
+  static const playlistRecommended = 'Recommended for you';
+  static const playlistEmptyTitle = 'This playlist is empty';
+  static const playlistEmptyBody =
+      'The videos, messages, and devotionals you watch and read will show up '
+      'here.';
+
+  // What a playlist's overflow offers.
+  static const playlistPlayAll = 'Play all';
+  static const playlistUpdateCover = 'Update cover photo';
+  static const playlistEditDetail = 'Edit playlist detail';
+  static const playlistDelete = 'Delete this playlist';
+
+  // The new/edit playlist form.
+  static const playlistNewTitle = 'New playlist';
+  static const playlistEditTitle = 'Edit playlist';
+  static const playlistNameLabel = 'Name of the playlist';
+  static const playlistNameHint = 'Encouragement for hard days';
+  static const playlistVisibilityLabel = 'Playlist visibility';
+  static const playlistPrivate = 'Private';
+  static const playlistPublic = 'Public';
+  static const playlistCreate = 'Create new playlist';
+  static const playlistUpdate = 'Update';
+
+  // Adding content to a playlist.
+  static const playlistAddTitle = 'Recommended contents';
+  static const playlistAddToPrefix = 'Add to';
+  static const playlistAddToSuffix = 'playlist';
+  static const playlistAdd = 'Add';
+  static const playlistAddSelection = 'Add selection';
+
+  // What one row inside a playlist offers.
+  static const playlistItemPlay = 'Play';
+  static const playlistItemRemove = 'Remove from playlist';
+  static const playlistItemAdd = 'Add to this playlist';
+
+  // Deleting one.
+  static const playlistDeleteTitle = 'Delete this playlist';
+  static const playlistDeleteConfirm = 'DELETE';
+  static String playlistDeleteBody(String name, int items) =>
+      '"$name" and its $items items will be removed from your playlists. The '
+      'content itself stays on GospelTube.';
+
+  // Giving — what the reader has sent to ministries.
+  static const givingTitle = 'My giving';
+  static const givingGivenThisYear = 'Given this year';
+  static const givingTotalSuffix = 'total';
+  static const givingGiftsSuffix = 'gifts';
+  static const givingAcrossPrefix = 'Across';
+  static const givingMinistriesSuffix = 'ministries';
+  static const givingDownloadStatement = 'Download yearly statement';
+  static const givingReceipt = 'Receipt';
+  static const givingInvoice = 'Invoice';
+  static const givingVoucher = 'Voucher';
+  static const givingEmptyTitle = 'No givings yet';
+  static const givingEmptyBody =
+      'When you give to a ministry, your gifts and receipts will be kept here '
+      'for your records.';
+
+  // Subscriptions — the ministries the reader follows.
+  static const followingTitle = 'Following';
+  static const followingManage = 'Manage';
+  static const followingSeeLatest = 'See latest content';
+  static const followingSearchHint = 'Search ministries...';
+  static const followingLive = 'LIVE';
+  static const followingLiveNow = 'Live now';
+  static const followingPostedPrefix = 'Posted';
+  static const followingUnfollowPrefix = 'Unfollow';
+  static const followingNoMatchTitle = 'No ministry matched';
+  static const followingNoMatchBody =
+      'Try a different name, or clear the search to see everyone you follow.';
+  static const followingFillTitle = 'Follow ministries to fill this feed';
+  static const followingFillBody =
+      'When you subscribe to a church or creator, their newest videos, '
+      'messages, and livestreams show up here, all in one place.';
+  static const followingStarterTitle = 'Ministries to get you started';
+  static const followingShowMore = 'Show more';
+
+  // How much a ministry is allowed to notify.
+  static const notifyAll = 'All';
+  static const notifyAllBody = 'Get notified on all things';
+  static const notifyPersonalized = 'Personalized';
+  static const notifyPersonalizedBody =
+      'Every new video, post, livestream and event';
+  static const notifyLive = 'Live & events';
+  static const notifyLiveBody = 'Streams and event reminders, nothing else';
+  static const notifyNone = 'None';
+  static const notifyNoneBody = 'Stay subscribed, no notifications';
 
   // History — what the reader has watched and read.
   static const historyTitle = 'History';

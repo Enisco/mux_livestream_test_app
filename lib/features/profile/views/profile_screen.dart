@@ -10,6 +10,11 @@ import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/history/views/history_screen.dart';
+import 'package:test_app/features/library/views/liked_saved_screens.dart';
+import 'package:test_app/features/library/views/giving_screen.dart';
+import 'package:test_app/features/library/views/my_events_screen.dart';
+import 'package:test_app/features/library/views/playlists_screen.dart';
+import 'package:test_app/features/library/views/records_screens.dart';
 import 'package:test_app/features/profile/data/profile_dummy_data.dart';
 import 'package:test_app/features/profile/views/widgets/profile_header_card.dart';
 import 'package:test_app/features/profile/views/widgets/profile_menu.dart';
@@ -204,17 +209,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedFolderHeart,
           label: AppStrings.profilePlaylist,
-          onTap: () => _todo(AppStrings.profilePlaylist),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PlaylistsScreen()),
+          ),
         ),
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedThumbsUp,
           label: AppStrings.profileLiked,
-          onTap: () => _todo(AppStrings.profileLiked),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LikedScreen()),
+          ),
         ),
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedBookmarkAdd01,
           label: AppStrings.profileSaved,
-          onTap: () => _todo(AppStrings.profileSaved),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SavedScreen()),
+          ),
         ),
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedCalendar03,
@@ -223,22 +237,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ? '${ProfileDummyData.upcomingEventCount} '
                     '${AppStrings.profileUpcomingSuffix}'
               : null,
-          onTap: () => _todo(AppStrings.profileMyEvents),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MyEventsScreen()),
+          ),
         ),
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedCharity,
           label: AppStrings.profilePrayerRequests,
-          onTap: () => _todo(AppStrings.profilePrayerRequests),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PrayerRequestsScreen()),
+          ),
         ),
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedFile01,
           label: AppStrings.profileTestimonies,
-          onTap: () => _todo(AppStrings.profileTestimonies),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TestimoniesScreen()),
+          ),
         ),
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedGift,
           label: AppStrings.profileGiving,
-          onTap: () => _todo(AppStrings.profileGiving),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const GivingScreen()),
+          ),
         ),
       ],
     );

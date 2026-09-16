@@ -132,9 +132,14 @@ class AppStyles {
     letterSpacing: letterSpacing,
   );
 
-  /// The brand fonts carry no emoji; naming the system faces is what makes
-  /// them resolve on Android and physical iOS devices.
+  /// What to reach for when the brand face has no glyph.
+  ///
+  /// Satoshi carries no emoji and no currency signs beyond the common few —
+  /// a naira amount renders as a box without this. Inter ships with the app
+  /// and covers both, and naming the system emoji faces is what makes those
+  /// resolve on Android and physical iOS devices.
   static const List<String> emojiFallback = [
+    featureFont,
     'Apple Color Emoji',
     'Noto Color Emoji',
     'Segoe UI Emoji',

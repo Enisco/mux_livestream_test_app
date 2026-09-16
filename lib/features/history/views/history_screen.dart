@@ -8,6 +8,7 @@ import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
+import 'package:test_app/shared/components/library_parts.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -67,10 +68,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.fieldBg,
-        title: Text(
-          AppStrings.historyClearTitle,
-          style: AppStyles.heading(16),
-        ),
+        title: Text(AppStrings.historyClearTitle, style: AppStyles.heading(16)),
         content: Text(
           AppStrings.historyClearBody,
           style: AppStyles.body(13, color: AppColors.neutral400),
@@ -119,10 +117,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HistoryHeader(
+          LibraryHeader(
+            title: AppStrings.historyTitle,
+            actionLabel: AppStrings.historyClearAll,
+            actionIcon: HugeIcons.strokeRoundedDelete02,
+            onAction: _confirmClear,
             controller: _controller,
             onQueryChanged: (v) => setState(() => _query = v),
-            onClearAll: _confirmClear,
+            searchHint: AppStrings.historySearchHint,
           ),
           Expanded(
             child: days.isEmpty && resume.isEmpty
@@ -140,7 +142,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _empty() => HistoryEmptyState(
+  Widget _empty() => LibraryEmptyState(
+    icon: HugeIcons.strokeRoundedUserGroup,
     title: _query.isEmpty
         ? AppStrings.historyEmptyTitle
         : AppStrings.historyNoMatchTitle,
@@ -172,10 +175,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             children: [
               for (final (i, item) in items.indexed) ...[
                 if (i > 0) SizedBox(width: 16.s),
-                HistoryResumeCard(
-                  item: item,
-                  onTap: () => _todo(item.title),
-                ),
+                HistoryResumeCard(item: item, onTap: () => _todo(item.title)),
               ],
             ],
           ),
@@ -186,13 +186,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   List<Widget> _day(HistoryDay day) => [
-    Padding(
-      padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 12.s),
-      child: Text(
-        day.label,
-        style: AppStyles.label(14, weight: AppStyles.bold, lineHeight: 20 / 14),
-      ),
-    ),
+    LibraryGroupLabel(label: day.label),
     for (final entry in day.entries)
       Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.s),

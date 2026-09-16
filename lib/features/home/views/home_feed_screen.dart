@@ -13,6 +13,7 @@ import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/subscriptions/views/manage_following_screen.dart';
 import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/empty_tab_views.dart';
@@ -330,6 +331,16 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
             onEditTopics: () {
               if (_requireAccount('edit your topics')) {
                 context.push(AppRouter.interests);
+              }
+            },
+            onManage: () {
+              if (_requireAccount('manage who you follow')) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ManageFollowingScreen(),
+                  ),
+                );
               }
             },
           ),
