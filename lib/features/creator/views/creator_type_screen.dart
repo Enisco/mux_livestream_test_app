@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/router.dart';
-import 'package:test_app/features/onboarding/views/widgets/onboarding_option_card.dart';
-import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
-import 'package:test_app/shared/components/gtube_logo_mark.dart';
+import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
-import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -20,10 +17,12 @@ enum CreatorType {
   String get value => name;
 }
 
+/// Who the channel is for.
+///
+/// The answer decides which setup form comes next and, later, whether the
+/// studio has one owner or a team, so it is asked before anything is typed.
 class CreatorTypeScreen extends StatelessWidget {
   const CreatorTypeScreen({super.key});
-
-  static const _progress = 52 / 350;
 
   Future<void> _choose(BuildContext context, CreatorType type) async {
     await LocalStorage.setString(LocalStorage.creatorTypeKey, type.value);
@@ -40,82 +39,42 @@ class CreatorTypeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return OnboardingScaffold(
       backgroundColor: AppColors.brandSecondary,
-      topBar: _TopBar(
-        progress: _progress,
-        onSkip: () => context.go(AppRouter.home),
+      topBar: CreatorFlowHeader(
+        title: AppStrings.creatorTypeTitle,
+        subtitle: AppStrings.creatorTypeSubtitle,
+        onBack: () => context.pop(),
+      ),
+      // The footnote answers the question the two cards raise — whether this
+      // replaces the account they already watch with.
+      footer: Text(
+        AppStrings.creatorTypeFootnote,
+        textAlign: TextAlign.center,
+        style: AppStyles.body(
+          12,
+          color: AppColors.neutral400,
+          lineHeight: 17 / 12,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Center(child: GTubeLogoMark.compact()),
-          const SizedBox(height: 8),
-          Text(
-            AppStrings.creatorTypeTitle,
-            textAlign: TextAlign.center,
-            style: AppStyles.heading(20, letterSpacing: -0.8),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            AppStrings.creatorTypeSubtitle,
-            textAlign: TextAlign.center,
-            style: AppStyles.body(13),
-          ),
-          const SizedBox(height: 40),
-          OnboardingOptionCard(
+          const SizedBox(height: 16),
+          CreatorChoiceCard(
             icon: AppAssets.iconPerson,
-            label: AppStrings.creatorTypeIndividual,
+            title: AppStrings.creatorTypeIndividual,
+            body: AppStrings.creatorTypeIndividualBody,
             onTap: () => _choose(context, CreatorType.individual),
           ),
-          const SizedBox(height: 10),
-          OnboardingOptionCard(
+          const SizedBox(height: 14),
+          CreatorChoiceCard(
             icon: AppAssets.iconOrganization,
-            label: AppStrings.creatorTypeOrganization,
+            title: AppStrings.creatorTypeOrganization,
+            body: AppStrings.creatorTypeOrganizationBody,
             onTap: () => _choose(context, CreatorType.organization),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.progress, required this.onSkip});
-
-  final double progress;
-  final VoidCallback onSkip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        OnboardingProgressBar(progress: progress),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 38,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GTubeBackButton(onTap: () => context.pop()),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onSkip,
-                child: Text(
-                  AppStrings.skip,
-                  style: AppStyles.caption(
-                    12,
-                    color: AppColors.neutral50,
-                    weight: AppStyles.medium,
-                    lineHeight: 16 / 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

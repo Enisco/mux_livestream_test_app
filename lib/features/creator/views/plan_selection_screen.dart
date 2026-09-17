@@ -17,6 +17,20 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
+/// Free is not a row in the plan catalogue — the API's tiers are basic, pro
+/// and enterprise, and "free" means no subscription at all. It is a card here
+/// because the design offers it (the comparison table has a Free column and
+/// the button has always said "Continue with Free"), and because a creator
+/// must be able to get into the app without paying.
+const _freeCopy = PlanCopy(
+  title: AppStrings.planFree,
+  tagline: AppStrings.planFreeTagline,
+  // Free is the floor, so it inherits nothing.
+  inheritsLine: AppStrings.planFreeIncludes,
+  leftFeatures: ['3 uploads a month', '5 GB Storage', '7-day analytics'],
+  rightFeatures: ['1 giving fund', 'Livestreaming', 'Community features'],
+);
+
 const _basicCopy = PlanCopy(
   title: AppStrings.planBasic,
   tagline: AppStrings.planBasicTagline,
@@ -68,8 +82,16 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
   List<SaasPlan> _plans = const [];
   String _currency = 'USD';
   bool _yearly = true;
+  bool _loadingPlans = true;
+  bool _plansFailed = false;
   bool _starting = false;
-  String? _selectedTier;
+
+  /// Not a server tier — see [_freeCopy].
+  static const _freeTier = 'free';
+
+  /// Free by default: the button acts on what is selected, so the safe
+  /// default is the one that costs nothing.
+  String _selectedTier = _freeTier;
 
   @override
   void initState() {
@@ -78,22 +100,41 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loadingPlans = true;
+      _plansFailed = false;
+    });
+
+    // The currency-hint route answers 500 for everyone, so the currency comes
+    // from the account's own country instead.
+    final currency = CreatorRepo.currencyForCountry(
+      LocalStorage.cachedCountryCode,
+    );
+    final subject = BillingSubject.fromCreatorType(
+      LocalStorage.getString(LocalStorage.creatorTypeKey),
+    );
+
     try {
-      final hint = await _repo.fetchCurrencyHint();
-      final subject = BillingSubject.fromCreatorType(
-        LocalStorage.getString(LocalStorage.creatorTypeKey),
-      );
       final plans = await _repo.fetchPlans(
         billingSubject: subject,
-        currency: hint.recommendedCurrency,
+        currency: currency,
       );
       if (!mounted) return;
       setState(() {
-        _currency = hint.recommendedCurrency;
+        _currency = currency;
         _plans = plans;
+        _loadingPlans = false;
       });
     } catch (e) {
       logger.e('Failed to load plans', error: e);
+      if (!mounted) return;
+      // Free is still reachable, so the screen stays usable — but it must not
+      // show blank prices as though they were real.
+      setState(() {
+        _currency = currency;
+        _loadingPlans = false;
+        _plansFailed = true;
+      });
     }
   }
 
@@ -116,8 +157,9 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
     return null;
   }
 
-  /// Hands off to the web checkout. Plan, provider and payment are all chosen
-  /// there; this screen only starts the attempt and then watches it.
+  /// Free needs no checkout — the channel already exists, so the reader goes
+  /// straight on. Anything paid hands off to the web checkout, where the
+  /// provider and the payment are chosen.
   Future<void> _continue() async {
     if (_starting) return;
     final creatorId = LocalStorage.creatorId;
@@ -127,10 +169,15 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
       return;
     }
 
+    if (_selectedTier == _freeTier) {
+      context.go(AppRouter.creatorLive);
+      return;
+    }
+
     setState(() => _starting = true);
     final result = await getIt<CheckoutHandoffService>().start(
       creatorId: creatorId,
-      planTier: _selectedTier ?? 'pro',
+      planTier: _selectedTier,
     );
     if (!mounted) return;
     setState(() => _starting = false);
@@ -145,6 +192,13 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
         _tell(AppStrings.checkoutFailed);
     }
   }
+
+  static String _tierLabel(String tier) => switch (tier) {
+    'basic' => AppStrings.planBasic,
+    'pro' => AppStrings.planPro,
+    'enterprise' => AppStrings.planEnterprise,
+    _ => AppStrings.planFree,
+  };
 
   void _tell(String message) => ScaffoldMessenger.of(
     context,
@@ -169,10 +223,62 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
           yearly: _yearly,
           onIntervalChanged: (yearly) => setState(() => _yearly = yearly),
         ),
+        // Prices come from the catalogue; when it is unreachable the cards
+        // show no figure, so the reason is said rather than left blank.
+        if (_loadingPlans)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(23, 0, 23, 4),
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              color: AppColors.brandPrimary,
+              backgroundColor: Colors.transparent,
+            ),
+          ),
+        if (_plansFailed)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(23, 0, 23, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    AppStrings.plansUnavailable,
+                    style: AppStyles.body(
+                      12,
+                      color: AppColors.neutral400,
+                      lineHeight: 16 / 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  key: const ValueKey('plans-retry'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _load,
+                  child: Text(
+                    AppStrings.plansRetry,
+                    style: AppStyles.label(
+                      12,
+                      weight: AppStyles.bold,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(23, 0, 23, 24),
             children: [
+              PlanCard(
+                copy: _freeCopy,
+                selected: _selectedTier == _freeTier,
+                customPrice:
+                    '${AppStrings.currencySymbolFor(_currency)}'
+                    '${AppStrings.planFreePrice}',
+                onTap: () => setState(() => _selectedTier = _freeTier),
+              ),
+              const SizedBox(height: 18),
               PlanCard(
                 copy: _basicCopy,
                 selected: _selectedTier == 'basic',
@@ -182,7 +288,7 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
               const SizedBox(height: 18),
               PlanCard(
                 copy: _proCopy,
-                selected: _selectedTier == 'pro' || _selectedTier == null,
+                selected: _selectedTier == 'pro',
                 price: _priceFor('pro'),
                 onTap: () => setState(() => _selectedTier = 'pro'),
               ),
@@ -198,6 +304,9 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
           ),
         ),
         _BottomBar(
+          label: _selectedTier == _freeTier
+              ? AppStrings.continueWithFree
+              : AppStrings.continueWithTier(_tierLabel(_selectedTier)),
           busy: _starting,
           onContinue: _continue,
           onCompare: () => PlanComparisonSheet.show(
@@ -365,10 +474,15 @@ class _Segment extends StatelessWidget {
 
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
+    required this.label,
     required this.onContinue,
     required this.onCompare,
     this.busy = false,
   });
+
+  /// Names the tier the button will act on, so the reader is never surprised
+  /// by a checkout they did not ask for.
+  final String label;
 
   final VoidCallback onContinue;
   final VoidCallback onCompare;
@@ -400,7 +514,7 @@ class _BottomBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 PrimaryButton(
-                  label: AppStrings.continueWithFree,
+                  label: label,
                   height: 54,
                   loading: busy,
                   onPressed: onContinue,

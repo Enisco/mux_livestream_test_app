@@ -20,6 +20,21 @@ abstract final class ApiEndpoints {
 
   static String creatorById(String id) => '$_creator/$id';
 
+  /// `kind` is `avatar` or `banner`. The onboarding-scoped twin
+  /// (`/v1/creator/onboard/{kind}/upload-url`) mints a file owned by the
+  /// *user*, which `PATCH /v1/creator/{id}` then refuses — so once the
+  /// channel exists, this is the one to use.
+  static String creatorAssetUploadUrl(String creatorId, String kind) =>
+      '$_creator/$creatorId/$kind/upload-url';
+
+  /// The creator dashboard. `section` is one of `context`,
+  /// `getting-started`, `attention`, `next-up`, `recent-content`.
+  static String creatorDashboard(String creatorId, String section) =>
+      '$_creator/$creatorId/dashboard/$section';
+
+  static String creatorDashboardPerformance(String creatorId) =>
+      '$_creator/$creatorId/dashboard/performance';
+
   static String creatorHandleAvailability(String handle) =>
       '$_creator/handle/$handle/availability';
 

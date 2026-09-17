@@ -22,10 +22,12 @@ class CheckoutAlreadyActive implements Exception {
 /// The mobile→web subscription handoff. This repo never sees PSP credentials:
 /// plan, provider and payment all happen on the web surface.
 class MobileCheckoutRepo {
-  MobileCheckoutRepo({ApiService? api})
-    : _api = api ?? GetIt.instance<ApiService>();
+  MobileCheckoutRepo({ApiService? api}) : _injected = api;
 
-  final ApiService _api;
+  final ApiService? _injected;
+
+  /// Resolved on use, not on construction — see [CreatorRepo].
+  ApiService get _api => _injected ?? GetIt.instance<ApiService>();
 
   static String get platform => Platform.isIOS ? 'ios' : 'android';
 

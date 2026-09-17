@@ -32,9 +32,7 @@ class ProfileMenuSection extends StatelessWidget {
       padding: EdgeInsets.only(bottom: 20.s),
       decoration: showDivider
           ? const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: AppColors.neutral800),
-              ),
+              border: Border(bottom: BorderSide(color: AppColors.neutral800)),
             )
           : null,
       child: Column(
@@ -105,7 +103,8 @@ class ProfileMenuItem extends StatelessWidget {
             SizedBox(
               width: 20.s,
               height: 20.s,
-              child: leading ??
+              child:
+                  leading ??
                   HugeIcon(
                     icon: icon!,
                     color: AppColors.textPrimary,
@@ -139,17 +138,11 @@ class ProfileMenuItem extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (tag != null) ...[
-                    SizedBox(width: 8.s),
-                    _Tag(label: tag!),
-                  ],
+                  if (tag != null) ...[SizedBox(width: 8.s), _Tag(label: tag!)],
                 ],
               ),
             ),
-            if (pill != null) ...[
-              SizedBox(width: 8.s),
-              _Pill(label: pill!),
-            ],
+            if (pill != null) ...[SizedBox(width: 8.s), _Pill(label: pill!)],
             SizedBox(width: 8.s),
             Icon(
               AppIcons.chevronRight,

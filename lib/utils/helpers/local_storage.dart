@@ -17,6 +17,10 @@ class LocalStorage {
 
   static const creatorTypeKey = 'gtube_creator_type';
 
+  /// The channel name as typed, so the screens after checkout can greet the
+  /// reader and title the bio step without another round trip.
+  static const creatorNameKey = 'gtube_creator_name';
+
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
@@ -49,6 +53,20 @@ class LocalStorage {
       final last = (map['lastName'] as String?) ?? '';
       final full = '$first $last'.trim();
       return full.isNotEmpty ? full : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The ISO-2 country the account was registered with, used to pick a
+  /// billing currency now that the currency-hint route is unavailable.
+  static String? get cachedCountryCode {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final code =
+          (jsonDecode(raw) as Map<String, dynamic>)['countryCode'] as String?;
+      return code == null || code.isEmpty ? null : code.toUpperCase();
     } catch (_) {
       return null;
     }

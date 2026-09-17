@@ -7,7 +7,7 @@
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Required to pick video files from your photo library.</string>
+	<string>Required to pick videos, and your channel photo and banner, from your photo library.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Required to preview and stream your camera when going live.</string>
 	<key>NSMicrophoneUsageDescription</key>

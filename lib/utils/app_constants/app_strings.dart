@@ -80,24 +80,68 @@ abstract final class AppStrings {
   static const interestFaith = 'Faith';
   static const interestGospelArtist = 'Gospel artist';
 
-  static const creatorSetupTitle = 'Setup your profile in seconds';
-  static const creatorSetupSubtitle = 'This sets up your studio.';
+  static const creatorSetupTitle = 'Create your ministry';
+  static const creatorSetupSubtitle = 'This sets up your studio';
+  static const creatorSetupProceed = 'Proceed';
+  static const creatorSetupFailed =
+      'Your channel could not be created. Please try again.';
+  static const creatorNameRequired = 'Your channel needs a name';
+
+  // Categories: the server caps the list at 8, the form insists on at least
+  // one. Both match the web client.
+  static const creatorCategoryMax = 8;
+  static const creatorCategoryMin1 = 'Choose at least one category';
+  static const creatorCategoryTooMany = 'Choose no more than 8 categories';
+
+  // The organisation block. `POST /v1/creator/onboard` refuses an
+  // organisation without these six; postal code and website are optional.
+  static const orgEmailLabel = 'Organization email';
+  static const orgEmailHint = 'hello@gracechurch.org';
+  static const orgEmailInvalid = 'Enter a valid email address';
+  static const orgPhoneLabel = 'Organization phone';
+  static const orgPhoneHint = '+1 555 012 3456';
+  static const orgAboutLabel = 'About';
+  static const orgAboutHint = 'Tell viewers about your ministry';
+  static const orgCountryLabel = 'Country';
+  static const orgCountryHint = 'Select country';
+  static const orgStateLabel = 'State / Province';
+  static const orgStateHint = 'e.g Lagos';
+  static const orgCityLabel = 'City';
+  static const orgCityHint = 'e.g Ikeja';
+  static const orgPostalLabel = 'Postal code';
+  static const orgPostalHint = 'e.g 37203';
+  static const orgWebsiteLabel = 'Website';
+  static const orgWebsiteOptional = 'optional';
+  static const orgWebsiteHint = 'https://gracechurch.org';
+  static const orgFieldsRequired =
+      'Fill in the organisation details before continuing';
+
   static const channelName = 'Channel name';
   static const channelNameHint = 'e.g Pastor Cece Winans';
   static const handleLabel = 'Handle';
   static const handlePrefix = '@';
   static const mostlyShare = 'What do you mostly share?';
   static const mostlyShareHint = 'e.g Preaching';
-  static const handleAvailable = 'Available: gospeltube.tv/@';
+  static const handleAvailable = 'Available — gospeltube.tv/@';
   static const handleTaken = 'That handle is taken';
   static const handleInvalid = 'That handle is not valid';
   static const creatorSetupFootnote =
       "You can polish your channel later. Let's get you set up first";
 
-  static const creatorTypeTitle = 'How will you share your ministry?';
-  static const creatorTypeSubtitle = 'This sets up your channel.';
-  static const creatorTypeIndividual = 'I’m an Individual';
-  static const creatorTypeOrganization = 'We’re an organization';
+  // "Start creating" — who the channel is for.
+  static const creatorTypeTitle = 'Start creating';
+  static const creatorTypeSubtitle = 'Who is this channel for?';
+  static const creatorTypeIndividual = 'Just me';
+  static const creatorTypeIndividualBody =
+      'A pastor, teacher, worship leader or speaker sharing under your own '
+      'name.';
+  static const creatorTypeOrganization = 'A ministry or church';
+  static const creatorTypeOrganizationBody =
+      'An organisation with a team you become the Owner and can invite '
+      'members with roles.';
+  static const creatorTypeFootnote =
+      "You keep watching as yourself either way, this adds a studio, it "
+      "doesn't replace your account.";
 
   static const orgTypeLabel = 'Type of organization';
   static const orgTypeHint = 'e.g Church, Bible study';
@@ -109,15 +153,99 @@ abstract final class AppStrings {
   static const orgTypeOthers = 'Others';
   static const addSelection = 'Add Selection';
 
+  // Once the plan is settled: the channel exists, now make it look like one.
+  static const creatorLiveTitlePrefix = "You're in,";
+  static const creatorLiveBodyPrefix = 'Your channel is live on';
+  static const creatorLiveBodyBrand = 'GospelTube';
+  static const creatorLiveBodySuffix = ". Let's make it yours.";
+  static const creatorLiveSetUp = 'Set up your profile';
+  static const creatorDoThisLater = "I'll do this later";
+
+  static const creatorPhotoTitle = 'Add your ministry photo';
+  static const creatorPhotoSubtitle =
+      'It appears beside everything you '
+      'publish.';
+  static const creatorPhotoCaption = 'This is what viewers see on your page';
+
+  static const creatorBannerTitle = 'Add a banner';
+  static const creatorBannerSubtitle =
+      'It appears beside everything you '
+      'publish.';
+  static const creatorBannerTapToAdd = 'Tap to add';
+
+  static const creatorBioTitlePrefix = 'What is';
+  static const creatorBioTitleSuffix = 'about?';
+  static const creatorBioSubtitle =
+      'One or two sentences on your channel '
+      'page.';
+  static const creatorBioHint =
+      'Spirit-led worship and teaching, sharing the hope of the gospel with '
+      'our city and beyond.';
+
+  /// The design's ceiling. Staging's own is 500, so this is the stricter of
+  /// the two and the one the counter shows.
+  static const creatorBioLimit = 300;
+  static const creatorBioSaving = 'Saving...';
+
+  static const creatorLinksTitle = 'Where else do people find you?';
+  static const creatorLinksSubtitle =
+      'Website and socials, shown on your '
+      'page.';
+  static const creatorLinksLabel = 'Website & social links';
+  static const creatorLinksOptional = 'optional';
+  static const creatorLinksWebsiteHint = 'yourchurch.org';
+  static const creatorLinksInstagramHint = 'Instagram URL';
+  static const creatorLinksYoutubeHint = 'Youtube URL';
+  static const creatorLinksAddAnother = 'Add another link';
+  static const creatorLinksMoreHint = 'Another URL';
+
+  static const creatorImageTooLarge =
+      'That image is over 8 MB. Pick a smaller one.';
+  static const creatorImageUnreadable = 'That image could not be opened.';
+  static const creatorImageUnsupported =
+      'That image format is not supported. Try a JPG or PNG.';
+  static const creatorImageChange = 'Change';
+  static const creatorImageUploading = 'Uploading...';
+  static const creatorImageUploadFailed =
+      'That upload did not go through. Try again.';
+  static const creatorImageOffline =
+      'No connection. Your image will need re-picking once you are back.';
+
+  static const creatorTopicsTitle = 'Your topics';
+  static const creatorTopicsSubtitle = 'Choose what you would mostly share';
+  static const creatorTopicsLabel = 'Topics';
+  static const creatorTopicsDone = 'Done';
+
   static const yourPlan = 'Your plan';
   static const billingMonthly = 'Monthly';
   static const billingYearly = 'Yearly · 2 months free';
+  static const plansUnavailable =
+      'Plan prices could not be loaded. You can still continue on Free.';
+  static const plansRetry = 'Retry';
   static const compareEverything = 'Compare everything';
   static const continueWithFree = 'Continue with Free';
+  static String continueWithTier(String tier) => 'Continue with $tier';
   static const perMonth = '/mo';
   static const perYear = '/yr';
   static const mostPopular = 'Most popular';
   static const currencyPrefix = 'IN ';
+
+  /// Only the currencies the app prices in; anything else prints its code.
+  static String currencySymbolFor(String currency) => switch (currency) {
+    'USD' || 'CAD' => r'$',
+    'NGN' => '₦',
+    'GBP' => '£',
+    'EUR' => '€',
+    'GHS' => '₵',
+    'KES' => 'KSh ',
+    'ZAR' => 'R',
+    _ => '$currency ',
+  };
+
+  static const planFree = 'Free';
+  static const planFreeTagline = 'Start sharing today';
+  static const planFreeIncludes = 'Includes:';
+  static const planFreePrice = '0';
   static const planBasic = 'Basic';
   static const planBasicTagline = 'Grow your reach';
   static const planPro = 'Pro';
@@ -623,6 +751,88 @@ abstract final class AppStrings {
   static const notifyLiveBody = 'Streams and event reminders, nothing else';
   static const notifyNone = 'None';
   static const notifyNoneBody = 'Stay subscribed, no notifications';
+
+  // The creator studio dashboard.
+  static const profileOpenStudio = 'Open studio';
+  static const profileOpenStudioNote = 'Your dashboard and content';
+
+  static const studioTab = 'Studio';
+  static const studioTabContent = 'Content';
+  static const studioTabImpact = 'Impact';
+  static const studioTabGiving = 'Giving';
+
+  static const studioWelcomePrefix = 'Welcome,';
+  static const studioReady = "Your studio is ready. Here's how to start.";
+  static String studioNeedsYouCount(int n) =>
+      '$n thing${n == 1 ? '' : 's'} need your attention today.';
+  static const studioCreate = '+ Create';
+  static const studioToday = 'TODAY';
+  static const studioNeedsYou = 'NEEDS YOU';
+  static const studioCreateCaption = 'CREATE';
+  static const studioQuickUpload = 'Quick upload';
+  static const studioFullAnalytics = 'Full analytics';
+  static const studioWebNote =
+      'Events, devotionals, promotions and your team are managed on the web '
+      'studio.';
+
+  static const studioViews = 'Views';
+  static const studioSubscribers = 'Subscribers';
+  static const studioGiving = 'Giving';
+  static const studioNoFigure = '—';
+
+  /// The server sends step keys without copy, so the words live here. A key
+  /// it sends that is not in this map is skipped rather than shown raw.
+  static const studioStepTitles = <String, String>{
+    'complete_profile': 'Complete your profile',
+    'publish_first_content': 'Upload your first sermon',
+    'invite_team': 'Invite your team',
+    'setup_giving': 'Set up giving',
+    'go_live': 'Go live on Sunday',
+  };
+  static const studioStepBodies = <String, String>{
+    'complete_profile': 'A photo, a banner and a line about you',
+    'publish_first_content': 'Video or audio, from your phone',
+    'invite_team': 'Add leaders and give them roles',
+    'setup_giving': 'Verify and connect your bank',
+    'go_live': 'Straight from your camera',
+  };
+
+  /// Likewise for the "needs you" rows.
+  static const studioAttentionTitles = <String, String>{
+    'prayer_requests': 'Prayer request',
+    'prayers': 'Prayer request',
+    'testimonies': 'Testimonies',
+    'comments': 'Comments',
+  };
+  static String studioAttentionNew(int n) => '$n New';
+  static String studioAttentionWaiting(int n) => '$n waiting';
+
+  // The studio switcher.
+  static const studiosSheetTitle = 'YOUR STUDIOS';
+  static const studiosPersonal = 'Personal';
+  static const studiosSwitch = 'Switch studio';
+  static const studiosSwitchNote = 'Work in another ministry you belong to';
+  static const studiosNotImplemented =
+      "Switching studios isn't yet implemented";
+  static const studiosSettings = 'Studio Settings';
+  static const studiosSettingsNote = 'Settings are managed on the web';
+  static const studiosBackToWatching = 'Back to watching';
+  static const studiosBackToWatchingNote = 'Return to your feed';
+
+  // The "+ Create" sheet.
+  static const createSheetTitle = 'WHAT ARE YOU SHARING';
+  static const createLivestream = 'Livestream';
+  static const createLivestreamBody =
+      'Go live now or set up an upcoming stream.';
+  static const createVideo = 'Video';
+  static const createVideoBody = 'Upload a sermon, message, or worship video.';
+  static const createAudio = 'Audio';
+  static const createAudioBody = 'Upload a sermon audio, song, or podcast';
+  static const createEvent = 'Event';
+  static const createEventBody = 'Schedule a service or gathering with RSVP.';
+  static const createBlog = 'Blog Post';
+  static const createBlogBody =
+      'A written update — announcements, short teachings';
 
   // History — what the reader has watched and read.
   static const historyTitle = 'History';

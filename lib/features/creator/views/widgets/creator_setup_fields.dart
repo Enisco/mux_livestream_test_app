@@ -51,16 +51,24 @@ class CreatorTextField extends StatelessWidget {
     required this.controller,
     required this.hint,
     this.contentPadding = const EdgeInsets.all(16),
+    this.keyboardType,
+    this.maxLines = 1,
   });
 
   final TextEditingController controller;
   final String hint;
   final EdgeInsets contentPadding;
+  final TextInputType? keyboardType;
+
+  /// The organisation's About box is the only multi-line one.
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
       style: AppStyles.body(13, color: AppColors.neutral50),
       cursorColor: AppColors.textPrimary,
       decoration: InputDecoration(

@@ -7,6 +7,7 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/creator/views/studio_shell.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/history/views/history_screen.dart';
@@ -179,6 +180,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           note: AppStrings.profileStartChannel,
           onTap: () => _todo(AppStrings.profileBecomeCreator),
         ),
+        // The channel's own studio, which is where a creator actually works.
+        if (channel != null)
+          ProfileMenuItem(
+            icon: HugeIcons.strokeRoundedGridView,
+            label: AppStrings.profileOpenStudio,
+            note: AppStrings.profileOpenStudioNote,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StudioShell()),
+            ),
+          ),
         if (channel != null)
           ProfileMenuItem(
             leading: DetailAvatar(

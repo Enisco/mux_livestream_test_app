@@ -7,18 +7,17 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
-import 'package:test_app/features/creator/views/widgets/category_picker_sheet.dart';
+import 'package:test_app/features/creator/views/widgets/creator_topics_sheet.dart';
+import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
-import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
-import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
-import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 class CreatorProfileSetupScreen extends StatefulWidget {
   const CreatorProfileSetupScreen({super.key});
@@ -37,9 +36,9 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
   HandleState _handleState = HandleState.idle;
   String _normalizedHandle = '';
   List<ContentCategory> _categories = const [];
-  ContentCategory? _category;
-
-  static const _progress = 236 / 350;
+  final Set<String> _selectedSlugs = {};
+  bool _saving = false;
+  String? _error;
 
   static const _handleDebounce = Duration(milliseconds: 400);
 
@@ -102,22 +101,76 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
     FocusScope.of(context).unfocus();
     if (_categories.isEmpty) await _loadCategories();
     if (!mounted || _categories.isEmpty) return;
-    final picked = await CategoryPickerSheet.show(context, _categories);
-    if (picked != null && mounted) setState(() => _category = picked);
+    final picked = await CreatorTopicsSheet.show(
+      context,
+      categories: _categories,
+      selected: _selectedSlugs,
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _selectedSlugs
+          ..clear()
+          ..addAll(picked);
+      });
+    }
+  }
+
+  /// The chosen topics, named rather than slugged, for the closed field.
+  String? get _categorySummary {
+    if (_selectedSlugs.isEmpty) return null;
+    return _categories
+        .where((c) => _selectedSlugs.contains(c.slug))
+        .map((c) => c.name)
+        .join(', ');
+  }
+
+  /// What is missing, or null when the form is ready.
+  String? _whatIsMissing() {
+    if (_channelCtrl.text.trim().isEmpty) {
+      return AppStrings.creatorNameRequired;
+    }
+    if (_selectedSlugs.isEmpty) return AppStrings.creatorCategoryMin1;
+    if (_selectedSlugs.length > AppStrings.creatorCategoryMax) {
+      return AppStrings.creatorCategoryTooMany;
+    }
+    return null;
   }
 
   Future<void> _continue() async {
-    final displayName = _channelCtrl.text.trim();
-    if (displayName.isEmpty) {
-      context.go(AppRouter.planSelection);
+    final missing = _whatIsMissing();
+    if (missing != null) {
+      setState(() => _error = missing);
       return;
     }
-    await _repo.saveCreatorProfile(
-      handle: _resolvedHandle(displayName),
-      displayName: displayName,
-      type: 'individual',
-      categorySlugs: _category == null ? null : [_category!.slug],
-    );
+    setState(() => _error = null);
+    final displayName = _channelCtrl.text.trim();
+    await LocalStorage.setString(LocalStorage.creatorNameKey, displayName);
+    setState(() => _saving = true);
+    try {
+      await _repo.saveCreatorProfile(
+        handle: _resolvedHandle(displayName),
+        displayName: displayName,
+        type: 'individual',
+        categorySlugs: _selectedSlugs.toList(),
+      );
+    } catch (e) {
+      // Advancing past a channel that was never created would walk the reader
+      // into the plan step with nothing to attach a subscription to.
+      logger.e('Could not create the channel', error: e);
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppStrings.creatorSetupFailed,
+            style: AppStyles.body(13),
+          ),
+          backgroundColor: AppColors.neutral800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (mounted) context.go(AppRouter.planSelection);
   }
 
@@ -130,27 +183,17 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
   Widget build(BuildContext context) {
     return OnboardingScaffold(
       backgroundColor: AppColors.brandSecondary,
-      backgroundAsset: AppAssets.worshipBg,
-      topBar: _TopBar(progress: _progress, onSkip: _continue),
-      footer: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            AppStrings.creatorSetupFootnote,
-            textAlign: TextAlign.center,
-            style: AppStyles.caption(
-              12,
-              weight: AppStyles.medium,
-              lineHeight: 16 / 12,
-            ),
-          ),
-          const SizedBox(height: 10),
-          PrimaryButton(
-            label: AppStrings.continueLabel,
-            height: 54,
-            onPressed: _continue,
-          ),
-        ],
+      topBar: CreatorFlowHeader(
+        title: AppStrings.creatorSetupTitle,
+        subtitle: AppStrings.creatorSetupSubtitle,
+        trailing: Image.asset(AppAssets.gtubeLogo, width: 24, height: 27),
+        onBack: () => context.pop(),
+      ),
+      footer: PrimaryButton(
+        label: AppStrings.creatorSetupProceed,
+        height: 54,
+        loading: _saving,
+        onPressed: _continue,
       ),
       child: _content(),
     );
@@ -163,20 +206,7 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(child: GTubeLogoMark.compact()),
-            const SizedBox(height: 8),
-            Text(
-              AppStrings.creatorSetupTitle,
-              textAlign: TextAlign.center,
-              style: AppStyles.heading(20, letterSpacing: -0.8),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppStrings.creatorSetupSubtitle,
-              textAlign: TextAlign.center,
-              style: AppStyles.body(13),
-            ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 18),
             const CreatorFieldLabel(AppStrings.channelName),
             const SizedBox(height: 10),
             CreatorTextField(
@@ -200,57 +230,24 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
             const SizedBox(height: 10),
             CreatorSelectField(
               hint: AppStrings.mostlyShareHint,
-              value: _category?.name,
+              value: _categorySummary,
               onTap: _pickCategory,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 15,
               ),
             ),
+            if (_error case final message?) ...[
+              const SizedBox(height: 14),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: AppStyles.body(12, color: AppColors.destructive),
+              ),
+            ],
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.progress, required this.onSkip});
-
-  final double progress;
-  final VoidCallback onSkip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        OnboardingProgressBar(progress: progress),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 38,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GTubeBackButton(onTap: () => context.pop()),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onSkip,
-                child: Text(
-                  AppStrings.skip,
-                  style: AppStyles.caption(
-                    12,
-                    color: AppColors.neutral50,
-                    weight: AppStyles.medium,
-                    lineHeight: 16 / 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

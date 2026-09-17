@@ -43,7 +43,9 @@ class ProfileHeaderCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.fieldBg,
           borderRadius: BorderRadius.circular(20.s),
-          border: Border.all(color: AppColors.textPrimary.withValues(alpha: 0.03)),
+          border: Border.all(
+            color: AppColors.textPrimary.withValues(alpha: 0.03),
+          ),
         ),
         child: Row(
           children: [
@@ -96,10 +98,7 @@ class ProfileHeaderCard extends StatelessWidget {
               ),
             ),
             SizedBox(width: 12.s),
-            _BellButton(
-              alert: hasNotifications,
-              onTap: onNotifications,
-            ),
+            _BellButton(alert: hasNotifications, onTap: onNotifications),
           ],
         ),
       ),

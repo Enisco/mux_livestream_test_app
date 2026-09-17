@@ -116,7 +116,12 @@ class _CheckoutStatusScreenState extends State<CheckoutStatusScreen>
 
   Future<void> _dismiss() async {
     await _store.clear();
-    if (mounted) context.go(AppRouter.home);
+    if (!mounted) return;
+    // A settled checkout means the channel exists, so the flow carries on into
+    // the profile steps; anything else drops back to the app.
+    context.go(
+      (_session?.isSettled ?? false) ? AppRouter.creatorLive : AppRouter.home,
+    );
   }
 
   @override

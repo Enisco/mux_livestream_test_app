@@ -26,6 +26,17 @@ class AppRouter {
   static const String orgSetup = '/org-setup';
   static const String planSelection = '/plan-selection';
   static const String checkoutStatus = '/checkout-status';
+
+  /// Everything after the plan is settled: the channel is live, then four
+  /// optional steps that make it look like a channel.
+  static const String creatorLive = '/creator-live';
+  static const String creatorPhoto = '/creator-photo';
+  static const String creatorBanner = '/creator-banner';
+  static const String creatorBio = '/creator-bio';
+  static const String creatorLinks = '/creator-links';
+
+  /// The creator studio: dashboard, content, impact and giving.
+  static const String studio = '/studio';
   static const String creatorProfile = '/creator';
 
   /// Profile by id — the form every in-app creator affordance uses.
