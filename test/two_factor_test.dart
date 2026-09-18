@@ -74,8 +74,10 @@ void main() {
         },
       );
       addTearDown(
-        () => tester.binding.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, null),
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
       );
 
       await _pump(tester, const TwoFactorScanScreen());
@@ -90,8 +92,10 @@ void main() {
     ) async {
       await _pump(tester, const TwoFactorCodeScreen());
 
-      expect(find.textContaining('6-digit code your app shows'),
-          findsOneWidget);
+      expect(
+        find.textContaining('6-digit code your app shows'),
+        findsOneWidget,
+      );
       expect(find.text(AppStrings.twoFactorTurnOn), findsOneWidget);
     });
 

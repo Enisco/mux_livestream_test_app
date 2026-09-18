@@ -118,11 +118,11 @@ void main() {
         _row(entityType: 'creator', id: 'c'),
       ]);
 
-      expect(
-        groups.map((g) => g.kind),
-        [SearchGroupKind.ministries, SearchGroupKind.videos,
-         SearchGroupKind.events],
-      );
+      expect(groups.map((g) => g.kind), [
+        SearchGroupKind.ministries,
+        SearchGroupKind.videos,
+        SearchGroupKind.events,
+      ]);
     });
 
     test('a kind with nothing in it is left out entirely', () {
@@ -153,13 +153,16 @@ void main() {
       expect(RecentSearches.load(), ['prayer', 'worship']);
     });
 
-    test('searching the same thing again moves it up, not duplicates it', () async {
-      await RecentSearches.add('worship');
-      await RecentSearches.add('prayer');
-      await RecentSearches.add('WORSHIP');
+    test(
+      'searching the same thing again moves it up, not duplicates it',
+      () async {
+        await RecentSearches.add('worship');
+        await RecentSearches.add('prayer');
+        await RecentSearches.add('WORSHIP');
 
-      expect(RecentSearches.load(), ['WORSHIP', 'prayer']);
-    });
+        expect(RecentSearches.load(), ['WORSHIP', 'prayer']);
+      },
+    );
 
     test('blank input is not remembered', () async {
       await RecentSearches.add('   ');
@@ -232,7 +235,13 @@ void main() {
       );
 
       for (final label in [
-        'All', 'Creators', 'Audio', 'Videos', 'Devotionals', 'Blogs', 'Events',
+        'All',
+        'Creators',
+        'Audio',
+        'Videos',
+        'Devotionals',
+        'Blogs',
+        'Events',
       ]) {
         expect(find.text(label), findsOneWidget, reason: label);
       }
@@ -292,20 +301,14 @@ void main() {
     testWidgets('an already-followed ministry says so', (tester) async {
       await _pump(
         tester,
-        SearchMinistryRow(
-          item: _row(entityType: 'creator'),
-          following: true,
-        ),
+        SearchMinistryRow(item: _row(entityType: 'creator'), following: true),
       );
       expect(find.text('Following'), findsOneWidget);
       expect(find.text('Follow'), findsNothing);
     });
 
     testWidgets('a content row reads kind, views and age', (tester) async {
-      await _pump(
-        tester,
-        SearchContentRow(item: _row(), kindLabel: 'Video'),
-      );
+      await _pump(tester, SearchContentRow(item: _row(), kindLabel: 'Video'));
 
       expect(find.text('Worship him'), findsOneWidget);
       expect(find.textContaining('Video'), findsOneWidget);

@@ -23,8 +23,10 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 void _notWired(BuildContext context, String what) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text('$what is not wired to the API yet',
-          style: AppStyles.body(13)),
+      content: Text(
+        '$what is not wired to the API yet',
+        style: AppStyles.body(13),
+      ),
       backgroundColor: AppColors.neutral800,
       behavior: SnackBarBehavior.floating,
     ),
@@ -60,10 +62,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
   }
 
   void _submit() {
-    final problem = AccountFormRules.name(
-      first: _first.text,
-      last: _last.text,
-    );
+    final problem = AccountFormRules.name(first: _first.text, last: _last.text);
     setState(() => _error = problem);
     if (problem == null) _notWired(context, 'Updating your name');
   }
@@ -84,9 +83,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
                 alignment: Alignment.bottomRight,
                 children: [
                   SettingsAvatar(
-                    name: name.isEmpty
-                        ? AppStrings.accountFallbackName
-                        : name,
+                    name: name.isEmpty ? AppStrings.accountFallbackName : name,
                     size: 80,
                   ),
                   Positioned(
@@ -177,9 +174,8 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ConfirmChangeScreen.email(
-            destination: _next.text.trim(),
-          ),
+          builder: (_) =>
+              ConfirmChangeScreen.email(destination: _next.text.trim()),
         ),
       );
     }
@@ -251,9 +247,8 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ConfirmChangeScreen.phone(
-            destination: _next.text.trim(),
-          ),
+          builder: (_) =>
+              ConfirmChangeScreen.phone(destination: _next.text.trim()),
         ),
       );
     }

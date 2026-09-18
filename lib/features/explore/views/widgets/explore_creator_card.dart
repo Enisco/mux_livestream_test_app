@@ -25,7 +25,6 @@ class ExploreCreatorCard extends StatelessWidget {
     this.onFollow,
   });
 
-
   final ExploreCreatorRef creator;
   final VoidCallback? onTap;
   final VoidCallback? onFollow;

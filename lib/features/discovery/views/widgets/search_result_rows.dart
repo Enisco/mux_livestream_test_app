@@ -68,9 +68,7 @@ class SearchMinistryRow extends StatelessWidget {
         margin: EdgeInsets.symmetric(horizontal: 27.s),
         padding: EdgeInsets.symmetric(vertical: 12.s),
         decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.neutral900),
-          ),
+          border: Border(bottom: BorderSide(color: AppColors.neutral900)),
         ),
         child: Row(
           children: [
@@ -198,8 +196,18 @@ class SearchEventRow extends StatelessWidget {
   final VoidCallback? onRsvp;
 
   static const _months = [
-    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
   ];
 
   @override
@@ -276,9 +284,7 @@ class SearchEventRow extends StatelessWidget {
                           color: AppColors.neutral500,
                         ),
                         SizedBox(width: 2.s),
-                        Flexible(
-                          child: Text(where, maxLines: 1, style: muted),
-                        ),
+                        Flexible(child: Text(where, maxLines: 1, style: muted)),
                         SizedBox(width: 6.s),
                         Text('·', style: muted),
                         SizedBox(width: 6.s),
@@ -486,11 +492,7 @@ class _Avatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: url == null || url!.isEmpty
-          ? Icon(
-              Icons.person,
-              size: size * 0.6,
-              color: AppColors.neutral400,
-            )
+          ? Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400)
           : Image.network(
               url!,
               fit: BoxFit.cover,
@@ -522,18 +524,12 @@ class _OutlineButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8.s),
           border: Border.all(
-            color: label == null
-                ? AppColors.neutral800
-                : AppColors.neutral700,
+            color: label == null ? AppColors.neutral800 : AppColors.neutral700,
             width: 1.5.s,
           ),
         ),
         child: icon != null
-            ? HugeIcon(
-                icon: icon!,
-                color: AppColors.textPrimary,
-                size: 20.s,
-              )
+            ? HugeIcon(icon: icon!, color: AppColors.textPrimary, size: 20.s)
             : Text(label!, style: AppStyles.button(13)),
       ),
     );

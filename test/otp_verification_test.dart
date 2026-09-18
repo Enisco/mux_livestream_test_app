@@ -91,7 +91,15 @@ void main() {
       tester,
     ) async {
       var attempts = 0;
-      await _pump(tester, _view(onVerify: (_) async { attempts++; return null; }));
+      await _pump(
+        tester,
+        _view(
+          onVerify: (_) async {
+            attempts++;
+            return null;
+          },
+        ),
+      );
 
       await tester.tap(find.text(AppStrings.verify));
       await tester.pump();
@@ -127,21 +135,25 @@ void main() {
   group('resending', () {
     testWidgets('is locked while the countdown runs', (tester) async {
       var sent = 0;
-      await _pump(tester, _view(onResend: () async { sent++; return null; }));
+      await _pump(
+        tester,
+        _view(
+          onResend: () async {
+            sent++;
+            return null;
+          },
+        ),
+      );
 
       // A 60-second cooldown reads as 1:00 on the first frame.
       expect(find.textContaining('1:00', findRichText: true), findsOneWidget);
-      await tester.tapOnText(
-        find.textRange.ofSubstring(AppStrings.sendAgain),
-      );
+      await tester.tapOnText(find.textRange.ofSubstring(AppStrings.sendAgain));
       await tester.pump();
       expect(sent, 0);
 
       // Let the clock run out.
       await tester.pump(const Duration(seconds: 60));
-      await tester.tapOnText(
-        find.textRange.ofSubstring(AppStrings.sendAgain),
-      );
+      await tester.tapOnText(find.textRange.ofSubstring(AppStrings.sendAgain));
       await tester.pump();
       expect(sent, 1);
     });
@@ -152,9 +164,7 @@ void main() {
       await _pump(tester, _view(onResend: () async => 'Could not send.'));
       await tester.pump(const Duration(seconds: 60));
 
-      await tester.tapOnText(
-        find.textRange.ofSubstring(AppStrings.sendAgain),
-      );
+      await tester.tapOnText(find.textRange.ofSubstring(AppStrings.sendAgain));
       await tester.pump();
 
       expect(find.text('Could not send.'), findsOneWidget);

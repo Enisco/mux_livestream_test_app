@@ -52,7 +52,11 @@ class TwoFactorIntroScreen extends StatelessWidget {
         Text(
           AppStrings.twoFactorHeading,
           textAlign: TextAlign.center,
-          style: AppStyles.heading(20, lineHeight: 28 / 20, letterSpacing: -0.4),
+          style: AppStyles.heading(
+            20,
+            lineHeight: 28 / 20,
+            letterSpacing: -0.4,
+          ),
         ),
         SizedBox(height: 10.s),
         Text(
@@ -100,7 +104,11 @@ class TwoFactorScanScreen extends StatelessWidget {
         Text(
           AppStrings.twoFactorHeading,
           textAlign: TextAlign.center,
-          style: AppStyles.heading(20, lineHeight: 28 / 20, letterSpacing: -0.4),
+          style: AppStyles.heading(
+            20,
+            lineHeight: 28 / 20,
+            letterSpacing: -0.4,
+          ),
         ),
         SizedBox(height: 10.s),
         Text(
@@ -169,10 +177,7 @@ class _TwoFactorCodeScreenState extends State<TwoFactorCodeScreen> {
           style: AppStyles.label(13, color: AppColors.neutral300),
         ),
         SizedBox(height: 24.s),
-        OtpCodeField(
-          controller: _code,
-          onCompleted: (_) => setState(() {}),
-        ),
+        OtpCodeField(controller: _code, onCompleted: (_) => setState(() {})),
         SizedBox(height: 20.s),
         Center(
           child: OtpResendRow(

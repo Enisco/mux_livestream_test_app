@@ -196,12 +196,15 @@ void main() {
       );
 
       await tester.tap(
-        find.ancestor(
-          of: find.byWidgetPredicate(
-            (w) => w is DesignIcon && w.asset == AppAssets.iconFeedPlusCircle,
-          ),
-          matching: find.byType(GestureDetector),
-        ).first,
+        find
+            .ancestor(
+              of: find.byWidgetPredicate(
+                (w) =>
+                    w is DesignIcon && w.asset == AppAssets.iconFeedPlusCircle,
+              ),
+              matching: find.byType(GestureDetector),
+            )
+            .first,
       );
       await tester.pump();
 
@@ -250,9 +253,7 @@ void main() {
         tester,
         SizedBox(
           width: 390,
-          child: ExploreCategoryChips(
-            categories: ExploreDummyData.categories,
-          ),
+          child: ExploreCategoryChips(categories: ExploreDummyData.categories),
         ),
       );
 

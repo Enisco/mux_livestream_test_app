@@ -72,9 +72,6 @@ abstract final class ApiEndpoints {
   static String creatorSubscribe(String creatorId) =>
       '/v1/creator/$creatorId/subscribe';
 
-  static const saasPlans = '/v1/payment/saas/plans';
-  static const saasCurrencyHint = '/v1/payment/saas/currency-hint';
-
   static const mobileCheckouts = '/v1/payment/mobile-web-checkouts';
   static const mobileCheckoutCapabilities = '$mobileCheckouts/capabilities';
 

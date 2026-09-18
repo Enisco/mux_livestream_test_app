@@ -51,7 +51,45 @@ void main() {
     return email;
   }
 
+  late GoRouter router;
+
   Future<void> pumpFlow(WidgetTester tester, {required String at}) async {
+    // Built once and held: creating the router inside the builder would mint
+    // a new one on every rebuild and snap the flow back to `initialLocation`.
+    router = GoRouter(
+      initialLocation: at,
+      routes: [
+        GoRoute(
+          path: AppRouter.creatorType,
+          builder: (_, _) => const CreatorTypeScreen(),
+        ),
+        GoRoute(
+          path: AppRouter.creatorSetup,
+          builder: (_, _) => const CreatorProfileSetupScreen(),
+        ),
+        GoRoute(
+          path: AppRouter.orgSetup,
+          builder: (_, _) => const OrganizationProfileSetupScreen(),
+        ),
+        GoRoute(
+          path: AppRouter.planSelection,
+          builder: (_, _) => const Text('PLAN'),
+        ),
+        GoRoute(
+          path: AppRouter.creatorLive,
+          builder: (_, _) => const CreatorLiveScreen(),
+        ),
+        GoRoute(
+          path: AppRouter.creatorBio,
+          builder: (_, _) => const CreatorBioScreen(),
+        ),
+        GoRoute(
+          path: AppRouter.creatorLinks,
+          builder: (_, _) => const Text('LINKS'),
+        ),
+        GoRoute(path: AppRouter.home, builder: (_, _) => const Text('HOME')),
+      ],
+    );
     await tester.pumpWidget(
       SizingBuilder(
         baseSize: const Size(390, 844),
@@ -59,43 +97,7 @@ void main() {
         builder: (context) => MaterialApp.router(
           debugShowCheckedModeBanner: false,
           theme: AppTheme.dark,
-          routerConfig: GoRouter(
-            initialLocation: at,
-            routes: [
-              GoRoute(
-                path: AppRouter.creatorType,
-                builder: (_, _) => const CreatorTypeScreen(),
-              ),
-              GoRoute(
-                path: AppRouter.creatorSetup,
-                builder: (_, _) => const CreatorProfileSetupScreen(),
-              ),
-              GoRoute(
-                path: AppRouter.orgSetup,
-                builder: (_, _) => const OrganizationProfileSetupScreen(),
-              ),
-              GoRoute(
-                path: AppRouter.planSelection,
-                builder: (_, _) => const Text('PLAN'),
-              ),
-              GoRoute(
-                path: AppRouter.creatorLive,
-                builder: (_, _) => const CreatorLiveScreen(),
-              ),
-              GoRoute(
-                path: AppRouter.creatorBio,
-                builder: (_, _) => const CreatorBioScreen(),
-              ),
-              GoRoute(
-                path: AppRouter.creatorLinks,
-                builder: (_, _) => const Text('LINKS'),
-              ),
-              GoRoute(
-                path: AppRouter.home,
-                builder: (_, _) => const Text('HOME'),
-              ),
-            ],
-          ),
+          routerConfig: router,
         ),
       ),
     );

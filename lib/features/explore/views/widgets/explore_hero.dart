@@ -142,10 +142,7 @@ class _WatchButton extends StatelessWidget {
           children: [
             DesignIcon(AppAssets.iconPlay, width: 20.s, height: 20.s),
             SizedBox(width: 5.s),
-            Text(
-              AppStrings.exploreWatch,
-              style: AppStyles.button(13),
-            ),
+            Text(AppStrings.exploreWatch, style: AppStyles.button(13)),
           ],
         ),
       ),

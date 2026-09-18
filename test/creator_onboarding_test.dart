@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/views/creator_live_screen.dart';
 import 'package:test_app/features/creator/views/creator_polish_screens.dart';
 import 'package:test_app/features/creator/views/creator_type_screen.dart';
@@ -224,22 +223,6 @@ void main() {
 
       expect(find.byType(TextField), findsNWidgets(4));
       expect(find.text('Another URL'), findsOneWidget);
-    });
-  });
-
-  group('billing currency', () {
-    test('known markets get their own currency', () {
-      expect(CreatorRepo.currencyForCountry('NG'), 'NGN');
-      expect(CreatorRepo.currencyForCountry('gb'), 'GBP');
-      expect(CreatorRepo.currencyForCountry('ZA'), 'ZAR');
-    });
-
-    test('anywhere else bills in USD', () {
-      // The catalogue may not carry every currency, and the web client sends
-      // USD outright, so that is the safe default.
-      expect(CreatorRepo.currencyForCountry('FR'), 'USD');
-      expect(CreatorRepo.currencyForCountry(null), 'USD');
-      expect(CreatorRepo.currencyForCountry(''), 'USD');
     });
   });
 

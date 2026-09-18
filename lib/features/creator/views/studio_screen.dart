@@ -80,6 +80,10 @@ class _StudioScreenState extends State<StudioScreen> {
 
   /// A studio still finding its feet leads with the steps rather than with
   /// numbers that are all dashes.
+  ///
+  /// Only meaningful once loaded: before that the screen knows nothing, and
+  /// guessing "established" would show a full dashboard of dashes with a
+  /// Full analytics link behind them.
   bool get _isNew => _steps.any((s) => !s.complete);
 
   void _say(String message) {
@@ -147,61 +151,71 @@ class _StudioScreenState extends State<StudioScreen> {
               SizedBox(height: 16.s),
               _greeting(),
               SizedBox(height: 20.s),
-              if (_isNew) ...[
-                GettingStartedCard(
-                  steps: _steps,
-                  onStep: (step) =>
-                      _todo(AppStrings.studioStepTitles[step.key] ?? step.key),
+              if (_loading) ...[
+                SizedBox(height: 60.s),
+                const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
                 ),
-                SizedBox(height: 22.s),
-              ],
-              const StudioSectionLabel(AppStrings.studioToday),
-              _statsRow(),
-              if (!_isNew) ...[
-                SizedBox(height: 10.s),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => _todo(AppStrings.studioFullAnalytics),
-                    child: Text(
-                      AppStrings.studioFullAnalytics,
-                      style: AppStyles.label(
-                        12,
-                        weight: AppStyles.bold,
-                        color: AppColors.brandPrimary,
+              ] else ...[
+                if (_isNew) ...[
+                  GettingStartedCard(
+                    steps: _steps,
+                    onStep: (step) => _todo(
+                      AppStrings.studioStepTitles[step.key] ?? step.key,
+                    ),
+                  ),
+                  SizedBox(height: 22.s),
+                ],
+                const StudioSectionLabel(AppStrings.studioToday),
+                _statsRow(),
+                if (!_isNew) ...[
+                  SizedBox(height: 10.s),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _todo(AppStrings.studioFullAnalytics),
+                      child: Text(
+                        AppStrings.studioFullAnalytics,
+                        style: AppStyles.label(
+                          12,
+                          weight: AppStyles.bold,
+                          color: AppColors.brandPrimary,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-              SizedBox(height: 22.s),
-              if (_attention.isNotEmpty) ...[
-                const StudioSectionLabel(AppStrings.studioNeedsYou),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.fieldBg,
-                    borderRadius: BorderRadius.circular(12.s),
-                  ),
-                  child: Column(
-                    children: [
-                      for (final (i, item) in _attention.indexed)
-                        AttentionRow(
-                          item: item,
-                          last: i == _attention.length - 1,
-                          onTap: () => _todo(item.key),
-                        ),
-                    ],
-                  ),
-                ),
+                ],
                 SizedBox(height: 22.s),
+                if (_attention.isNotEmpty) ...[
+                  const StudioSectionLabel(AppStrings.studioNeedsYou),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.fieldBg,
+                      borderRadius: BorderRadius.circular(12.s),
+                    ),
+                    child: Column(
+                      children: [
+                        for (final (i, item) in _attention.indexed)
+                          AttentionRow(
+                            item: item,
+                            last: i == _attention.length - 1,
+                            onTap: () => _todo(item.key),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 22.s),
+                ],
+                if (_isNew) ...[
+                  const StudioSectionLabel(AppStrings.studioCreateCaption),
+                  _quickUpload(),
+                  SizedBox(height: 22.s),
+                ],
+                const WebStudioNote(),
               ],
-              if (_isNew) ...[
-                const StudioSectionLabel(AppStrings.studioCreateCaption),
-                _quickUpload(),
-                SizedBox(height: 22.s),
-              ],
-              const WebStudioNote(),
             ],
           ),
         ),
@@ -261,11 +275,12 @@ class _StudioScreenState extends State<StudioScreen> {
               ),
               SizedBox(height: 4.s),
               Text(
-                _loading
-                    ? ''
-                    : _isNew
-                    ? AppStrings.studioReady
-                    : AppStrings.studioNeedsYouCount(_attention.length),
+                switch ((_loading, _isNew, _attention.length)) {
+                  (true, _, _) => '',
+                  (_, true, _) => AppStrings.studioReady,
+                  (_, _, 0) => AppStrings.studioAllClear,
+                  (_, _, final n) => AppStrings.studioNeedsYouCount(n),
+                },
                 style: AppStyles.body(
                   12,
                   color: AppColors.neutral400,

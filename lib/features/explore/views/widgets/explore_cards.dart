@@ -59,7 +59,10 @@ class ExploreLiveCard extends StatelessWidget {
               ),
             ),
             SizedBox(height: 12.s),
-            SizedBox(width: 149.s, child: ExploreCardMeta(card: card)),
+            SizedBox(
+              width: 149.s,
+              child: ExploreCardMeta(card: card),
+            ),
           ],
         ),
       ),
@@ -210,7 +213,10 @@ class ExploreTrendingCard extends StatelessWidget {
               ),
             ),
             SizedBox(height: 10.s),
-            SizedBox(width: 149.s, child: ExploreCardMeta(card: card)),
+            SizedBox(
+              width: 149.s,
+              child: ExploreCardMeta(card: card),
+            ),
             if (card.sponsored) ...[
               SizedBox(height: 10.s),
               const ExploreSponsoredTag(),
@@ -312,7 +318,10 @@ class ExplorePosterCard extends StatelessWidget {
               ),
             ),
             SizedBox(height: 8.s),
-            SizedBox(width: 149.s, child: ExploreCardMeta(card: card)),
+            SizedBox(
+              width: 149.s,
+              child: ExploreCardMeta(card: card),
+            ),
             if (card.sponsored) ...[
               SizedBox(height: 8.s),
               const ExploreSponsoredTag(),

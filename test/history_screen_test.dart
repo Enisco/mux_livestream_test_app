@@ -234,14 +234,17 @@ void main() {
         for (final day in HistoryDummyData.days)
           for (final e in day.entries) e.kind,
       };
-      expect(used, containsAll(<HistoryKind>[
-        HistoryKind.library,
-        HistoryKind.video,
-        HistoryKind.audio,
-        HistoryKind.devotional,
-        HistoryKind.blog,
-        HistoryKind.event,
-      ]));
+      expect(
+        used,
+        containsAll(<HistoryKind>[
+          HistoryKind.library,
+          HistoryKind.video,
+          HistoryKind.audio,
+          HistoryKind.devotional,
+          HistoryKind.blog,
+          HistoryKind.event,
+        ]),
+      );
     });
   });
 }

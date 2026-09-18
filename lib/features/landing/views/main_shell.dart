@@ -105,6 +105,7 @@ class _FollowingTab extends StatelessWidget {
   Widget build(BuildContext context) =>
       const HomeFeedScreen(initialTab: HomeTab.following);
 }
+
 class _ProfileTab extends StatefulWidget {
   const _ProfileTab();
 

@@ -84,8 +84,7 @@ class DetailAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ring =
-        ringColor ??
-        (isOrganization ? AppColors.purple400 : AppColors.cyan400);
+        ringColor ?? (isOrganization ? AppColors.purple400 : AppColors.cyan400);
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     final avatar = Container(
       width: size.s,

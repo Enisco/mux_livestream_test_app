@@ -125,8 +125,6 @@ abstract final class AppStrings {
   static const handleAvailable = 'Available — gospeltube.tv/@';
   static const handleTaken = 'That handle is taken';
   static const handleInvalid = 'That handle is not valid';
-  static const creatorSetupFootnote =
-      "You can polish your channel later. Let's get you set up first";
 
   // "Start creating" — who the channel is for.
   static const creatorTypeTitle = 'Start creating';
@@ -143,14 +141,8 @@ abstract final class AppStrings {
       "You keep watching as yourself either way, this adds a studio, it "
       "doesn't replace your account.";
 
-  static const orgTypeLabel = 'Type of organization';
-  static const orgTypeHint = 'e.g Church, Bible study';
   static const orgNameLabel = 'Organization name';
   static const orgNameHint = 'e.g CCI international';
-  static const orgTypeChurch = 'Church';
-  static const orgTypeMinistry = 'Ministry';
-  static const orgTypeBibleSchool = 'Bible School';
-  static const orgTypeOthers = 'Others';
   static const addSelection = 'Add Selection';
 
   // Once the plan is settled: the channel exists, now make it look like one.
@@ -217,45 +209,24 @@ abstract final class AppStrings {
   static const creatorTopicsDone = 'Done';
 
   static const yourPlan = 'Your plan';
-  static const billingMonthly = 'Monthly';
-  static const billingYearly = 'Yearly · 2 months free';
-  static const plansUnavailable =
-      'Plan prices could not be loaded. You can still continue on Free.';
-  static const plansRetry = 'Retry';
+  static const planHandoffSubtitle = 'Start free, or upgrade any time.';
+  static const planChoose = 'See paid plans';
+  static const planFreeHeading = 'Free';
+  static const planHandoffNote =
+      'Paid plans open in a secure browser, where you pick the plan, currency '
+      'and payment method. You will come straight back here when you are '
+      'done.';
+
+  /// Shown both when the storefront genuinely may not sell and when the
+  /// capability check fails, which cannot be told apart from the client — so
+  /// it states the effect rather than guessing at a reason.
+  static const planUnavailableHere =
+      "Paid plans aren't available on this device right now. Everything "
+      'below is yours on Free.';
   static const compareEverything = 'Compare everything';
   static const continueWithFree = 'Continue with Free';
-  static String continueWithTier(String tier) => 'Continue with $tier';
-  static const perMonth = '/mo';
-  static const perYear = '/yr';
-  static const mostPopular = 'Most popular';
-  static const currencyPrefix = 'IN ';
 
-  /// Only the currencies the app prices in; anything else prints its code.
-  static String currencySymbolFor(String currency) => switch (currency) {
-    'USD' || 'CAD' => r'$',
-    'NGN' => '₦',
-    'GBP' => '£',
-    'EUR' => '€',
-    'GHS' => '₵',
-    'KES' => 'KSh ',
-    'ZAR' => 'R',
-    _ => '$currency ',
-  };
-
-  static const planFree = 'Free';
   static const planFreeTagline = 'Start sharing today';
-  static const planFreeIncludes = 'Includes:';
-  static const planFreePrice = '0';
-  static const planBasic = 'Basic';
-  static const planBasicTagline = 'Grow your reach';
-  static const planPro = 'Pro';
-  static const planProTagline = 'Best for active ministries';
-  static const planEnterprise = 'Enterprise';
-  static const planEnterpriseTagline = 'For large organisations';
-  static const planEnterprisePrice = 'Custom';
-  static const everythingInFree = 'Everything In Free, plus:';
-  static const everythingInBasic = 'Everything In Basic, plus:';
-  static const everythingInPro = 'Everything In Pro, plus:';
 
   static const loginTitle = 'Log in to GospelTube';
   static const noAccount = 'Don’t have an account';
@@ -270,10 +241,6 @@ abstract final class AppStrings {
   static const emailHint = 'e.g name@mail.com';
   static const resetPassword = 'Reset Password';
   static const resetLinkSent = 'Check your inbox for the reset link.';
-
-  static const everyFeatureEveryPlan = 'Every feature, every plan';
-  static const tierFree = 'Free';
-  static const rowPricePerMonth = 'Price /month';
 
   static const followingLabel = 'Following';
   static const share = 'Share';
@@ -707,7 +674,6 @@ abstract final class AppStrings {
       'content itself stays on GospelTube.';
 
   // Giving — what the reader has sent to ministries.
-  static const givingTitle = 'My giving';
   static const givingGivenThisYear = 'Given this year';
   static const givingTotalSuffix = 'total';
   static const givingGiftsSuffix = 'gifts';
@@ -728,8 +694,6 @@ abstract final class AppStrings {
   static const followingSeeLatest = 'See latest content';
   static const followingSearchHint = 'Search ministries...';
   static const followingLive = 'LIVE';
-  static const followingLiveNow = 'Live now';
-  static const followingPostedPrefix = 'Posted';
   static const followingUnfollowPrefix = 'Unfollow';
   static const followingNoMatchTitle = 'No ministry matched';
   static const followingNoMatchBody =
@@ -765,6 +729,7 @@ abstract final class AppStrings {
   static const studioReady = "Your studio is ready. Here's how to start.";
   static String studioNeedsYouCount(int n) =>
       '$n thing${n == 1 ? '' : 's'} need your attention today.';
+  static const studioAllClear = 'Nothing needs you today.';
   static const studioCreate = '+ Create';
   static const studioToday = 'TODAY';
   static const studioNeedsYou = 'NEEDS YOU';

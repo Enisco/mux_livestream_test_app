@@ -46,10 +46,7 @@ void main() {
       );
 
       expect(find.text('Ayomide John'), findsOneWidget);
-      expect(
-        find.textContaining('@emekamusa · Account info'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('@emekamusa · Account info'), findsOneWidget);
     });
 
     testWidgets('a reader with no handle still gets the way in', (

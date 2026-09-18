@@ -103,10 +103,7 @@ void main() {
           baseSize: const Size(390, 844),
           builder: (context) => MaterialApp(
             home: Scaffold(
-              body: CreateSheet(
-                kinds: CreateKind.values,
-                onPick: (_) {},
-              ),
+              body: CreateSheet(kinds: CreateKind.values, onPick: (_) {}),
             ),
           ),
         ),

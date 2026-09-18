@@ -16,7 +16,12 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Artwork, from a bundled placeholder or the network, whichever the row has.
 class ExploreThumb extends StatelessWidget {
-  const ExploreThumb({super.key, this.asset, this.url, this.fit = BoxFit.cover});
+  const ExploreThumb({
+    super.key,
+    this.asset,
+    this.url,
+    this.fit = BoxFit.cover,
+  });
 
   final String? asset;
   final String? url;

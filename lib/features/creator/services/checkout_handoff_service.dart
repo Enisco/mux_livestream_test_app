@@ -57,9 +57,9 @@ class CheckoutHandoffService {
   static Future<bool> _openInSystemBrowser(Uri uri) =>
       launchUrl(uri, mode: LaunchMode.inAppBrowserView);
 
-  /// TODO(payments): confirm with the backend what `storefrontCountry` should
-  /// be. Apple's storefront is alpha-3 and Play's is separate again, so device
-  /// region is a stand-in until then.
+  /// ISO 3166-1 **alpha-2**, as the guide's `storefrontCountry=NG` examples
+  /// show. Taken from the device region, which is the closest thing the app
+  /// has to a storefront without querying the store itself.
   static String resolveStorefrontCountry() {
     final code = PlatformDispatcher.instance.locale.countryCode;
     if (code != null && RegExp(r'^[A-Za-z]{2}$').hasMatch(code)) {
@@ -71,6 +71,27 @@ class CheckoutHandoffService {
   static String newAttemptKey(String creatorId) =>
       'subscription:creator:$creatorId:attempt:${_uuid.v4()}';
 
+  /// Whether this storefront may sell a subscription at all.
+  ///
+  /// The guide is explicit that the purchase action is *hidden* rather than
+  /// disabled when this is false, so the screen asks before drawing it.
+  Future<bool> canPurchaseSubscription() async {
+    try {
+      final caps = await _repo.fetchCapabilities(
+        storefrontCountry: resolveStorefrontCountry(),
+      );
+      return caps.subscriptionAvailable;
+    } catch (e) {
+      logger.w('Capabilities check failed', error: e);
+      return false;
+    }
+  }
+
+  /// Creates the durable session and opens it in a system browser.
+  ///
+  /// No plan is named here: the session body carries only purpose, creator,
+  /// platform, storefront and idempotency key. Tier, interval, currency and
+  /// provider are chosen on the web surface.
   Future<HandoffResult> start({
     required String creatorId,
     String? planTier,

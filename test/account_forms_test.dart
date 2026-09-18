@@ -36,7 +36,7 @@ void main() {
     await LocalStorage.setString(
       LocalStorage.cachedUserKey,
       '{"firstName":"Ayomide","lastName":"John",'
-          '"email":"ayomide.john@mail.com"}',
+      '"email":"ayomide.john@mail.com"}',
     );
   });
 
@@ -76,8 +76,10 @@ void main() {
         AppStrings.settingsEmailUnchanged,
       );
       expect(
-        AccountFormRules.email(value: 'AYOMIDE.JOHN@MAIL.COM',
-            current: current),
+        AccountFormRules.email(
+          value: 'AYOMIDE.JOHN@MAIL.COM',
+          current: current,
+        ),
         AppStrings.settingsEmailUnchanged,
       );
     });
@@ -112,16 +114,14 @@ void main() {
         AppStrings.settingsPhoneUnchanged,
       );
       expect(
-        AccountFormRules.phone(value: '+234-80-123-234-5678',
-            current: current),
+        AccountFormRules.phone(value: '+234-80-123-234-5678', current: current),
         AppStrings.settingsPhoneUnchanged,
       );
     });
 
     test('a different number passes', () {
       expect(
-        AccountFormRules.phone(value: '+234 90 555 111 2222',
-            current: current),
+        AccountFormRules.phone(value: '+234 90 555 111 2222', current: current),
         isNull,
       );
     });
@@ -131,22 +131,40 @@ void main() {
     test('the current one is required first', () {
       expect(
         AccountFormRules.newPassword(
-            current: '', next: 'abcd1234', confirm: 'abcd1234'),
+          current: '',
+          next: 'abcd1234',
+          confirm: 'abcd1234',
+        ),
         AppStrings.settingsPasswordRequired,
       );
     });
 
     test('the rule under the field is the rule enforced', () {
       expect(AccountFormRules.isStrong('abcd1234'), isTrue);
-      expect(AccountFormRules.isStrong('abcdefgh'), isFalse, reason: 'no digit');
-      expect(AccountFormRules.isStrong('12345678'), isFalse, reason: 'no letter');
-      expect(AccountFormRules.isStrong('abc1234'), isFalse, reason: 'too short');
+      expect(
+        AccountFormRules.isStrong('abcdefgh'),
+        isFalse,
+        reason: 'no digit',
+      );
+      expect(
+        AccountFormRules.isStrong('12345678'),
+        isFalse,
+        reason: 'no letter',
+      );
+      expect(
+        AccountFormRules.isStrong('abc1234'),
+        isFalse,
+        reason: 'too short',
+      );
     });
 
     test('a new password identical to the old one is refused', () {
       expect(
         AccountFormRules.newPassword(
-            current: 'abcd1234', next: 'abcd1234', confirm: 'abcd1234'),
+          current: 'abcd1234',
+          next: 'abcd1234',
+          confirm: 'abcd1234',
+        ),
         AppStrings.settingsPasswordSame,
       );
     });
@@ -154,7 +172,10 @@ void main() {
     test('the confirmation has to match', () {
       expect(
         AccountFormRules.newPassword(
-            current: 'old12345', next: 'abcd1234', confirm: 'abcd9999'),
+          current: 'old12345',
+          next: 'abcd1234',
+          confirm: 'abcd9999',
+        ),
         AppStrings.settingsPasswordMismatch,
       );
     });
@@ -162,7 +183,10 @@ void main() {
     test('a sound change passes', () {
       expect(
         AccountFormRules.newPassword(
-            current: 'old12345', next: 'abcd1234', confirm: 'abcd1234'),
+          current: 'old12345',
+          next: 'abcd1234',
+          confirm: 'abcd1234',
+        ),
         isNull,
       );
     });

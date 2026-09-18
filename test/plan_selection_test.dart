@@ -5,20 +5,44 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/router.dart';
-import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
 import 'package:test_app/features/creator/views/plan_selection_screen.dart';
-import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
-/// The plan step, with the catalogue unreachable — which is its real state
-/// while `GET /v1/payment/saas/plans` answers 500.
-Future<void> _pump(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(390 * 3, 1400 * 3);
+/// Stands in for the handoff, which is the screen's only collaborator now
+/// that the plan catalogue lives on the web surface.
+class _FakeHandoff extends CheckoutHandoffService {
+  _FakeHandoff({this.available = true, this.outcome = HandoffOutcome.launched});
+
+  final bool available;
+  final HandoffOutcome outcome;
+  int starts = 0;
+
+  @override
+  Future<bool> canPurchaseSubscription() async => available;
+
+  @override
+  Future<HandoffResult> start({
+    required String creatorId,
+    String? planTier,
+  }) async {
+    starts++;
+    // The plan is never named by mobile: the web surface chooses it.
+    expect(planTier, isNull);
+    return HandoffResult(outcome, sessionId: 'session-1');
+  }
+}
+
+Future<void> _pump(WidgetTester tester, _FakeHandoff handoff) async {
+  tester.view.physicalSize = const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
+
+  await getIt.reset();
+  getIt.registerSingleton<CheckoutHandoffService>(handoff);
+
   await tester.pumpWidget(
     MaterialApp.router(
       routerConfig: GoRouter(
@@ -34,28 +58,7 @@ Future<void> _pump(WidgetTester tester) async {
       ),
     ),
   );
-  await tester.pump();
-}
-
-/// Stands in for a catalogue that cannot be reached — `GET
-/// /v1/payment/saas/plans` answers 500 on staging.
-class _UnreachableCatalogue extends CreatorRepo {
-  @override
-  Future<List<SaasPlan>> fetchPlans({
-    required BillingSubject billingSubject,
-    required String currency,
-    int page = 1,
-    int limit = 12,
-  }) async => throw Exception('catalogue unavailable');
-}
-
-/// Fails the test loudly if a Free selection ever starts a checkout.
-class _NeverCheckout extends CheckoutHandoffService {
-  @override
-  Future<HandoffResult> start({
-    required String creatorId,
-    String? planTier,
-  }) async => fail('Free must not start a checkout');
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -64,78 +67,99 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     await LocalStorage.init();
-    // The screen resolves both of these on build. The catalogue stands in for
-    // the 500 staging currently returns, which is the state under test.
-    await getIt.reset();
-    getIt.registerSingleton<CreatorRepo>(_UnreachableCatalogue());
-    getIt.registerSingleton<CheckoutHandoffService>(_NeverCheckout());
+    await LocalStorage.setString(LocalStorage.creatorIdKey, 'creator-1');
   });
 
-  testWidgets('Free is offered as a plan in its own right', (tester) async {
-    await _pump(tester);
-
-    expect(find.text(AppStrings.planFree), findsOneWidget);
-    expect(find.text(AppStrings.planBasic), findsOneWidget);
-    expect(find.text(AppStrings.planPro), findsOneWidget);
-    expect(find.text(AppStrings.planEnterprise), findsOneWidget);
-  });
-
-  testWidgets('Free is what the button acts on until told otherwise', (
+  testWidgets('no plan catalogue is shown — the web surface owns it', (
     tester,
   ) async {
-    await _pump(tester);
+    await _pump(tester, _FakeHandoff());
 
-    // Pro used to be the default, which meant an unthinking tap started a
-    // paid checkout.
-    expect(find.text(AppStrings.continueWithFree), findsOneWidget);
+    for (final tier in const ['Basic', 'Pro', 'Enterprise']) {
+      expect(find.text(tier), findsNothing, reason: tier);
+    }
+    expect(find.text(AppStrings.compareEverything), findsNothing);
   });
 
-  testWidgets('the button names whichever tier is chosen', (tester) async {
-    await _pump(tester);
+  testWidgets('both ways forward are offered when purchase is allowed', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeHandoff());
 
-    await tester.tap(find.text(AppStrings.planPro));
-    await tester.pump();
-    expect(
-      find.text(AppStrings.continueWithTier(AppStrings.planPro)),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text(AppStrings.planFree));
-    await tester.pump();
+    expect(find.text(AppStrings.planChoose), findsOneWidget);
     expect(find.text(AppStrings.continueWithFree), findsOneWidget);
+    expect(find.textContaining('secure browser'), findsOneWidget);
   });
 
-  testWidgets('choosing Free skips checkout entirely', (tester) async {
-    await LocalStorage.setString(LocalStorage.creatorIdKey, 'creator-1');
-    await _pump(tester);
+  testWidgets('the purchase action is hidden where it cannot be sold', (
+    tester,
+  ) async {
+    // The guide requires hiding it, not disabling it.
+    await _pump(tester, _FakeHandoff(available: false));
 
-    await tester.tap(find.text(AppStrings.continueWithFree));
+    expect(find.text(AppStrings.planChoose), findsNothing);
+    expect(find.text(AppStrings.continueWithFree), findsOneWidget);
+    expect(find.text(AppStrings.planUnavailableHere), findsOneWidget);
+  });
+
+  testWidgets('Free skips the handoff entirely', (tester) async {
+    final handoff = _FakeHandoff();
+    await _pump(tester, handoff);
+
+    await tester.tap(find.byKey(const ValueKey('continue-free')));
     await tester.pumpAndSettle();
 
     expect(find.text('at ${AppRouter.creatorLive}'), findsOneWidget);
+    expect(handoff.starts, 0);
+  });
+
+  testWidgets('choosing a paid plan hands off and then watches the session', (
+    tester,
+  ) async {
+    final handoff = _FakeHandoff();
+    await _pump(tester, handoff);
+
+    await tester.tap(find.byKey(const ValueKey('choose-plan')));
+    await tester.pumpAndSettle();
+
+    expect(handoff.starts, 1);
+    expect(find.text('at ${AppRouter.checkoutStatus}'), findsOneWidget);
+  });
+
+  testWidgets('a resumed session is watched rather than restarted', (
+    tester,
+  ) async {
+    final handoff = _FakeHandoff(outcome: HandoffOutcome.alreadyActive);
+    await _pump(tester, handoff);
+
+    await tester.tap(find.byKey(const ValueKey('choose-plan')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('at ${AppRouter.checkoutStatus}'), findsOneWidget);
+  });
+
+  testWidgets('an unavailable storefront hides the action after the fact', (
+    tester,
+  ) async {
+    final handoff = _FakeHandoff(outcome: HandoffOutcome.unavailable);
+    await _pump(tester, handoff);
+
+    await tester.tap(find.byKey(const ValueKey('choose-plan')));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.planChoose), findsNothing);
     expect(find.text('at ${AppRouter.checkoutStatus}'), findsNothing);
   });
 
-  testWidgets('a studio with no channel is not sent to checkout', (
-    tester,
-  ) async {
-    await _pump(tester);
+  testWidgets('a creator without a channel is not handed off', (tester) async {
+    await LocalStorage.remove(LocalStorage.creatorIdKey);
+    final handoff = _FakeHandoff();
+    await _pump(tester, handoff);
 
-    await tester.tap(find.text(AppStrings.continueWithFree));
+    await tester.tap(find.byKey(const ValueKey('choose-plan')));
     await tester.pumpAndSettle();
 
+    expect(handoff.starts, 0);
     expect(find.text('at ${AppRouter.home}'), findsOneWidget);
-  });
-
-  group('the currency symbol', () {
-    test('covers the markets the app prices in', () {
-      expect(AppStrings.currencySymbolFor('NGN'), '₦');
-      expect(AppStrings.currencySymbolFor('USD'), r'$');
-      expect(AppStrings.currencySymbolFor('GBP'), '£');
-    });
-
-    test('an unknown currency prints its code rather than a wrong sign', () {
-      expect(AppStrings.currencySymbolFor('JPY'), 'JPY ');
-    });
   });
 }

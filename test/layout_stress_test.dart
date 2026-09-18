@@ -194,10 +194,7 @@ void main() {
     testWidgets('a creator with an empty name does not crash the avatar', (
       tester,
     ) async {
-      await _stress(
-        tester,
-        ExploreCreatorCard(creator: _creator(name: '')),
-      );
+      await _stress(tester, ExploreCreatorCard(creator: _creator(name: '')));
     });
   });
 

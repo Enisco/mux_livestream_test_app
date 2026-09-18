@@ -26,10 +26,7 @@ class _EventRemindersScreenState extends State<EventRemindersScreen> {
   void _report() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          AppStrings.remindersNotWired,
-          style: AppStyles.body(13),
-        ),
+        content: Text(AppStrings.remindersNotWired, style: AppStyles.body(13)),
         backgroundColor: AppColors.neutral800,
         behavior: SnackBarBehavior.floating,
       ),
@@ -140,7 +137,8 @@ class _EventRemindersScreenState extends State<EventRemindersScreen> {
                               in PreferencesDummyData.leadTimes) ...[
                             _LeadRow(
                               label: leadTimeLabel(minutes),
-                              isDefault: minutes ==
+                              isDefault:
+                                  minutes ==
                                   PreferencesDummyData.defaultLeadMinutes,
                               selected: minutes == _lead,
                               onTap: () {

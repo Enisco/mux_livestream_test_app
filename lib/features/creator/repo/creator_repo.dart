@@ -158,54 +158,6 @@ class CreatorRepo {
     await _api.patch(ApiEndpoints.creatorById(creatorId), data: body);
   }
 
-  /// The plan catalogue for a billing subject and currency.
-  ///
-  /// Paged the way the web client pages it. Both query parameters are
-  /// required — the route answers 400 naming the missing one, and
-  /// `billingSubject` is spelled the British way (`organisation`).
-  Future<List<SaasPlan>> fetchPlans({
-    required BillingSubject billingSubject,
-    required String currency,
-    int page = 1,
-    int limit = 12,
-  }) async {
-    final response = await _api.get(
-      ApiEndpoints.saasPlans,
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        'billingSubject': billingSubject.value,
-        'currency': currency,
-      },
-    );
-    final payload = (response.data as Map<String, dynamic>)['data'];
-    final rows = (payload as Map<String, dynamic>)['data'] as List<dynamic>;
-    return rows
-        .map((e) => SaasPlan.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// Which currency to price the plans in.
-  ///
-  /// `GET /v1/payment/saas/currency-hint` would answer this, but it returns
-  /// 500 on staging for every caller, so the currency is derived from the
-  /// country the account registered with and falls back to USD — which is
-  /// what the web client sends outright.
-  static String currencyForCountry(String? isoCode) =>
-      _currencyByCountry[isoCode?.toUpperCase()] ?? 'USD';
-
-  /// Only the markets the platform actually prices in; everywhere else bills
-  /// in USD rather than in a currency the catalogue may not carry.
-  static const _currencyByCountry = <String, String>{
-    'NG': 'NGN',
-    'GH': 'GHS',
-    'KE': 'KES',
-    'ZA': 'ZAR',
-    'GB': 'GBP',
-    'US': 'USD',
-    'CA': 'CAD',
-  };
-
   Future<HandleAvailability> checkHandleAvailability(String handle) async {
     final response = await _api.get(
       ApiEndpoints.creatorHandleAvailability(handle),

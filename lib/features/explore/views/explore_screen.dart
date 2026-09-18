@@ -108,8 +108,7 @@ class _Content extends StatelessWidget {
           title: AppStrings.exploreLive,
           onSeeAll: () => _todo(context, AppStrings.exploreLive),
           itemCount: ExploreDummyData.live.length,
-          itemBuilder: (_, i) =>
-              ExploreLiveCard(
+          itemBuilder: (_, i) => ExploreLiveCard(
             card: ExploreDummyData.live[i],
             onTap: () => _todo(context, ExploreDummyData.live[i].title),
           ),
@@ -120,8 +119,7 @@ class _Content extends StatelessWidget {
           title: AppStrings.exploreContinueWatching,
           onSeeAll: () => _todo(context, AppStrings.exploreContinueWatching),
           itemCount: ExploreDummyData.continueWatching.length,
-          itemBuilder: (_, i) =>
-              ExploreContinueCard(
+          itemBuilder: (_, i) => ExploreContinueCard(
             card: ExploreDummyData.continueWatching[i],
             onTap: () =>
                 _todo(context, ExploreDummyData.continueWatching[i].title),
@@ -169,8 +167,7 @@ class _Content extends StatelessWidget {
           title: AppStrings.exploreMinistries,
           onSeeAll: () => _todo(context, AppStrings.exploreMinistries),
           itemCount: ExploreDummyData.ministries.length,
-          itemBuilder: (_, i) =>
-              ExploreCreatorCard(
+          itemBuilder: (_, i) => ExploreCreatorCard(
             creator: ExploreDummyData.ministries[i],
             onTap: () => _todo(context, ExploreDummyData.ministries[i].name),
             onFollow: () => _todo(context, 'Following a ministry'),
@@ -184,8 +181,7 @@ class _Content extends StatelessWidget {
           gap: 24,
           crossAxisAlignment: CrossAxisAlignment.end,
           itemCount: ExploreDummyData.events.length,
-          itemBuilder: (_, i) =>
-              ExploreEventRow(
+          itemBuilder: (_, i) => ExploreEventRow(
             event: ExploreDummyData.events[i],
             onTap: () => _todo(context, ExploreDummyData.events[i].title),
           ),

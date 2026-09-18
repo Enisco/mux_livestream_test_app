@@ -66,13 +66,12 @@ void main() {
       await tester.pump();
 
       // The chosen row is the only one filled in.
-      final filled = tester
-          .widgetList<Container>(find.byType(Container))
-          .where((c) {
-            final border = (c.decoration as BoxDecoration?)?.border;
-            return border is Border &&
-                border.top.color == AppColors.brandPrimary;
-          });
+      final filled = tester.widgetList<Container>(find.byType(Container)).where(
+        (c) {
+          final border = (c.decoration as BoxDecoration?)?.border;
+          return border is Border && border.top.color == AppColors.brandPrimary;
+        },
+      );
       expect(filled, hasLength(1));
     });
 
@@ -84,10 +83,12 @@ void main() {
       await tester.pump();
 
       final gate = tester.widget<IgnorePointer>(
-        find.ancestor(
-          of: find.text('15 minutes before'),
-          matching: find.byType(IgnorePointer),
-        ).first,
+        find
+            .ancestor(
+              of: find.text('15 minutes before'),
+              matching: find.byType(IgnorePointer),
+            )
+            .first,
       );
       expect(gate.ignoring, isTrue);
     });
@@ -133,8 +134,9 @@ void main() {
     testWidgets('the pill toggles the topic', (tester) async {
       await _pump(tester, const TopicsSheet());
 
-      final onBefore =
-          tester.widgetList<Icon>(find.byIcon(Icons.check_rounded)).length;
+      final onBefore = tester
+          .widgetList<Icon>(find.byIcon(Icons.check_rounded))
+          .length;
 
       // The pill sits at the end of the first row.
       await tester.tap(find.byIcon(Icons.check_rounded).first);
@@ -226,8 +228,11 @@ void main() {
 
   group('all four survive a small screen', () {
     testWidgets('reminders at 320pt', (tester) async {
-      await _pump(tester, const EventRemindersScreen(),
-          size: const Size(320, 568));
+      await _pump(
+        tester,
+        const EventRemindersScreen(),
+        size: const Size(320, 568),
+      );
       expect(tester.takeException(), isNull);
     });
 
@@ -237,12 +242,14 @@ void main() {
     });
 
     testWidgets('both dialogs at 320pt', (tester) async {
-      await _pump(tester, const LogOutAllDialog(),
-          size: const Size(320, 568));
+      await _pump(tester, const LogOutAllDialog(), size: const Size(320, 568));
       expect(tester.takeException(), isNull);
 
-      await _pump(tester, const DeactivateAccountDialog(),
-          size: const Size(320, 568));
+      await _pump(
+        tester,
+        const DeactivateAccountDialog(),
+        size: const Size(320, 568),
+      );
       expect(tester.takeException(), isNull);
     });
   });

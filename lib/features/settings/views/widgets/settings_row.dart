@@ -97,7 +97,9 @@ class SettingsRow extends StatelessWidget {
             else if (icon case final glyph?)
               HugeIcon(
                 icon: glyph,
-                color: destructive ? AppColors.destructive : AppColors.neutral300,
+                color: destructive
+                    ? AppColors.destructive
+                    : AppColors.neutral300,
                 size: 24.s,
               ),
             SizedBox(width: 10.s),

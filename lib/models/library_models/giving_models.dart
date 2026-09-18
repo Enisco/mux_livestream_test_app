@@ -5,12 +5,14 @@
 /// prints what it is handed rather than formatting anything itself.
 library;
 
+import 'package:test_app/utils/app_constants/app_strings.dart';
+
 /// The document a gift produced. Each opens a different thing, and the design
 /// names them differently, so the kind is carried rather than inferred.
 enum GiftDocument {
-  receipt('Receipt'),
-  invoice('Invoice'),
-  voucher('Voucher');
+  receipt(AppStrings.givingReceipt),
+  invoice(AppStrings.givingInvoice),
+  voucher(AppStrings.givingVoucher);
 
   const GiftDocument(this.label);
 

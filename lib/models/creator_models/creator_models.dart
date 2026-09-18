@@ -160,68 +160,6 @@ class ContentCategory {
       );
 }
 
-enum BillingSubject {
-  individual('individual'),
-  organisation('organisation');
-
-  const BillingSubject(this.value);
-
-  final String value;
-
-  static BillingSubject fromCreatorType(String? creatorType) =>
-      creatorType == 'organization'
-      ? BillingSubject.organisation
-      : BillingSubject.individual;
-}
-
-class SaasPlan {
-  const SaasPlan({
-    required this.id,
-    required this.planTier,
-    required this.billingSubject,
-    required this.billingInterval,
-    required this.currency,
-    required this.amountMinor,
-  });
-
-  final String id;
-  final String planTier;
-  final String billingSubject;
-
-  final String billingInterval;
-  final String currency;
-  final int amountMinor;
-
-  int get amountMajor => amountMinor ~/ 100;
-
-  factory SaasPlan.fromJson(Map<String, dynamic> json) => SaasPlan(
-    id: json['id'] as String? ?? '',
-    planTier: json['planTier'] as String? ?? '',
-    billingSubject: json['billingSubject'] as String? ?? '',
-    billingInterval: json['billingInterval'] as String? ?? '',
-    currency: json['currency'] as String? ?? '',
-    amountMinor: (json['amountMinor'] as num?)?.toInt() ?? 0,
-  );
-}
-
-class CurrencyHint {
-  const CurrencyHint({
-    required this.recommendedCurrency,
-    required this.recommendedProvider,
-  });
-
-  final String recommendedCurrency;
-  final String recommendedProvider;
-
-  factory CurrencyHint.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>;
-    return CurrencyHint(
-      recommendedCurrency: data['recommendedCurrency'] as String? ?? 'USD',
-      recommendedProvider: data['recommendedProvider'] as String? ?? '',
-    );
-  }
-}
-
 enum MobileCheckoutStatus {
   created,
   inProgress,

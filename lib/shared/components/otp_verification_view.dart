@@ -162,7 +162,11 @@ class _OtpVerificationViewState extends State<OtpVerificationView> {
         Text(
           widget.title,
           textAlign: TextAlign.center,
-          style: AppStyles.heading(20, lineHeight: 32 / 20, letterSpacing: -0.8),
+          style: AppStyles.heading(
+            20,
+            lineHeight: 32 / 20,
+            letterSpacing: -0.8,
+          ),
         ),
         const SizedBox(height: 8),
         Text.rich(
