@@ -4,10 +4,15 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
 import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
+import 'package:test_app/features/creator/views/go_live_setup_screen.dart';
+import 'package:test_app/features/creator/views/new_article_screen.dart';
+import 'package:test_app/features/creator/views/new_event_screen.dart';
+import 'package:test_app/features/creator/views/new_media_screen.dart';
 import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
 import 'package:test_app/models/creator_models/dashboard_models.dart';
+import 'package:test_app/models/creator_models/media_upload_models.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -114,7 +119,7 @@ class _StudioScreenState extends State<StudioScreen> {
     switch (choice) {
       case StudiosChoice.switchStudio:
         // No route returns the studios a user belongs to yet; the backend
-        // will publish one. See OPEN_ISSUES 44.
+        // will publish one. See OPEN_ISSUES 22.
         _say(AppStrings.studiosNotImplemented);
       case StudiosChoice.settings:
         _todo(AppStrings.studiosSettings);
@@ -131,6 +136,47 @@ class _StudioScreenState extends State<StudioScreen> {
     ];
     final picked = await CreateSheet.show(context, kinds: allowed);
     if (!mounted || picked == null) return;
+    // Video and audio are the same screen; everything else is not built.
+    final kind = switch (picked) {
+      CreateKind.video => MediaUploadKind.video,
+      CreateKind.audio => MediaUploadKind.music,
+      _ => null,
+    };
+    if (picked == CreateKind.livestream) {
+      // Going live is not an upload: it opens the camera, not a picker.
+      final went = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const GoLiveSetupScreen()),
+      );
+      if ((went ?? false) && mounted) await _load();
+      return;
+    }
+    if (picked == CreateKind.blog) {
+      final made = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const NewArticleScreen()),
+      );
+      if ((made ?? false) && mounted) await _load();
+      return;
+    }
+    if (picked == CreateKind.event) {
+      final made = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const NewEventScreen()),
+      );
+      if ((made ?? false) && mounted) await _load();
+      return;
+    }
+    if (kind != null) {
+      final made = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => NewMediaScreen(kind: kind)),
+      );
+      // A first upload changes the getting-started checklist and the
+      // counts, so the tab should not still be showing the old ones.
+      if ((made ?? false) && mounted) await _load();
+      return;
+    }
     _todo(picked.title);
   }
 

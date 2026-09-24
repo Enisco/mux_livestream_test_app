@@ -253,8 +253,8 @@ void main() {
         size: const Size(390, 1400),
       );
 
-      for (final topic in CreatorTopicsSheet.fallback) {
-        expect(find.text(topic), findsOneWidget, reason: topic);
+      for (final (slug, name) in CreatorTopicsSheet.fallback) {
+        expect(find.text(name), findsOneWidget, reason: slug);
       }
     });
 

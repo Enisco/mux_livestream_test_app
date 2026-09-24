@@ -39,25 +39,29 @@ class CreatorTopicsSheet extends StatefulWidget {
         CreatorTopicsSheet(categories: categories, selected: selected),
   );
 
-  /// The design's list, in its order. Slugged the way the API slugs its own.
-  static const fallback = <String>[
-    'Worship',
-    'Preaching',
-    'Bible study',
-    'Youth',
-    'Gospel Music & Worship',
-    'Marriage & Family',
-    'Faith & Finances',
-    'Healing & Deliverance',
-    'Prayer & Spiritual Growth',
+  /// What `GET /v1/user/categories` actually returns, verbatim, for when
+  /// that call fails.
+  ///
+  /// These are not the design's nine labels. Slugging those the obvious way
+  /// produced `preaching`, `marriage-family` and the rest, every one of
+  /// which the API refuses — *"Unsupported categories: preaching"* — so an
+  /// onboarding that fell back would have been rejected on save.
+  static const fallback = <(String, String)>[
+    ('worship', 'Worship'),
+    ('sermons', 'Sermons'),
+    ('bible-study', 'Bible Study'),
+    ('prayer', 'Prayer'),
+    ('gospel-music', 'Gospel Music'),
+    ('live-services', 'Live Services'),
+    ('testimonies', 'Testimonies'),
+    ('youth', 'Youth'),
+    ('family', 'Family'),
+    ('devotionals', 'Devotionals'),
   ];
 
   static List<ContentCategory> get _fallbackCategories => [
-    for (final name in fallback)
-      ContentCategory(
-        slug: name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-'),
-        name: name,
-      ),
+    for (final (slug, name) in fallback)
+      ContentCategory(slug: slug, name: name),
   ];
 
   @override

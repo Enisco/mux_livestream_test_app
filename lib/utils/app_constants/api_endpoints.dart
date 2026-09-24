@@ -35,6 +35,58 @@ abstract final class ApiEndpoints {
   static String creatorDashboardPerformance(String creatorId) =>
       '$_creator/$creatorId/dashboard/performance';
 
+  /// What a creator has made. Three sources, because media, written posts
+  /// and calendar events are three services.
+  static String creatorMediaSearch(String creatorId) =>
+      '$_media/creator/$creatorId/search';
+
+  static String creatorPostsSearch(String creatorId) =>
+      '/v1/content/posts/creator/$creatorId/search';
+
+  static String creatorEventsSearch(String creatorId) =>
+      '/v1/content/calendar/events/creator/$creatorId/search';
+
+  /// Uploading a video or a piece of audio. Three calls, in this order:
+  /// a ticket, the bytes straight to Mux as a **PUT**, then the row.
+  /// A livestream uses none of these — see the live provision routes.
+  static const mediaRequestUpload = '$_media/request-upload';
+  static const mediaThumbnailUploadUrl = '$_media/thumbnail/upload-url';
+  static const createMedia = _media;
+
+  static String mediaById(String mediaId) => '$_media/$mediaId';
+
+  /// Takes `{visibility}` and nothing else. It may be called while the
+  /// upload is still processing: the backend publishes once Mux is ready.
+  static String publishMedia(String mediaId) => '$_media/$mediaId/publish';
+
+  /// Calendar events. They live in the content service, not the media one,
+  /// and nothing about them is uploaded or transcoded.
+  static const calendarEvents = '/v1/content/calendar/events';
+
+  static String calendarEventById(String eventId) => '$calendarEvents/$eventId';
+
+  /// Takes no body. Refuses the event unless a description is set, plus an
+  /// address for anything physical and a meeting link for anything virtual.
+  static String publishCalendarEvent(String eventId) =>
+      '$calendarEvents/$eventId/publish';
+
+  /// Articles. Markdown and images in the content service; nothing is
+  /// transcoded. `scheduledAt` goes on with a PATCH, never on create.
+  static const contentPosts = '/v1/content/posts';
+
+  static String contentPostById(String postId) => '$contentPosts/$postId';
+
+  static String publishContentPost(String postId) =>
+      '$contentPosts/$postId/publish';
+
+  /// Resolves each `![alt](file:{id})` in a body to a picture, or says why
+  /// it cannot yet.
+  static const contentPostBodyEmbeds = '$contentPosts/body-embeds/resolve';
+
+  /// A cover image for a post or an event: `{creatorId, category, filename,
+  /// mimeType, size}` where `category` is `cover` or `body_image`.
+  static const contentAssetUploadUrl = '/v1/content/assets/upload-url';
+
   static String creatorHandleAvailability(String handle) =>
       '$_creator/handle/$handle/availability';
 
@@ -94,6 +146,32 @@ abstract final class ApiEndpoints {
 
   static String creatorLiveStatus(String creatorId) =>
       '$_public/live/creator/$creatorId/status';
+
+  /// A broadcast session, with its title, categories and replay policy.
+  /// This is what the design's Go Live form fills in — the creator-scoped
+  /// `start` above carries none of it.
+  static String createLiveSession(String creatorId) =>
+      '$_media/live/creator/$creatorId/sessions';
+
+  /// Opens the window in which Mux will accept the encoder. Ingest is
+  /// disabled the rest of the time, because a durable Mux livestream bills
+  /// for it whenever it accepts data.
+  static String armLiveIngest(String mediaId) =>
+      '$_media/live/streams/$mediaId/ingest/arm';
+
+  static String disableLiveIngest(String mediaId) =>
+      '$_media/live/streams/$mediaId/ingest/disable';
+
+  static String startLiveSession(String mediaId) =>
+      '$_media/live/streams/$mediaId/start';
+
+  static String cancelLiveSession(String mediaId) =>
+      '$_media/live/streams/$mediaId/cancel';
+
+  /// The authoritative snapshot: presence, giving, prayers and the
+  /// session's own state.
+  static String liveStudio(String mediaId) =>
+      '$_media/live/streams/$mediaId/studio';
 
   static String livestreamPlaybackToken(String mediaId) =>
       '$_media/live/streams/$mediaId/playback-token';

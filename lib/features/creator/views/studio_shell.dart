@@ -4,7 +4,11 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
+import 'package:test_app/features/creator/views/studio_content_screen.dart';
 import 'package:test_app/features/creator/views/studio_screen.dart';
+import 'package:test_app/models/creator_models/dashboard_models.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -23,6 +27,23 @@ class StudioShell extends StatefulWidget {
 class _StudioShellState extends State<StudioShell> {
   int _tab = 0;
 
+  /// Fetched once for the shell so every tab shares one answer rather than
+  /// each asking again on every switch.
+  DashboardContext? _context;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContext();
+  }
+
+  Future<void> _loadContext() async {
+    final creatorId = LocalStorage.creatorId;
+    if (creatorId == null) return;
+    final context = await CreatorDashboardRepo().fetchContext(creatorId);
+    if (mounted) setState(() => _context = context);
+  }
+
   /// Impact carries the count of things waiting; the design shows it on the
   /// tab itself so it is visible from anywhere in the studio.
   static const _impactBadge = 18;
@@ -38,7 +59,7 @@ class _StudioShellState extends State<StudioShell> {
               0 => StudioScreen(
                 onLeaveStudio: () => context.go(AppRouter.home),
               ),
-              1 => const _NotBuilt(AppStrings.studioTabContent),
+              1 => StudioContentScreen(context: _context),
               2 => const _NotBuilt(AppStrings.studioTabImpact),
               _ => const _NotBuilt(AppStrings.studioTabGiving),
             },

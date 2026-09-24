@@ -730,6 +730,308 @@ abstract final class AppStrings {
   static String studioNeedsYouCount(int n) =>
       '$n thing${n == 1 ? '' : 's'} need your attention today.';
   static const studioAllClear = 'Nothing needs you today.';
+
+  // The Content tab.
+  static const contentChipAll = 'All';
+  static const contentSearchHint = 'Search your content...';
+  static const contentEmptyTitle = 'Nothing shared yet';
+  static const contentEmptyBody =
+      'Your first sermon, song or word is the beginning of your channel. '
+      'Everything you publish will live here.';
+  static const contentCreate = 'Create';
+  static const contentShare = 'Share content';
+  static const contentEdit = 'Edit';
+  static const contentProcessing = 'Processing';
+  static const contentDraft = 'Draft';
+  static const contentScheduled = 'Scheduled';
+
+  /// States the API returns that the design does not draw. Left unnamed,
+  /// a failed upload read as "Public · 2d".
+  static const contentFailed = 'Upload failed';
+  static const contentInReview = 'In review';
+  static const contentBlocked = 'Blocked';
+  static const contentArchived = 'Archived';
+  static const contentCancelled = 'Cancelled';
+  static const contentLiveNow = 'Live now';
+
+  /// The recording a broadcast left behind — a video row pointing back at
+  /// the session. It is not an upload, and it is not the session either.
+  static const contentReplay = 'Replay';
+
+  /// The broadcast itself, once it is over.
+  static const contentEnded = 'Ended';
+  static const contentEdited = 'edited';
+  static const contentJustNow = 'just now';
+  static const contentPublic = 'Public';
+  static const contentUnlisted = 'Unlisted';
+  static const contentPrivate = 'Private';
+  static const contentViews = 'views';
+  static const contentPlays = 'plays';
+  static const contentReads = 'reads';
+  static const contentGoing = 'going';
+  static const contentWatchedLive = 'watched live';
+
+  // Uploading a video or a piece of audio. The two are one screen; a
+  // livestream is a different thing entirely and has its own.
+  static const newVideoTitle = 'New video';
+  static const newVideoSubtitle =
+      'Share a sermon, message, or worship video with your community.';
+
+  /// The audio design repeats the video frame's subtitle word for word,
+  /// down to "worship video". On the audio screen that is simply wrong, so
+  /// this names a song instead.
+  static const newAudioTitle = 'New audio';
+  static const newAudioSubtitle =
+      'Share a sermon, message, or worship song with your community.';
+
+  /// The ceilings are staging's own `constraints.maxSizeBytes`: 5 GB for a
+  /// video ticket, 1 GB for a music one. The design says 4 GB on the video
+  /// frame and repeats "MP4 or MOV, up to 4GB" on the audio frame, which
+  /// names neither the right containers nor the right ceiling.
+  static const newVideoPickHint = 'MP4 or MOV, up to 5GB';
+  static const newAudioPickHint = 'MP3, M4A or WAV, up to 1GB';
+  static const newVideoSelect = 'Select video';
+  static const newAudioSelect = 'Select audio';
+
+  static const newMediaUploading = 'Uploading';
+  static const newMediaUploaded = 'Ready to publish';
+  static const newMediaUploadFailed = 'Upload failed';
+  static const newMediaThumbnail = 'Thumbnail';
+  static const newMediaRequired = 'required';
+  static const newMediaThumbnailCta = 'Upload thumbnail (1280×720)';
+  static const newMediaThumbnailChange = 'Change thumbnail';
+  static const newMediaTitleLabel = 'Title';
+  static const newMediaTitleHint = 'e.g Walking by faith';
+  static const newMediaDescriptionLabel = 'Description';
+  static const newMediaDescriptionHint =
+      'A message on trusting God through uncertain seasons.';
+  static const newMediaCategoryLabel = 'Category';
+  static const newMediaCategoryHint = 'e.g Sermons';
+  static const newMediaPublish = 'Upload & publish';
+  static const newMediaSaveDraft = 'Save as draft instead';
+
+  // A calendar event. Nothing here is uploaded or transcoded; an event
+  // lives in the content service, not the media one.
+  static const newEventTitle = 'New event';
+  static const newEventSubtitle =
+      'Invite your community to a service or gathering';
+  static const newEventCover = 'Cover art';
+  static const newEventTitleLabel = 'Event title';
+  static const newEventTitleHint = 'e.g Encounter Conference 2026';
+  static const newEventType = 'Event type';
+  static const newEventPhysical = 'In Person';
+  static const newEventPhysicalBody = 'A physical location for the event';
+  static const newEventVirtual = 'Virtual';
+  static const newEventVirtualBody = 'A virtual meeting link';
+  static const newEventHybrid = 'Hybrid';
+  static const newEventHybridBody =
+      'A combination of physical event and virtual event';
+  static const newEventStartDate = 'Start Date';
+  static const newEventEndDate = 'End Date';
+  static const newEventNoEndDate = 'Leave blank if no end date';
+  static const newEventTime = 'Time';
+  static const newEventLocation = 'Location (in person)';
+  static const newEventLocationHint = 'Lekki Conference Centre';
+
+  /// The design collects one free-text venue name. Publishing needs a
+  /// street address **and** a city — "Add a street address and city before
+  /// publishing this event" — so both are asked for.
+  static const newEventAddress = 'Street address';
+  static const newEventAddressHint = 'e.g 1 Admiralty Way';
+  static const newEventCity = 'City';
+  static const newEventCityHint = 'e.g Lagos';
+
+  /// The design has no field for this at all, though it offers Virtual and
+  /// Hybrid — neither of which can be published without one.
+  static const newEventMeetingUrl = 'Meeting link';
+  static const newEventMeetingUrlHint = 'https://…';
+
+  static const newEventRsvp = 'Allow RSVP';
+  static const newEventRsvpBody =
+      'Let people register interest & get reminders';
+  static const newEventCapacity = 'Capacity';
+  static const newEventCapacityHint = '500';
+  static const newEventVisibility = 'Visibility';
+  static const newEventPublish = 'Publish event';
+  static const newEventLiveTitle = 'Your event is live';
+  static const newEventLiveBody =
+      "It's now on your channel for your community to book.";
+  static const newEventDraftBody =
+      "It's in your content, ready whenever you are.";
+
+  // What can go wrong.
+  static const newEventNeedsDescription =
+      'Add a description before publishing this event.';
+  static const newEventNeedsAddress =
+      'Add a street address and city before publishing this event.';
+  static const newEventNeedsMeetingUrl =
+      'Add a meeting link before publishing this event.';
+  static const newEventBadSchedule =
+      'That end date falls before the start. Check the dates.';
+  static const newEventCapacityFloor = 'Capacity has to be at least 1.';
+  static const newEventCoverTooLarge = 'That image is larger than 8 MB.';
+
+  // Writing an article. Markdown and images in the content service.
+  static const newArticleTitle = 'New article';
+  static const newArticleSubtitle =
+      'Share an update or article with your community.';
+  static const articleWrite = 'Write';
+  static const articlePreview = 'Preview';
+  static const articleCover = 'Cover image';
+  static const articleAddCover = 'Add a cover';
+  static const articleTitleHint = 'Why we still gather';
+
+  /// The design says the headline is "optional, but it helps people find
+  /// your post". The API refuses the post without one, so this says so.
+  static const articleTitleNote = 'Your headline — readers find the post by it';
+
+  static const articleBodyHint =
+      'Every year our church sets aside twenty-one days before Easter.';
+  static const articlePublish = 'Publish';
+  static const articlePreviewNote = 'This is exactly how readers will see it';
+  static const articleReadSuffix = 'min read';
+  static const articleDraftBadge = 'Not published yet';
+  static const articleLinkTitle = 'Link address';
+  static const articleLinkHint = 'https://';
+
+  // What each toolbar button drops when nothing is selected.
+  static const articleBoldPlaceholder = 'bold text';
+  static const articleItalicPlaceholder = 'italic text';
+  static const articleHeadingPlaceholder = 'Heading';
+  static const articleBulletPlaceholder = 'List item';
+  static const articleLinkPlaceholder = 'link text';
+
+  static const newArticleLiveTitle = 'Your article is live';
+  static const newArticleLiveBody =
+      "It's now on your channel for your community to read.";
+  static const newArticleScheduledTitle = 'Your article is scheduled';
+
+  // What can go wrong.
+  static const articleNeedsTitle = 'Give the article a headline.';
+  static const articleNeedsBody = 'Write something before publishing.';
+  static const articleTitleTooLong = 'Headlines are capped at 500 characters.';
+
+  // Going live. Not an upload: the camera pushes RTMP to Mux, and the API
+  // refuses to let a livestream be created as ordinary media.
+  static const goLiveTitle = 'Go Live';
+  static const goLiveSubtitle = 'Go live with your community in real time.';
+  static const goLiveCoverLabel = 'Live cover art';
+  static const goLiveDescriptionLabel = 'Description';
+  static const goLiveDescriptionHint = "What's this service about?";
+  static const goLiveTitleLabel = 'Title';
+  static const goLiveTitleHint = 'e.g Walking by faith';
+  static const goLiveCategoryLabel = 'Category';
+  static const goLiveStart = 'Go Live and notify subscribers';
+
+  static const goLiveConnecting = 'Connecting…';
+  static const goLiveConnectingBody =
+      'Your stream is starting.\nStay on this screen.';
+  static const goLiveLivePill = 'LIVE';
+  static const goLiveEnd = 'End';
+  static const goLiveNoGiving = '—';
+
+  /// The design runs viewer chat along the foot of the broadcast. Nothing
+  /// in the livestream contract carries live messages (OPEN_ISSUES 37).
+  static const goLiveChatUnavailable = 'Live chat is not available yet';
+
+  // Ending it.
+  static const goLiveEndTitle = 'End your livestream';
+  static const goLiveEndReplay =
+      'Your recording will be saved and published as a replay automatically.';
+  static const goLiveEndReplayPrivate =
+      'Your recording will be saved privately.';
+  static const goLiveEndReplayNone = 'No recording will be kept.';
+  static const goLiveKeepStreaming = 'Keep streaming';
+  static const goLiveEndStream = 'End stream';
+
+  // What can go wrong.
+  static const goLiveNeedsCamera =
+      'GospelTube needs the camera and microphone to broadcast.';
+  static const goLiveConflict =
+      'Another broadcast is already running on this channel.';
+  static const goLiveNotArmed =
+      'The connection window closed. Start again to reopen it.';
+  static const goLiveRejected = 'The broadcast could not start. Please retry.';
+
+  // "When should this go live".
+  static const goLiveSheetTitle = 'When should this go live';
+  static const goLiveSheetSubtitle =
+      'Choose when this content is visible to viewers';
+  static const goLiveSheetQuestion = 'When should this go live?';
+  static const goLiveNow = 'Publish now';
+  static const goLiveNowBody = 'Goes live immediately';
+  static const goLiveLater = 'Schedule for later';
+  static const goLiveLaterBody = 'Auto-publishes at the time you pick';
+  static const goLiveDate = 'Date';
+  static const goLiveTime = 'Time';
+  static const goLiveCancel = 'Cancel';
+  static const goLiveSchedule = 'Schedule';
+
+  /// The API refuses a schedule in the past outright.
+  static const goLivePastMoment = 'Pick a date and time still to come.';
+
+  // How it ended. The audio design reuses the video card verbatim, down to
+  // "Your video is live"; each kind says its own name here.
+  static const newVideoLiveTitle = 'Your video is live';
+  static const newVideoLiveBody =
+      "It's now on your channel for your community to watch.";
+  static const newAudioLiveTitle = 'Your audio is live';
+  static const newAudioLiveBody =
+      "It's now on your channel for your community to listen to.";
+  static const newVideoScheduledTitle = 'Your video is scheduled';
+  static const newAudioScheduledTitle = 'Your audio is scheduled';
+  static const newMediaDraftTitle = 'Saved as draft';
+  static const newMediaDraftBody =
+      "It's in your content, ready whenever you are.";
+  static const newMediaDone = 'Done';
+
+  // What can go wrong.
+  static const newVideoTooLarge = 'That video is larger than 5 GB.';
+  static const newAudioTooLarge = 'That track is larger than 1 GB.';
+  static const newVideoBadFormat =
+      "That file isn't supported. Choose an MP4 or MOV.";
+  static const newAudioBadFormat =
+      "That file isn't supported. Choose an MP3, M4A or WAV.";
+  static const newMediaNetwork =
+      'The upload could not finish. Check your connection and try again.';
+  static const newMediaRejected = 'That upload was refused. Please try again.';
+  static const newMediaExpired =
+      'That upload expired before it was published. Choose the video again.';
+  static const newMediaSchedulePast =
+      'That moment has passed. Pick a time still to come.';
+  static const newMediaThumbTooLarge = 'That image is larger than 10 MB.';
+  static const newMediaThumbUnreadable = "That image could not be read.";
+  static const newMediaNeedsFile = 'Choose a file first.';
+  static const newMediaTitleTooLong = 'Titles are capped at 180 characters.';
+  static const newMediaDescriptionTooLong =
+      'Descriptions are capped at 5,000 characters.';
+  static const newMediaCategoryMax = 'Choose up to 8 categories.';
+
+  // One piece of content, opened from the list.
+  static const contentKindVideo = 'Video';
+  static const contentKindLivestream = 'Livestream';
+  static const contentKindAudio = 'Audio';
+  static const contentKindPost = 'Articles/Blogs';
+  static const contentKindEvent = 'Events';
+  static const contentPerformance = 'PERFORMANCE';
+  static const contentViewContent = 'View content';
+  static const contentPublished = 'Published';
+  static const contentPlaysLabel = 'Plays';
+  static const contentWatchedLiveLabel = 'Watched live';
+  static const contentReadsLabel = 'Reads';
+  static const contentLikes = 'Likes';
+  static const contentComments = 'Comments';
+  static const contentGoingLabel = 'Going';
+  static const contentCopyLink = 'Copy link';
+  static const contentEditOnWeb = 'Edit on web';
+  static const contentManageOnWeb = 'Manage on web';
+  static const contentWebStudioNote =
+      'Title, description, visibility and series are edited on the web '
+      'studio.';
+  static const contentWebOnlyAction =
+      'Open the web studio to edit this content.';
+  static const contentNoPublicLink = 'A shareable link is not available yet.';
+  static const contentAnalyticsPro = 'Detailed analytics need the Pro plan.';
   static const studioCreate = '+ Create';
   static const studioToday = 'TODAY';
   static const studioNeedsYou = 'NEEDS YOU';

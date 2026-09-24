@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/s3_upload.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// The two images a channel carries, and what staging will accept for each.
@@ -57,10 +58,6 @@ class CreatorAssetRepo {
 
   final ApiService _api;
 
-  /// A bare client: the S3 leg must not carry the app's Authorization header
-  /// or its base URL.
-  static final _plain = Dio();
-
   Future<AssetUploadResult> upload({
     required String creatorId,
     required CreatorAssetKind kind,
@@ -95,18 +92,13 @@ class CreatorAssetRepo {
         return _fail(AssetUploadFailure.rejected, 'malformed ticket');
       }
 
-      final form = FormData.fromMap({
-        for (final entry in fields.entries) entry.key: '${entry.value}',
-        // S3 requires the file part last; FormData preserves insertion order.
-        'file': MultipartFile.fromBytes(image.bytes, filename: image.filename),
-      });
-
-      final put = await _plain.post<void>(
-        uploadUrl,
-        data: form,
-        options: Options(validateStatus: (code) => code != null && code < 400),
+      await S3PresignedUpload.send(
+        uploadUrl: uploadUrl,
+        fields: fields,
+        bytes: image.bytes,
+        filename: image.filename,
       );
-      logger.i('Uploaded ${kind.slug} (${image.size}B) → ${put.statusCode}');
+      logger.i('Uploaded ${kind.slug} (${image.size}B)');
 
       return AssetUploadResult.uploaded(fileId);
     } on DioException catch (e) {
