@@ -70,7 +70,12 @@ class LiveStatPill extends StatelessWidget {
       children: [
         HugeIcon(icon: icon, color: AppColors.textPrimary, size: 14.s),
         SizedBox(width: 6.s),
-        Text(value, style: AppStyles.label(12, weight: AppStyles.bold)),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppStyles.label(12, weight: AppStyles.bold),
+        ),
       ],
     ),
   );
@@ -104,6 +109,67 @@ String _grouped(int value) {
     out.write(digits[i]);
   }
   return out.toString();
+}
+
+/// The counters along the top of a broadcast, with the camera flip pinned
+/// to the end.
+///
+/// The pills scroll rather than compete for room: a giving total names its
+/// currency, so the row's width is not something the screen can predict,
+/// and on a narrow phone it overflowed by 140 pixels when it tried.
+class LiveStatBar extends StatelessWidget {
+  const LiveStatBar({
+    super.key,
+    required this.likes,
+    required this.viewers,
+    required this.giving,
+    required this.onFlipCamera,
+  });
+
+  final int likes;
+  final int viewers;
+  final String giving;
+  final VoidCallback onFlipCamera;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              const LivePill(),
+              SizedBox(width: 8.s),
+              LiveStatPill(
+                pillKey: const ValueKey('live-likes'),
+                icon: HugeIcons.strokeRoundedThumbsUp,
+                value: '$likes',
+              ),
+              SizedBox(width: 8.s),
+              LiveStatPill(
+                pillKey: const ValueKey('live-viewers'),
+                icon: HugeIcons.strokeRoundedView,
+                value: '$viewers',
+              ),
+              SizedBox(width: 8.s),
+              LiveStatPill(
+                pillKey: const ValueKey('live-giving'),
+                icon: HugeIcons.strokeRoundedGift,
+                value: giving,
+              ),
+            ],
+          ),
+        ),
+      ),
+      SizedBox(width: 8.s),
+      LiveRoundButton(
+        buttonKey: const ValueKey('live-flip'),
+        icon: HugeIcons.strokeRoundedCamera01,
+        onTap: onFlipCamera,
+      ),
+    ],
+  );
 }
 
 /// A round control on the broadcast bar.
@@ -339,12 +405,16 @@ class _Action extends StatelessWidget {
 }
 
 /// "1:04" — how long this has been going out.
+///
+/// The clock runs from the server's `startedAt`, which can be a moment
+/// ahead of the device's own. Left alone that read "0:-5", so anything
+/// before zero is simply zero.
 String formatElapsed(Duration elapsed) {
-  final minutes = elapsed.inMinutes;
-  final seconds = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
-  if (elapsed.inHours > 0) {
-    final mm = minutes.remainder(60).toString().padLeft(2, '0');
-    return '${elapsed.inHours}:$mm:$seconds';
+  final safe = elapsed.isNegative ? Duration.zero : elapsed;
+  final seconds = safe.inSeconds.remainder(60).toString().padLeft(2, '0');
+  if (safe.inHours > 0) {
+    final mm = safe.inMinutes.remainder(60).toString().padLeft(2, '0');
+    return '${safe.inHours}:$mm:$seconds';
   }
-  return '$minutes:$seconds';
+  return '${safe.inMinutes}:$seconds';
 }

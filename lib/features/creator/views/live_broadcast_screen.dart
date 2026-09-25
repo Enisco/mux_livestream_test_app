@@ -413,36 +413,11 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     children: [
       Padding(
         padding: EdgeInsets.fromLTRB(16.s, 10.s, 16.s, 0),
-        child: Row(
-          children: [
-            const LivePill(),
-            SizedBox(width: 8.s),
-            LiveStatPill(
-              pillKey: const ValueKey('live-likes'),
-              icon: HugeIcons.strokeRoundedThumbsUp,
-              value: '${_studio.likeCount}',
-            ),
-            SizedBox(width: 8.s),
-            LiveStatPill(
-              pillKey: const ValueKey('live-viewers'),
-              icon: HugeIcons.strokeRoundedView,
-              value: '${_studio.viewerCount}',
-            ),
-            SizedBox(width: 8.s),
-            Flexible(
-              child: LiveStatPill(
-                pillKey: const ValueKey('live-giving'),
-                icon: HugeIcons.strokeRoundedGift,
-                value: givingLabel(_studio),
-              ),
-            ),
-            const Spacer(),
-            LiveRoundButton(
-              buttonKey: const ValueKey('live-flip'),
-              icon: HugeIcons.strokeRoundedCamera01,
-              onTap: () => _controller.switchCamera(),
-            ),
-          ],
+        child: LiveStatBar(
+          likes: _studio.likeCount,
+          viewers: _studio.viewerCount,
+          giving: givingLabel(_studio),
+          onFlipCamera: () => _controller.switchCamera(),
         ),
       ),
       const Spacer(),
@@ -472,12 +447,21 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
               icon: HugeIcons.strokeRoundedMessage01,
               onTap: () => setState(() => _chatShown = !_chatShown),
             ),
-            const Spacer(),
-            Text(
-              formatElapsed(_elapsed),
-              style: AppStyles.label(13, weight: AppStyles.bold),
+            // The clock takes the slack and gives it back: on a small
+            // phone a three-hour broadcast plus both controls and End
+            // overran the row by a few pixels.
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10.s),
+                child: Text(
+                  formatElapsed(_elapsed),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppStyles.label(13, weight: AppStyles.bold),
+                ),
+              ),
             ),
-            SizedBox(width: 12.s),
             GestureDetector(
               key: const ValueKey('live-end'),
               behavior: HitTestBehavior.opaque,

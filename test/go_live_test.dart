@@ -338,12 +338,50 @@ void main() {
     });
 
     test('elapsed time reads as a clock', () {
+      expect(formatElapsed(Duration.zero), '0:00');
       expect(formatElapsed(const Duration(seconds: 4)), '0:04');
       expect(formatElapsed(const Duration(minutes: 12, seconds: 5)), '12:05');
       expect(
         formatElapsed(const Duration(hours: 1, minutes: 2, seconds: 3)),
         '1:02:03',
       );
+      // The clock runs from the server's `startedAt`, which can sit a
+      // moment ahead of the device's. That used to read "0:-5".
+      expect(formatElapsed(const Duration(seconds: -5)), '0:00');
+      expect(formatElapsed(const Duration(minutes: -3)), '0:00');
+    });
+
+    test('the giving label survives the odd shapes money comes in', () {
+      LivestreamStudio withTotal(int minor, String currency) =>
+          LivestreamStudio.fromJson({
+            'session': const <String, dynamic>{},
+            'presence': const <String, dynamic>{},
+            'connection': const <String, dynamic>{},
+            'metrics': {
+              'giving': {
+                'settlementTotals': [
+                  {'currency': currency, 'provisionalGrossMinor': minor},
+                ],
+              },
+              'prayers': const {'count': 0},
+            },
+          });
+
+      expect(givingLabel(withTotal(0, 'NGN')), 'NGN 0');
+      expect(givingLabel(withTotal(99, 'NGN')), 'NGN 0');
+      expect(givingLabel(withTotal(100, 'USD')), 'USD 1');
+      expect(givingLabel(withTotal(123456789, 'NGN')), 'NGN 1,234,567');
+      // No settlement rows at all is not the same as no giving service.
+      final none = LivestreamStudio.fromJson(const {
+        'session': <String, dynamic>{},
+        'presence': <String, dynamic>{},
+        'connection': <String, dynamic>{},
+        'metrics': {
+          'giving': {'settlementTotals': []},
+          'prayers': {'count': 0},
+        },
+      });
+      expect(givingLabel(none), '0');
     });
 
     testWidgets('the countdown draws 3, 2, 1 and nothing else', (tester) async {
