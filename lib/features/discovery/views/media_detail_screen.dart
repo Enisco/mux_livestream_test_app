@@ -491,7 +491,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   Future<void> _offerQualities(String url) async {
     final byLabel = await HlsManifest.fetch(url);
     if (!mounted || byLabel.isEmpty) return;
-    _playback.offerHlsQualities(byLabel);
+    _playback.offerHlsQualities(byLabel, forUrl: url);
   }
 
   Widget _buildError() => ErrorStateView(onRetry: _fetchDetail);

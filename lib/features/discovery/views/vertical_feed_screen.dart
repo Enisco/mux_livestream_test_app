@@ -398,7 +398,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Retry'),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppColors.brandPrimary,
                 foregroundColor: Colors.black,
               ),
             ),
@@ -1150,7 +1150,7 @@ class _AvatarButton extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 1.5),
-              color: AppColors.surfaceVariant,
+              color: AppColors.neutral800,
             ),
             child: Center(
               child: Text(
@@ -1174,7 +1174,7 @@ class _AvatarButton extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                    color: AppColors.brandPrimary,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

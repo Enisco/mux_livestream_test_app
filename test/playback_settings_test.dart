@@ -88,6 +88,54 @@ a.m3u8
     });
   });
 
+  group('an offer racing the stream it belongs to', () {
+    // The manifest is read over the network while the player is opening, so
+    // the two finish in either order. Getting this wrong loses the quality
+    // menu intermittently, on exactly the fast connections where the
+    // manifest wins.
+    test('an offer for the open stream applies at once', () {
+      final offers = HlsQualityOffers();
+      final ready = offers.offer('a.m3u8', const {
+        '720p': 1,
+      }, openUrl: 'a.m3u8');
+      expect(ready, const {'720p': 1});
+    });
+
+    test('an offer that arrives first is kept for when the stream opens', () {
+      final offers = HlsQualityOffers();
+      // Nothing open yet: nothing to apply...
+      expect(offers.offer('a.m3u8', const {'720p': 1}, openUrl: null), isNull);
+      // ...but it is not lost.
+      expect(offers.forUrl('a.m3u8'), const {'720p': 1});
+    });
+
+    test("one stream's renditions are never applied to another", () {
+      final offers = HlsQualityOffers();
+      expect(
+        offers.offer('a.m3u8', const {'720p': 1}, openUrl: 'b.m3u8'),
+        isNull,
+      );
+      expect(offers.forUrl('b.m3u8'), isNull);
+    });
+
+    test('an empty offer is not remembered', () {
+      final offers = HlsQualityOffers();
+      expect(offers.offer('a.m3u8', const {}, openUrl: 'a.m3u8'), isNull);
+      expect(offers.forUrl('a.m3u8'), isNull);
+    });
+
+    test('it does not grow without bound over a long session', () {
+      final offers = HlsQualityOffers();
+      for (var i = 0; i < HlsQualityOffers.maxRemembered * 3; i++) {
+        offers.offer('s$i.m3u8', const {'720p': 1});
+      }
+      // The most recent is still there; the rest have been let go.
+      final last = HlsQualityOffers.maxRemembered * 3 - 1;
+      expect(offers.forUrl('s$last.m3u8'), isNotNull);
+      expect(offers.forUrl('s0.m3u8'), isNull);
+    });
+  });
+
   group('the speed menu', () {
     test('offers the usual ladder around 1x', () {
       expect(PlaybackController.rateChoices, [

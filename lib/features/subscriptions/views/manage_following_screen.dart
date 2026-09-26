@@ -186,6 +186,10 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
     });
     try {
       await _repo.unfollow(ministry.id);
+      // Stop listening for a ministry that is no longer on the list.
+      if (GetIt.instance.isRegistered<LiveSocketService>()) {
+        GetIt.instance<LiveSocketService>().unsubscribeCreator(ministry.id);
+      }
       if (mounted && _ministries.isEmpty) unawaited(_loadSuggestions());
     } catch (e) {
       logger.w('Could not unfollow ${ministry.id}', error: e);

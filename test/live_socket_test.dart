@@ -252,6 +252,23 @@ void main() {
       expect(seen, hasLength(3));
     });
 
+    test('two callers connecting at once build one socket, not two', () async {
+      // There is an await between the null check and the assignment — the
+      // access token is read from storage — and both screens that use this
+      // can call connect more than once (a retry, a reload). Two sockets
+      // would mean duplicated events and an orphaned connection.
+      final service = LiveSocketService(
+        tokenStorage: _NoTokens(),
+        origin: 'https://api.example.test',
+      );
+      addTearDown(service.dispose);
+
+      final first = service.connect();
+      final second = service.connect();
+      expect(identical(first, second), isTrue);
+      await Future.wait([first, second]);
+    });
+
     test(
       'a build with no BASE_URL stays offline rather than dialling',
       () async {

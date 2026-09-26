@@ -69,7 +69,28 @@ class LiveSocketService {
     return '$trimmed/live';
   }
 
-  Future<void> connect() async {
+  /// Held while a connection is being set up.
+  ///
+  /// There is an `await` between the null check and the assignment — the
+  /// access token is read from storage — so two callers arriving together
+  /// would both get past the check and build a socket each, and the second
+  /// would quietly orphan the first. Both screens that use this can call it
+  /// more than once (a retry, a reload), so this is reachable.
+  Future<void>? _connecting;
+
+  Future<void> connect() {
+    final inFlight = _connecting;
+    if (inFlight != null) return inFlight;
+    if (_socket != null) return Future.value();
+    late final Future<void> attempt;
+    attempt = _connect().whenComplete(() {
+      if (identical(_connecting, attempt)) _connecting = null;
+    });
+    _connecting = attempt;
+    return attempt;
+  }
+
+  Future<void> _connect() async {
     if (_socket != null) return;
     final url = _namespaceUrl;
     if (url == '/live') {

@@ -449,13 +449,25 @@ class PlaybackController implements PlaybackHandle {
   /// Label → bitrate ceiling, for an HLS stream whose manifest has been read.
   final Map<String, int> _hlsBitrates = {};
 
-  /// Offers the renditions an HLS manifest advertises.
+  /// The stream currently open, so an offer can be matched to it.
+  String? _openUrl;
+
+  final _offeredHls = HlsQualityOffers();
+
+  /// Offers the renditions an HLS manifest advertises, for [forUrl].
   ///
-  /// Called by whoever knows the manifest URL; the controller does not fetch
-  /// it, because a failed or slow manifest read must not sit between a reader
-  /// and their video.
-  void offerHlsQualities(Map<String, int> byLabel) {
-    if (!_isHls || byLabel.isEmpty) return;
+  /// The controller does not fetch the manifest itself, because a slow or
+  /// missing one must never sit between a reader and their video.
+  void offerHlsQualities(Map<String, int> byLabel, {required String forUrl}) {
+    final ready = _offeredHls.offer(
+      forUrl,
+      byLabel,
+      openUrl: _isHls ? _openUrl : null,
+    );
+    if (ready != null) _applyHlsQualities(ready);
+  }
+
+  void _applyHlsQualities(Map<String, int> byLabel) {
     _hlsBitrates
       ..clear()
       ..[_autoQuality] = 0
@@ -555,10 +567,19 @@ class PlaybackController implements PlaybackHandle {
     // choice — carrying 2x from the last video into the next one would be a
     // surprise.
     _isHls = _looksLikeHls(url);
+    _openUrl = url;
     _tracks.clear();
     qualities.value = const [];
     quality.value = _autoQuality;
     if (rate.value != 1.0) unawaited(setRate(1.0));
+
+    // The manifest is read off the network in parallel with opening the
+    // stream, so the renditions can arrive either side of this point. An
+    // offer that got here first is applied now rather than lost.
+    if (_isHls) {
+      final offered = _offeredHls.forUrl(url);
+      if (offered != null) _applyHlsQualities(offered);
+    }
 
     try {
       await _player.open(Media(url), play: false);
@@ -731,4 +752,37 @@ class PlaybackController implements PlaybackHandle {
     muted.dispose();
     fullscreen.dispose();
   }
+}
+
+/// Remembers which renditions belong to which stream.
+///
+/// The manifest is read over the network while the stream is opening, so the
+/// two race in both directions: on a fast CDN the renditions can arrive
+/// before the player has opened anything, and `play` clears the quality list
+/// as it starts — so an offer that landed first used to be silently thrown
+/// away and the quality menu simply never appeared.
+///
+/// Keyed by URL rather than applied blind, because applying one video's
+/// renditions to another would offer qualities that do not exist on it.
+class HlsQualityOffers {
+  final Map<String, Map<String, int>> _byUrl = {};
+
+  /// How many streams' offers to remember. A session can open a great many.
+  static const maxRemembered = 8;
+
+  /// Records an offer, and returns it when it belongs to the open stream —
+  /// null when there is nothing to apply yet.
+  Map<String, int>? offer(
+    String url,
+    Map<String, int> byLabel, {
+    String? openUrl,
+  }) {
+    if (byLabel.isEmpty || url.isEmpty) return null;
+    if (_byUrl.length >= maxRemembered) _byUrl.clear();
+    _byUrl[url] = byLabel;
+    return openUrl == url ? byLabel : null;
+  }
+
+  /// What was offered for [url], for a stream that has just opened.
+  Map<String, int>? forUrl(String url) => _byUrl[url];
 }

@@ -110,13 +110,15 @@ class ErrorStateView extends StatelessWidget {
                 onPressed: onRetry,
               ),
             ),
-            if (showBack ?? Navigator.of(context).canPop()) ...[
+            if (showBack ??
+                (Navigator.maybeOf(context)?.canPop() ?? false)) ...[
               SizedBox(height: 12.s),
               SizedBox(
                 width: 200.s,
                 child: TextButton(
                   key: const ValueKey('error-go-back'),
-                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                  onPressed:
+                      onBack ?? () => Navigator.maybeOf(context)?.maybePop(),
                   style: TextButton.styleFrom(
                     minimumSize: Size(200.s, 48.s),
                     foregroundColor: AppColors.textPrimary,
