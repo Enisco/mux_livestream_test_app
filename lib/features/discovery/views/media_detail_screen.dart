@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/locator.dart';
+import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/audio_hero.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/discovery/views/widgets/video_hero.dart';
+import 'package:test_app/shared/services/hls_manifest.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
@@ -114,6 +118,14 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         clientSessionId: _clientSessionId,
       );
       if (!mounted) return;
+      // Mux serves HLS, whose renditions media_kit does not expose as
+      // tracks — the quality menu has to read them off the manifest. Left
+      // unawaited on purpose: a slow or missing manifest costs the menu, not
+      // the video.
+      final playbackUrl = detail.playback?.playbackUrl;
+      if (playbackUrl != null && playbackUrl.isNotEmpty) {
+        unawaited(_offerQualities(playbackUrl));
+      }
       setState(() {
         _detail = detail;
         _suggestions = detail.suggestions;
@@ -476,6 +488,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     return '${months[local.month - 1]} ${local.day}, ${local.year}';
   }
 
+  Future<void> _offerQualities(String url) async {
+    final byLabel = await HlsManifest.fetch(url);
+    if (!mounted || byLabel.isEmpty) return;
+    _playback.offerHlsQualities(byLabel);
+  }
+
   Widget _buildError() => ErrorStateView(onRetry: _fetchDetail);
 
   /// Pulls another page of "Up next".
@@ -507,13 +525,70 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
+  /// Only where there is actually a run to swipe through: a single still
+  /// image or a one-off would just be this page with a different chrome.
+  bool get _canSwipeFeed =>
+      _mediaType != MediaTypes.music &&
+      _suggestions.any((s) => s.entityType == 'media');
+
+  void _openVerticalFeed() {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => VerticalFeedScreen(
+          anchorMediaId: _mediaId,
+          // What the reader was looking at when they swiped in.
+          prioritizeMediaIds: [
+            for (final s in _suggestions)
+              if (s.entityType == 'media') s.entityId,
+          ],
+          source: AnalyticsSource.suggestedContent,
+        ),
+      ),
+    );
+  }
+
   Widget _buildUpNext() {
     return Padding(
       padding: EdgeInsets.fromLTRB(16.s, 18.s, 16.s, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DetailSectionHeading(AppStrings.upNext),
+          Row(
+            children: [
+              const Expanded(child: DetailSectionHeading(AppStrings.upNext)),
+              // Turns "similar videos" into something you keep swiping
+              // through, starting on the one already playing.
+              if (_canSwipeFeed)
+                GestureDetector(
+                  key: const ValueKey('watch-in-feed'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _openVerticalFeed,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4.s),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.swipe_vertical_rounded,
+                          size: 16.s,
+                          color: AppColors.brandPrimary,
+                        ),
+                        SizedBox(width: 6.s),
+                        Text(
+                          AppStrings.watchInFeed,
+                          style: AppStyles.label(
+                            13,
+                            color: AppColors.brandPrimary,
+                            weight: AppStyles.semiBold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
           SizedBox(height: 18.s),
           for (final s in _suggestions)
             Padding(

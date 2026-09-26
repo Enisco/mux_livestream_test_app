@@ -22,7 +22,7 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 /// What staging taught that the guide does not say:
 ///
 ///  * **`title` is required to create at all**, 1–500 characters. The
-///    design calls the headline optional (OPEN_ISSUES 32).
+///    design calls the headline optional; the API does not.
 ///  * `body` may be empty on a draft, but publishing refuses it: *"Add
 ///    post content before publishing this post"*.
 ///  * `scheduledAt` is **refused on create** and accepted only on PATCH,

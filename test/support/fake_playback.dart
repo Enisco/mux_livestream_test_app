@@ -19,6 +19,21 @@ class FakePlayback implements PlaybackHandle {
   @override
   void setFullscreen(bool value) => fullscreen.value = value;
 
+  @override
+  final ValueNotifier<double> rate = ValueNotifier(1.0);
+
+  @override
+  final ValueNotifier<List<String>> qualities = ValueNotifier(const []);
+
+  @override
+  final ValueNotifier<String> quality = ValueNotifier('Auto');
+
+  @override
+  Future<void> setRate(double value) async => rate.value = value;
+
+  @override
+  Future<void> setQuality(String label) async => quality.value = label;
+
   final List<String> played = [];
   final List<PlaybackTarget> targets = [];
   final List<Duration> seeks = [];

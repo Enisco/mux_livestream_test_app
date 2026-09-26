@@ -180,6 +180,12 @@ class WebFeedItemMeta {
   final int? videoCount;
   final int? musicCount;
 
+  /// Where this viewer is in a devotional series. The feed reports it per
+  /// row, which is what lets the card say "Continue" rather than "Start".
+  final bool progressHasStarted;
+  final int progressCompletedCount;
+  final String? progressCurrentEntryId;
+
   const WebFeedItemMeta({
     this.thumbnailUrl,
     this.previewUrl,
@@ -203,6 +209,9 @@ class WebFeedItemMeta {
     this.seriesId,
     this.videoCount,
     this.musicCount,
+    this.progressHasStarted = false,
+    this.progressCompletedCount = 0,
+    this.progressCurrentEntryId,
   });
 
   factory WebFeedItemMeta.fromJson(Map<String, dynamic> json) =>
@@ -234,6 +243,10 @@ class WebFeedItemMeta {
         seriesId: json['seriesId'] as String?,
         videoCount: (json['videoCount'] as num?)?.toInt(),
         musicCount: (json['musicCount'] as num?)?.toInt(),
+        progressHasStarted: json['viewerProgressHasStarted'] as bool? ?? false,
+        progressCompletedCount:
+            (json['viewerProgressCompletedCount'] as num?)?.toInt() ?? 0,
+        progressCurrentEntryId: json['viewerProgressCurrentEntryId'] as String?,
       );
 }
 

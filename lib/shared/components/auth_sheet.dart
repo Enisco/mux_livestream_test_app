@@ -11,7 +11,7 @@ void showAuthSheet(BuildContext outerContext, String feature) {
     backgroundColor: Colors.transparent,
     builder: (sheetCtx) => Container(
       decoration: const BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.neutral900,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -25,7 +25,7 @@ void showAuthSheet(BuildContext outerContext, String feature) {
               height: 4,
               margin: const EdgeInsets.only(bottom: 24),
               decoration: BoxDecoration(
-                color: AppColors.textTertiary.withValues(alpha: 0.4),
+                color: AppColors.neutral500.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -34,11 +34,11 @@ void showAuthSheet(BuildContext outerContext, String feature) {
               height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.12),
+                color: AppColors.brandPrimary.withValues(alpha: 0.12),
               ),
               child: const Icon(
                 IconsaxPlusBold.lock,
-                color: AppColors.primary,
+                color: AppColors.brandPrimary,
                 size: 26,
               ),
             ),
@@ -57,7 +57,7 @@ void showAuthSheet(BuildContext outerContext, String feature) {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: AppColors.neutral400,
                 height: 1.4,
               ),
             ),
@@ -68,7 +68,7 @@ void showAuthSheet(BuildContext outerContext, String feature) {
                 outerContext.push(AppRouter.signIn);
               },
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppColors.brandPrimary,
                 foregroundColor: Colors.black,
                 minimumSize: const Size(double.infinity, 52),
                 shape: RoundedRectangleBorder(
@@ -90,7 +90,7 @@ void showAuthSheet(BuildContext outerContext, String feature) {
                 foregroundColor: AppColors.textPrimary,
                 minimumSize: const Size(double.infinity, 52),
                 side: const BorderSide(
-                  color: AppColors.surfaceVariant,
+                  color: AppColors.buttonSecondaryActive,
                   width: 1.5,
                 ),
                 shape: RoundedRectangleBorder(

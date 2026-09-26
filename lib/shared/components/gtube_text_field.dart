@@ -18,6 +18,7 @@ class GTubeTextField extends StatefulWidget {
     this.textInputAction,
     this.autofillHints,
     this.autofocus = false,
+    this.readOnly = false,
     this.textCapitalization = TextCapitalization.none,
   });
 
@@ -31,6 +32,11 @@ class GTubeTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
   final bool autofocus;
+
+  /// Shown but not editable — a value the app filled in that the reader
+  /// still needs to be able to see.
+  final bool readOnly;
+
   final TextCapitalization textCapitalization;
 
   static const radius = 8.0;
@@ -81,6 +87,7 @@ class _GTubeTextFieldState extends State<GTubeTextField> {
       textCapitalization: widget.textCapitalization,
       inputFormatters: widget.inputFormatters,
       obscureText: widget.obscureText,
+      readOnly: widget.readOnly,
       validator: widget.validator,
       textInputAction: widget.textInputAction,
       autofillHints: widget.autofillHints,

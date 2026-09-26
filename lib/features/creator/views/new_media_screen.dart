@@ -381,7 +381,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
 
   /// The quota refusal is the one worth repeating in the server's words: it
   /// names the plan's number, which nothing else tells the client
-  /// (OPEN_ISSUES 27). Everything else reads better in ours.
+  /// (OPEN_ISSUES 19). Everything else reads better in ours.
   String _explain(MediaUploadException e) =>
       e.failure == MediaUploadFailure.quotaReached && e.message != null
       ? e.message!

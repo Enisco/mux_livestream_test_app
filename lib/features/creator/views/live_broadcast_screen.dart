@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:apivideo_live_stream/apivideo_live_stream.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/shared/services/live_socket_service.dart';
 import 'package:test_app/features/creator/repo/livestream_repo.dart';
 import 'package:test_app/features/creator/views/widgets/live_broadcast_parts.dart';
 import 'package:test_app/models/creator_models/livestream_models.dart';
@@ -25,9 +27,9 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 ///    while ingest is disabled, and it is disabled by default;
 ///  * **start** the session, which sits at `connecting` until the provider
 ///    sees the encoder;
-///  * poll the studio snapshot for the counters, because the contract
-///    carries them over Socket.IO and the app has no socket client
-///    (OPEN_ISSUES 35);
+///  * follow the studio room on the `/live` Socket.IO namespace for the
+///    counters, status, encoder and ingest state, with the HTTP snapshot as
+///    the authority on open and after every reconnect;
 ///  * **end** with a reason, rather than just stopping the camera.
 ///
 /// Leaving without going live cancels the session, so a half-made broadcast
@@ -78,6 +80,8 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 
   LivestreamStudio _studio = LivestreamStudio.empty;
   Timer? _poll;
+  StreamSubscription<LiveEvent>? _liveEvents;
+  StreamSubscription<void>? _liveReconnects;
   Timer? _tick;
   Duration _elapsed = Duration.zero;
 
@@ -102,6 +106,11 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     _poll?.cancel();
     _tick?.cancel();
     _countdownTimer?.cancel();
+    unawaited(_liveEvents?.cancel());
+    unawaited(_liveReconnects?.cancel());
+    if (GetIt.instance.isRegistered<LiveSocketService>()) {
+      GetIt.instance<LiveSocketService>().unsubscribeStudio(widget.mediaId);
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -147,7 +156,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
       // wait fifteen minutes for.
       if (!mounted || _phase == _Phase.failed) return;
       await _repo.start(widget.mediaId);
-      _startPolling();
+      unawaited(_startWatching());
     } on LiveException catch (e) {
       if (mounted) _fail(_wording(e));
     }
@@ -176,11 +185,72 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 
   // ---- what the counters read --------------------------------------------
 
-  void _startPolling() {
-    _refresh();
-    // The contract publishes these over a socket; polling is what the app
-    // can do today, and four seconds is gentle enough to keep up with.
-    _poll = Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
+  /// Follows the studio room, and keeps a slow snapshot underneath it.
+  ///
+  /// This used to be a four-second poll. The socket carries the same state as
+  /// it happens, so the poll drops to a safety net: the contract is explicit
+  /// that events are hints and the snapshot is the authority, and a socket
+  /// that silently stops delivering must not leave a broadcast's counters
+  /// frozen.
+  Future<void> _startWatching() async {
+    await _refresh();
+
+    // The snapshot poll below is the safety net, so a socket that cannot be
+    // reached degrades to the old behaviour rather than stopping a broadcast.
+    if (!GetIt.instance.isRegistered<LiveSocketService>()) {
+      _poll = Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
+      return;
+    }
+    final socket = GetIt.instance<LiveSocketService>();
+    try {
+      await socket.connect();
+      socket.subscribeStudio(widget.mediaId);
+    } catch (e) {
+      logger.w('Live socket unavailable; falling back to polling', error: e);
+      _poll = Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
+      return;
+    }
+
+    _liveEvents = socket.events.listen(_onLiveEvent);
+    // The contract asks for a refetch after a reconnect, because anything
+    // that happened while the socket was away was never delivered.
+    _liveReconnects = socket.reconnects.listen((_) => unawaited(_refresh()));
+
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
+  }
+
+  void _onLiveEvent(LiveEvent event) {
+    if (event.streamId.isNotEmpty && event.streamId != widget.mediaId) return;
+    if (!mounted) return;
+
+    switch (event.type) {
+      case LiveEventType.viewerCount:
+        setState(() {
+          _studio = _studio.copyWith(
+            viewerCount: event.viewerCount,
+            peakViewerCount: event.peakViewerCount,
+          );
+        });
+      case LiveEventType.statusChanged:
+        final runtime = LiveRuntime.parse(event.status);
+        setState(() => _studio = _studio.copyWith(runtime: runtime));
+        if (runtime.isOnAir && _phase == _Phase.connecting) {
+          _onAir(DateTime.tryParse(event.data['startedAt'] as String? ?? ''));
+        }
+        // The encoder dropping is not the same as ending, but saying LIVE
+        // through either would be a lie.
+        if (runtime == LiveRuntime.reconnecting && _phase == _Phase.live) {
+          setState(() => _phase = _Phase.connecting);
+        }
+        if (runtime == LiveRuntime.ended) unawaited(_refresh());
+      case LiveEventType.metricsUpdated:
+      case LiveEventType.encoderStatusChanged:
+      case LiveEventType.ingestStatusChanged:
+      case LiveEventType.replayStatusChanged:
+        // Shapes differ enough from the snapshot that re-reading it is both
+        // simpler and safer than mapping each one by hand.
+        unawaited(_refresh());
+    }
   }
 
   Future<void> _refresh() async {
@@ -489,7 +559,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 ///
 /// Comments on a livestream are ordinary media comments, and the app
 /// already reads and writes them — but nothing pushes them, and there is no
-/// live chat channel in the contract at all (OPEN_ISSUES 37). Rather than
+/// live chat channel in the contract at all (OPEN_ISSUES 23). Rather than
 /// invent messages, this says plainly that it is not wired yet.
 class _LiveChat extends StatelessWidget {
   const _LiveChat();

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
@@ -16,6 +17,7 @@ import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -207,6 +209,13 @@ class _OrganizationProfileSetupScreenState
         // Website is collected but deliberately not sent: links are not being
         // accepted from creators yet. `POST /v1/creator/onboard` does take a
         // `website`, so this is the one line to restore when that changes.
+      );
+      // The channel exists now, so the funnel can name it; the plan step is
+      // what comes next and it needs a creator to attach a subscription to.
+      recordOnboardingState(
+        step: OnboardingStep.creatorProfileForm,
+        creatorType: OnboardingCreatorType.organization,
+        creatorId: LocalStorage.creatorId,
       );
     } catch (e) {
       // Advancing past a channel that was never created would walk the reader

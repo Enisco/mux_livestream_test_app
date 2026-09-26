@@ -230,6 +230,22 @@ abstract class PlaybackHandle {
   Future<void> stop();
   Future<void> stopIfActive(String mediaId);
   Future<void> pauseIfActive(String mediaId);
+
+  /// How fast the current media plays. 1.0 is normal.
+  ValueListenable<double> get rate;
+
+  Future<void> setRate(double value);
+
+  /// The video qualities this stream offers, "Auto" first.
+  ///
+  /// Empty until a stream is open and its renditions are known — a
+  /// progressive file usually offers exactly one, so the control hides
+  /// itself rather than showing a menu with nothing to choose.
+  ValueListenable<List<String>> get qualities;
+
+  ValueListenable<String> get quality;
+
+  Future<void> setQuality(String label);
 }
 
 /// The app's single media pipeline.
@@ -280,6 +296,35 @@ class PlaybackController implements PlaybackHandle {
   final ValueNotifier<bool> fullscreen = ValueNotifier(false);
 
   @override
+  final ValueNotifier<double> rate = ValueNotifier(1.0);
+
+  @override
+  final ValueNotifier<List<String>> qualities = ValueNotifier(const []);
+
+  @override
+  final ValueNotifier<String> quality = ValueNotifier(_autoQuality);
+
+  static const _autoQuality = 'Auto';
+
+  /// The rates the design's menu offers.
+  static const rateChoices = <double>[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+  /// Label → the track behind it, for a stream media_kit enumerates.
+  final Map<String, VideoTrack> _tracks = {};
+
+  /// Whether the open stream is HLS, which media_kit does **not** enumerate
+  /// as separate video tracks — its renditions are switched by setting
+  /// `hls-bitrate` on the native player instead.
+  bool _isHls = false;
+
+  /// Mux serves HLS, and an `.m3u8` is the only thing that needs the
+  /// `hls-bitrate` path rather than track selection.
+  static bool _looksLikeHls(String url) {
+    final path = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
+    return path.contains('.m3u8');
+  }
+
+  @override
   void setFullscreen(bool value) => fullscreen.value = value;
 
   final List<StreamSubscription<dynamic>> _subs = [];
@@ -318,7 +363,109 @@ class PlaybackController implements PlaybackHandle {
         if (done) _reportCompleted();
       }),
       _player.stream.error.listen((e) => logger.w('Playback error: $e')),
+      _player.stream.tracks.listen(_onTracks),
+      _player.stream.track.listen(_onTrack),
     ]);
+  }
+
+  /// What the open stream can offer.
+  ///
+  /// HLS renditions are not video tracks, so for an HLS stream this reports
+  /// nothing and [setQuality] drives `hls-bitrate` instead. For everything
+  /// else the tracks are the qualities.
+  void _onTracks(Tracks tracks) {
+    if (_isHls) return;
+    _tracks
+      ..clear()
+      ..[_autoQuality] = VideoTrack.auto();
+    final labels = <String>[_autoQuality];
+    for (var i = 0; i < tracks.video.length; i++) {
+      final track = tracks.video[i];
+      final label = _trackLabel(track, i);
+      if (label == _autoQuality || _tracks.containsKey(label)) continue;
+      labels.add(label);
+      _tracks[label] = track;
+    }
+    // One rendition is no choice at all; the control hides on an empty list.
+    qualities.value = labels.length > 1 ? labels : const [];
+    if (!labels.contains(quality.value)) quality.value = _autoQuality;
+  }
+
+  void _onTrack(Track track) {
+    if (_isHls) return;
+    for (final entry in _tracks.entries) {
+      if (entry.value.id == track.video.id) {
+        quality.value = entry.key;
+        return;
+      }
+    }
+  }
+
+  static String _trackLabel(VideoTrack track, int index) {
+    if (track.id == 'auto') return _autoQuality;
+    final title = track.title;
+    if (title != null && title.isNotEmpty) return title;
+    if ((track.h ?? 0) > 0) return '${track.h}p';
+    if ((track.w ?? 0) > 0) return '${track.w}p';
+    return 'Track ${index + 1}';
+  }
+
+  @override
+  Future<void> setRate(double value) async {
+    final clamped = value.clamp(0.25, 4.0).toDouble();
+    rate.value = clamped;
+    try {
+      await _player.setRate(clamped);
+    } catch (e) {
+      logger.w('Could not set playback rate', error: e);
+    }
+  }
+
+  @override
+  Future<void> setQuality(String label) async {
+    if (!qualities.value.contains(label)) return;
+    quality.value = label;
+    try {
+      if (_isHls) {
+        // media_kit does not expose HLS renditions as tracks; the native
+        // player picks one by bitrate ceiling, and "no" means let it choose.
+        final ceiling = _hlsBitrates[label];
+        final platform = _player.platform;
+        if (platform is NativePlayer) {
+          await platform.setProperty(
+            'hls-bitrate',
+            ceiling == null || ceiling == 0 ? 'no' : '$ceiling',
+          );
+        }
+        return;
+      }
+      final track = _tracks[label];
+      if (track != null) await _player.setVideoTrack(track);
+    } catch (e) {
+      logger.w('Could not set video quality', error: e);
+    }
+  }
+
+  /// Label → bitrate ceiling, for an HLS stream whose manifest has been read.
+  final Map<String, int> _hlsBitrates = {};
+
+  /// Offers the renditions an HLS manifest advertises.
+  ///
+  /// Called by whoever knows the manifest URL; the controller does not fetch
+  /// it, because a failed or slow manifest read must not sit between a reader
+  /// and their video.
+  void offerHlsQualities(Map<String, int> byLabel) {
+    if (!_isHls || byLabel.isEmpty) return;
+    _hlsBitrates
+      ..clear()
+      ..[_autoQuality] = 0
+      ..addAll(byLabel);
+    final labels = [
+      _autoQuality,
+      ...byLabel.keys.where((k) => k != _autoQuality),
+    ];
+    qualities.value = labels.length > 1 ? labels : const [];
+    if (!labels.contains(quality.value)) quality.value = _autoQuality;
   }
 
   void _armStartWatchdog(String mediaId) {
@@ -403,6 +550,16 @@ class PlaybackController implements PlaybackHandle {
       target: target,
       buffering: true,
     );
+
+    // A new stream brings its own renditions, and the rate is a per-media
+    // choice — carrying 2x from the last video into the next one would be a
+    // surprise.
+    _isHls = _looksLikeHls(url);
+    _tracks.clear();
+    qualities.value = const [];
+    quality.value = _autoQuality;
+    if (rate.value != 1.0) unawaited(setRate(1.0));
+
     try {
       await _player.open(Media(url), play: false);
       await _applyVolume(kind);

@@ -157,6 +157,11 @@ class DiscoveryRepo {
     );
   }
 
+  Future<MediaSeriesDetail> fetchMediaSeries(String id) async {
+    final response = await _api.get(ApiEndpoints.publicMediaSeries(id));
+    return MediaSeriesDetail.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<EventDetail> fetchEvent(String id) async {
     final response = await _api.get(ApiEndpoints.publicEvent(id));
     return EventDetail.fromJson(response.data as Map<String, dynamic>);

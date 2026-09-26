@@ -151,7 +151,9 @@ class _PolishScaffold extends StatelessWidget {
       case 2:
         context.go(AppRouter.creatorLinks);
       default:
-        context.go(AppRouter.home);
+        // Setting up a channel ends in the studio it just made, not back on
+        // the home feed with nothing to show for it.
+        context.go(AppRouter.studio);
     }
   }
 

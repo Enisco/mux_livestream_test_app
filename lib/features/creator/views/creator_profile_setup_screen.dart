@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/views/widgets/creator_topics_sheet.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
@@ -14,6 +15,7 @@ import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -152,6 +154,13 @@ class _CreatorProfileSetupScreenState extends State<CreatorProfileSetupScreen> {
         displayName: displayName,
         type: 'individual',
         categorySlugs: _selectedSlugs.toList(),
+      );
+      // The channel exists now, so the funnel can name it; the plan step is
+      // what comes next and it needs a creator to attach a subscription to.
+      recordOnboardingState(
+        step: OnboardingStep.creatorProfileForm,
+        creatorType: OnboardingCreatorType.individual,
+        creatorId: LocalStorage.creatorId,
       );
     } catch (e) {
       // Advancing past a channel that was never created would walk the reader

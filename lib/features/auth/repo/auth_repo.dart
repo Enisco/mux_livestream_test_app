@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 
 import 'package:test_app/core/logger.dart';
@@ -42,6 +41,24 @@ class AuthRepo {
     await _api.post(
       ApiEndpoints.forgotPassword,
       data: {'email': email.toLowerCase()},
+    );
+  }
+
+  /// Finishes a reset with the token from the email.
+  ///
+  /// `POST /v1/auth/password/reset` takes `{token, newPassword}` and answers
+  /// **"Invalid or expired reset token."** for a token that has been used,
+  /// has lapsed, or was never issued — one message for all three, so the
+  /// screen cannot tell the reader which it was.
+  ///
+  /// `newPassword` is bounded at 8–128 characters server-side.
+  Future<void> completePasswordReset({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _api.post(
+      ApiEndpoints.resetPassword,
+      data: {'token': token, 'newPassword': newPassword},
     );
   }
 
@@ -90,39 +107,30 @@ class AuthRepo {
     return result;
   }
 
+  /// Renews the session at launch.
+  ///
+  /// This goes through [ApiService.refreshSession] rather than posting to
+  /// the refresh route itself. Refresh tokens rotate, so a refresh here
+  /// racing one the interceptor started — which is exactly what a cold
+  /// start produces — would spend the same token twice and the loser's 401
+  /// would clear a session that had just been renewed.
   Future<bool> tryRefreshSession() async {
     if (!await _tokenStorage.hasSession) return false;
-    try {
-      final refresh = await _tokenStorage.refreshToken;
-      final response = await _api.post(
-        ApiEndpoints.refresh,
-        data: {'refreshToken': refresh},
-        options: Options(headers: {}),
-      );
-      final result = RefreshSessionResponse.fromJson(
-        response.data as Map<String, dynamic>,
-      );
-      await _tokenStorage.saveSession(
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      );
-      await LocalStorage.setString(
-        LocalStorage.cachedUserKey,
-        result.user.toJsonString(),
-      );
-      return true;
-    } catch (e) {
-      final status = e is DioException ? e.response?.statusCode : null;
-      if (status != null && status >= 400 && status < 500) {
-        logger.e('Session refresh rejected ($status)', error: e);
+
+    final outcome = await _api.refreshSession();
+    switch (outcome) {
+      case RefreshOutcome.refreshed:
+        return true;
+      case RefreshOutcome.rejected:
+        logger.e('Session refresh rejected');
         await _tokenStorage.clearAll();
         return false;
-      }
-      logger.w(
-        'Session refresh unreachable — keeping cached session',
-        error: e,
-      );
-      return true;
+      case RefreshOutcome.unavailable:
+        // Never reached the server, so the tokens are probably still good;
+        // signing the reader out over a dropped connection would lose the
+        // session for nothing.
+        logger.w('Session refresh unreachable — keeping cached session');
+        return true;
     }
   }
 

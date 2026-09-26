@@ -34,9 +34,9 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 ///  * There is **no scheduled publish**. `publishAt` and `scheduledAt` are
 ///    refused on create and on PATCH, and the publish route quietly ignores
 ///    any body it is given, so passing one would look like it worked
-///    (OPEN_ISSUES 29).
+///    (OPEN_ISSUES 21).
 ///  * `recurrence.mode` accepts only `none`, and there is no series field
-///    of any name (OPEN_ISSUES 28).
+///    of any name (OPEN_ISSUES 20).
 class EventRepo {
   EventRepo([ApiService? api]) : _injected = api;
 

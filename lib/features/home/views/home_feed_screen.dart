@@ -8,6 +8,7 @@ import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
@@ -71,23 +72,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   List<WebFeedItem> _upcoming = const [];
   final Set<String> _followPending = {};
 
-  /// Chip label → the category slugs the API knows. 'Trending' is a sort, not
-  /// a category, so it carries no slugs.
-  static const _topicSlugs = <String, List<String>>{
-    'Trending': [],
-    'Worship': ['worship'],
-    'Preaching': ['sermons'],
-    'Bible Study': ['bible-study'],
-    'Youth': ['youth'],
-  };
+  /// 'Trending' is a sort, not a category, so it carries no slug and always
+  /// leads.
+  static const trendingTopic = 'Trending';
 
-  static final _topics = _topicSlugs.keys.toList();
+  /// Chip label → the slug it filters on, built from `/v1/user/categories`.
+  ///
+  /// This used to be a hardcoded five: it labelled `sermons` as "Preaching",
+  /// which is not what the API calls it, and left `prayer`, `gospel-music`,
+  /// `live-services`, `testimonies`, `family` and `devotionals` with no chip
+  /// at all. Labels and slugs come from the same row now, so a chip can only
+  /// ever send the slug it is named after.
+  Map<String, List<String>> _topicSlugs = const {trendingTopic: []};
+
+  List<String> _topics = const [trendingTopic];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scroll.addListener(_onScroll);
+    unawaited(_loadTopics());
     _init();
   }
 
@@ -163,7 +168,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   /// The Live tab is the same feed restricted to what is broadcasting now.
   bool get _liveOnly => _tab == HomeTab.live;
 
-  String get _sort => _topic == 'Trending' ? 'trending' : 'recent';
+  String get _sort => _topic == trendingTopic ? 'trending' : 'recent';
 
   List<String> get _categorySlugs => _topicSlugs[_topic] ?? const [];
 
@@ -264,6 +269,27 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
       _cursor = null;
     });
     _load();
+  }
+
+  /// The chip row, from the live taxonomy. A failed lookup leaves Trending
+  /// standing on its own rather than falling back to a stale copy — the feed
+  /// still works, it just cannot be narrowed by topic.
+  Future<void> _loadTopics() async {
+    try {
+      final rows = await GetIt.instance<CreatorRepo>().fetchCategories();
+      final live = rows.where((c) => c.isActive && c.slug.isNotEmpty).toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      if (!mounted) return;
+      setState(() {
+        _topicSlugs = {
+          trendingTopic: const [],
+          for (final c in live) c.name: [c.slug],
+        };
+        _topics = _topicSlugs.keys.toList();
+      });
+    } catch (e) {
+      logger.w('Could not load home topics', error: e);
+    }
   }
 
   void _onTopicChanged(String? topic) {

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/core/transitions.dart';
 import 'package:test_app/features/auth/views/forgot_password_screen.dart';
+import 'package:test_app/features/auth/views/reset_password_screen.dart';
 import 'package:test_app/features/auth/views/sign_in_screen.dart';
 import 'package:test_app/features/auth/views/sign_up_screen.dart';
 import 'package:test_app/features/auth/views/verify_email_screen.dart';
@@ -34,6 +35,13 @@ final List<RouteBase> authRoutes = [
     path: AppRouter.forgotPassword,
     pageBuilder: (context, state) =>
         slideTransition(state, const ForgotPasswordScreen()),
+  ),
+  GoRoute(
+    path: AppRouter.resetPassword,
+    pageBuilder: (context, state) => slideTransition(
+      state,
+      ResetPasswordScreen(token: state.uri.queryParameters['token']),
+    ),
   ),
   GoRoute(
     path: AppRouter.verifyEmail,

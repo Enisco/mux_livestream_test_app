@@ -25,9 +25,13 @@ import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
+import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Opens the creator profile. Every creator affordance in the app routes here —
 /// feed card avatars and names, following suggestions, event and livestream
@@ -234,11 +238,48 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     );
   }
 
+  /// Whether there is anything to swipe through — a library of only posts
+  /// and events is not a feed.
+  bool get _libraryHasVideo => _library.any(
+    (section) => section.items.any((i) => i.entityType == 'media'),
+  );
+
+  void _openLibraryAsFeed(String creatorId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => VerticalFeedScreen(
+          anchorCreatorId: creatorId,
+          prioritizeMediaIds: [
+            for (final section in _library)
+              for (final item in section.items)
+                if (item.entityType == 'media') item.entityId,
+          ],
+          source: AnalyticsSource.creatorProfile,
+        ),
+      ),
+    );
+  }
+
   Widget _body() {
     if (_loading) return const HomeLoader();
     final loaded = _profile;
     if (_failed || loaded == null) {
-      return SafeArea(child: ErrorStateView(onRetry: _loadProfile));
+      // A ministry whose page cannot be read still has to be leavable: this
+      // branch replaced the whole screen, header and all, so the only way out
+      // of a failed church page was to force-quit the app.
+      return SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(15.s, 12.s, 15.s, 0),
+              child: const GTubeBackButton(size: 20, box: 32),
+            ),
+            Expanded(child: ErrorStateView(onRetry: _loadProfile)),
+          ],
+        ),
+      );
     }
     // The header's follow state comes from the store, so following from one of
     // the cards below — or from anywhere else in the session — shows here too.
@@ -312,6 +353,41 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     if (_tab == CreatorTab.library) {
       if (_library.isEmpty) return [_emptySliver()];
       return [
+        // A ministry's library is a run of their own videos, so it can be
+        // watched as one instead of tapped through a row at a time.
+        if (_libraryHasVideo)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16.s, 12.s, 16.s, 0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  key: const ValueKey('library-watch-in-feed'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _openLibraryAsFeed(profile.id),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.swipe_vertical_rounded,
+                        size: 16.s,
+                        color: AppColors.brandPrimary,
+                      ),
+                      SizedBox(width: 6.s),
+                      Text(
+                        AppStrings.watchLibraryInFeed,
+                        style: AppStyles.label(
+                          13,
+                          color: AppColors.brandPrimary,
+                          weight: AppStyles.semiBold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         SliverToBoxAdapter(
           child: CreatorLibraryTab(
             sections: _library,

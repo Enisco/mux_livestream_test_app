@@ -1,9 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/subscriptions/data/subscriptions_dummy_data.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/subscriptions/repo/following_repo.dart';
+import 'package:test_app/models/creator_models/livestream_models.dart';
 import 'package:test_app/models/subscription_models/subscription_models.dart';
+import 'package:test_app/shared/services/live_socket_service.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/components/library_parts.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
@@ -13,8 +21,16 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Everyone the reader follows, and what each is allowed to notify about.
 ///
-/// Unfollowing and the notification levels are held in memory only — see
-/// [SubscriptionsDummyData] for which routes are missing.
+/// This ran on a hardcoded list until the routes turned up. Two of those
+/// invented ministries carried `isLive: true` permanently, which is why
+/// ministries appeared to be broadcasting when they were not — the badge had
+/// no source at all. It is real now:
+///
+///  * the list is `GET /v1/discovery/following-creators`,
+///  * "Live now" comes from the feed's own `liveOnly: true` answer,
+///  * unfollow is `DELETE /v1/creator/{id}/subscribe`,
+///  * the notification level rewrites the four `notifyOn*` flags through the
+///    upserting `POST`.
 class ManageFollowingScreen extends StatefulWidget {
   const ManageFollowingScreen({super.key});
 
@@ -24,15 +40,116 @@ class ManageFollowingScreen extends StatefulWidget {
 
 class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
   final _controller = TextEditingController();
-  late List<FollowedMinistry> _ministries = [
-    ...SubscriptionsDummyData.following,
-  ];
+  final _repo = GetIt.instance<FollowingRepo>();
+
+  List<FollowedMinistry> _ministries = const [];
+  List<SuggestedMinistry> _suggestions = const [];
   String _query = '';
+  bool _loading = true;
+  bool _failed = false;
+  StreamSubscription<LiveEvent>? _liveEvents;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
 
   @override
   void dispose() {
+    unawaited(_liveEvents?.cancel());
+    if (GetIt.instance.isRegistered<LiveSocketService>()) {
+      final socket = GetIt.instance<LiveSocketService>();
+      for (final m in _ministries) {
+        socket.unsubscribeCreator(m.id);
+      }
+    }
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final following = await _repo.fetchFollowing();
+      // Asked separately because the following payload carries no live flag.
+      // A failure here costs the badges, not the list.
+      var live = const <String>{};
+      try {
+        live = await _repo.fetchLiveCreatorIds();
+      } catch (e) {
+        logger.w('Live status unavailable for the following list', error: e);
+      }
+      if (!mounted) return;
+      setState(() {
+        _ministries = [
+          for (final m in following)
+            live.contains(m.id) ? m.copyWith(isLive: true) : m,
+        ];
+        _loading = false;
+      });
+      if (following.isEmpty) unawaited(_loadSuggestions());
+      unawaited(_watchLive());
+    } catch (e) {
+      logger.w('Could not load the following list', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  /// Follows each ministry's public room so a badge appears when they go on
+  /// air and — the half that was actually wrong — disappears when they stop.
+  ///
+  /// Without this the badges are only as fresh as the last time the screen
+  /// was opened, which is how a ministry that ended an hour ago can still be
+  /// shown as live.
+  Future<void> _watchLive() async {
+    // Live badges are a nicety; the list is the screen. A socket that cannot
+    // be reached, or is not registered at all, must cost the badges and
+    // nothing else.
+    if (!GetIt.instance.isRegistered<LiveSocketService>()) return;
+    final socket = GetIt.instance<LiveSocketService>();
+    try {
+      await socket.connect();
+    } catch (e) {
+      logger.w('Live socket unavailable', error: e);
+      return;
+    }
+    for (final m in _ministries) {
+      socket.subscribeCreator(m.id);
+    }
+    _liveEvents ??= socket.events.listen((event) {
+      if (event.type != LiveEventType.statusChanged) return;
+      if (!mounted || event.creatorId.isEmpty) return;
+      final live = LiveRuntime.parse(event.status).isOnAir;
+      setState(() {
+        _ministries = [
+          for (final m in _ministries)
+            m.id == event.creatorId ? m.copyWith(isLive: live) : m,
+        ];
+      });
+    });
+  }
+
+  Future<void> _loadSuggestions() async {
+    try {
+      final rows = await GetIt.instance<DiscoveryRepo>()
+          .fetchRecommendedCreators(limit: 10);
+      if (!mounted) return;
+      setState(
+        () =>
+            _suggestions = rows.map(SuggestedMinistry.fromRecommended).toList(),
+      );
+    } catch (e) {
+      logger.w('Could not load suggested ministries', error: e);
+    }
   }
 
   List<FollowedMinistry> get _matches {
@@ -57,12 +174,52 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
     );
   }
 
-  void _unfollow(FollowedMinistry ministry) {
+  /// Removed straight away, and put back if the server refuses — the row
+  /// disappearing and then returning is easier to understand than a row that
+  /// sits there until a request finishes.
+  Future<void> _unfollow(FollowedMinistry ministry) async {
+    final before = _ministries;
     setState(() {
       _ministries = _ministries
           .where((m) => m.id != ministry.id)
           .toList(growable: false);
     });
+    try {
+      await _repo.unfollow(ministry.id);
+      if (mounted && _ministries.isEmpty) unawaited(_loadSuggestions());
+    } catch (e) {
+      logger.w('Could not unfollow ${ministry.id}', error: e);
+      if (!mounted) return;
+      setState(() => _ministries = before);
+      _report(AppStrings.followingUnfollowFailed);
+    }
+  }
+
+  Future<void> _setNotify(FollowedMinistry ministry, NotifyLevel level) async {
+    final before = _ministries;
+    setState(() {
+      final i = _ministries.indexWhere((m) => m.id == ministry.id);
+      if (i < 0) return;
+      _ministries = [..._ministries]..[i] = ministry.withNotify(level);
+    });
+    try {
+      await _repo.setNotifyLevel(ministry.id, level);
+    } catch (e) {
+      logger.w('Could not set notify level for ${ministry.id}', error: e);
+      if (!mounted) return;
+      setState(() => _ministries = before);
+      _report(AppStrings.followingNotifyFailed);
+    }
+  }
+
+  Future<void> _follow(SuggestedMinistry ministry) async {
+    try {
+      await _repo.follow(ministry.id);
+      await _load();
+    } catch (e) {
+      logger.w('Could not follow ${ministry.id}', error: e);
+      if (mounted) _report(AppStrings.followingNotifyFailed);
+    }
   }
 
   void _openNotifications(FollowedMinistry ministry) {
@@ -74,15 +231,11 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
         ministry: ministry,
         onPicked: (level) {
           Navigator.pop(sheetContext);
-          setState(() {
-            final i = _ministries.indexWhere((m) => m.id == ministry.id);
-            if (i < 0) return;
-            _ministries = [..._ministries]..[i] = ministry.withNotify(level);
-          });
+          unawaited(_setNotify(ministry, level));
         },
         onUnfollow: () {
           Navigator.pop(sheetContext);
-          _unfollow(ministry);
+          unawaited(_unfollow(ministry));
         },
       ),
     );
@@ -111,7 +264,18 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
             searchHint: AppStrings.followingSearchHint,
           ),
           Expanded(
-            child: matches.isEmpty
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  )
+                : _failed
+                ? ErrorStateView(
+                    onRetry: _load,
+                    title: AppStrings.followingLoadFailed,
+                  )
+                : matches.isEmpty
                 ? SingleChildScrollView(
                     child: searching
                         ? const LibraryEmptyState(
@@ -120,11 +284,9 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
                             body: AppStrings.followingNoMatchBody,
                           )
                         : FollowingStarterView(
-                            suggestions: SubscriptionsDummyData.suggested,
-                            onFollow: (m) =>
-                                _report('Following ${m.name} is not built yet'),
-                            onShowMore: () =>
-                                _report('More ministries are not built yet'),
+                            suggestions: _suggestions,
+                            onFollow: (m) => unawaited(_follow(m)),
+                            onShowMore: () => unawaited(_loadSuggestions()),
                           ),
                   )
                 : ListView.builder(
@@ -132,7 +294,7 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
                     itemCount: matches.length,
                     itemBuilder: (context, i) => _MinistryRow(
                       ministry: matches[i],
-                      onUnfollow: () => _unfollow(matches[i]),
+                      onUnfollow: () => unawaited(_unfollow(matches[i])),
                       onNotifications: () => _openNotifications(matches[i]),
                     ),
                   ),

@@ -53,6 +53,7 @@ class FeedCardData {
     this.eventStart,
     this.location,
     this.planLabel,
+    this.resumable = false,
     this.subtitle,
     this.targetType,
   });
@@ -91,6 +92,10 @@ class FeedCardData {
   final String? location;
 
   final String? planLabel;
+
+  /// Whether this reader has already begun the plan, which changes the
+  /// card's action from "Start Devotion" to "Continue".
+  final bool resumable;
 
   final String? subtitle;
 
@@ -1625,7 +1630,12 @@ class _DevotionalBody extends StatelessWidget {
               ),
             ),
             SizedBox(width: 10.s),
-            _OutlineButton(label: AppStrings.startDevotion, onTap: onStart),
+            _OutlineButton(
+              label: data.resumable
+                  ? AppStrings.continueDevotion
+                  : AppStrings.startDevotion,
+              onTap: onStart,
+            ),
           ],
         ),
       ],

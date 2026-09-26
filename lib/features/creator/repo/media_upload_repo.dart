@@ -216,7 +216,7 @@ class MediaUploadRepo {
 
   /// The gateway answers a list of sentences under `error`. The monthly
   /// quota is the one worth repeating verbatim: it names a number the
-  /// dashboard context does not carry (OPEN_ISSUES 27).
+  /// dashboard context does not carry (OPEN_ISSUES 19).
   static MediaUploadException _translate(DioException e) {
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout ||

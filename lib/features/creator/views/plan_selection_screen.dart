@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -5,10 +7,12 @@ import 'package:hugeicons/hugeicons.dart';
 
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -57,6 +61,11 @@ class _PlanSelectionScreenState extends State<PlanSelectionScreen> {
   /// The way past this step without paying, and the only way past it where
   /// the storefront cannot sell at all.
   void _continueFree() {
+    recordOnboardingState(
+      status: OnboardingStatus.completed,
+      step: OnboardingStep.subscriptionPlan,
+      creatorId: LocalStorage.creatorId,
+    );
     context.go(
       LocalStorage.creatorId == null ? AppRouter.home : AppRouter.creatorLive,
     );

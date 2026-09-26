@@ -23,8 +23,62 @@ import 'package:test_app/shared/services/vertical_feed_preloader.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
+/// Full-screen swipeable playback.
+///
+/// Reached two ways, both of them a continuation of something the reader was
+/// already watching rather than a destination of its own:
+///
+///  * from a video's detail page, where "similar" becomes a feed you keep
+///    swiping through instead of a list you tap back and forth in;
+///  * from a ministry's library, where it plays that ministry's own run.
+///
+/// Seeding matters: opening this from a video has to *start on that video*,
+/// which is what [anchorMediaId] is for. The feed's own ordering is only
+/// used when nothing seeded it.
+/// Where the anchor goes.
+///
+/// Kept out of the widget so the rule itself can be tested: the feed route
+/// treats `anchorMediaId` as a relevance hint and may return it anywhere, so
+/// "open this one in the feed" has to place it.
+abstract final class VerticalFeedOrdering {
+  static List<T> anchorFirst<T>(
+    List<T> items,
+    String? anchorId, {
+    String Function(T)? idOf,
+  }) {
+    if (anchorId == null || anchorId.isEmpty) return items;
+    String id(T item) => idOf == null ? item as String : idOf(item);
+    final index = items.indexWhere((i) => id(i) == anchorId);
+    if (index < 0) return items;
+    return [items[index], ...items.where((i) => id(i) != anchorId)];
+  }
+}
+
 class VerticalFeedScreen extends StatefulWidget {
-  const VerticalFeedScreen({super.key});
+  const VerticalFeedScreen({
+    super.key,
+    this.anchorMediaId,
+    this.anchorCreatorId,
+    this.prioritizeMediaIds = const [],
+    this.source = AnalyticsSource.unknown,
+  });
+
+  /// The video the reader came from. It leads, and the rest follows it.
+  final String? anchorMediaId;
+
+  /// A ministry's own run, from their library.
+  final String? anchorCreatorId;
+
+  /// What was on screen beside the anchor — the "similar videos" the reader
+  /// was looking at when they swiped in.
+  final List<String> prioritizeMediaIds;
+
+  final String source;
+
+  bool get isSeeded =>
+      anchorMediaId != null ||
+      anchorCreatorId != null ||
+      prioritizeMediaIds.isNotEmpty;
 
   @override
   State<VerticalFeedScreen> createState() => _VerticalFeedScreenState();
@@ -62,7 +116,10 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     unawaited(GetIt.instance<PlaybackController>().stop());
 
     final preloader = GetIt.instance<VerticalFeedPreloader>();
-    if (preloader.hasData) {
+    // Warm data is the *general* feed. A seeded open must not show it.
+    if (widget.isSeeded) {
+      _load();
+    } else if (preloader.hasData) {
       _usePreloaderData(preloader);
     } else if (preloader.isWarmingUp) {
       unawaited(_waitForWarmup(preloader));
@@ -115,10 +172,14 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
       _currentIndex = 0;
     });
     try {
-      final result = await _repo.fetchVerticalFeed();
+      final result = await _repo.fetchVerticalFeed(
+        anchorMediaId: widget.anchorMediaId,
+        anchorCreatorId: widget.anchorCreatorId,
+        prioritizeMediaIds: widget.prioritizeMediaIds,
+      );
       if (!mounted) return;
       setState(() {
-        _items.addAll(result.items);
+        _items.addAll(_ordered(result.items));
         _nextCursor = result.nextCursor;
         _loading = false;
       });
@@ -134,6 +195,18 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
       });
     }
   }
+
+  /// Puts the video the reader came from first.
+  ///
+  /// `anchorMediaId` steers relevance but does not guarantee position — the
+  /// anchor came back third on staging — and opening "watch this one in the
+  /// feed" on somebody else's video would be plainly wrong.
+  List<VerticalFeedItem> _ordered(List<VerticalFeedItem> items) =>
+      VerticalFeedOrdering.anchorFirst<VerticalFeedItem>(
+        items,
+        widget.anchorMediaId,
+        idOf: (i) => i.mediaId,
+      );
 
   Future<void> _loadMore() async {
     if (_loadingMore || _loading || _nextCursor == null) return;

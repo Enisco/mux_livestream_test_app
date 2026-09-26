@@ -10,6 +10,19 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/phone_number.dart';
 
+/// A dial-code selector and a number input inside one field shell.
+///
+/// **A deliberate departure from the design, kept on purpose.** Sign-up
+/// (`10513-42109`) draws a single "Phone number (optional)" text field and no
+/// country field at all, and `countryCode` used to be guessed from the device
+/// locale — which is wrong for anyone travelling, on a VPN, or using a phone
+/// bought abroad. The field is required here and the dial code is chosen
+/// rather than inferred.
+///
+/// The flag, the `+dial` label, the divider and the picker sheet are all
+/// invented to match the surrounding field styling, because the design has
+/// nothing to copy. If sign-up ever gains a phone field, reconcile against
+/// it — but the guessing is not coming back.
 class GTubePhoneField extends StatefulWidget {
   const GTubePhoneField({
     super.key,

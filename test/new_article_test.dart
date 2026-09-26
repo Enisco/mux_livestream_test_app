@@ -5,7 +5,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/creator/repo/post_repo.dart';
 import 'package:test_app/features/creator/views/new_article_screen.dart';
-import 'package:test_app/features/creator/views/widgets/markdown_body.dart';
+import 'package:test_app/shared/components/markdown_body.dart';
 import 'package:test_app/features/creator/views/widgets/new_article_parts.dart';
 import 'package:test_app/models/creator_models/post_draft_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
@@ -290,10 +290,10 @@ void main() {
       expect((blocks[3] as BulletBlock).items, hasLength(2));
     });
 
-    test('syntax it does not know survives as words', () {
-      final blocks = parseMarkdownBlocks('| a | b |\n|---|---|');
+    test('raw HTML is left as the text it is, because GFM disables it', () {
+      final blocks = parseMarkdownBlocks('<script>alert(1)</script>');
       expect(blocks.single, isA<ParagraphBlock>());
-      expect((blocks.single as ParagraphBlock).text, contains('| a | b |'));
+      expect((blocks.single as ParagraphBlock).text, contains('<script>'));
     });
 
     testWidgets('bold, headings and lists all reach the screen', (

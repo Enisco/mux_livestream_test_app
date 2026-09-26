@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -5,6 +7,7 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
+import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
 import 'package:test_app/features/onboarding/views/widgets/radio_option_row.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
@@ -75,6 +78,12 @@ class _DiscoverySourceScreenState extends State<DiscoverySourceScreen> {
         logger.w('Could not save discovery source', error: e);
       }
     }
+    // The last step a watcher takes, so the funnel is finished rather than
+    // merely advanced.
+    recordOnboardingState(
+      status: OnboardingStatus.completed,
+      step: OnboardingStep.viewerPreferences,
+    );
     if (mounted) context.go(AppRouter.home);
   }
 

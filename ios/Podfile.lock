@@ -99,7 +99,7 @@ PODS:
   - video_thumbnail (0.0.1):
     - Flutter
     - libwebp
-  - volume_controller (0.0.1):
+  - volume_controller (3.7.0):
     - Flutter
   - wakelock_plus (0.0.1):
     - Flutter
@@ -218,7 +218,7 @@ SPEC CHECKSUMS:
   SwiftyGif: 706c60cf65fa2bc5ee0313beece843c8eb8194d4
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   video_thumbnail: b637e0ad5f588ca9945f6e2c927f73a69a661140
-  volume_controller: 3657a1f65bedb98fa41ff7dc5793537919f31b12
+  volume_controller: b2f529b1dc3496fe900df1baef358aadce59a827
   wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556
 
 PODFILE CHECKSUM: e30f02f9d1c72c47bb6344a0a748c9d268180865

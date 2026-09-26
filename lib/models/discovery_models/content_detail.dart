@@ -183,6 +183,9 @@ class EventDetail {
     this.startAt,
     this.endAt,
     this.locationLabel,
+    this.addressLine,
+    this.city,
+    this.meetingUrl,
     this.venueType,
     this.status,
     this.scriptureRefs = const [],
@@ -196,12 +199,35 @@ class EventDetail {
   final DateTime? startAt;
   final DateTime? endAt;
   final String? locationLabel;
+
+  /// The street and the city, which is what a map app needs. The event
+  /// carries no coordinates, so this text *is* the location.
+  final String? addressLine;
+  final String? city;
+
+  /// Where a virtual or hybrid event actually happens.
+  final String? meetingUrl;
+
   final String? venueType;
   final String? status;
   final List<String> scriptureRefs;
   final ContentEngagement engagement;
 
-  bool get isOnline => venueType == 'online';
+  bool get isOnline => venueType == 'online' || venueType == 'virtual';
+
+  /// Everything that describes where to go, in the order it reads.
+  String? get fullAddress {
+    final parts = [
+      locationLabel?.trim(),
+      addressLine?.trim(),
+      city?.trim(),
+    ].whereType<String>().where((p) => p.isNotEmpty).toList();
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  /// Whether there is enough to point a map at. The venue name alone is
+  /// often enough for a well-known place, so it counts.
+  bool get hasPlace => (fullAddress ?? '').isNotEmpty && !isOnline;
 
   factory EventDetail.fromJson(Map<String, dynamic> json) {
     final d = json['data'] is Map<String, dynamic>
@@ -222,6 +248,9 @@ class EventDetail {
           locationMap['label'] as String? ??
           locationMap['name'] as String? ??
           locationMap['address'] as String?,
+      addressLine: locationMap['addressLine'] as String?,
+      city: locationMap['city'] as String?,
+      meetingUrl: locationMap['meetingUrl'] as String?,
       venueType: d['venueType'] as String?,
       status: d['status'] as String?,
       scriptureRefs: (d['scriptureRefs'] as List<dynamic>? ?? [])
@@ -230,4 +259,59 @@ class EventDetail {
       engagement: ContentEngagement.fromJson(d),
     );
   }
+}
+
+/// `GET /v1/public/media/series/{id}` — a run of videos and tracks.
+///
+/// The feed row only says how many of each there are; this is what names
+/// them, in the order the creator arranged.
+class MediaSeriesDetail {
+  const MediaSeriesDetail({
+    required this.id,
+    required this.title,
+    this.creatorId = '',
+    this.description = '',
+    this.coverThumbnailKey,
+    this.categorySlugs = const [],
+    this.videoCount = 0,
+    this.musicCount = 0,
+    this.orderedMediaIds = const [],
+  });
+
+  factory MediaSeriesDetail.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : json;
+    return MediaSeriesDetail(
+      id: data['id'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      creatorId: data['creatorId'] as String? ?? '',
+      description: data['description'] as String? ?? '',
+      coverThumbnailKey: data['coverThumbnailKey'] as String?,
+      categorySlugs: [
+        for (final s in data['categorySlugs'] as List? ?? const [])
+          if (s is String) s,
+      ],
+      videoCount: (data['videoCount'] as num?)?.toInt() ?? 0,
+      musicCount: (data['musicCount'] as num?)?.toInt() ?? 0,
+      orderedMediaIds: [
+        for (final s in data['orderedMediaIds'] as List? ?? const [])
+          if (s is String) s,
+      ],
+    );
+  }
+
+  final String id;
+  final String title;
+  final String creatorId;
+  final String description;
+  final String? coverThumbnailKey;
+  final List<String> categorySlugs;
+  final int videoCount;
+  final int musicCount;
+
+  /// The running order. Each id opens on the media detail screen.
+  final List<String> orderedMediaIds;
+
+  int get itemCount => orderedMediaIds.length;
 }

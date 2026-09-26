@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
@@ -12,8 +10,6 @@ import 'package:test_app/core/router.dart';
 import 'package:test_app/gtube_app.dart';
 import 'package:test_app/shared/services/media_session_handler.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
-import 'package:test_app/shared/services/token_storage_service.dart';
-import 'package:test_app/shared/services/vertical_feed_preloader.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,10 +26,6 @@ Future<void> main() async {
   await setupLocator();
   setupSessionExpiredCallback();
   await _startMediaSession();
-
-  if (await getIt<TokenStorageService>().hasSession) {
-    unawaited(getIt<VerticalFeedPreloader>().warmUp());
-  }
 
   runApp(const GTubeApp());
 }

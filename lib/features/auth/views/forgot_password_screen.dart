@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/locator.dart';
+import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/repo/auth_repo.dart';
 import 'package:test_app/features/auth/views/widgets/auth_widgets.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
@@ -138,6 +140,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   label: AppStrings.resetPassword,
                   loading: _submitting,
                   onPressed: _submit,
+                ),
+                // The email carries a code, and nothing in the app could
+                // spend it until now. Offered always rather than only after
+                // sending: a link that opened in a browser, or a second
+                // attempt on a code already in hand, both arrive here.
+                const SizedBox(height: 14),
+                GestureDetector(
+                  key: const ValueKey('have-reset-code'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => context.push(AppRouter.resetPassword),
+                  child: Text(
+                    AppStrings.haveResetCode,
+                    textAlign: TextAlign.center,
+                    style: AppStyles.label(
+                      13,
+                      color: AppColors.brandPrimary,
+                      weight: AppStyles.bold,
+                    ),
+                  ),
                 ),
               ],
             ),

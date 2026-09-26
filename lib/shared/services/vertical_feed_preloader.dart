@@ -63,6 +63,14 @@ class VerticalFeedPreloader {
 
   bool isInitializing(String mediaId) => _initializing.contains(mediaId);
 
+  /// Fetches the vertical feed and opens players for the first few items.
+  ///
+  /// Nothing calls this today: the only screen that reads these players,
+  /// [VerticalFeedScreen], is not reachable from the new design, and warming
+  /// up for it meant three native players and four requests per launch that
+  /// nobody ever consumed. The screen loads for itself when it has no warm
+  /// data, so wiring this back up is an optimisation the vertical-feed
+  /// migration can pick up, not a prerequisite for it.
   Future<void> warmUp() async {
     if (_loading || _items.isNotEmpty) return;
     _loading = true;
@@ -193,6 +201,5 @@ class VerticalFeedPreloader {
     _nextCursor = null;
     _loading = false;
     _isAuthenticated = false;
-    unawaited(warmUp());
   }
 }

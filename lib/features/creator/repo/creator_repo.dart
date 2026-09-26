@@ -42,7 +42,7 @@ class CreatorRepo {
   }) async {
     final existingId = LocalStorage.creatorId;
     if (existingId == null) {
-      final channel = await _onboardWithFreeHandle(
+      final channelId = await _onboardWithFreeHandle(
         handle: handle,
         displayName: displayName,
         type: type,
@@ -56,8 +56,8 @@ class CreatorRepo {
         postalCode: postalCode,
         website: website,
       );
-      unawaited(_provisionQuietly(channel.id));
-      return channel.id;
+      unawaited(_provisionQuietly(channelId));
+      return channelId;
     }
     await updateCreatorProfile(
       creatorId: existingId,
@@ -74,7 +74,7 @@ class CreatorRepo {
   /// name, and two ministries with the same name derive the same handle. The
   /// server answers 409, and retrying changes nothing — so the second attempt
   /// suffixes the handle rather than handing back a dead end.
-  Future<CreatorChannel> _onboardWithFreeHandle({
+  Future<String> _onboardWithFreeHandle({
     required String handle,
     required String displayName,
     required String type,
@@ -89,7 +89,7 @@ class CreatorRepo {
     String? website,
   }) async {
     try {
-      return await onboardCreator(
+      return (await onboardCreator(
         handle: handle,
         displayName: displayName,
         type: type,
@@ -102,13 +102,27 @@ class CreatorRepo {
         city: city,
         postalCode: postalCode,
         website: website,
-      );
+      )).id;
     } on DioException catch (e) {
       if (e.response?.statusCode != 409) rethrow;
+
+      // Two different things answer 409 here. "User already owns a creator
+      // profile" means this reader has a channel already — retrying with a
+      // new handle would only be refused again, and they would be locked
+      // out of their own studio. Hand back what they already have.
+      if (_saysAlreadyACreator(e)) {
+        final existing = await fetchAndCacheCreatorId();
+        if (existing != null) {
+          logger.i('Reader already owns a channel; opening it instead');
+          return existing;
+        }
+        rethrow;
+      }
+
       final suffix = _uuid.v4().substring(0, 6);
       final trimmed = handle.length > 20 ? handle.substring(0, 20) : handle;
       logger.w('Handle "$handle" taken; retrying as "$trimmed$suffix"');
-      return onboardCreator(
+      return (await onboardCreator(
         handle: '$trimmed$suffix',
         displayName: displayName,
         type: type,
@@ -121,8 +135,14 @@ class CreatorRepo {
         city: city,
         postalCode: postalCode,
         website: website,
-      );
+      )).id;
     }
+  }
+
+  static bool _saysAlreadyACreator(DioException e) {
+    final body = e.response?.data;
+    final said = body is Map ? body['error']?.toString() ?? '' : '';
+    return said.toLowerCase().contains('already owns a creator');
   }
 
   Future<void> _provisionQuietly(String creatorId) async {
@@ -183,6 +203,61 @@ class CreatorRepo {
   ApiService get _api => _injected ?? GetIt.instance<ApiService>();
 
   String? get cachedCreatorId => LocalStorage.creatorId;
+
+  /// Whether this reader has a channel, and which one.
+  ///
+  /// The cached id is trusted when there is one; otherwise the server is
+  /// asked, because a reader who signs in on a new phone still has their
+  /// channel. `GET /v1/creator/profile` answers **404 "Creator profile not
+  /// found"** when there is none, which is what tells a reader with no
+  /// channel apart from a request that simply failed — and the difference
+  /// matters: one should be invited to start a channel, the other should
+  /// not be told anything at all.
+  Future<ChannelLookup> resolveChannel({bool force = false}) async {
+    if (!force) {
+      final cached = LocalStorage.creatorId;
+      if (cached != null && cached.isNotEmpty) {
+        return ChannelLookup.found(cached);
+      }
+    }
+    try {
+      final response = await _api.get(ApiEndpoints.creatorProfile);
+      final data = response.data as Map<String, dynamic>;
+      final creator =
+          (data['data'] as Map<String, dynamic>?)?['creator']
+              as Map<String, dynamic>?;
+      final id = creator?['id'] as String?;
+      if (id == null || id.isEmpty) return const ChannelLookup.none();
+      await LocalStorage.setString(LocalStorage.creatorIdKey, id);
+      return ChannelLookup.found(id);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return const ChannelLookup.none();
+      logger.w('Could not resolve the reader\'s channel', error: e);
+      return const ChannelLookup.unavailable();
+    } catch (e) {
+      logger.w('Could not resolve the reader\'s channel', error: e);
+      return const ChannelLookup.unavailable();
+    }
+  }
+
+  /// Who a post will go out as: the name, handle and tick a reader sees.
+  ///
+  /// The article preview claims to be "exactly how readers will see it", so
+  /// the byline has to be the real channel rather than a placeholder.
+  Future<CreatorByline?> fetchByline() async {
+    try {
+      final response = await _api.get(ApiEndpoints.creatorProfile);
+      final data = response.data as Map<String, dynamic>;
+      final creator =
+          (data['data'] as Map<String, dynamic>)['creator']
+              as Map<String, dynamic>?;
+      if (creator == null) return null;
+      return CreatorByline.fromJson(creator);
+    } catch (e) {
+      logger.w('fetchByline failed', error: e);
+      return null;
+    }
+  }
 
   Future<String?> fetchAndCacheCreatorId() async {
     try {

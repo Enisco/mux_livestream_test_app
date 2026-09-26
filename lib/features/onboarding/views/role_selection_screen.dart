@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/features/onboarding/views/widgets/onboarding_option_card.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
@@ -26,6 +30,16 @@ class RoleSelectionScreen extends StatelessWidget {
 
   Future<void> _choose(BuildContext context, OnboardingIntent intent) async {
     await LocalStorage.setString(LocalStorage.onboardingIntentKey, intent.name);
+    // The funnel state is the server's, not just this phone's, so a signup
+    // interrupted here can be resumed elsewhere. Note the wire word for
+    // "ministry" is `creator`; the API refuses anything else.
+    recordOnboardingState(
+      status: OnboardingStatus.inProgress,
+      intent: intent == OnboardingIntent.watch
+          ? OnboardingIntentState.watch
+          : OnboardingIntentState.creator,
+      step: OnboardingStep.platformIntent,
+    );
     if (!context.mounted) return;
     switch (intent) {
       case OnboardingIntent.watch:

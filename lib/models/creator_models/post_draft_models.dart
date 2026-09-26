@@ -20,7 +20,7 @@ class PostDraft {
 
   /// **Required, 1–500 characters — even to save a draft.** The design
   /// calls the headline "optional, but it helps people find your post";
-  /// the API refuses the post without one (OPEN_ISSUES 32).
+  /// the API refuses the post without one, so the form asks for it.
   final String title;
 
   /// GFM markdown. Inline images are `![alt](file:{fileId})`, which the

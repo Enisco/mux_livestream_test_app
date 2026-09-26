@@ -133,7 +133,7 @@ class EventDraft {
   /// there is nothing to choose. `seriesId` is not sent because **events
   /// have no series** — the API refuses the property under every name
   /// tried, and the event it returns carries no such field
-  /// (OPEN_ISSUES 28).
+  /// (OPEN_ISSUES 20).
   Map<String, dynamic> toJson(String creatorId) => {
     'creatorId': creatorId,
     'title': title,

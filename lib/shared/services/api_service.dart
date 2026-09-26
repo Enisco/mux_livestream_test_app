@@ -1,10 +1,13 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/models/auth_models/auth_models.dart';
 import 'package:test_app/shared/services/device_info_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Why a refresh attempt ended. Only [rejected] should end the session.
 enum RefreshOutcome {
@@ -48,6 +51,17 @@ class ApiService {
   late final Dio _dio;
   bool _isHandlingExpiry = false;
 
+  /// The refresh currently in flight, if any.
+  ///
+  /// The server **rotates** refresh tokens: every successful refresh returns
+  /// a new one and invalidates the one that was spent. So a burst of 401s —
+  /// which is exactly what a cold start produces, when several requests go
+  /// out together on an access token that has just expired — must not each
+  /// start its own refresh. The first would succeed and the rest would send
+  /// a token the server had already retired, get 401, and tear down a
+  /// session that had in fact just been renewed.
+  Future<RefreshOutcome>? _refreshInFlight;
+
   final TokenStorageService _tokenStorage;
   final DeviceInfoService _deviceInfo;
 
@@ -68,6 +82,13 @@ class ApiService {
     );
     _dio.interceptors.add(_buildInterceptor());
   }
+
+  /// Lets a test answer this service's requests without a network, so the
+  /// interceptor's own behaviour — refreshing, retrying, giving up — can be
+  /// exercised rather than mocked around.
+  @visibleForTesting
+  set httpClientAdapter(HttpClientAdapter adapter) =>
+      _dio.httpClientAdapter = adapter;
 
   InterceptorsWrapper _buildInterceptor() {
     return InterceptorsWrapper(
@@ -150,7 +171,31 @@ class ApiService {
     );
   }
 
-  Future<RefreshOutcome> _tryRefreshToken() async {
+  /// Renews the session, joining a refresh already under way rather than
+  /// starting a competing one.
+  ///
+  /// Everything that renews goes through here — the interceptor on a 401
+  /// and the splash screen on launch alike. Two paths refreshing at once
+  /// would spend the same rotating token twice, and the loser's 401 would
+  /// tear down the session the winner had just renewed.
+  Future<RefreshOutcome> refreshSession() => _tryRefreshToken();
+
+  /// Refreshes once, however many callers ask at the same time.
+  Future<RefreshOutcome> _tryRefreshToken() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    late final Future<RefreshOutcome> attempt;
+    attempt = _refreshOnce().whenComplete(() {
+      // Only ever clears itself: a later refresh may already have taken
+      // its place by the time this one finishes.
+      if (identical(_refreshInFlight, attempt)) _refreshInFlight = null;
+    });
+    _refreshInFlight = attempt;
+    return attempt;
+  }
+
+  Future<RefreshOutcome> _refreshOnce() async {
     final refresh = await _tokenStorage.refreshToken;
     if (refresh == null || refresh.isEmpty) return RefreshOutcome.rejected;
     try {
@@ -165,6 +210,14 @@ class ApiService {
           accessToken: data['accessToken'] as String,
           refreshToken: data['refreshToken'] as String,
         );
+        // The response carries the account too; caching it here means the
+        // launch path gets everything it used to without a second refresh.
+        if (data['user'] case final Map<String, dynamic> user) {
+          await LocalStorage.setString(
+            LocalStorage.cachedUserKey,
+            GtubeUser.fromJson(user).toJsonString(),
+          );
+        }
         return RefreshOutcome.refreshed;
       }
       return RefreshOutcome.rejected;

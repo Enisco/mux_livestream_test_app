@@ -23,6 +23,8 @@ class ErrorStateView extends StatelessWidget {
     this.title,
     this.body,
     this.retryLabel,
+    this.onBack,
+    this.showBack,
   });
 
   final VoidCallback onRetry;
@@ -31,6 +33,23 @@ class ErrorStateView extends StatelessWidget {
   final String? title;
   final String? body;
   final String? retryLabel;
+
+  /// What leaving means here. Defaults to popping the route.
+  final VoidCallback? onBack;
+
+  /// Whether to offer a way out at all.
+  ///
+  /// Left null this answers itself: a pushed route can be left, a tab body
+  /// cannot (and has the nav bar anyway). Screens that replace their whole
+  /// body with this — a creator's page, a content detail — used to keep their
+  /// back arrow only in the success branch, so a page whose data failed to
+  /// load left the reader with a Retry button and nothing else. Retry does
+  /// not help when the content is simply gone, and force-quitting the app was
+  /// the only way out.
+  ///
+  /// Deciding it here rather than per screen means a screen added later
+  /// cannot reintroduce the trap by forgetting.
+  final bool? showBack;
 
   bool get _offline {
     if (!GetIt.instance.isRegistered<ConnectivityService>()) return false;
@@ -91,6 +110,28 @@ class ErrorStateView extends StatelessWidget {
                 onPressed: onRetry,
               ),
             ),
+            if (showBack ?? Navigator.of(context).canPop()) ...[
+              SizedBox(height: 12.s),
+              SizedBox(
+                width: 200.s,
+                child: TextButton(
+                  key: const ValueKey('error-go-back'),
+                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                  style: TextButton.styleFrom(
+                    minimumSize: Size(200.s, 48.s),
+                    foregroundColor: AppColors.textPrimary,
+                  ),
+                  child: Text(
+                    AppStrings.goBack,
+                    style: AppStyles.button(
+                      15,
+                      color: AppColors.textPrimary,
+                      weight: AppStyles.semiBold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

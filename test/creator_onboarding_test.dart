@@ -36,6 +36,7 @@ Future<void> _pump(
             '/creator-links',
             '/creator-photo',
             '/home',
+            '/studio',
           ])
             GoRoute(path: path, builder: (_, _) => Text('at $path')),
         ],
@@ -122,7 +123,9 @@ void main() {
 
       await tester.tap(find.text(AppStrings.creatorDoThisLater));
       await tester.pumpAndSettle();
-      expect(find.text('at /home'), findsOneWidget);
+      // The channel already exists by this step, so skipping the rest
+      // lands in the studio rather than back on the home feed.
+      expect(find.text('at /studio'), findsOneWidget);
     });
   });
 

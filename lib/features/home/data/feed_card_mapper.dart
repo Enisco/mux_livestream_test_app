@@ -2,6 +2,7 @@ import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Turns a web-feed row into card data.
@@ -37,17 +38,29 @@ abstract final class FeedCardMapper {
       body: bodyFor(kind, item),
       subtitle: subtitleFor(kind, item),
       planLabel: kind == FeedCardKind.devotional
-          ? planLabel(facets.categorySlugs)
+          ? planLabel(meta.publishedEntryCount, facets.categorySlugs)
           : null,
+      resumable: kind == FeedCardKind.devotional && meta.progressHasStarted,
       category: facets.categorySlugs.isEmpty
           ? null
           : titleCase(facets.categorySlugs.first),
       eventStart: item.startsAt,
       location: meta.locationLabel,
-      thumbnailUrl: meta.thumbnailUrl,
+      // Media arrives with a resolved URL; every other type carries a bare
+      // storage key that only needs the CDN host in front of it.
+      thumbnailUrl: AssetUrlResolver.imageFor(
+        url: meta.thumbnailUrl,
+        key: meta.thumbnailKey,
+      ),
       duration: duration(meta.durationSeconds),
       verified: item.creatorVerified,
-      avatarUrl: isChannel ? meta.thumbnailUrl : null,
+      // A creator row IS its own avatar; other rows show the poster's.
+      avatarUrl: isChannel
+          ? AssetUrlResolver.imageFor(
+              url: meta.thumbnailUrl,
+              key: meta.avatarKey,
+            )
+          : AssetUrlResolver.resolve(creator?.avatarKey),
       sponsored: item.isPromoted,
       likes: facets.likes,
       saves: facets.favorites,
@@ -141,8 +154,14 @@ abstract final class FeedCardMapper {
     return subtitle;
   }
 
-  static String? planLabel(List<String> slugs) =>
-      slugs.isEmpty ? null : '${titleCase(slugs.first)} plan';
+  /// The overlay the design writes across a devotional cover: "14-day
+  /// devotional plan". The count is `publishedEntryCount`; a series with none
+  /// published yet falls back to its topic so the slot is never blank.
+  static String? planLabel(int? entries, List<String> slugs) {
+    final days = entries ?? 0;
+    if (days > 0) return AppStrings.devotionalPlanLabel(days);
+    return slugs.isEmpty ? null : '${titleCase(slugs.first)} plan';
+  }
 
   static String titleCase(String slug) => slug
       .split(RegExp(r'[-_ ]'))

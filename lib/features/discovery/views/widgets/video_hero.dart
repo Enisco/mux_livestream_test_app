@@ -7,6 +7,7 @@ import 'package:sizing/sizing.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:test_app/shared/components/app_icons.dart';
+import 'package:test_app/features/discovery/views/widgets/playback_settings_sheet.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -233,13 +234,12 @@ class _HeroStill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url == null || url!.isEmpty) {
-      return const ColoredBox(color: AppColors.surfaceVariant);
+      return const ColoredBox(color: AppColors.neutral800);
     }
     return Image.network(
       url!,
       fit: BoxFit.cover,
-      errorBuilder: (_, _, _) =>
-          const ColoredBox(color: AppColors.surfaceVariant),
+      errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.neutral800),
       loadingBuilder: (_, child, progress) =>
           progress == null ? child : const ColoredBox(color: Colors.black),
     );
@@ -422,6 +422,11 @@ class _BottomBarState extends State<_BottomBar> {
             onTap: widget.playback.toggleMuted,
           ),
         ),
+        _IconButton(
+          key: const ValueKey('playback-settings'),
+          icon: Icons.settings_rounded,
+          onTap: () => showPlaybackSettings(context, playback: widget.playback),
+        ),
         _IconButton(icon: widget.fullscreenIcon, onTap: widget.onFullscreen),
       ],
     );
@@ -429,7 +434,7 @@ class _BottomBarState extends State<_BottomBar> {
 }
 
 class _IconButton extends StatelessWidget {
-  const _IconButton({required this.icon, required this.onTap});
+  const _IconButton({super.key, required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;

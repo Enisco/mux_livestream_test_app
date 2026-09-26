@@ -4,10 +4,14 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/locator.dart';
+import 'package:go_router/go_router.dart';
+
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/core/router.dart';
+import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
-import 'package:test_app/features/creator/views/studio_shell.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/history/views/history_screen.dart';
@@ -43,25 +47,46 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   CreatorProfile? _channel;
 
+  /// What the server says about whether this reader has a channel. Until it
+  /// answers, the studio block shows nothing rather than guessing wrong in
+  /// either direction.
+  ChannelLookup? _lookup;
+
   @override
   void initState() {
     super.initState();
     _loadChannel();
   }
 
-  /// A reader who has set up a channel gets it in the studio block; everyone
-  /// else gets the invitation to make one.
-  Future<void> _loadChannel() async {
-    final id = LocalStorage.creatorId;
-    if (id == null || id.isEmpty) return;
+  /// A reader who has a channel gets the way into their studio; a reader who
+  /// has none gets the invitation to start one. Which of those it is comes
+  /// from the server, not from whatever happens to be cached.
+  Future<void> _loadChannel({bool force = false}) async {
+    final lookup = await getIt<CreatorRepo>().resolveChannel(force: force);
+    if (!mounted) return;
+    setState(() => _lookup = lookup);
+
+    final id = lookup.id;
+    if (id == null) return;
     try {
       final profile = await getIt<DiscoveryRepo>().fetchCreatorById(id);
       if (mounted) setState(() => _channel = profile);
     } catch (e) {
-      // Not worth an error state: the row simply falls back to the invitation.
+      // The studio row still works without the channel's picture and name.
       logger.w('Own channel unavailable', error: e);
     }
   }
+
+  /// Starts the channel a reader does not have yet, and comes back to see
+  /// whether they finished — so the block turns into their studio without
+  /// them having to leave the tab and return.
+  Future<void> _becomeCreator() async {
+    await context.push(AppRouter.creatorType);
+    if (!mounted) return;
+    await _loadChannel(force: true);
+  }
+
+  void _openStudio() => context.go(AppRouter.studio);
 
   void _signOut() {
     showDialog<void>(
@@ -171,25 +196,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _studio() {
     final channel = _channel;
+    final lookup = _lookup;
+
+    // Nothing is offered until the server has answered: inviting a reader
+    // who already has a channel walks them into a 409, and hiding the
+    // studio from one who does is just as wrong. A lookup that failed says
+    // neither, so the whole block stands down rather than leaving its
+    // heading over an empty space.
+    if (lookup == null || (!lookup.canStartOne && !lookup.hasChannel)) {
+      return const SizedBox.shrink();
+    }
+
     return ProfileMenuSection(
       caption: AppStrings.profileStudio,
       children: [
-        ProfileMenuItem(
-          icon: HugeIcons.strokeRoundedVideo01,
-          label: AppStrings.profileBecomeCreator,
-          note: AppStrings.profileStartChannel,
-          onTap: () => _todo(AppStrings.profileBecomeCreator),
-        ),
-        // The channel's own studio, which is where a creator actually works.
-        if (channel != null)
+        if (lookup.canStartOne)
           ProfileMenuItem(
+            key: const ValueKey('profile-become-creator'),
+            icon: HugeIcons.strokeRoundedVideo01,
+            label: AppStrings.profileBecomeCreator,
+            note: AppStrings.profileStartChannel,
+            onTap: _becomeCreator,
+          ),
+        // The channel's own studio, which is where a creator actually works.
+        if (lookup.hasChannel)
+          ProfileMenuItem(
+            key: const ValueKey('profile-open-studio'),
             icon: HugeIcons.strokeRoundedGridView,
             label: AppStrings.profileOpenStudio,
             note: AppStrings.profileOpenStudioNote,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StudioShell()),
-            ),
+            onTap: _openStudio,
           ),
         if (channel != null)
           ProfileMenuItem(

@@ -105,6 +105,11 @@ abstract final class ApiEndpoints {
 
   static String publicPost(String id) => '/v1/public/content/posts/$id';
 
+  /// A **media series** is not a media: `/v1/discovery/media/{id}/detail`
+  /// answers 404 for one. This is the route that knows about them, and it
+  /// carries `orderedMediaIds`, which is the series' running order.
+  static String publicMediaSeries(String id) => '/v1/public/media/series/$id';
+
   static String publicDevotionalSeries(String id) =>
       '/v1/public/content/devotionals/series/$id';
 
@@ -119,6 +124,10 @@ abstract final class ApiEndpoints {
   static const publicTestimonies = '/v1/public/engagement/testimonies';
 
   static const recommendedCreators = '/v1/discovery/recommended-creators';
+
+  /// Everyone this reader follows, with `latestContentAt` and the four
+  /// `notifyOn*` flags the notification sheet sets.
+  static const followingCreators = '/v1/discovery/following-creators';
   static const upcomingEvents = '/v1/discovery/upcoming-events';
 
   static String creatorSubscribe(String creatorId) =>

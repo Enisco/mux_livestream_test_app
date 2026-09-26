@@ -68,17 +68,8 @@ abstract final class AppStrings {
   static const interestsSubtitle = 'This helps us customize your experience';
   static const interestsHint = 'Pick 3 or more for the best feed.';
   static const skip = 'Skip';
-  static const interestPreaching = 'Preaching';
-  static const interestWorship = 'Worship';
-  static const interestBibleStudy = 'Bible study';
-  static const interestYouthFamily = 'Youth & family';
-  static const interestMission = 'Mission';
-  static const interestGrief = 'Grief & comfort';
-  static const interestMarriageFamilyRelationships =
-      'Marriage, family & relationships';
-  static const interestLeadership = 'Leadership';
-  static const interestFaith = 'Faith';
-  static const interestGospelArtist = 'Gospel artist';
+  // The interest chips are labelled by `GET /v1/user/categories` now, so the
+  // app holds no copy of the taxonomy to drift out of step with it.
 
   static const creatorSetupTitle = 'Create your ministry';
   static const creatorSetupSubtitle = 'This sets up your studio';
@@ -242,6 +233,26 @@ abstract final class AppStrings {
   static const resetPassword = 'Reset Password';
   static const resetLinkSent = 'Check your inbox for the reset link.';
 
+  /// Finishing the reset, once the email has arrived.
+  static const setNewPasswordTitle = 'Set a new password';
+  static const setNewPasswordSubtitle =
+      'Paste the code from your reset email, then choose a new password.';
+  static const resetCodeHint = 'Reset code';
+  static const newPasswordHint = 'New password';
+  static const confirmPasswordHint = 'Confirm new password';
+  static const saveNewPassword = 'Save new password';
+  static const haveResetCode = 'I have a reset code';
+  static const passwordResetDone =
+      'Your password has been changed. Sign in with it now.';
+  static const backToSignIn = 'Back to sign in';
+  static const resetCodeRequired = 'Paste the code from your reset email';
+  static const passwordRequired = 'Password is required';
+  static const passwordTooShort = 'Minimum 8 characters';
+  static const passwordTooLong = 'Maximum 128 characters';
+  static const passwordsDoNotMatch = 'Both passwords must match';
+  static const resetTokenRejected =
+      'That reset code is invalid or has expired. Request a new link.';
+
   static const followingLabel = 'Following';
   static const share = 'Share';
   static const descriptionLabel = 'Description';
@@ -364,7 +375,20 @@ abstract final class AppStrings {
   static const sponsored = 'Sponsored';
   static const rsvp = 'RSVP';
   static const readMore = 'Read more';
+
+  /// A run of videos and tracks a creator arranged in order.
+  static const seriesTitle = 'Series';
+  static const inThisSeries = 'In this series';
+  static const seriesEmpty = 'Nothing has been added to this series yet.';
+  static String seriesEpisode(int n) => 'Episode $n';
+
   static const startDevotion = 'Start Devotion';
+
+  /// The same plan, once this reader has begun it.
+  static const continueDevotion = 'Continue';
+
+  /// The overlay across a devotional cover, e.g. "14-day devotional plan".
+  static String devotionalPlanLabel(int days) => '$days-day devotional plan';
   static const follow = 'Follow';
   static const following = 'Following';
   static const viewChannel = 'View Channel';
@@ -931,7 +955,7 @@ abstract final class AppStrings {
   static const goLiveNoGiving = '—';
 
   /// The design runs viewer chat along the foot of the broadcast. Nothing
-  /// in the livestream contract carries live messages (OPEN_ISSUES 37).
+  /// in the livestream contract carries live messages (OPEN_ISSUES 23).
   static const goLiveChatUnavailable = 'Live chat is not available yet';
 
   // Ending it.
@@ -1235,6 +1259,29 @@ abstract final class AppStrings {
   static const streamNotLiveDesc =
       'The stream hasn\'t started. Try again in a moment.';
   static const goBack = 'Go Back';
+  static const subscribersLabel = 'Subscribers';
+
+  /// An event's location, and getting there.
+  static const eventDirections = 'Directions';
+  static const eventJoinOnline = 'Join online';
+  static const eventNoMapApp = 'No map app could open that address';
+
+  /// Swiping into the short-video feed from a video or a ministry's library.
+  static const watchInFeed = 'Swipe feed';
+  static const watchLibraryInFeed = 'Play as feed';
+
+  /// The player's settings sheet.
+  static const playbackSpeed = 'Playback speed';
+  static const videoQuality = 'Quality';
+  static const speedNormal = 'Normal';
+
+  /// Manage following — what a ministry was last doing.
+  static const followingLiveNow = 'Live now';
+  static const followingNoPostsYet = 'No posts yet';
+  static String followingPostedAgo(String ago) => 'Posted $ago ago';
+  static const followingLoadFailed = "Couldn't load who you follow";
+  static const followingUnfollowFailed = "Couldn't unfollow — try again";
+  static const followingNotifyFailed = "Couldn't save that — try again";
   static const tooltipVolume = 'Volume';
   static const tooltipFullscreen = 'Fullscreen (F)';
   static const tooltipExitFullscreen = 'Exit fullscreen (F)';
@@ -1286,6 +1333,15 @@ abstract final class AppStrings {
 
   static const shortVideos = 'Short Videos';
   static const featureShortVideosDesc = 'Full-screen vertical video feed';
+
+  /// The You tab before anyone has signed in.
+  static const authWallTitle = 'Watch. Follow. Create.';
+  static const authWallSubtitle =
+      'Sign in to follow your favourite creators,\nsave content, and broadcast live.';
+  static const authWallFollow = 'Follow creators you love';
+  static const authWallSave = 'Save videos to your library';
+  static const authWallRecommend = 'Personalised recommendations';
+  static const authWallGoLive = 'Go live and stream your content';
 
   static String filesCount(int n) => '$n file${n == 1 ? '' : 's'}';
 }

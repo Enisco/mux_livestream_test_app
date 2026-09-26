@@ -5,11 +5,17 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/creator/repo/content_asset_repo.dart';
 import 'package:test_app/features/creator/repo/post_repo.dart';
+import 'package:test_app/models/creator_models/creator_models.dart';
+import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/features/home/views/widgets/feed_card.dart'
+    show formatCount;
 import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
 import 'package:test_app/features/creator/views/widgets/go_live_sheet.dart';
-import 'package:test_app/features/creator/views/widgets/markdown_body.dart';
+import 'package:test_app/shared/components/markdown_body.dart';
 import 'package:test_app/features/creator/views/widgets/new_article_parts.dart';
 import 'package:test_app/features/creator/views/widgets/new_event_parts.dart';
 import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
@@ -47,6 +53,9 @@ class NewArticleScreen extends StatefulWidget {
 class _NewArticleScreenState extends State<NewArticleScreen> {
   late final _repo = widget.posts ?? PostRepo();
 
+  /// The channel this goes out as, so the preview's byline is the real one.
+  CreatorByline? _byline;
+
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
 
@@ -66,6 +75,7 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
   void initState() {
     super.initState();
     _titleController.addListener(_onTyped);
+    unawaited(_loadByline());
     _bodyController.addListener(_onBodyTyped);
   }
 
@@ -98,6 +108,12 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
     final embeds = await _repo.resolveEmbeds(creatorId: creatorId, body: body);
     if (!mounted) return;
     setState(() => _embeds = embeds);
+  }
+
+  Future<void> _loadByline() async {
+    // A byline that cannot be read costs the byline, not the editor.
+    final byline = await CreatorRepo().fetchByline();
+    if (mounted) setState(() => _byline = byline);
   }
 
   PostDraft get _draft => PostDraft(
@@ -322,10 +338,18 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
     ],
   );
 
-  /// What a reader would get. The counts the design shows beside the read
-  /// time — opens, and how long ago it went out — belong to a post that has
-  /// been published; a new one has neither, so it says so instead
-  /// (OPEN_ISSUES 33).
+  /// What a reader would get.
+  ///
+  /// Every figure here is the true one for a post being written. The design's
+  /// meta line reads "12.9K Opens · 2 min read · 6 hours ago"; two of those
+  /// three belong to a post that already exists, and a draft has neither an
+  /// audience nor a publication date. Putting a fabricated number in front of
+  /// the creator would be worse than saying so, so the line says what is
+  /// actually true and the read time — words over two hundred, image tokens
+  /// excluded — is real and updates as they type.
+  ///
+  /// The byline **is** real and available, so it is shown: the channel's
+  /// avatar, name and tick, exactly as a reader would see them.
   Widget _preview() => ListView(
     padding: EdgeInsets.fromLTRB(20.s, 16.s, 20.s, 20.s),
     children: [
@@ -344,6 +368,10 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
             : _titleController.text.trim(),
         style: AppStyles.heading(22, letterSpacing: -0.6),
       ),
+      if (_byline case final byline?) ...[
+        SizedBox(height: 12.s),
+        _PreviewByline(byline: byline),
+      ],
       SizedBox(height: 8.s),
       Text(
         '${AppStrings.articleDraftBadge} · '
@@ -420,4 +448,72 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
       onPressed: _publish,
     ),
   );
+}
+
+/// The channel a post goes out as, under the preview's headline.
+class _PreviewByline extends StatelessWidget {
+  const _PreviewByline({required this.byline});
+
+  final CreatorByline byline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 16.s,
+          backgroundColor: AppColors.neutral800,
+          backgroundImage: byline.avatarUrl == null
+              ? null
+              : NetworkImage(byline.avatarUrl!),
+          child: byline.avatarUrl != null
+              ? null
+              : Icon(
+                  Icons.person_rounded,
+                  size: 18.s,
+                  color: AppColors.neutral500,
+                ),
+        ),
+        SizedBox(width: 10.s),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      byline.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppStyles.label(14, weight: AppStyles.semiBold),
+                    ),
+                  ),
+                  if (byline.verified) ...[
+                    SizedBox(width: 5.s),
+                    DesignIcon(
+                      AppAssets.iconFeedVerified,
+                      width: 13.s,
+                      height: 13.s,
+                    ),
+                  ],
+                ],
+              ),
+              Text(
+                byline.subscriberCount > 0
+                    ? '${byline.handle} · '
+                          '${formatCount(byline.subscriberCount)} '
+                          '${AppStrings.subscribersLabel}'
+                    : byline.handle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppStyles.body(12, color: AppColors.neutral500),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }

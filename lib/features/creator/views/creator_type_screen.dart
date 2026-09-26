@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
+import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -26,6 +30,12 @@ class CreatorTypeScreen extends StatelessWidget {
 
   Future<void> _choose(BuildContext context, CreatorType type) async {
     await LocalStorage.setString(LocalStorage.creatorTypeKey, type.value);
+    recordOnboardingState(
+      step: OnboardingStep.creatorProfileType,
+      creatorType: type == CreatorType.individual
+          ? OnboardingCreatorType.individual
+          : OnboardingCreatorType.organization,
+    );
     if (!context.mounted) return;
     switch (type) {
       case CreatorType.individual:

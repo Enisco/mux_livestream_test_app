@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
+import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/features/onboarding/views/widgets/category_glyphs.dart';
 import 'package:test_app/features/onboarding/views/widgets/interest_chip.dart';
 import 'package:test_app/features/onboarding/views/widgets/onboarding_progress_bar.dart';
+import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
@@ -16,70 +20,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
-class Interest {
-  const Interest(this.label, {this.icon, this.slugs = const []});
-
-  final String label;
-
-  final Widget Function()? icon;
-
-  /// Category slugs from `/v1/user/categories`. Empty where the design's chip
-  /// has no equivalent in the API taxonomy — see docs/OPEN_ISSUES.md.
-  final List<String> slugs;
-}
-
-Widget _svg(String asset) => SvgPicture.asset(
-  asset,
-  width: InterestChip.iconSize,
-  height: InterestChip.iconSize,
-);
-
-final _interests = <Interest>[
-  Interest(
-    AppStrings.interestPreaching,
-    icon: () => _svg(AppAssets.iconCatMicrophone),
-    slugs: ['sermons'],
-  ),
-  Interest(
-    AppStrings.interestWorship,
-    icon: () => _svg(AppAssets.iconCatDove),
-    slugs: ['worship'],
-  ),
-  Interest(
-    AppStrings.interestBibleStudy,
-    icon: () => _svg(AppAssets.iconCatBible),
-    slugs: ['bible-study'],
-  ),
-  Interest(
-    AppStrings.interestYouthFamily,
-    icon: () => const FamilyGlyph(),
-    slugs: ['youth', 'family'],
-  ),
-  Interest(
-    AppStrings.interestMission,
-    icon: () => _svg(AppAssets.iconCatGlobe),
-  ),
-  Interest(
-    AppStrings.interestGrief,
-    icon: () => _svg(AppAssets.iconCatHeartHand),
-  ),
-  Interest(
-    AppStrings.interestMarriageFamilyRelationships,
-    icon: () => _svg(AppAssets.iconCatRings),
-    slugs: ['family'],
-  ),
-  Interest(
-    AppStrings.interestLeadership,
-    icon: () => _svg(AppAssets.iconCatCrown),
-  ),
-  Interest(AppStrings.interestFaith, icon: () => _svg(AppAssets.iconCatCoins)),
-  Interest(
-    AppStrings.interestGospelArtist,
-    icon: () => _svg(AppAssets.iconCatMusicNote),
-    slugs: ['gospel-music'],
-  ),
-];
-
 class InterestsScreen extends StatefulWidget {
   const InterestsScreen({super.key});
 
@@ -88,15 +28,40 @@ class InterestsScreen extends StatefulWidget {
 }
 
 class _InterestsScreenState extends State<InterestsScreen> {
+  /// Selection is by slug, which is also exactly what gets sent — there is no
+  /// label-to-slug table left to disagree with the backend.
   final _selected = <String>{};
+
+  List<ContentCategory> _categories = const [];
+  bool _loading = true;
 
   static const _progress = 236 / 350;
 
-  /// Slugs for the picks, deduped. Chips with no API category contribute none.
-  List<String> get _slugs => <String>{
-    for (final interest in _interests)
-      if (_selected.contains(interest.label)) ...interest.slugs,
-  }.toList();
+  List<String> get _slugs => _selected.toList();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCategories());
+  }
+
+  /// The chips are the live taxonomy, ordered the way the API orders it.
+  ///
+  /// A failed lookup leaves the list empty rather than falling back to a
+  /// hardcoded copy: a stale copy is how the labels and the slugs drifted
+  /// apart in the first place, and this step is skippable.
+  Future<void> _loadCategories() async {
+    try {
+      final rows = await getIt<CreatorRepo>().fetchCategories();
+      final live = rows.where((c) => c.isActive && c.slug.isNotEmpty).toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      if (mounted) setState(() => _categories = live);
+    } catch (e) {
+      logger.w('Could not load interest categories', error: e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   Future<void> _continue() async {
     final slugs = _slugs;
@@ -165,27 +130,29 @@ class _InterestsScreenState extends State<InterestsScreen> {
         ),
         const SizedBox(height: 22),
         Expanded(
-          child: SingleChildScrollView(
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              runAlignment: WrapAlignment.center,
-              spacing: 10,
-              runSpacing: 17,
-              children: [
-                for (final interest in _interests)
-                  InterestChip(
-                    label: interest.label,
-                    icon: interest.icon?.call(),
-                    selected: _selected.contains(interest.label),
-                    onTap: () => setState(() {
-                      if (!_selected.remove(interest.label)) {
-                        _selected.add(interest.label);
-                      }
-                    }),
+          child: _loading && _categories.isEmpty
+              ? const Center(child: CupertinoActivityIndicator())
+              : SingleChildScrollView(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    runAlignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 17,
+                    children: [
+                      for (final category in _categories)
+                        InterestChip(
+                          label: category.name,
+                          icon: CategoryGlyphs.forSlug(category.slug),
+                          selected: _selected.contains(category.slug),
+                          onTap: () => setState(() {
+                            if (!_selected.remove(category.slug)) {
+                              _selected.add(category.slug);
+                            }
+                          }),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ),
+                ),
         ),
       ],
     );

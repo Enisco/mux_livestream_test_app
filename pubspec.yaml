@@ -46,6 +46,8 @@ dependencies:
   audio_session: ^0.2.4
   qr_flutter: ^4.1.0
   flutter_timezone: ^5.1.0
+  socket_io_client: ^3.1.6
+  volume_controller: ^3.7.1
 
 dev_dependencies:
   flutter_test:
@@ -79,6 +81,12 @@ flutter:
           weight: 400
         - asset: fonts/Satoshi-Medium.otf
           weight: 500
+        # SemiBold has no static cut. The variable face carries a continuous
+        # wght axis (300-900), and AppStyles._base already sends the exact
+        # weight as a FontVariation, so 600 is instanced rather than
+        # rounded to the nearest neighbour.
+        - asset: fonts/Satoshi-Variable.ttf
+          weight: 600
         - asset: fonts/Satoshi-Bold.otf
           weight: 700
         - asset: fonts/Satoshi-Black.otf

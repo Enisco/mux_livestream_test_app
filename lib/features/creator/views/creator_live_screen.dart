@@ -40,7 +40,9 @@ class CreatorLiveScreen extends StatelessWidget {
         children: [
           CreatorSkipLine(
             label: AppStrings.creatorDoThisLater,
-            onTap: () => context.go(AppRouter.home),
+            // The channel exists by this point; skipping the polish steps
+            // should still land in the studio it belongs to.
+            onTap: () => context.go(AppRouter.studio),
           ),
           const SizedBox(height: 10),
           PrimaryButton(

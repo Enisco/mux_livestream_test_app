@@ -119,7 +119,7 @@ class _StudioScreenState extends State<StudioScreen> {
     switch (choice) {
       case StudiosChoice.switchStudio:
         // No route returns the studios a user belongs to yet; the backend
-        // will publish one. See OPEN_ISSUES 22.
+        // will publish one. See OPEN_ISSUES 14.
         _say(AppStrings.studiosNotImplemented);
       case StudiosChoice.settings:
         _todo(AppStrings.studiosSettings);
@@ -274,6 +274,7 @@ class _StudioScreenState extends State<StudioScreen> {
     children: [
       Flexible(
         child: StudioPill(
+          key: const ValueKey('studio-pill'),
           name: _context?.displayName ?? '',
           onTap: _openStudios,
         ),

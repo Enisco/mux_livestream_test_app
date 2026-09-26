@@ -120,6 +120,7 @@ const _live = {
 };
 
 void main() {
+  _devotionalGroup();
   group('every entity type lands on a kind', () {
     final cases = <String, (Map<String, dynamic>, FeedCardKind)>{
       'creator': (_creator, FeedCardKind.channel),
@@ -311,6 +312,67 @@ void _libraryShapeTests() {
     test('the proxy thumbnail url is used as-is', () {
       final item = WebFeedResponse.fromJson(libraryResponse).items.first;
       expect(item.meta.thumbnailUrl, contains('/assets/thumbnail'));
+    });
+  });
+}
+
+/// The devotional card's cover overlay and its action word.
+///
+/// The frame writes "14-day devotional plan" across the cover and offers
+/// "Start Devotion"; the feed reports both the entry count and whether this
+/// reader has already begun, so neither has to be guessed.
+void _devotionalGroup() {
+  group('devotional plan card', () {
+    test('the overlay counts the days in the plan', () {
+      expect(FeedCardMapper.planLabel(14, const []), '14-day devotional plan');
+      expect(FeedCardMapper.planLabel(1, const []), '1-day devotional plan');
+    });
+
+    test('a plan with nothing published yet falls back to its topic', () {
+      expect(
+        FeedCardMapper.planLabel(0, const ['devotionals']),
+        'Devotionals plan',
+      );
+      expect(
+        FeedCardMapper.planLabel(null, const ['bible-study']),
+        'Bible Study plan',
+      );
+    });
+
+    test('and with neither, the slot stays empty rather than lying', () {
+      expect(FeedCardMapper.planLabel(null, const []), isNull);
+    });
+
+    test('a series this reader has begun is resumable', () {
+      final card = FeedCardMapper.toCardData(
+        WebFeedItem.fromJson({
+          'entityType': 'devotional_series',
+          'entityId': 'd1',
+          'title': 'Forty Days',
+          'meta': {
+            'publishedEntryCount': 40,
+            'viewerProgressHasStarted': true,
+            'viewerProgressCompletedCount': 3,
+          },
+          'facets': <String, dynamic>{},
+        }),
+      );
+      expect(card.kind, FeedCardKind.devotional);
+      expect(card.planLabel, '40-day devotional plan');
+      expect(card.resumable, isTrue);
+    });
+
+    test('and one they have not is not', () {
+      final card = FeedCardMapper.toCardData(
+        WebFeedItem.fromJson({
+          'entityType': 'devotional_series',
+          'entityId': 'd2',
+          'title': 'Three Days',
+          'meta': {'publishedEntryCount': 3},
+          'facets': <String, dynamic>{},
+        }),
+      );
+      expect(card.resumable, isFalse);
     });
   });
 }

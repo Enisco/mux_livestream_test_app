@@ -14,6 +14,13 @@ class AppRouter {
   static const String signIn = '/sign-in';
   static const String signUp = '/sign-up';
   static const String forgotPassword = '/forgot-password';
+
+  /// Finishing a reset. `?token=` is filled in by the emailed link; without
+  /// one the screen asks the reader to paste the code.
+  static const String resetPassword = '/reset-password';
+
+  static String resetPasswordWithToken(String token) =>
+      '$resetPassword?token=${Uri.encodeQueryComponent(token)}';
   static const String verifyEmail = '/verify-email';
 
   static const String welcomeNote = '/welcome-note';

@@ -9,8 +9,9 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/media_detail_screen.dart';
+import 'package:test_app/features/discovery/views/media_series_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
-import 'package:test_app/features/discovery/views/widgets/markdown_body.dart';
+import 'package:test_app/shared/components/markdown_body.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
@@ -22,12 +23,14 @@ import 'package:test_app/models/discovery_models/content_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
+import 'package:test_app/shared/services/maps_launcher.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:hugeicons/hugeicons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -55,6 +58,13 @@ void openContentDetail(
     'event' => (BuildContext _) => ContentDetailScreen(
       item: item,
       kind: ContentDetailKind.event,
+      source: source,
+    ),
+    // A media series is not a media either: the media aggregate 404s on one,
+    // and only `/v1/public/media/series/{id}` knows the running order.
+    'media_series' => (BuildContext _) => MediaSeriesScreen(
+      seriesId: item.entityId,
+      fallbackTitle: item.title,
       source: source,
     ),
     // A devotional entry belongs to its series; open the series.
@@ -323,7 +333,17 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
         child: CircularProgressIndicator(color: AppColors.brandPrimary),
       );
     }
-    if (_failed) return ErrorStateView(onRetry: _load);
+    // The bar stays put whatever the body is doing. It used to be drawn only
+    // once the content had loaded, so a page that failed left no way back.
+    if (_failed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TopBar(onBack: () => Navigator.of(context).maybePop()),
+          Expanded(child: ErrorStateView(onRetry: _load)),
+        ],
+      );
+    }
 
     return SingleChildScrollView(
       child: Column(
@@ -499,11 +519,173 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
     if (event == null) return const [];
     return [
       _EventFacts(event: event),
+      if (event.hasPlace) ...[
+        SizedBox(height: 20.s),
+        _EventPlaceCard(event: event),
+      ],
+      if (event.isOnline && (event.meetingUrl ?? '').isNotEmpty) ...[
+        SizedBox(height: 20.s),
+        _MeetingLinkCard(url: event.meetingUrl!),
+      ],
       if (event.description case final d? when d.trim().isNotEmpty) ...[
         SizedBox(height: 20.s),
         DetailDescriptionCard(body: d),
       ],
     ];
+  }
+}
+
+/// Where the event is, and a way to get there.
+///
+/// The design draws a map preview with a pin. An event carries only text and
+/// no coordinates, and the app has no maps SDK or key — so instead of a fake
+/// map, the address is handed to whichever map app the reader already has,
+/// which is where they would have gone next anyway.
+class _EventPlaceCard extends StatelessWidget {
+  const _EventPlaceCard({required this.event});
+
+  final EventDetail event;
+
+  Future<void> _openMaps(BuildContext context) async {
+    final query = event.fullAddress;
+    if (query == null) return;
+    final opened = await MapsLauncher.open(query);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.eventNoMapApp, style: AppStyles.body(13)),
+          backgroundColor: AppColors.neutral800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final street = [
+      event.addressLine?.trim(),
+      event.city?.trim(),
+    ].whereType<String>().where((p) => p.isNotEmpty).join(', ');
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.s),
+      child: GestureDetector(
+        key: const ValueKey('event-directions'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openMaps(context),
+        child: Container(
+          padding: EdgeInsets.all(14.s),
+          decoration: BoxDecoration(
+            color: AppColors.neutral900,
+            borderRadius: BorderRadius.circular(12.s),
+            border: Border.all(color: AppColors.neutral800),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40.s,
+                height: 40.s,
+                decoration: BoxDecoration(
+                  color: AppColors.brandPrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10.s),
+                ),
+                child: Icon(
+                  Icons.place_rounded,
+                  color: AppColors.brandPrimary,
+                  size: 20.s,
+                ),
+              ),
+              SizedBox(width: 12.s),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if ((event.locationLabel ?? '').isNotEmpty)
+                      Text(
+                        event.locationLabel!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppStyles.label(14, weight: AppStyles.semiBold),
+                      ),
+                    if (street.isNotEmpty) ...[
+                      SizedBox(height: 2.s),
+                      Text(
+                        street,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppStyles.body(12, color: AppColors.neutral400),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(width: 10.s),
+              Text(
+                AppStrings.eventDirections,
+                style: AppStyles.label(
+                  13,
+                  color: AppColors.brandPrimary,
+                  weight: AppStyles.semiBold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A virtual or hybrid event's meeting link, which publishing requires and
+/// the design has no field for.
+class _MeetingLinkCard extends StatelessWidget {
+  const _MeetingLinkCard({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.s),
+      child: GestureDetector(
+        key: const ValueKey('event-meeting-link'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => unawaited(
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(14.s),
+          decoration: BoxDecoration(
+            color: AppColors.neutral900,
+            borderRadius: BorderRadius.circular(12.s),
+            border: Border.all(color: AppColors.neutral800),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.videocam_rounded,
+                color: AppColors.brandPrimary,
+                size: 20.s,
+              ),
+              SizedBox(width: 12.s),
+              Expanded(
+                child: Text(
+                  AppStrings.eventJoinOnline,
+                  style: AppStyles.label(14, weight: AppStyles.semiBold),
+                ),
+              ),
+              Icon(
+                Icons.open_in_new_rounded,
+                color: AppColors.neutral400,
+                size: 16.s,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

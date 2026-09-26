@@ -6,6 +6,7 @@ import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/repo/mobile_checkout_repo.dart';
 import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/subscriptions/repo/following_repo.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
@@ -15,6 +16,7 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/connectivity_service.dart';
 import 'package:test_app/shared/services/device_info_service.dart';
+import 'package:test_app/shared/services/live_socket_service.dart';
 import 'package:test_app/shared/services/media_url_resolver.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/shared/services/playback_info_cache.dart';
@@ -56,6 +58,10 @@ Future<void> setupLocator() async {
     () => CheckoutHandoffService(repo: getIt<MobileCheckoutRepo>()),
   );
   getIt.registerLazySingleton<DiscoveryRepo>(() => DiscoveryRepo());
+  getIt.registerLazySingleton<FollowingRepo>(FollowingRepo.new);
+  getIt.registerLazySingleton<LiveSocketService>(
+    () => LiveSocketService(tokenStorage: getIt<TokenStorageService>()),
+  );
   getIt.registerLazySingleton<OnboardingRepo>(() => OnboardingRepo());
   getIt.registerLazySingleton<EngagementRepo>(() => EngagementRepo());
   // App-scoped on purpose: a like made on one screen has to be the like every

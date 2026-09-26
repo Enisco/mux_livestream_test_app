@@ -36,7 +36,7 @@ class AuthField extends StatelessWidget {
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: AppColors.neutral400,
           ),
         ),
         const SizedBox(height: 6),
@@ -49,12 +49,12 @@ class AuthField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(
-              color: AppColors.textTertiary,
+              color: AppColors.neutral500,
               fontSize: 15,
             ),
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: AppColors.surfaceVariant,
+            fillColor: AppColors.fieldBg,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 14,
@@ -70,7 +70,7 @@ class AuthField extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
-                color: AppColors.primary,
+                color: AppColors.brandPrimary,
                 width: 1.5,
               ),
             ),
@@ -167,12 +167,12 @@ class AuthLogoHeader extends StatelessWidget {
           width: 68,
           height: 68,
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.12),
+            color: AppColors.brandPrimary.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(18),
           ),
           child: const Icon(
             Icons.play_circle_fill_rounded,
-            color: AppColors.primary,
+            color: AppColors.brandPrimary,
             size: 36,
           ),
         ),
@@ -182,7 +182,7 @@ class AuthLogoHeader extends StatelessWidget {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: AppColors.primary,
+            color: AppColors.brandPrimary,
             letterSpacing: 0.5,
           ),
         ),

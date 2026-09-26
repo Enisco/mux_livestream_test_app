@@ -133,7 +133,8 @@ class GivingTotal {
 ///
 /// It is what the broadcast screen's counters read. The contract also
 /// carries these over a Socket.IO `/live` namespace; the app has no socket
-/// client, so it polls this instead (OPEN_ISSUES 35).
+/// client. `LiveSocketService` follows the studio room now, and this stays
+/// the authority behind it — read on open and after every reconnect.
 class LivestreamStudio {
   const LivestreamStudio({
     required this.runtime,
@@ -188,7 +189,7 @@ class LivestreamStudio {
   final int likeCount;
 
   /// Only ever a count: nothing lists the requests themselves
-  /// (OPEN_ISSUES 36).
+  /// (OPEN_ISSUES 22).
   final int prayerCount;
 
   /// Null when the payment service could not be reached.
@@ -204,6 +205,37 @@ class LivestreamStudio {
       (giving == null || giving!.isEmpty) ? null : giving!.first;
 
   static const empty = LivestreamStudio(runtime: LiveRuntime.idle);
+
+  /// Folds a socket event into the last snapshot.
+  ///
+  /// Events carry a slice of the state, not all of it, so anything the event
+  /// does not mention has to survive — a viewer-count tick must not blank the
+  /// giving totals it knows nothing about.
+  LivestreamStudio copyWith({
+    LiveRuntime? runtime,
+    bool? isLiveNow,
+    DateTime? startedAt,
+    int? viewerCount,
+    int? peakViewerCount,
+    int? likeCount,
+    int? prayerCount,
+    List<GivingTotal>? giving,
+    String? ingestStatus,
+    String? encoderStatus,
+    DateTime? armedUntil,
+  }) => LivestreamStudio(
+    runtime: runtime ?? this.runtime,
+    isLiveNow: isLiveNow ?? this.isLiveNow,
+    startedAt: startedAt ?? this.startedAt,
+    viewerCount: viewerCount ?? this.viewerCount,
+    peakViewerCount: peakViewerCount ?? this.peakViewerCount,
+    likeCount: likeCount ?? this.likeCount,
+    prayerCount: prayerCount ?? this.prayerCount,
+    giving: giving ?? this.giving,
+    ingestStatus: ingestStatus ?? this.ingestStatus,
+    encoderStatus: encoderStatus ?? this.encoderStatus,
+    armedUntil: armedUntil ?? this.armedUntil,
+  );
 }
 
 /// Why going live could not go ahead, in terms the screen can explain.

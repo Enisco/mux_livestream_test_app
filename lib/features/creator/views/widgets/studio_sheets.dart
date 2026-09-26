@@ -149,7 +149,7 @@ enum StudiosChoice { switchStudio, settings, backToWatching }
 /// "Your studios" — which studio the reader is in, and the way back out.
 ///
 /// The design lists every studio the reader can work in. Nothing in the spec
-/// returns that list (see OPEN_ISSUES 22), so the owned studio is real and
+/// returns that list (see OPEN_ISSUES 14), so the owned studio is real and
 /// the rest sits behind one "Switch studio" row that says it is not
 /// implemented. Inventing membership rows was the alternative and would have
 /// told the reader they belong to ministries they do not.
