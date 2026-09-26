@@ -64,4 +64,28 @@ abstract final class AssetUrlResolver {
     if (direct != null && direct.isNotEmpty) return direct;
     return resolve(key);
   }
+
+  /// A media's own still, served by the API rather than the CDN.
+  ///
+  /// `GET /v1/public/media/{id}/assets/thumbnail` is public and answers a
+  /// 302 to a signed Mux image — which for a video with no uploaded cover is
+  /// the generated first frame. It is the only way to show a still for
+  /// anything whose `thumbnailSource` is `mux_auto`, because those rows carry
+  /// no `thumbnailKey` at all.
+  static String? mediaThumbnail(String? mediaId) {
+    final id = mediaId?.trim();
+    if (id == null || id.isEmpty) return null;
+    final base = _apiBase;
+    if (base.isEmpty) return null;
+    return '$base/v1/public/media/$id/assets/thumbnail';
+  }
+
+  static String get _apiBase {
+    try {
+      final raw = (dotenv.env['BASE_URL'] ?? '').trim();
+      return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
+    } catch (_) {
+      return '';
+    }
+  }
 }

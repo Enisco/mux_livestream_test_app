@@ -8,6 +8,8 @@
 /// publish no response schema.
 library;
 
+import 'package:test_app/shared/services/asset_url_resolver.dart';
+
 /// The kinds the Content tab filters by. `music` is the API's word for what
 /// the design calls Audio.
 ///
@@ -241,6 +243,33 @@ class StudioContentItem {
   final String visibility;
 
   final String? thumbnailKey;
+
+  /// Whether tapping this should open the player.
+  ///
+  /// Only media, and only once there is something to play: a draft has no
+  /// transcode yet, a failed one never will, and a livestream session is not
+  /// watchable at all — its recording is a separate row.
+  bool get isPlayable =>
+      (kind == StudioContentKind.video || kind == StudioContentKind.audio) &&
+      (state == StudioContentState.published ||
+          state == StudioContentState.replay);
+
+  /// The still to show for this row, or null when there is nothing to show.
+  ///
+  /// Two sources, because the API uses two. An uploaded cover arrives as a
+  /// `thumbnailKey` on the CDN; a video left to Mux carries no key at all and
+  /// its generated first frame comes from the public asset route instead.
+  /// Posts and events only ever have the former.
+  String? get stillUrl {
+    final fromKey = AssetUrlResolver.resolve(thumbnailKey);
+    if (fromKey != null) return fromKey;
+    return switch (kind) {
+      StudioContentKind.video ||
+      StudioContentKind.livestream ||
+      StudioContentKind.audio => AssetUrlResolver.mediaThumbnail(id),
+      StudioContentKind.post || StudioContentKind.event => null,
+    };
+  }
 
   /// Video and audio only.
   final int? durationSeconds;

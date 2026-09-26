@@ -85,6 +85,7 @@ class CreatorProfileHeader extends StatelessWidget {
     this.onFollow,
     this.onGive,
     this.onMore,
+    this.onOpenStudio,
   });
 
   final CreatorProfile profile;
@@ -93,6 +94,10 @@ class CreatorProfileHeader extends StatelessWidget {
   final VoidCallback? onFollow;
   final VoidCallback? onGive;
   final VoidCallback? onMore;
+
+  /// Offered instead of Follow / Give Now when this channel is the reader's
+  /// own — you cannot follow or give to yourself, and the API refuses both.
+  final VoidCallback? onOpenStudio;
 
   @override
   Widget build(BuildContext context) {
@@ -211,10 +216,12 @@ class CreatorProfileHeader extends StatelessWidget {
                 SizedBox(height: 16.s),
                 _Actions(
                   following: profile.isFollowing,
+                  owned: profile.isOwnedByViewer,
                   busy: busy,
                   onFollow: onFollow,
                   onGive: onGive,
                   onMore: onMore,
+                  onOpenStudio: onOpenStudio,
                 ),
               ],
             ),
@@ -229,16 +236,20 @@ class _Actions extends StatelessWidget {
   const _Actions({
     required this.following,
     required this.busy,
+    this.owned = false,
     this.onFollow,
     this.onGive,
     this.onMore,
+    this.onOpenStudio,
   });
 
   final bool following;
   final bool busy;
+  final bool owned;
   final VoidCallback? onFollow;
   final VoidCallback? onGive;
   final VoidCallback? onMore;
+  final VoidCallback? onOpenStudio;
 
   @override
   Widget build(BuildContext context) {
@@ -246,24 +257,41 @@ class _Actions extends StatelessWidget {
     final followColour = following ? AppColors.red500 : AppColors.textPrimary;
     return Row(
       children: [
-        Expanded(
-          child: _OutlineButton(
-            label: following ? AppStrings.unfollow : AppStrings.follow,
-            colour: followColour,
-            borderColour: following ? AppColors.red500 : AppColors.neutral700,
-            busy: busy,
-            onTap: onFollow,
+        if (owned)
+          // Looking at your own channel as a reader would see it. Follow and
+          // Give Now have nobody to point at, so the one useful action takes
+          // their place.
+          Expanded(
+            child: _OutlineButton(
+              key: const ValueKey('profile-open-own-studio'),
+              label: AppStrings.profileOpenStudio,
+              colour: AppColors.textPrimary,
+              borderColour: AppColors.neutral700,
+              onTap: onOpenStudio,
+            ),
+          )
+        else ...[
+          Expanded(
+            child: _OutlineButton(
+              key: const ValueKey('profile-follow'),
+              label: following ? AppStrings.unfollow : AppStrings.follow,
+              colour: followColour,
+              borderColour: following ? AppColors.red500 : AppColors.neutral700,
+              busy: busy,
+              onTap: onFollow,
+            ),
           ),
-        ),
-        SizedBox(width: 10.s),
-        Expanded(
-          child: _OutlineButton(
-            label: AppStrings.giveNow,
-            colour: AppColors.textPrimary,
-            borderColour: AppColors.neutral700,
-            onTap: onGive,
+          SizedBox(width: 10.s),
+          Expanded(
+            child: _OutlineButton(
+              key: const ValueKey('profile-give'),
+              label: AppStrings.giveNow,
+              colour: AppColors.textPrimary,
+              borderColour: AppColors.neutral700,
+              onTap: onGive,
+            ),
           ),
-        ),
+        ],
         SizedBox(width: 10.s),
         _CircleButton(
           square: true,
@@ -282,6 +310,7 @@ class _Actions extends StatelessWidget {
 
 class _OutlineButton extends StatelessWidget {
   const _OutlineButton({
+    super.key,
     required this.label,
     required this.colour,
     required this.borderColour,
@@ -444,10 +473,20 @@ class _Tab extends StatelessWidget {
 
 /// Per-tab empty state (Figma `11117-123440`).
 class CreatorTabEmptyState extends StatelessWidget {
-  const CreatorTabEmptyState({super.key, required this.tab, this.onAction});
+  const CreatorTabEmptyState({
+    super.key,
+    required this.tab,
+    this.onAction,
+    this.owned = false,
+  });
 
   final CreatorTab tab;
   final VoidCallback? onAction;
+
+  /// The reader's own channel. "Subscribe/follow" and "Notify me when live"
+  /// are invitations to an audience, and the owner is not one — an empty
+  /// tab of their own just reads as empty.
+  final bool owned;
 
   @override
   Widget build(BuildContext context) {
@@ -487,19 +526,22 @@ class CreatorTabEmptyState extends StatelessWidget {
               lineHeight: 18 / 12,
             ),
           ),
-          SizedBox(height: 20.s),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onAction,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 24.s, vertical: 11.s),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8.s),
-                border: Border.all(color: AppColors.neutral700, width: 1.5.s),
+          if (!owned) ...[
+            SizedBox(height: 20.s),
+            GestureDetector(
+              key: const ValueKey('tab-empty-action'),
+              behavior: HitTestBehavior.opaque,
+              onTap: onAction,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 24.s, vertical: 11.s),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8.s),
+                  border: Border.all(color: AppColors.neutral700, width: 1.5.s),
+                ),
+                child: Text(tab.emptyAction, style: AppStyles.button(13)),
               ),
-              child: Text(tab.emptyAction, style: AppStyles.button(13)),
             ),
-          ),
+          ],
         ],
       ),
     );

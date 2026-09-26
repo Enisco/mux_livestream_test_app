@@ -21,12 +21,44 @@ abstract final class CreatorMediaPicker {
     _ => MediaUploadTarget.web,
   };
 
+  /// How to ask the platform. See [pick] for why this is not
+  /// [FileType.custom].
+  static FileType fileTypeFor(MediaUploadKind kind) => switch (kind) {
+    MediaUploadKind.video => FileType.video,
+    MediaUploadKind.music => FileType.audio,
+  };
+
   static Future<MediaPickResult> pick({required MediaUploadKind kind}) async {
     final types = uploadMimeTypes(kind, target);
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: types.keys.toList(growable: false),
-    );
+
+    // `FileType.video` / `FileType.audio`, **never** `FileType.custom`.
+    //
+    // Custom used to carry the extension list, and the sheet opened with
+    // nothing in it at all. Reading file_picker 8.3.7's Android side shows
+    // why: `custom` resolves to `*/*`, and the extensions are handed to
+    // `Intent.EXTRA_MIME_TYPES` **verbatim** —
+    //
+    // ```java
+    // intent.setType("*/*");
+    // intent.putExtra(Intent.EXTRA_MIME_TYPES, allowedExtensions);
+    // ```
+    //
+    // — so DocumentsUI was asked to filter on the MIME types `mp4`, `mov`,
+    // `m4v` and `webm`, none of which is a MIME type. Nothing matched, and
+    // the browser was empty. It would have been empty for any extension.
+    //
+    // `video` and `audio` resolve to `video/*` and `audio/*`, which is a
+    // filter the platform understands.
+    //
+    // Worth knowing: `image` is special-cased there to `ACTION_PICK` on
+    // `MediaStore.Images`, which is why picking a thumbnail opens the
+    // gallery grid while these open the document picker filtered by type.
+    // Both list what the creator is looking for; they do not look identical.
+    //
+    // The format is still held to [uploadMimeTypes] below: the picker is
+    // wide, the acceptance is not, and a container the API will not take is
+    // refused by name rather than by being impossible to choose.
+    final result = await FilePicker.platform.pickFiles(type: fileTypeFor(kind));
     final file = result?.files.singleOrNull;
     if (file == null) return const MediaPickResult.cancelled();
 

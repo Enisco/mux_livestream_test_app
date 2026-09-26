@@ -348,6 +348,15 @@ class _Still extends StatelessWidget {
                 size: 18.s,
               ),
             ),
+            // The still goes over the glyph, so a row with no picture — or
+            // one whose picture will not load — still reads as what it is
+            // rather than as an empty grey box.
+            if (item.stillUrl case final url?)
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
             if (item.state == StudioContentState.live)
               Positioned(
                 left: 6.s,

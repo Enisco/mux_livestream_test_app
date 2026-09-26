@@ -8,6 +8,7 @@ import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
+import 'package:test_app/shared/services/viewer_identity.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -117,13 +118,20 @@ class SearchMinistryRow extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 10.s),
-            _OutlineButton(
-              label: following
-                  ? AppStrings.searchFollowing
-                  : AppStrings.searchFollow,
-              onTap: onFollow,
-            ),
+            // Nobody follows their own ministry, and the API refuses it.
+            if (!ViewerIdentity.owns(
+              item.profileCreatorId,
+              flaggedByApi: item.isOwnedByViewer,
+            )) ...[
+              SizedBox(width: 10.s),
+              _OutlineButton(
+                key: const ValueKey('search-follow'),
+                label: following
+                    ? AppStrings.searchFollowing
+                    : AppStrings.searchFollow,
+                onTap: onFollow,
+              ),
+            ],
             SizedBox(width: 10.s),
             _OutlineButton(
               icon: HugeIcons.strokeRoundedMoreVertical,
@@ -505,7 +513,7 @@ class _Avatar extends StatelessWidget {
 
 /// The bordered pill the design uses for Follow, RSVP and the overflow.
 class _OutlineButton extends StatelessWidget {
-  const _OutlineButton({this.label, this.icon, this.onTap});
+  const _OutlineButton({super.key, this.label, this.icon, this.onTap});
 
   final String? label;
   final List<List<dynamic>>? icon;

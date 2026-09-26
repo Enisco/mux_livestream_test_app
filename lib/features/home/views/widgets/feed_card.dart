@@ -48,6 +48,7 @@ class FeedCardData {
     this.liked = false,
     this.saved = false,
     this.following = false,
+    this.mine = false,
     this.subscribers = 0,
     this.category,
     this.eventStart,
@@ -85,6 +86,11 @@ class FeedCardData {
   final bool saved;
 
   final bool following;
+
+  /// The reader's own channel. Follow has nobody to point at, and the API
+  /// refuses it — so the affordance is not offered at all.
+  final bool mine;
+
   final int subscribers;
 
   final String? category;
@@ -340,7 +346,7 @@ class _CreatorRow extends StatelessWidget {
           // Wiring both to follow left the avatar dead once following, which
           // is the one state where opening the profile matters most.
           onTap: onCreatorTap,
-          onFollow: following ? null : onFollow,
+          onFollow: (following || data.mine) ? null : onFollow,
         ),
         SizedBox(width: 10.s),
         Expanded(
@@ -1462,7 +1468,7 @@ class _ChannelBody extends StatelessWidget {
           verified: data.verified,
           size: 48.s,
           onTap: onOpen,
-          onFollow: following ? null : onFollow,
+          onFollow: (following || data.mine) ? null : onFollow,
         ),
         SizedBox(height: 12.s),
         Row(
@@ -1510,14 +1516,18 @@ class _ChannelBody extends StatelessWidget {
         SizedBox(height: 16.s),
         Row(
           children: [
-            Expanded(
-              child: _OutlineButton(
-                label: following ? AppStrings.following : AppStrings.follow,
-                onTap: onFollow,
-                expand: true,
+            // Your own channel in the feed: Follow has nobody to point at,
+            // so the card leads with the one action that means something.
+            if (!data.mine) ...[
+              Expanded(
+                child: _OutlineButton(
+                  label: following ? AppStrings.following : AppStrings.follow,
+                  onTap: onFollow,
+                  expand: true,
+                ),
               ),
-            ),
-            SizedBox(width: 12.s),
+              SizedBox(width: 12.s),
+            ],
             Expanded(
               child: _OutlineButton(
                 label: AppStrings.viewChannel,

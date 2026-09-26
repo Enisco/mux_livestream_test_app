@@ -6,6 +6,9 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
+import 'package:test_app/features/discovery/views/media_detail_screen.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/creator_models/studio_content_models.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -271,60 +274,111 @@ class StudioContentDetailScreen extends StatelessWidget {
 }
 
 /// The still, with what kind it is and how long it runs.
+///
+/// This was a grey box reading "View content" — the row already carried a
+/// `thumbnailKey`, and a video left to Mux has a generated first frame behind
+/// the public asset route, so there was a picture to show all along. Tapping
+/// it opens the same player a viewer gets, rather than describing one.
 class _Hero extends StatelessWidget {
   const _Hero({required this.item});
 
   final StudioContentItem item;
 
+  void _open(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => MediaDetailScreen(
+          item: WebFeedItem.fromJson({
+            'entityType': 'media',
+            'entityId': item.id,
+            'title': item.title,
+            'meta': {'mediaType': item.kind.name},
+            'facets': {'mediaType': item.kind.name},
+          }),
+          source: AnalyticsSource.creatorProfile,
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(10.s),
-    child: AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const ColoredBox(color: AppColors.fieldBg),
-          Center(
-            child: Text(
-              AppStrings.contentViewContent,
-              style: AppStyles.label(
-                12,
-                color: AppColors.neutral300,
-                lineHeight: 16 / 12,
+  Widget build(BuildContext context) => GestureDetector(
+    key: const ValueKey('studio-content-hero'),
+    behavior: HitTestBehavior.opaque,
+    onTap: item.isPlayable ? () => _open(context) : null,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(10.s),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: AppColors.fieldBg),
+            if (item.stillUrl case final url?)
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
-            ),
-          ),
-          Positioned(
-            left: 10.s,
-            top: 10.s,
-            child: HugeIcon(
-              icon: switch (item.kind) {
-                StudioContentKind.audio => HugeIcons.strokeRoundedHeadphones,
-                StudioContentKind.post => HugeIcons.strokeRoundedBookOpen01,
-                StudioContentKind.livestream =>
-                  HugeIcons.strokeRoundedLiveStreaming01,
-                _ => HugeIcons.strokeRoundedVideo01,
-              },
-              color: AppColors.brandPrimary,
-              size: 18.s,
-            ),
-          ),
-          if (_badge case final label?)
-            Positioned(
-              right: 10.s,
-              bottom: 8.s,
-              child: Text(
-                label,
-                style: AppStyles.label(
-                  11,
-                  weight: AppStyles.bold,
-                  color: AppColors.neutral100,
-                  lineHeight: 14 / 11,
+            if (item.isPlayable)
+              Center(
+                child: Container(
+                  width: 52.s,
+                  height: 52.s,
+                  decoration: BoxDecoration(
+                    color: AppColors.overlayDark,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    color: AppColors.textPrimary,
+                    size: 30.s,
+                  ),
+                ),
+              )
+            else if (item.stillUrl == null)
+              Center(
+                child: Text(
+                  AppStrings.contentViewContent,
+                  style: AppStyles.label(
+                    12,
+                    color: AppColors.neutral300,
+                    lineHeight: 16 / 12,
+                  ),
                 ),
               ),
+            Positioned(
+              left: 10.s,
+              top: 10.s,
+              child: HugeIcon(
+                icon: switch (item.kind) {
+                  StudioContentKind.audio => HugeIcons.strokeRoundedHeadphones,
+                  StudioContentKind.post => HugeIcons.strokeRoundedBookOpen01,
+                  StudioContentKind.livestream =>
+                    HugeIcons.strokeRoundedLiveStreaming01,
+                  _ => HugeIcons.strokeRoundedVideo01,
+                },
+                color: AppColors.brandPrimary,
+                size: 18.s,
+              ),
             ),
-        ],
+            if (_badge case final label?)
+              Positioned(
+                right: 10.s,
+                bottom: 8.s,
+                child: Text(
+                  label,
+                  style: AppStyles.label(
+                    11,
+                    weight: AppStyles.bold,
+                    color: AppColors.neutral100,
+                    lineHeight: 14 / 11,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     ),
   );

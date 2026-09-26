@@ -10,6 +10,10 @@ class WebFeedItem {
   final String? subtitle;
   final bool isFollowingCreator;
 
+  /// The reader's own channel. Discovery sends this per row; it is what
+  /// stops a creator being offered Follow on their own content.
+  final bool isOwnedByViewer;
+
   /// Events carry their schedule at the top level, not in `meta`.
   final DateTime? calendarStartAt;
   final DateTime? calendarEndAt;
@@ -23,6 +27,7 @@ class WebFeedItem {
     this.facets = const WebFeedFacets(),
     this.subtitle,
     this.isFollowingCreator = false,
+    this.isOwnedByViewer = false,
     this.calendarStartAt,
     this.calendarEndAt,
   });
@@ -75,6 +80,7 @@ class WebFeedItem {
         : const WebFeedFacets(),
     subtitle: json['subtitle'] as String?,
     isFollowingCreator: json['isFollowingCreator'] as bool? ?? false,
+    isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
     calendarStartAt: DateTime.tryParse(
       json['calendarStartAt'] as String? ?? '',
     ),
@@ -89,6 +95,9 @@ class WebFeedCreator {
   final String? avatarKey;
   final bool isVerified;
   final bool isFollowing;
+
+  /// The reader's own channel — never offered to follow.
+  final bool isOwnedByViewer;
   final int subscriberCount;
 
   const WebFeedCreator({
@@ -98,6 +107,7 @@ class WebFeedCreator {
     this.avatarKey,
     this.isVerified = false,
     this.isFollowing = false,
+    this.isOwnedByViewer = false,
     this.subscriberCount = 0,
   });
 
@@ -108,6 +118,7 @@ class WebFeedCreator {
     avatarKey: json['avatarKey'] as String?,
     isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
     isFollowing: json['isFollowing'] as bool? ?? false,
+    isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
     subscriberCount: (json['subscriberCount'] as num?)?.toInt() ?? 0,
   );
 }
@@ -284,6 +295,7 @@ class RecommendedCreator {
     this.avatarKey,
     this.isVerified = false,
     this.isFollowing = false,
+    this.isOwnedByViewer = false,
   });
 
   final String creatorId;
@@ -293,6 +305,9 @@ class RecommendedCreator {
   final bool isVerified;
   final bool isFollowing;
 
+  /// The reader's own channel — never offered to follow.
+  final bool isOwnedByViewer;
+
   factory RecommendedCreator.fromJson(Map<String, dynamic> json) =>
       RecommendedCreator(
         creatorId: json['creatorId'] as String? ?? '',
@@ -301,5 +316,6 @@ class RecommendedCreator {
         avatarKey: json['avatarKey'] as String?,
         isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
         isFollowing: json['isFollowing'] as bool? ?? false,
+        isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
       );
 }

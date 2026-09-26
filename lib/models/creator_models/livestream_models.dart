@@ -189,7 +189,7 @@ class LivestreamStudio {
   final int likeCount;
 
   /// Only ever a count: nothing lists the requests themselves
-  /// (OPEN_ISSUES 22).
+  /// (OPEN_ISSUES 24).
   final int prayerCount;
 
   /// Null when the payment service could not be reached.

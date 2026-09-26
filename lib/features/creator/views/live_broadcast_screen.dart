@@ -57,9 +57,43 @@ class LiveBroadcastScreen extends StatefulWidget {
 
   @override
   State<LiveBroadcastScreen> createState() => _LiveBroadcastScreenState();
+
+  /// How long to wait for the backend to see the encoder before saying so.
+  ///
+  /// The contract gives the provider about fifteen minutes; that is the
+  /// backend's patience, not a reader's. Nothing moved the screen off
+  /// "Connecting…" before this, so a push that silently never arrived —
+  /// which is what an emulator usually does — left a spinner running
+  /// indefinitely.
+  static const connectTimeout = Duration(seconds: 45);
 }
 
-enum _Phase { preparing, connecting, live, ending, failed }
+/// Where a broadcast is in its life, as this screen sees it.
+enum LivePhase { preparing, connecting, live, ending, failed }
+
+/// What losing the RTMP push means, given where the broadcast had got to.
+///
+/// This rule did not exist: `onError` and `onDisconnection` only wrote to the
+/// log, so a push that died left the screen on "Connecting…" indefinitely
+/// while the backend waited out its fifteen-minute patience for an encoder
+/// that was never coming back.
+enum LiveLossAction {
+  /// Before going live, a lost push is fatal for this attempt.
+  fail,
+
+  /// Once live it is a drop. The backend is already waiting for the encoder
+  /// to return, so the push is made again rather than the broadcast ended.
+  repush,
+
+  /// Nothing to do — not started yet, already ending, or already failed.
+  ignore;
+
+  static LiveLossAction forPhase(LivePhase phase) => switch (phase) {
+    LivePhase.connecting => fail,
+    LivePhase.live => repush,
+    LivePhase.preparing || LivePhase.ending || LivePhase.failed => ignore,
+  };
+}
 
 class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     with WidgetsBindingObserver {
@@ -75,7 +109,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
         onError: _onRtmpError,
       );
 
-  _Phase _phase = _Phase.preparing;
+  LivePhase _phase = LivePhase.preparing;
   String? _failure;
 
   LivestreamStudio _studio = LivestreamStudio.empty;
@@ -105,6 +139,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     _tick?.cancel();
+    _connectWatchdog?.cancel();
     _countdownTimer?.cancel();
     unawaited(_liveEvents?.cancel());
     unawaited(_liveReconnects?.cancel());
@@ -149,12 +184,13 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
       // Nothing may push until the window is open.
       await _repo.armIngest(widget.mediaId);
       if (!mounted) return;
-      setState(() => _phase = _Phase.connecting);
+      setState(() => _phase = LivePhase.connecting);
+      _armConnectWatchdog();
 
       await _push();
       // A push that could not even open is not worth asking the backend to
       // wait fifteen minutes for.
-      if (!mounted || _phase == _Phase.failed) return;
+      if (!mounted || _phase == LivePhase.failed) return;
       await _repo.start(widget.mediaId);
       unawaited(_startWatching());
     } on LiveException catch (e) {
@@ -173,12 +209,33 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     } catch (e) {
       logger.e('RTMP push failed', error: e);
       if (mounted) _fail(AppStrings.goLiveRejected);
+    } finally {
+      // This used to latch on for the life of the screen, so a second push
+      // — after a drop — returned without doing anything.
+      _pushing = false;
     }
   }
 
+  Timer? _connectWatchdog;
+
+  void _armConnectWatchdog() {
+    _connectWatchdog?.cancel();
+    _connectWatchdog = Timer(LiveBroadcastScreen.connectTimeout, () {
+      if (mounted && _phase == LivePhase.connecting) {
+        _fail(AppStrings.goLiveNoEncoder);
+      }
+    });
+  }
+
   void _fail(String message) {
+    _connectWatchdog?.cancel();
+    // Nothing on the failure screen reads the counters, and the snapshot
+    // poll otherwise kept asking every few seconds for as long as the
+    // creator looked at the error. `_retry` starts it again.
+    _poll?.cancel();
+    _poll = null;
     setState(() {
-      _phase = _Phase.failed;
+      _phase = LivePhase.failed;
       _failure = message;
     });
   }
@@ -234,13 +291,14 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
       case LiveEventType.statusChanged:
         final runtime = LiveRuntime.parse(event.status);
         setState(() => _studio = _studio.copyWith(runtime: runtime));
-        if (runtime.isOnAir && _phase == _Phase.connecting) {
+        if (runtime.isOnAir && _phase == LivePhase.connecting) {
           _onAir(DateTime.tryParse(event.data['startedAt'] as String? ?? ''));
         }
         // The encoder dropping is not the same as ending, but saying LIVE
         // through either would be a lie.
-        if (runtime == LiveRuntime.reconnecting && _phase == _Phase.live) {
-          setState(() => _phase = _Phase.connecting);
+        if (runtime == LiveRuntime.reconnecting && _phase == LivePhase.live) {
+          setState(() => _phase = LivePhase.connecting);
+          _armConnectWatchdog();
         }
         if (runtime == LiveRuntime.ended) unawaited(_refresh());
       case LiveEventType.metricsUpdated:
@@ -259,13 +317,15 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
       if (!mounted) return;
       setState(() => _studio = studio);
 
-      if (studio.runtime.isOnAir && _phase == _Phase.connecting) {
+      if (studio.runtime.isOnAir && _phase == LivePhase.connecting) {
         _onAir(studio.startedAt);
       }
       // The encoder can drop mid-broadcast. Saying LIVE while the backend
       // is waiting for it back would be a lie.
-      if (studio.runtime == LiveRuntime.reconnecting && _phase == _Phase.live) {
-        setState(() => _phase = _Phase.connecting);
+      if (studio.runtime == LiveRuntime.reconnecting &&
+          _phase == LivePhase.live) {
+        setState(() => _phase = LivePhase.connecting);
+        _armConnectWatchdog();
       }
     } catch (e) {
       // A dropped poll is not worth interrupting a broadcast for.
@@ -274,8 +334,10 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   }
 
   void _onAir(DateTime? startedAt) {
+    // The backend has seen the encoder; nothing left to wait for.
+    _connectWatchdog?.cancel();
     setState(() {
-      _phase = _Phase.live;
+      _phase = LivePhase.live;
       _countdown = 3;
     });
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -304,7 +366,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   }
 
   Future<void> _end() async {
-    setState(() => _phase = _Phase.ending);
+    setState(() => _phase = LivePhase.ending);
     _poll?.cancel();
     _tick?.cancel();
     try {
@@ -334,19 +396,87 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     Navigator.pop(context, false);
   }
 
-  void _onRtmpUp() => logger.d('RTMP connected');
+  void _onRtmpUp() {
+    logger.d('RTMP connected');
+    // Reaching the server is not being live — the backend still has to see
+    // the encoder — so the watchdog keeps running until it does.
+  }
 
   void _onRtmpFailed(String reason) {
     logger.e('RTMP connection failed: $reason');
-    if (mounted && _phase == _Phase.connecting) {
+    if (mounted && _phase == LivePhase.connecting) {
       _fail(AppStrings.goLiveRejected);
     }
   }
 
-  void _onRtmpDown() => logger.d('RTMP disconnected');
+  void _onRtmpDown() {
+    logger.d('RTMP disconnected');
+    _handleTransportLoss(AppStrings.goLiveDropped);
+  }
 
-  void _onRtmpError(Exception error) =>
-      logger.e('Live stream error', error: error);
+  /// An error raised *after* the connection opened — a write that failed, a
+  /// socket that broke.
+  ///
+  /// This only wrote to the log, which is why a broadcast whose RTMP push
+  /// died sat on "Connecting…" for ever: the error arrived, was noted, and
+  /// nothing moved. The backend waits about fifteen minutes for an encoder
+  /// that is never coming.
+  void _onRtmpError(Exception error) {
+    logger.e('Live stream error', error: error);
+    _handleTransportLoss(AppStrings.goLiveDropped);
+  }
+
+  /// The push stopped reaching the server.
+  ///
+  /// Before going live that is fatal for this attempt. Once live it is a
+  /// drop, and the backend is already waiting for the encoder to come back —
+  /// so one re-push is tried rather than ending the broadcast outright.
+  void _handleTransportLoss(String message) {
+    if (!mounted) return;
+    switch (LiveLossAction.forPhase(_phase)) {
+      case LiveLossAction.fail:
+        _fail(message);
+      case LiveLossAction.repush:
+        setState(() => _phase = LivePhase.connecting);
+        _armConnectWatchdog();
+        unawaited(_repush());
+      case LiveLossAction.ignore:
+        break;
+    }
+  }
+
+  /// Another go at the same session.
+  ///
+  /// The arm window is re-opened first: it lasts about fifteen minutes, and
+  /// a retry after a slow failure could easily fall outside the one taken
+  /// out at the start.
+  Future<void> _retry() async {
+    setState(() {
+      _phase = LivePhase.connecting;
+      _failure = null;
+    });
+    _armConnectWatchdog();
+    try {
+      await _repo.armIngest(widget.mediaId);
+      if (!mounted || _phase != LivePhase.connecting) return;
+      await _repush();
+      if (!mounted || _phase != LivePhase.connecting) return;
+      await _repo.start(widget.mediaId);
+      unawaited(_startWatching());
+    } on LiveException catch (e) {
+      if (mounted) _fail(_wording(e));
+    }
+  }
+
+  Future<void> _repush() async {
+    try {
+      await _controller.stopStreaming();
+    } catch (e) {
+      logger.w('Could not stop the dead stream', error: e);
+    }
+    if (!mounted || _phase != LivePhase.connecting) return;
+    await _push();
+  }
 
   static String _wording(LiveException e) => switch (e.failure) {
     LiveFailure.noPermission => AppStrings.goLiveNeedsCamera,
@@ -365,12 +495,12 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     onPopInvokedWithResult: (didPop, _) {
       if (didPop) return;
       switch (_phase) {
-        case _Phase.live:
+        case LivePhase.live:
           _askToEnd();
-        case _Phase.ending:
+        case LivePhase.ending:
           // Already on its way out; nothing to decide.
           break;
-        case _Phase.preparing || _Phase.connecting || _Phase.failed:
+        case LivePhase.preparing || LivePhase.connecting || LivePhase.failed:
           _abandon();
       }
     },
@@ -383,12 +513,12 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
             ApiVideoCameraPreview(controller: _controller)
           else
             const ColoredBox(color: Colors.black),
-          if (_phase == _Phase.live) LiveCountdown(value: _countdown),
+          if (_phase == LivePhase.live) LiveCountdown(value: _countdown),
           SafeArea(
             child: switch (_phase) {
-              _Phase.preparing || _Phase.connecting => _connecting(),
-              _Phase.failed => _failed(),
-              _Phase.live || _Phase.ending => _onAirOverlay(),
+              LivePhase.preparing || LivePhase.connecting => _connecting(),
+              LivePhase.failed => _failed(),
+              LivePhase.live || LivePhase.ending => _onAirOverlay(),
             },
           ),
         ],
@@ -462,6 +592,23 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
           ),
         ),
         SizedBox(height: 22.s),
+        // A failed connection is usually a network blip, and the session is
+        // still sitting there waiting — so trying again should not mean
+        // setting the whole broadcast up a second time.
+        GestureDetector(
+          key: const ValueKey('live-failed-retry'),
+          behavior: HitTestBehavior.opaque,
+          onTap: _retry,
+          child: Text(
+            AppStrings.feedRetry,
+            style: AppStyles.label(
+              13,
+              weight: AppStyles.bold,
+              color: AppColors.brandPrimary,
+            ),
+          ),
+        ),
+        SizedBox(height: 14.s),
         GestureDetector(
           key: const ValueKey('live-failed-back'),
           behavior: HitTestBehavior.opaque,
@@ -471,7 +618,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
             style: AppStyles.label(
               13,
               weight: AppStyles.bold,
-              color: AppColors.brandPrimary,
+              color: AppColors.neutral400,
             ),
           ),
         ),
@@ -535,7 +682,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
             GestureDetector(
               key: const ValueKey('live-end'),
               behavior: HitTestBehavior.opaque,
-              onTap: _phase == _Phase.ending ? null : _askToEnd,
+              onTap: _phase == LivePhase.ending ? null : _askToEnd,
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 22.s, vertical: 11.s),
                 decoration: BoxDecoration(
@@ -559,7 +706,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 ///
 /// Comments on a livestream are ordinary media comments, and the app
 /// already reads and writes them — but nothing pushes them, and there is no
-/// live chat channel in the contract at all (OPEN_ISSUES 23). Rather than
+/// live chat channel in the contract at all (OPEN_ISSUES 25). Rather than
 /// invent messages, this says plainly that it is not wired yet.
 class _LiveChat extends StatelessWidget {
   const _LiveChat();

@@ -316,6 +316,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
               onFollow: _toggleFollow,
               onGive: () => _requireAccount('give to this ministry'),
               onMore: () => _requireAccount('use that'),
+              onOpenStudio: () => context.go(AppRouter.studio),
             ),
           ),
           SliverToBoxAdapter(
@@ -466,6 +467,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   Widget _emptySliver() => SliverToBoxAdapter(
     child: CreatorTabEmptyState(
       tab: _tab,
+      owned: _profile?.isOwnedByViewer ?? false,
       onAction: () => _requireAccount(_tab.emptyActionFeature),
     ),
   );

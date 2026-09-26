@@ -3,6 +3,7 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
+import 'package:test_app/shared/services/viewer_identity.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Turns a web-feed row into card data.
@@ -68,6 +69,12 @@ abstract final class FeedCardMapper {
       views: facets.views > 0 ? formatCount(facets.views) : null,
       viewCount: facets.views,
       following: item.isFollowingCreator || (creator?.isFollowing ?? false),
+      // A creator scrolling past their own post is not an audience for it.
+      mine: ViewerIdentity.owns(
+        isChannel ? item.profileCreatorId : creator?.creatorId,
+        flaggedByApi:
+            item.isOwnedByViewer || (creator?.isOwnedByViewer ?? false),
+      ),
       subscribers: creator?.subscriberCount ?? 0,
       liked: mine.contains(InteractionTypes.like),
       saved: mine.contains(InteractionTypes.favorite),

@@ -1,3 +1,5 @@
+import 'package:test_app/shared/services/viewer_identity.dart';
+
 /// A creator as a viewer sees them (Figma "Creators Profile - Viewers POV").
 ///
 /// Served by `GET /v1/creator/{id}` and `GET /v1/creator/handle/{handle}`,
@@ -13,6 +15,7 @@ class CreatorProfile {
     this.type = 'individual',
     this.isVerified = false,
     this.isFollowing = false,
+    this.isOwnedByViewer = false,
     this.subscriberCount = 0,
     this.totalViews = 0,
     this.categorySlugs = const [],
@@ -28,6 +31,10 @@ class CreatorProfile {
   final String type;
   final bool isVerified;
   final bool isFollowing;
+
+  /// The reader looking at this channel is the one who runs it, so Follow,
+  /// Give Now and Subscribe have nobody to point at.
+  final bool isOwnedByViewer;
   final int subscriberCount;
   final int totalViews;
   final List<String> categorySlugs;
@@ -52,6 +59,12 @@ class CreatorProfile {
       type: map['type'] as String? ?? 'individual',
       isVerified: map['isVerified'] as bool? ?? map['verifiedAt'] != null,
       isFollowing: map['isFollowing'] as bool? ?? false,
+      // This route carries no `isOwnedByViewer`, so it is settled against
+      // the reader's own cached channel.
+      isOwnedByViewer: ViewerIdentity.owns(
+        map['id'] as String?,
+        flaggedByApi: map['isOwnedByViewer'] as bool? ?? false,
+      ),
       subscriberCount: (map['subscriberCount'] as num?)?.toInt() ?? 0,
       totalViews: (map['totalViews'] as num?)?.toInt() ?? 0,
       categorySlugs: (map['categorySlugs'] as List<dynamic>? ?? [])
@@ -72,6 +85,7 @@ class CreatorProfile {
         type: type,
         isVerified: isVerified,
         isFollowing: isFollowing ?? this.isFollowing,
+        isOwnedByViewer: isOwnedByViewer,
         subscriberCount: subscriberCount ?? this.subscriberCount,
         totalViews: totalViews,
         categorySlugs: categorySlugs,

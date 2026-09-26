@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
-
+import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
-import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/features/creator/views/go_live_setup_screen.dart';
 import 'package:test_app/features/creator/views/new_article_screen.dart';
 import 'package:test_app/features/creator/views/new_event_screen.dart';
 import 'package:test_app/features/creator/views/new_media_screen.dart';
+import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
@@ -128,6 +129,40 @@ class _StudioScreenState extends State<StudioScreen> {
     }
   }
 
+  /// Where a getting-started step actually leads.
+  ///
+  /// Every row used to answer "not built yet", which was wrong twice over:
+  /// the destinations exist, and a checklist whose steps cannot be started
+  /// is worse than no checklist. A completed step still leads somewhere —
+  /// "Complete your profile" is how a creator goes back and changes the
+  /// photo they already set.
+  Future<void> _openStep(GettingStartedStep step) async {
+    switch (step.key) {
+      case 'complete_profile':
+        // The polish chain: photo → banner → bio → links, which ends by
+        // returning here, so the checklist is re-read on the way back.
+        context.go(AppRouter.creatorPhoto);
+      case 'publish_first_content':
+        // The same sheet Quick upload opens. The step is about *content*,
+        // not specifically media, so the full choice is the right one.
+        await _openCreate();
+      case 'go_live':
+        final went = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => const GoLiveSetupScreen()),
+        );
+        if ((went ?? false) && mounted) await _load();
+      case 'invite_team':
+      case 'setup_giving':
+        // Team roles and bank verification are web-studio work, like events
+        // and promotions — which the card at the bottom of this screen
+        // already says.
+        _say(AppStrings.studioStepOnWeb);
+      default:
+        _todo(AppStrings.studioStepTitles[step.key] ?? step.key);
+    }
+  }
+
   Future<void> _openCreate() async {
     final current = _context;
     final allowed = [
@@ -206,12 +241,7 @@ class _StudioScreenState extends State<StudioScreen> {
                 ),
               ] else ...[
                 if (_isNew) ...[
-                  GettingStartedCard(
-                    steps: _steps,
-                    onStep: (step) => _todo(
-                      AppStrings.studioStepTitles[step.key] ?? step.key,
-                    ),
-                  ),
+                  GettingStartedCard(steps: _steps, onStep: _openStep),
                   SizedBox(height: 22.s),
                 ],
                 const StudioSectionLabel(AppStrings.studioToday),
@@ -248,7 +278,16 @@ class _StudioScreenState extends State<StudioScreen> {
                           AttentionRow(
                             item: item,
                             last: i == _attention.length - 1,
-                            onTap: () => _todo(item.key),
+                            // Named, not keyed: this said
+                            // "prayer_requests is not built yet". There is
+                            // no creator-side inbox to open — the screen of
+                            // that name is the *reader's* own requests, on
+                            // placeholder data, so opening it would show a
+                            // creator somebody else's list.
+                            onTap: () => _todo(
+                              AppStrings.studioAttentionTitles[item.key] ??
+                                  item.key,
+                            ),
                           ),
                       ],
                     ),
@@ -303,7 +342,7 @@ class _StudioScreenState extends State<StudioScreen> {
   );
 
   Widget _greeting() {
-    final name = _context?.firstName ?? '';
+    // final name = _context?.firstName ?? '';
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -313,9 +352,10 @@ class _StudioScreenState extends State<StudioScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                name.isEmpty
-                    ? AppStrings.studioWelcomePrefix.replaceAll(',', '')
-                    : '${AppStrings.studioWelcomePrefix} $name',
+                AppStrings.studioWelcomeBack,
+                // name.isEmpty
+                //     ? AppStrings.studioWelcomePrefix.replaceAll(',', '')
+                //     : '${AppStrings.studioWelcomePrefix} $name',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppStyles.heading(22, letterSpacing: -0.6),

@@ -7,6 +7,7 @@ import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/shared/services/viewer_identity.dart';
 
 /// Shared head of both empty tabs: a tinted disc, a headline and a line of
 /// explanation, then a hairline before the list below.
@@ -122,7 +123,15 @@ class FollowingEmptyView extends StatelessWidget {
         const _Divider(),
         if (suggestions.isNotEmpty) ...[
           _SectionLabel(AppStrings.ministriesToFollow),
-          for (final creator in suggestions)
+          // A recommendation engine should not recommend a creator to
+          // themselves, but nothing stops it — and the row's only action is
+          // one the API refuses.
+          for (final creator in suggestions.where(
+            (c) => !ViewerIdentity.owns(
+              c.creatorId,
+              flaggedByApi: c.isOwnedByViewer,
+            ),
+          ))
             _SuggestionRow(
               creator: creator,
               busy: pending.contains(creator.creatorId),

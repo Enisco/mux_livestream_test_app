@@ -749,7 +749,7 @@ abstract final class AppStrings {
   static const studioTabImpact = 'Impact';
   static const studioTabGiving = 'Giving';
 
-  static const studioWelcomePrefix = 'Welcome,';
+  static const studioWelcomeBack = 'Welcome back';
   static const studioReady = "Your studio is ready. Here's how to start.";
   static String studioNeedsYouCount(int n) =>
       '$n thing${n == 1 ? '' : 's'} need your attention today.';
@@ -955,7 +955,7 @@ abstract final class AppStrings {
   static const goLiveNoGiving = '—';
 
   /// The design runs viewer chat along the foot of the broadcast. Nothing
-  /// in the livestream contract carries live messages (OPEN_ISSUES 23).
+  /// in the livestream contract carries live messages (OPEN_ISSUES 25).
   static const goLiveChatUnavailable = 'Live chat is not available yet';
 
   // Ending it.
@@ -976,6 +976,17 @@ abstract final class AppStrings {
   static const goLiveNotArmed =
       'The connection window closed. Start again to reopen it.';
   static const goLiveRejected = 'The broadcast could not start. Please retry.';
+
+  /// The encoder reached the server and the connection then broke, or never
+  /// completed. Emulators cannot usually push RTMP at all, which is the most
+  /// common cause of this during development.
+  static const goLiveNoEncoder =
+      'Your camera could not reach the streaming server. Check your '
+      'connection and try again — some emulators cannot stream at all.';
+
+  /// The push died mid-broadcast.
+  static const goLiveDropped =
+      'The connection to the streaming server dropped.';
 
   // "When should this go live".
   static const goLiveSheetTitle = 'When should this go live';
@@ -1087,6 +1098,10 @@ abstract final class AppStrings {
     'setup_giving': 'Verify and connect your bank',
     'go_live': 'Straight from your camera',
   };
+
+  /// A checklist step this phone cannot finish. Team roles and bank
+  /// verification both live on the web studio, like events and promotions.
+  static const studioStepOnWeb = 'Open the web studio to finish this step.';
 
   /// Likewise for the "needs you" rows.
   static const studioAttentionTitles = <String, String>{
