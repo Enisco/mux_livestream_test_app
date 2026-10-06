@@ -29,6 +29,8 @@ class Gift {
     required this.document,
     this.ministryVerified = false,
     this.converted = '',
+    this.refunded = false,
+    this.monthLabel = '',
   });
 
   final String id;
@@ -48,6 +50,13 @@ class Gift {
   final String converted;
 
   final GiftDocument document;
+
+  /// Refunds never change a gift's status: it stays in the list, and is left
+  /// out of the summary's totals.
+  final bool refunded;
+
+  /// "JUNE 2026" — the heading this gift is filed under.
+  final String monthLabel;
 }
 
 /// A month's gifts under the heading the design gives it.
@@ -68,6 +77,7 @@ class GivingSummary {
     required this.gifts,
     required this.ministries,
     this.converted = '',
+    this.availableYears = const [],
   });
 
   final int year;
@@ -78,6 +88,10 @@ class GivingSummary {
 
   final int gifts;
   final int ministries;
+
+  /// Which years the reader actually gave in — the picker offers these
+  /// rather than a range that mostly answers empty.
+  final List<int> availableYears;
 
   bool get isEmpty => gifts == 0;
 }

@@ -23,11 +23,17 @@ class ExploreCreatorCard extends StatelessWidget {
     required this.creator,
     this.onTap,
     this.onFollow,
+    this.isFollowing = false,
   });
 
   final ExploreCreatorRef creator;
   final VoidCallback? onTap;
   final VoidCallback? onFollow;
+
+  /// Drawn as a tick rather than a plus once the viewer follows. Without it
+  /// the badge is an action with no feedback — you tap, and nothing says
+  /// whether it took.
+  final bool isFollowing;
 
   @override
   Widget build(BuildContext context) {
@@ -102,11 +108,25 @@ class ExploreCreatorCard extends StatelessWidget {
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: onFollow,
-                        child: DesignIcon(
-                          AppAssets.iconFeedPlusCircle,
-                          width: 16.s,
-                          height: 16.s,
-                        ),
+                        child: isFollowing
+                            ? Container(
+                                width: 16.s,
+                                height: 16.s,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.green500,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.check_rounded,
+                                  size: 11.s,
+                                  color: AppColors.base1,
+                                ),
+                              )
+                            : DesignIcon(
+                                AppAssets.iconFeedPlusCircle,
+                                width: 16.s,
+                                height: 16.s,
+                              ),
                       ),
                     ),
                   ),

@@ -43,12 +43,17 @@ class ExploreSectionHeader extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 8.s),
-            Icon(
-              AppIcons.chevronRight,
-              size: 16.s,
-              color: AppColors.textPrimary,
-            ),
+            // No chevron where there is nowhere to go: Trending and Continue
+            // watching are orderings rather than kinds, so no type tab means
+            // either of them.
+            if (onSeeAll != null) ...[
+              SizedBox(width: 8.s),
+              Icon(
+                AppIcons.chevronRight,
+                size: 16.s,
+                color: AppColors.textPrimary,
+              ),
+            ],
           ],
         ),
       ),

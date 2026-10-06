@@ -3,7 +3,7 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
-import 'package:test_app/features/profile/data/profile_dummy_data.dart';
+import 'package:test_app/models/history_models/profile_watch_progress.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
@@ -217,16 +217,20 @@ class ContinueWatchingCard extends StatelessWidget {
                       ],
                     ],
                   ),
-                  SizedBox(height: 4.s),
-                  Text(
-                    '${progress.remainingLabel} '
-                    '${AppStrings.profileRemainingSuffix}',
-                    style: AppStyles.body(
-                      11,
-                      weight: AppStyles.regular,
-                      color: AppColors.neutral400,
+                  // A clip too short to have a meaningful remainder says
+                  // nothing, rather than a bare "remaining".
+                  if (progress.remainingLabel.isNotEmpty) ...[
+                    SizedBox(height: 4.s),
+                    Text(
+                      '${progress.remainingLabel} '
+                      '${AppStrings.profileRemainingSuffix}',
+                      style: AppStyles.body(
+                        11,
+                        weight: AppStyles.regular,
+                        color: AppColors.neutral400,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

@@ -1,15 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/locator.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/search_screen.dart';
-import 'package:test_app/features/explore/data/explore_dummy_data.dart';
+import 'package:test_app/features/explore/data/explore_categories.dart';
+import 'package:test_app/features/explore/repo/explore_repo.dart';
 import 'package:test_app/features/explore/views/widgets/explore_category_chips.dart';
 import 'package:test_app/features/explore/views/widgets/explore_cards.dart';
 import 'package:test_app/features/explore/views/widgets/explore_creator_card.dart';
 import 'package:test_app/features/explore/views/widgets/explore_event_row.dart';
 import 'package:test_app/features/explore/views/widgets/explore_hero.dart';
 import 'package:test_app/features/explore/views/widgets/explore_rail.dart';
+import 'package:test_app/features/discovery/data/search_query.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/models/explore_models/explore_models.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
+import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -18,12 +31,117 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// Explore: the catalogue as rails — what is live now, what the reader left
 /// unfinished, and what is worth starting.
 ///
-/// The rows are placeholders. None of these rails has an endpoint yet, so
-/// every one reads [ExploreDummyData]; the widgets already take the models the
-/// real responses will parse into, so wiring them up is a swap at this level
-/// and nowhere else. See that file for how to retire it.
-class ExploreScreen extends StatelessWidget {
-  const ExploreScreen({super.key});
+/// Two things to know about this screen:
+///
+/// - **A quiet rail is not drawn at all.** A browse that comes back empty
+///   means "not right now"; a heading over no cards reads as a claim that the
+///   whole category is empty. So each rail is conditional, and the screen only
+///   shows an error when *everything* failed.
+/// - **Explore is its own attribution source.** Every click beacon from here
+///   carries `explore`, not `home_feed`, or a creator cannot tell Explore
+///   discovery from the feed in their "How people find you" breakdown.
+class ExploreScreen extends StatefulWidget {
+  const ExploreScreen({super.key, this.repo});
+
+  /// Defaults to the real thing; a test supplies its own.
+  final ExploreRepo? repo;
+
+  @override
+  State<ExploreScreen> createState() => _ExploreScreenState();
+
+  static void openSearch(BuildContext context, {String? query}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: query)),
+    );
+  }
+}
+
+class _ExploreScreenState extends State<ExploreScreen> {
+  late final _repo = widget.repo ?? ExploreRepo();
+
+  ExplorePage? _page;
+  bool _loading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final page = await _repo.load();
+      if (!mounted) return;
+      setState(() {
+        _page = page;
+        _loading = false;
+        // Every rail failing is a real error. One or two being quiet is not.
+        _failed = page.isEmpty;
+      });
+    } catch (e) {
+      logger.w('Explore failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  void _openCard(ExploreCard card) {
+    final item = card.source;
+    if (item == null) return;
+    getIt<AnalyticsService>().trackContentClick(
+      mediaId: item.entityId,
+      contentType: ContentTypes.fromEntityType(item.entityType),
+      creatorId: card.creator.id,
+      mediaType: item.mediaType,
+      source: AnalyticsSource.explore,
+      promotion: item.promotion,
+    );
+    openContentDetail(context, item, source: AnalyticsSource.explore);
+  }
+
+  void _openCreator(String creatorId) {
+    if (creatorId.isEmpty) return;
+    openCreatorProfile(context, creatorId: creatorId);
+  }
+
+  /// Follow from the rail, without leaving it.
+  ///
+  /// The store holds the optimistic state and reconciles against the server,
+  /// which is what the card's button reads — subscriber counts are written
+  /// back from analytics and are never a read-back of the act just taken.
+  Future<void> _toggleFollow(ExploreCreatorRef creator) async {
+    if (creator.id.isEmpty) return;
+    await getIt<EngagementStore>().toggleFollow(creator.id);
+  }
+
+  /// The design's second hero action.
+  ///
+  /// Playlists are the one thing on this screen with no live source yet —
+  /// `lib/features/library` still runs on `playlist_dummy_data.dart` — so
+  /// adding to one would go nowhere. Saying so beats a button that appears
+  /// to work.
+  void _addToPlaylist() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppStrings.explorePlaylistsNotReady,
+          style: AppStyles.body(13),
+        ),
+        backgroundColor: AppColors.neutral800,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,18 +153,50 @@ class ExploreScreen extends StatelessWidget {
         backgroundColor: AppColors.base1,
         body: Stack(
           children: [
-            const _Content(),
-            _FloatingSearch(onTap: () => openSearch(context)),
+            RefreshIndicator(
+              color: AppColors.brandPrimary,
+              backgroundColor: AppColors.base1,
+              onRefresh: _load,
+              child: _body(),
+            ),
+            _FloatingSearch(onTap: () => ExploreScreen.openSearch(context)),
           ],
         ),
       ),
     );
   }
 
-  static void openSearch(BuildContext context, {String? query}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: query)),
+  Widget _body() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.brandPrimary),
+      );
+    }
+    if (_failed || _page == null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.sizeOf(context).height * 0.25),
+          ErrorStateView(onRetry: _load),
+        ],
+      );
+    }
+    return _Content(
+      page: _page!,
+      onOpenCard: _openCard,
+      onOpenCreator: _openCreator,
+      onFollow: _toggleFollow,
+      onAddToPlaylist: _addToPlaylist,
+      onTopic: (category) => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SearchScreen(initialCategory: category),
+        ),
+      ),
+      onSeeAll: (filter) => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SearchScreen(initialFilter: filter)),
+      ),
     );
   }
 }
@@ -70,127 +220,174 @@ class _FloatingSearch extends StatelessWidget {
 }
 
 class _Content extends StatelessWidget {
-  const _Content();
+  const _Content({
+    required this.page,
+    required this.onOpenCard,
+    required this.onOpenCreator,
+    required this.onFollow,
+    required this.onAddToPlaylist,
+    required this.onTopic,
+    required this.onSeeAll,
+  });
 
-  /// The rails run on placeholder rows, so a tap has nothing real to open.
-  /// Saying so beats a button that looks live and does nothing.
-  void _todo(BuildContext context, String what) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$what is not built yet', style: AppStyles.body(13)),
-        backgroundColor: AppColors.neutral800,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  final ExplorePage page;
+  final ValueChanged<ExploreCard> onOpenCard;
+  final ValueChanged<String> onOpenCreator;
+  final ValueChanged<ExploreCreatorRef> onFollow;
+  final VoidCallback onAddToPlaylist;
+
+  /// A Browse chip is a category, so it narrows by slug rather than running
+  /// a search for the label's words.
+  final ValueChanged<ExploreCategory> onTopic;
+
+  /// A rail is a kind of thing, so "See all" opens that type tab rather than
+  /// searching for the heading's words.
+  final ValueChanged<SearchFilter> onSeeAll;
 
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.paddingOf(context).top;
     const gap = kExploreSectionGap;
 
+    /// One rail, or nothing at all when it has no rows.
+    List<Widget> rail(
+      String title,
+      int count,
+      Widget Function(BuildContext, int) builder, {
+      SearchFilter? seeAll,
+      double itemGap = 16,
+      CrossAxisAlignment align = CrossAxisAlignment.start,
+    }) => count == 0
+        ? const []
+        : [
+            ExploreRail(
+              key: ValueKey('explore-rail-$title'),
+              title: title,
+              // Trending and Continue watching are orderings, not types —
+              // there is no tab that means either, so they offer no See all
+              // rather than one that lands somewhere arbitrary.
+              onSeeAll: seeAll == null ? null : () => onSeeAll(seeAll),
+              gap: itemGap,
+              crossAxisAlignment: align,
+              itemCount: count,
+              itemBuilder: builder,
+            ),
+            SizedBox(height: gap.s),
+          ];
+
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.only(
         // Clear of the floating nav bar at the bottom of the shell.
         bottom: MediaQuery.paddingOf(context).bottom + 110.s,
       ),
       children: [
-        ExploreHeroPanel(
-          hero: ExploreDummyData.hero,
-          topInset: topInset,
-          onWatch: () => _todo(context, AppStrings.exploreWatch),
-          onAddToPlaylist: () =>
-              _todo(context, AppStrings.exploreAddToPlaylist),
-        ),
-        SizedBox(height: 16.s),
+        if (page.hero case final hero?) ...[
+          ExploreHeroPanel(
+            hero: hero,
+            topInset: topInset,
+            onWatch: () => onOpenCard(page.trending.first),
+            onAddToPlaylist: onAddToPlaylist,
+          ),
+          SizedBox(height: 16.s),
+        ] else
+          SizedBox(height: topInset + 76.s),
 
-        ExploreRail(
-          title: AppStrings.exploreLive,
-          onSeeAll: () => _todo(context, AppStrings.exploreLive),
-          itemCount: ExploreDummyData.live.length,
-          itemBuilder: (_, i) => ExploreLiveCard(
-            card: ExploreDummyData.live[i],
-            onTap: () => _todo(context, ExploreDummyData.live[i].title),
+        ...rail(
+          seeAll: SearchFilter.live,
+          AppStrings.exploreLive,
+          page.live.length,
+          (_, i) => ExploreLiveCard(
+            card: page.live[i],
+            onTap: () => onOpenCard(page.live[i]),
           ),
         ),
-        SizedBox(height: gap.s),
 
-        ExploreRail(
-          title: AppStrings.exploreContinueWatching,
-          onSeeAll: () => _todo(context, AppStrings.exploreContinueWatching),
-          itemCount: ExploreDummyData.continueWatching.length,
-          itemBuilder: (_, i) => ExploreContinueCard(
-            card: ExploreDummyData.continueWatching[i],
-            onTap: () =>
-                _todo(context, ExploreDummyData.continueWatching[i].title),
+        ...rail(
+          AppStrings.exploreContinueWatching,
+          page.continueWatching.length,
+          (_, i) => ExploreContinueCard(
+            card: page.continueWatching[i],
+            onTap: () => onOpenCard(page.continueWatching[i]),
           ),
         ),
-        SizedBox(height: gap.s),
 
-        ExploreRail(
-          title: AppStrings.exploreTrendingToday,
-          onSeeAll: () => _todo(context, AppStrings.exploreTrendingToday),
-          itemCount: ExploreDummyData.trending.length,
-          itemBuilder: (_, i) => ExploreTrendingCard(
-            card: ExploreDummyData.trending[i],
+        ...rail(
+          AppStrings.exploreTrendingToday,
+          page.trending.length,
+          (_, i) => ExploreTrendingCard(
+            card: page.trending[i],
             rank: i + 1,
-            onTap: () => _todo(context, ExploreDummyData.trending[i].title),
+            onTap: () => onOpenCard(page.trending[i]),
           ),
         ),
-        SizedBox(height: gap.s),
 
-        ExploreRail(
-          title: AppStrings.exploreDevotionals,
-          onSeeAll: () => _todo(context, AppStrings.exploreDevotionals),
-          itemCount: ExploreDummyData.devotionals.length,
-          itemBuilder: (_, i) => ExplorePosterCard(
-            card: ExploreDummyData.devotionals[i],
+        ...rail(
+          seeAll: SearchFilter.devotionals,
+          AppStrings.exploreDevotionals,
+          page.devotionals.length,
+          (_, i) => ExplorePosterCard(
+            card: page.devotionals[i],
             kindIcon: AppAssets.iconCatBible,
-            onTap: () => _todo(context, ExploreDummyData.devotionals[i].title),
+            onTap: () => onOpenCard(page.devotionals[i]),
           ),
         ),
-        SizedBox(height: gap.s),
 
-        ExploreRail(
-          title: AppStrings.exploreArticles,
-          onSeeAll: () => _todo(context, AppStrings.exploreArticles),
-          itemCount: ExploreDummyData.articles.length,
-          itemBuilder: (_, i) => ExplorePosterCard(
-            card: ExploreDummyData.articles[i],
+        ...rail(
+          seeAll: SearchFilter.blogs,
+          AppStrings.exploreArticles,
+          page.articles.length,
+          (_, i) => ExplorePosterCard(
+            card: page.articles[i],
             kindIcon: AppAssets.iconBookOpen,
-            onTap: () => _todo(context, ExploreDummyData.articles[i].title),
+            onTap: () => onOpenCard(page.articles[i]),
           ),
         ),
-        SizedBox(height: gap.s),
 
-        ExploreRail(
-          title: AppStrings.exploreMinistries,
-          onSeeAll: () => _todo(context, AppStrings.exploreMinistries),
-          itemCount: ExploreDummyData.ministries.length,
-          itemBuilder: (_, i) => ExploreCreatorCard(
-            creator: ExploreDummyData.ministries[i],
-            onTap: () => _todo(context, ExploreDummyData.ministries[i].name),
-            onFollow: () => _todo(context, 'Following a ministry'),
+        ...rail(
+          seeAll: SearchFilter.creators,
+          AppStrings.exploreMinistries,
+          page.ministries.length,
+          (_, i) => ListenableBuilder(
+            // The store is the one truth for follow state, so a follow made
+            // on a channel page shows here too, without a refetch.
+            listenable: getIt<EngagementStore>(),
+            builder: (_, _) => ExploreCreatorCard(
+              creator: page.ministries[i],
+              isFollowing: getIt<EngagementStore>().isFollowing(
+                page.ministries[i].id,
+                fallback: page.ministries[i].isFollowing,
+              ),
+              onTap: () => onOpenCreator(page.ministries[i].id),
+              onFollow: () => onFollow(page.ministries[i]),
+            ),
           ),
         ),
-        SizedBox(height: gap.s),
 
-        ExploreRail(
-          title: AppStrings.exploreUpcomingEvent,
-          onSeeAll: () => _todo(context, AppStrings.exploreUpcomingEvent),
-          gap: 24,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          itemCount: ExploreDummyData.events.length,
-          itemBuilder: (_, i) => ExploreEventRow(
-            event: ExploreDummyData.events[i],
-            onTap: () => _todo(context, ExploreDummyData.events[i].title),
+        ...rail(
+          seeAll: SearchFilter.events,
+          AppStrings.exploreUpcomingEvent,
+          page.events.length,
+          (_, i) => ExploreEventRow(
+            event: page.events[i],
+            onTap: () {
+              final source = page.events[i].source;
+              if (source != null) {
+                openContentDetail(
+                  context,
+                  source,
+                  source: AnalyticsSource.explore,
+                );
+              }
+            },
           ),
+          itemGap: 24,
+          align: CrossAxisAlignment.end,
         ),
-        SizedBox(height: gap.s),
 
         ExploreCategoryChips(
-          categories: ExploreDummyData.categories,
-          onSelected: (c) => ExploreScreen.openSearch(context, query: c.label),
+          categories: ExploreCategories.all,
+          onSelected: onTopic,
         ),
       ],
     );

@@ -4,8 +4,8 @@ import 'package:test_app/models/history_models/history_models.dart';
 ///
 /// The items are [HistoryEntry] because a playlist row and a history row are
 /// the same thing in the design — a still, a title, a creator, a meta line —
-/// and the whole library already speaks that shape. When the playlist routes
-/// land, the payload maps onto it rather than onto a second content model.
+/// and the whole library already speaks that shape. The detail read returns
+/// media search hits, which map straight onto it.
 class Playlist {
   const Playlist({
     required this.id,
@@ -17,6 +17,9 @@ class Playlist {
     this.runtime = '',
     this.ownerName = '',
     this.ownerVerified = false,
+    this.declaredCount = 0,
+    this.unavailableCount = 0,
+    this.description,
   });
 
   final String id;
@@ -42,19 +45,39 @@ class Playlist {
   final String ownerName;
   final bool ownerVerified;
 
-  int get itemCount => items.length;
+  /// What the server says is in it.
+  ///
+  /// The list read carries no items at all, and the detail read's `items`
+  /// leave out anything no longer public — so counting the array would
+  /// under-report. [itemCount] prefers this.
+  final int declaredCount;
 
-  bool get isEmpty => items.isEmpty;
+  /// Entries that can no longer be shown: deleted, or no longer public.
+  final int unavailableCount;
 
-  Playlist copyWith({String? name, bool? isPrivate}) => Playlist(
+  final String? description;
+
+  int get itemCount => declaredCount > 0 ? declaredCount : items.length;
+
+  bool get isEmpty => itemCount == 0;
+
+  Playlist copyWith({
+    String? name,
+    bool? isPrivate,
+    List<HistoryEntry>? items,
+    int? declaredCount,
+  }) => Playlist(
     id: id,
     name: name ?? this.name,
     updatedAgo: updatedAgo,
     covers: covers,
-    items: items,
+    items: items ?? this.items,
     isPrivate: isPrivate ?? this.isPrivate,
     runtime: runtime,
     ownerName: ownerName,
     ownerVerified: ownerVerified,
+    declaredCount: declaredCount ?? this.declaredCount,
+    unavailableCount: unavailableCount,
+    description: description,
   );
 }

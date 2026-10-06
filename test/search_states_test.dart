@@ -6,7 +6,6 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/discovery/data/recent_searches.dart';
 import 'package:test_app/features/discovery/data/search_grouping.dart';
 import 'package:test_app/features/discovery/data/search_query.dart';
-import 'package:test_app/features/discovery/data/search_suggestions_dummy.dart';
 import 'package:test_app/features/discovery/views/widgets/search_result_rows.dart';
 import 'package:test_app/features/discovery/views/widgets/search_type_tabs.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -67,6 +66,7 @@ Future<void> _pump(
 }
 
 void main() {
+  _arrivalTests();
   setUpAll(loadAppFonts);
 
   group('results are filed by kind', () {
@@ -198,31 +198,9 @@ void main() {
     });
   });
 
-  group('autocomplete', () {
-    test('offers nothing for an empty query', () {
-      expect(SearchSuggestions.forQuery('  '), isEmpty);
-    });
-
-    test('a prefix match is ranked above a mere contains', () {
-      // Someone typing "wor" means "worship" far more often than the phrase
-      // that merely contains "wor" in "word".
-      final hits = SearchSuggestions.forQuery('wor');
-      expect(hits.first, startsWith('wor'));
-      expect(hits, contains('worship songs'));
-    });
-
-    test('matching is case-insensitive', () {
-      expect(SearchSuggestions.forQuery('WORSHIP'), isNotEmpty);
-    });
-
-    test('a query nothing matches offers nothing', () {
-      expect(SearchSuggestions.forQuery('zzzzz'), isEmpty);
-    });
-
-    test('the list is capped', () {
-      expect(SearchSuggestions.forQuery('a', limit: 2).length, lessThan(3));
-    });
-  });
+  // Completions used to come from a canned vocabulary; they are rows from the
+  // search index now, so what is worth pinning moved to the request itself —
+  // see search_query_test.dart. What stays here is the screen's own handling.
 
   group('the type tabs', () {
     testWidgets('offer the seven kinds the design draws', (tester) async {
@@ -387,6 +365,28 @@ void main() {
       await tester.pump();
       expect(ran, 1);
       expect(filled, 0);
+    });
+  });
+}
+
+/// Arriving at search from Explore, which is not the same as typing.
+void _arrivalTests() {
+  group('arriving from Explore', () {
+    test('a rail\'s See all is a type, not a phrase', () {
+      // Searching for the words "Live now" would return whatever happens to
+      // contain them.
+      expect(SearchFilter.live.entityTypes, ['media']);
+      expect(SearchFilter.live.liveOnly, isTrue);
+      expect(SearchFilter.events.entityTypes, ['event']);
+      expect(SearchFilter.creators.entityTypes, ['creator']);
+    });
+
+    test('Trending and Continue watching map to no tab', () {
+      // They are orderings, not kinds — which is why those two rails offer
+      // no See all rather than one that lands somewhere arbitrary.
+      final labels = SearchFilter.values.map((f) => f.label.toLowerCase());
+      expect(labels, isNot(contains('trending')));
+      expect(labels, isNot(contains('continue watching')));
     });
   });
 }

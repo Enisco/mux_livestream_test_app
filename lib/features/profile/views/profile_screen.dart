@@ -20,7 +20,12 @@ import 'package:test_app/features/library/views/giving_screen.dart';
 import 'package:test_app/features/library/views/my_events_screen.dart';
 import 'package:test_app/features/library/views/playlists_screen.dart';
 import 'package:test_app/features/library/views/records_screens.dart';
-import 'package:test_app/features/profile/data/profile_dummy_data.dart';
+import 'dart:async';
+
+import 'package:test_app/features/library/repo/viewer_library_repo.dart';
+import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/models/history_models/history_models.dart';
+import 'package:test_app/models/history_models/profile_watch_progress.dart';
 import 'package:test_app/features/profile/views/widgets/profile_header_card.dart';
 import 'package:test_app/features/profile/views/widgets/profile_menu.dart';
 import 'package:test_app/features/settings/views/settings_screen.dart';
@@ -38,14 +43,30 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 /// still invented is listed in [ProfileDummyData]; the destinations that do not
 /// exist yet are marked below.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.library, this.records});
+
+  /// Default to the real things; a test supplies its own.
+  final ViewerLibraryRepo? library;
+  final ViewerRecordsRepo? records;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  late final _library = widget.library ?? ViewerLibraryRepo();
+  late final _records = widget.records ?? ViewerRecordsRepo();
+
   CreatorProfile? _channel;
+
+  /// The card under CONTINUE WATCHING, and the pill on "My events".
+  ///
+  /// Both are read from lists the reader's own library already loads — the
+  /// first part-watched row of their history, and their own RSVPs — rather
+  /// than from anything this screen owns. Null and zero both mean "do not
+  /// draw it", which is what a reader with no history should see.
+  HistoryEntry? _lastWatched;
+  int _upcomingEvents = 0;
 
   /// What the server says about whether this reader has a channel. Until it
   /// answers, the studio block shows nothing rather than guessing wrong in
@@ -56,6 +77,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadChannel();
+    unawaited(_loadLibrary());
+  }
+
+  /// Neither of these is worth an error state: a missing resume card or a
+  /// missing count leaves the row as it would be for someone with nothing
+  /// there, which is the honest reading.
+  Future<void> _loadLibrary() async {
+    try {
+      final page = await _library.fetchHistory(limit: 20);
+      final resume = [
+        for (final day in page.days)
+          for (final e in day.entries)
+            if (e.progress != null && !e.isEvent) e,
+      ];
+      if (mounted) setState(() => _lastWatched = resume.firstOrNull);
+    } catch (e) {
+      logger.w('Profile history unavailable', error: e);
+    }
+    try {
+      final events = await _records.fetchMyEvents(limit: 50);
+      if (!mounted) return;
+      setState(() {
+        _upcomingEvents = events.where((e) => !e.past).length;
+      });
+    } catch (e) {
+      logger.w('Profile events unavailable', error: e);
+    }
   }
 
   /// A reader who has a channel gets the way into their studio; a reader who
@@ -153,12 +201,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ProfileHeaderCard(
               name: name,
               handle: LocalStorage.cachedHandle,
-              hasNotifications: ProfileDummyData.hasUnreadNotifications,
+              // Nothing reports unread notifications — there is no route —
+              // so the bell carries no dot rather than a permanent one.
+              hasNotifications: false,
               onTap: () => _todo(AppStrings.profileAccountInfo),
               onNotifications: () => _todo('Notifications'),
             ),
             SizedBox(height: 26.s),
-            _continueWatching(),
+            // Nothing part-watched means no section at all, which is what a
+            // reader with no history should see.
+            if (_lastWatched != null) _continueWatching(),
             _studio(),
             SizedBox(height: 20.s),
             _you(),
@@ -171,7 +223,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _continueWatching() {
-    const progress = ProfileDummyData.lastWatched;
+    final row = _lastWatched!;
+    final progress = ProfileWatchProgress(
+      mediaId: row.id,
+      title: row.title,
+      creatorName: row.creatorName,
+      creatorVerified: row.creatorVerified,
+      thumbnailUrl: row.thumbnailUrl,
+      fraction: row.progress ?? 0,
+      remainingLabel: remainingOf(row),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -281,8 +342,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ProfileMenuItem(
           icon: HugeIcons.strokeRoundedCalendar03,
           label: AppStrings.profileMyEvents,
-          pill: ProfileDummyData.upcomingEventCount > 0
-              ? '${ProfileDummyData.upcomingEventCount} '
+          pill: _upcomingEvents > 0
+              ? '$_upcomingEvents '
                     '${AppStrings.profileUpcomingSuffix}'
               : null,
           onTap: () => Navigator.push(

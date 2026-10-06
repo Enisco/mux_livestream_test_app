@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/records_dummy_data.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
@@ -14,27 +18,64 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Events the reader said they would go to, split by whether they still can.
 ///
-/// Nothing is stored — see [RecordsDummyData]. Tapping RSVP flips the row
+/// The list spans every ministry the reader has RSVP'd to and includes past
+/// events, so the grouping into Upcoming and Past happens here rather than in
+/// two reads. Tapping RSVP flips the row
 /// locally so the two states can be seen; it posts nothing.
 class MyEventsScreen extends StatefulWidget {
-  const MyEventsScreen({super.key});
+  const MyEventsScreen({super.key, this.repo});
+
+  /// Defaults to the real thing; a test supplies its own.
+  final ViewerRecordsRepo? repo;
 
   @override
   State<MyEventsScreen> createState() => _MyEventsScreenState();
 }
 
 class _MyEventsScreenState extends State<MyEventsScreen> {
-  final _controller = TextEditingController();
-  String _query = '';
-  final _going = <String>{};
+  late final _repo = widget.repo ?? ViewerRecordsRepo();
+  List<MyEvent> _events = const [];
+  bool _loading = true;
+  bool _failed = false;
 
   @override
   void initState() {
     super.initState();
-    for (final e in RecordsDummyData.events) {
-      if (e.going) _going.add(e.id);
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final rows = await _repo.fetchMyEvents();
+      if (!mounted) return;
+      setState(() {
+        _events = rows;
+        _going
+          ..clear()
+          ..addAll([
+            for (final e in rows)
+              if (e.going) e.id,
+          ]);
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('My events failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
     }
   }
+
+  final _controller = TextEditingController();
+  String _query = '';
+  final _going = <String>{};
 
   @override
   void dispose() {
@@ -44,8 +85,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
 
   List<MyEvent> get _matches {
     final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return RecordsDummyData.events;
-    return RecordsDummyData.events
+    if (q.isEmpty) return _events;
+    return _events
         .where(
           (e) =>
               e.title.toLowerCase().contains(q) ||
@@ -86,7 +127,15 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
             searchHint: AppStrings.likedSearchHint,
           ),
           Expanded(
-            child: matches.isEmpty
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  )
+                : _failed
+                ? ErrorStateView(onRetry: _load)
+                : matches.isEmpty
                 ? SingleChildScrollView(
                     child: LibraryEmptyState(
                       icon: HugeIcons.strokeRoundedFavourite,
@@ -102,9 +151,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                     padding: EdgeInsets.only(top: 12.s, bottom: 40.s),
                     children: [
                       LibraryCount(
-                        text:
-                            '${RecordsDummyData.eventsTotal} '
-                            '${AppStrings.myEventsCountSuffix}',
+                        text: AppStrings.myEventsCount(_events.length),
                       ),
                       if (upcoming.isNotEmpty) ...[
                         LibraryGroupLabel(

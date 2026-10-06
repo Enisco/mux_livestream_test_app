@@ -39,6 +39,111 @@ class DiscoveryRepo {
     return WebFeedResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// `POST /v1/search/public/query` — global discovery across every indexed
+  /// entity, unauthenticated.
+  ///
+  /// Two things to know before calling it:
+  ///
+  /// - **Omit [q] for a browse.** An empty query with a `sort` is the
+  ///   supported way to build a catalogue rail; a `"*"` wildcard is not and
+  ///   will not behave.
+  /// - **`sort: "trending"` is media-only** by contract — the gateway
+  ///   rejects other entity types for it.
+  ///
+  /// [entityIds] narrows to exactly those rows, which is how a rail of bare
+  /// references is hydrated in one round trip. Search ranks by relevance, so
+  /// the caller must restore its own order afterwards.
+  ///
+  /// The route also takes `preferenceBoostCategorySlugs`, a soft relevance
+  /// boost towards the viewer's own topics. Nothing in this app's design asks
+  /// for it — `user-app` uses it for a "topics you follow" rail we do not
+  /// have — so it is not plumbed through; add it here when a surface wants
+  /// it.
+  Future<WebFeedResponse> searchPublic({
+    String? q,
+    List<String>? entityTypes,
+    List<String>? categorySlugs,
+    List<String>? entityIds,
+    bool? liveOnly,
+    String? mediaType,
+    String sort = 'relevance',
+    int size = 10,
+    String? cursor,
+  }) async {
+    final filters = <Map<String, dynamic>>[
+      if (categorySlugs != null && categorySlugs.isNotEmpty)
+        {'field': 'categorySlugs', 'values': categorySlugs},
+      if (entityIds != null && entityIds.isNotEmpty)
+        {'field': 'entityId', 'values': entityIds},
+      if (liveOnly ?? false) {'field': 'media.isLiveNow', 'value': true},
+      // Video and audio share the `media` entity type; this is what tells
+      // them apart, and it is a server filter rather than a client sift.
+      if (mediaType != null) {'field': 'media.mediaType', 'value': mediaType},
+    ];
+    final response = await _api.post(
+      ApiEndpoints.publicSearch,
+      data: {
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        if (entityTypes != null && entityTypes.isNotEmpty)
+          'entityTypes': entityTypes,
+        if (filters.isNotEmpty) 'filters': filters,
+        'sort': sort,
+        'size': size,
+        'cursor': ?cursor,
+      },
+    );
+    return WebFeedResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Type-ahead over the same index.
+  ///
+  /// Returns real entities — `{entityType, entityId, title, subtitle}` — not
+  /// query strings, so a suggestion can open the thing itself rather than
+  /// running a search for its name. `size` is 1–20; anything outside that is
+  /// refused by the gateway.
+  ///
+  /// **Undocumented**; see [ApiEndpoints.publicSearchAutocomplete].
+  Future<List<WebFeedItem>> autocomplete(
+    String q, {
+    List<String>? entityTypes,
+    int size = 8,
+  }) async {
+    if (q.trim().isEmpty) return const [];
+    final response = await _api.get(
+      ApiEndpoints.publicSearchAutocomplete,
+      queryParameters: {
+        'q': q.trim(),
+        'size': size.clamp(1, 20),
+        if (entityTypes != null && entityTypes.isNotEmpty)
+          'entityTypes': entityTypes.join(','),
+      },
+    );
+    return WebFeedResponse.fromJson(
+      response.data as Map<String, dynamic>,
+    ).items;
+  }
+
+  /// `GET /v1/analytics/viewer/continue-watching` — **bare references**, with
+  /// no title and no thumbnail. Hydrate them with [searchPublic] and
+  /// `entityIds`, then put them back in this order.
+  ///
+  /// Signed-in only; a rail built from it is hidden for anonymous readers
+  /// rather than rendered empty.
+  Future<List<ContinueWatchingRef>> fetchContinueWatching({
+    int limit = 10,
+  }) async {
+    final response = await _api.get(
+      ApiEndpoints.continueWatching,
+      queryParameters: {'limit': limit},
+    );
+    final data = (response.data as Map<String, dynamic>)['data'];
+    final items = data is Map<String, dynamic> ? data['items'] : null;
+    return [
+      for (final row in items as List? ?? const [])
+        if (row is Map<String, dynamic>) ContinueWatchingRef.fromJson(row),
+    ];
+  }
+
   /// Suggestions for the empty Following tab.
   Future<List<RecommendedCreator>> fetchRecommendedCreators({
     int limit = 10,

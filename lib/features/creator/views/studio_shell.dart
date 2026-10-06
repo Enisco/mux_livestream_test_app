@@ -5,6 +5,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
+import 'package:test_app/features/creator/views/impact_screen.dart';
 import 'package:test_app/features/creator/views/studio_content_screen.dart';
 import 'package:test_app/features/creator/views/studio_screen.dart';
 import 'package:test_app/models/creator_models/dashboard_models.dart';
@@ -15,8 +16,8 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The creator studio, and the four things it is made of.
 ///
-/// Content, Impact and Giving are their own Figma sections and are not built
-/// yet; each says so rather than showing an empty screen that looks broken.
+/// Giving is its own Figma section and is not built yet; it says so rather
+/// than showing an empty screen that looks broken.
 class StudioShell extends StatefulWidget {
   const StudioShell({super.key});
 
@@ -40,13 +41,22 @@ class _StudioShellState extends State<StudioShell> {
   Future<void> _loadContext() async {
     final creatorId = LocalStorage.creatorId;
     if (creatorId == null) return;
-    final context = await CreatorDashboardRepo().fetchContext(creatorId);
+    final repo = CreatorDashboardRepo();
+    final context = await repo.fetchContext(creatorId);
     if (mounted) setState(() => _context = context);
+
+    final attention = await repo.fetchAttention(creatorId);
+    if (!mounted) return;
+    setState(() => _impactBadge = attention.fold(0, (sum, i) => sum + i.count));
   }
 
-  /// Impact carries the count of things waiting; the design shows it on the
-  /// tab itself so it is visible from anywhere in the studio.
-  static const _impactBadge = 18;
+  /// How many things are waiting, for the badge on the Impact tab.
+  ///
+  /// This was hardcoded to the design's `18`, which meant every studio
+  /// claimed eighteen things needed attention whatever was actually there.
+  /// It is the sum of the dashboard's attention feed now, and a studio with
+  /// nothing waiting carries no badge at all.
+  int _impactBadge = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +70,7 @@ class _StudioShellState extends State<StudioShell> {
                 onLeaveStudio: () => context.go(AppRouter.home),
               ),
               1 => StudioContentScreen(context: _context),
-              2 => const _NotBuilt(AppStrings.studioTabImpact),
+              2 => ImpactScreen(context: _context),
               _ => const _NotBuilt(AppStrings.studioTabGiving),
             },
           ),

@@ -1,3 +1,5 @@
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
+
 /// hugeicons draws from path data rather than a font, so its glyphs are typed
 /// as raw path lists rather than [IconData]. Named here so the shape of a
 /// category is readable.
@@ -5,11 +7,13 @@ typedef HugeIconData = List<List<dynamic>>;
 
 /// View models for the Explore tab.
 ///
-/// These are deliberately flat and presentation-shaped rather than mirrors of
-/// an API payload: the discovery endpoints for Explore do not exist yet, so
-/// there is nothing to mirror. When the backend guides land, the mapping layer
-/// parses into these and only [ExploreDummyData] goes away — the widgets keep
-/// reading the same fields.
+/// Deliberately flat and presentation-shaped rather than mirrors of a payload:
+/// every rail here is composed from several reads, so no single response has
+/// this shape. `ExploreRepo` does the mapping.
+///
+/// Each one keeps the row it came from in `source`, because opening a card
+/// means handing the real `WebFeedItem` to the detail screens — the flat
+/// fields are for drawing, not for navigating.
 class ExploreCreatorRef {
   const ExploreCreatorRef({
     required this.id,
@@ -20,6 +24,7 @@ class ExploreCreatorRef {
     this.verified = false,
     this.subscribers = 0,
     this.isOrganisation = false,
+    this.isFollowing = false,
   });
 
   final String id;
@@ -38,6 +43,10 @@ class ExploreCreatorRef {
 
   /// Organisations get a purple avatar ring, individuals a cyan one.
   final bool isOrganisation;
+
+  /// What the server last said. The card reads the engagement store over the
+  /// top of it, so a follow made anywhere shows here without a refetch.
+  final bool isFollowing;
 }
 
 /// One thumbnail card in a horizontal rail.
@@ -55,6 +64,7 @@ class ExploreCard {
     this.badge,
     this.sponsored = false,
     this.progress,
+    this.source,
   });
 
   final String id;
@@ -71,6 +81,9 @@ class ExploreCard {
 
   /// How far the viewer got, 0-1. Only "Continue watching" sets it.
   final double? progress;
+
+  /// The row this was drawn from, for opening it.
+  final WebFeedItem? source;
 }
 
 class ExploreEvent {
@@ -83,13 +96,14 @@ class ExploreEvent {
     required this.time,
     required this.creator,
     this.sponsored = false,
+    this.source,
   });
 
   final String id;
   final String title;
 
-  /// Kept as text, not a DateTime: the tile prints them verbatim and the API
-  /// has not settled on a format yet.
+  /// Kept as text: the tile prints them verbatim, and the formatting choice
+  /// belongs here rather than in the widget.
   final String day;
   final String month;
 
@@ -97,6 +111,9 @@ class ExploreEvent {
   final String time;
   final ExploreCreatorRef creator;
   final bool sponsored;
+
+  /// The row this was drawn from, for opening it.
+  final WebFeedItem? source;
 }
 
 class ExploreCategory {
@@ -119,6 +136,7 @@ class ExploreHero {
     required this.creator,
     this.backdropAsset,
     this.backdropUrl,
+    this.source,
   });
 
   final String id;
@@ -127,4 +145,7 @@ class ExploreHero {
   final ExploreCreatorRef creator;
   final String? backdropAsset;
   final String? backdropUrl;
+
+  /// The row this was drawn from, for opening it.
+  final WebFeedItem? source;
 }

@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/records_dummy_data.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/models/creator_models/impact_models.dart'
+    show testimonyImpactTagLabel;
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/components/library_parts.dart';
@@ -30,14 +36,51 @@ void _report(BuildContext context, String message) {
 
 /// What the reader has asked a ministry to pray about.
 class PrayerRequestsScreen extends StatefulWidget {
-  const PrayerRequestsScreen({super.key});
+  const PrayerRequestsScreen({super.key, this.repo});
+
+  /// Defaults to the real thing; a test supplies its own.
+  final ViewerRecordsRepo? repo;
 
   @override
   State<PrayerRequestsScreen> createState() => _PrayerRequestsScreenState();
 }
 
 class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
+  late final _repo = widget.repo ?? ViewerRecordsRepo();
   String _filter = AppStrings.prayerFilterAll;
+  List<PrayerRequest> _rows = const [];
+  bool _loading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final rows = await _repo.fetchMyPrayers();
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('My prayers failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
   final _deleted = <String>{};
 
   /// The chips mix two axes — three statuses and one content kind — so each
@@ -58,7 +101,7 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
   }
 
   List<PrayerRequest> get _matches =>
-      RecordsDummyData.prayers.where(_keeps).toList(growable: false);
+      _rows.where(_keeps).toList(growable: false);
 
   void _openActions(PrayerRequest request) {
     showModalBottomSheet<void>(
@@ -127,7 +170,15 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
             ),
           ),
           Expanded(
-            child: matches.isEmpty
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  )
+                : _failed
+                ? ErrorStateView(onRetry: _load)
+                : matches.isEmpty
                 ? const SingleChildScrollView(
                     child: LibraryEmptyState(
                       icon: HugeIcons.strokeRoundedHandPrayer,
@@ -206,18 +257,53 @@ class _PrayerCard extends StatelessWidget {
 
 /// What the reader has told a ministry God has done, and whether it is live.
 class TestimoniesScreen extends StatefulWidget {
-  const TestimoniesScreen({super.key});
+  const TestimoniesScreen({super.key, this.repo});
+
+  final ViewerRecordsRepo? repo;
 
   @override
   State<TestimoniesScreen> createState() => _TestimoniesScreenState();
 }
 
 class _TestimoniesScreenState extends State<TestimoniesScreen> {
+  late final _repo = widget.repo ?? ViewerRecordsRepo();
+  List<Testimony> _rows = const [];
+  bool _loading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final rows = await _repo.fetchMyTestimonies();
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('My testimonies failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
   final _removed = <String>{};
 
-  List<Testimony> get _matches => RecordsDummyData.testimonies
-      .where((t) => !_removed.contains(t.id))
-      .toList(growable: false);
+  List<Testimony> get _matches =>
+      _rows.where((t) => !_removed.contains(t.id)).toList(growable: false);
 
   void _openActions(Testimony testimony) {
     showModalBottomSheet<void>(
@@ -264,7 +350,15 @@ class _TestimoniesScreenState extends State<TestimoniesScreen> {
             onAction: () => _report(context, 'Sorting is not built yet'),
           ),
           Expanded(
-            child: matches.isEmpty
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  )
+                : _failed
+                ? ErrorStateView(onRetry: _load)
+                : matches.isEmpty
                 ? const SingleChildScrollView(
                     child: LibraryEmptyState(
                       icon: HugeIcons.strokeRoundedMessage01,
@@ -323,7 +417,7 @@ class _TestimonyCard extends StatelessWidget {
         TestimonyStatus.approved => HugeIcons.strokeRoundedCheckmarkCircle02,
         TestimonyStatus.rejected => HugeIcons.strokeRoundedCancelCircle,
       },
-      tags: testimony.tags,
+      tags: [for (final t in testimony.tags) testimonyImpactTagLabel(t)],
       body: testimony.body,
       footer: _TestimonyFooter(testimony: testimony),
       onMore: onMore,
@@ -378,7 +472,7 @@ class _TestimonyFooter extends StatelessWidget {
         Expanded(
           child: Text(
             testimony.status == TestimonyStatus.pending
-                ? AppStrings.testimonyPendingNote
+                ? AppStrings.testimonyPendingNote(testimony.author)
                 : AppStrings.testimonyRejectedNote,
             style: AppStyles.label(
               12,

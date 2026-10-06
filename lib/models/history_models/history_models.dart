@@ -1,8 +1,8 @@
 /// What the reader has watched and read, and where they left off.
 ///
-/// Shaped for the screen rather than for any payload: `/v1/analytics/viewer/
-/// continue-watching` is the only route that exists today, and there is no
-/// history-list route at all, so there is nothing yet to mirror.
+/// Shaped for the screen rather than for any one payload: History, Liked and
+/// Saved return the same enriched search hit under different envelopes, so one
+/// model feeds all three and `ViewerLibraryRepo` does the mapping.
 library;
 
 /// The kinds of thing history remembers. Each names itself on its own row.
@@ -40,6 +40,7 @@ class HistoryEntry {
     this.eventDate,
     this.eventVenue,
     this.eventTime,
+    this.targetType = '',
   });
 
   final String id;
@@ -66,6 +67,13 @@ class HistoryEntry {
   final String? eventDate;
   final String? eventVenue;
   final String? eventTime;
+
+  /// What to pass to an engagement call for this row.
+  ///
+  /// The list gives it as `engagementTargetType` (or `historyTargetType`),
+  /// and that is the value to use — mapping it from [kind] would guess, and
+  /// a devotional entry is not a devotional series.
+  final String targetType;
 
   bool get isEvent => kind == HistoryKind.event;
 }

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/profile/data/profile_dummy_data.dart';
+import 'package:test_app/models/history_models/profile_watch_progress.dart';
 import 'package:test_app/features/profile/views/widgets/profile_header_card.dart';
 import 'package:test_app/features/profile/views/widgets/profile_menu.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -34,6 +34,25 @@ Iterable<Container> _dots(WidgetTester tester) =>
       final width = c.constraints?.maxWidth ?? 0;
       return shape == BoxShape.circle && width > 0 && width <= 12;
     });
+
+/// A part-watched row, as the history list hands one over.
+const _resume = ProfileWatchProgress(
+  mediaId: 'm1',
+  title: 'The Prodigal Returns',
+  creatorName: 'Grace Community',
+  creatorVerified: true,
+  fraction: 0.67,
+  remainingLabel: '24m',
+);
+
+/// A clip too short to have a meaningful remainder.
+const _tooShort = ProfileWatchProgress(
+  mediaId: 'm2',
+  title: 'A short clip',
+  creatorName: 'Grace Community',
+  fraction: 0.1,
+  remainingLabel: '',
+);
 
 void main() {
   setUpAll(loadAppFonts);
@@ -101,21 +120,24 @@ void main() {
 
   group('continue watching', () {
     testWidgets('shows what is left of it', (tester) async {
-      await _pump(
-        tester,
-        const ContinueWatchingCard(progress: ProfileDummyData.lastWatched),
-      );
+      await _pump(tester, const ContinueWatchingCard(progress: _resume));
 
       expect(find.text('The Prodigal Returns'), findsOneWidget);
       expect(find.text('Grace Community'), findsOneWidget);
       expect(find.text('24m remaining'), findsOneWidget);
     });
 
+    testWidgets('a clip too short to have a remainder says nothing', (
+      tester,
+    ) async {
+      // Otherwise the card reads "remaining" with no figure in front of it.
+      await _pump(tester, const ContinueWatchingCard(progress: _tooShort));
+      expect(find.textContaining('remaining'), findsNothing);
+      expect(find.text('A short clip'), findsOneWidget);
+    });
+
     testWidgets('the bar reflects how far in the reader got', (tester) async {
-      await _pump(
-        tester,
-        const ContinueWatchingCard(progress: ProfileDummyData.lastWatched),
-      );
+      await _pump(tester, const ContinueWatchingCard(progress: _resume));
 
       final bar = tester.widget<FractionallySizedBox>(
         find.byType(FractionallySizedBox),

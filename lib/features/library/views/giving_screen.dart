@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/giving_dummy_data.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/models/library_models/giving_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
@@ -15,23 +19,85 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// What the reader has given, a year at a time.
 ///
 /// A summary card over a worship backdrop, then the year's gifts grouped by
-/// month, each with the document it produced. Nothing is wired — see
-/// [GivingDummyData].
+/// What the reader has given, a year at a time.
+///
+/// **Neither route exists on staging.** `GET /v1/payment/giving/me/summary`
+/// and `…/me/gifts` are both documented in the giving guide and both answer
+/// `Cannot GET`, so this screen loads, fails, and says so — see
+/// `docs/OPEN_ISSUES.md`. It is wired, not stubbed: the day the routes land
+/// it works without further change.
 class GivingScreen extends StatefulWidget {
-  const GivingScreen({super.key});
+  const GivingScreen({super.key, this.repo});
+
+  /// Defaults to the real thing; a test supplies its own.
+  final ViewerRecordsRepo? repo;
 
   @override
   State<GivingScreen> createState() => _GivingScreenState();
 }
 
 class _GivingScreenState extends State<GivingScreen> {
-  int _year = GivingDummyData.years.first;
+  late final _repo = widget.repo ?? ViewerRecordsRepo();
+  int _year = DateTime.now().year;
+  GivingSummary? _loaded;
+  List<GivingMonth> _loadedMonths = const [];
+  bool _loading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final summary = await _repo.fetchGivingSummary(_year);
+      final gifts = await _repo.fetchGifts(_year);
+      if (!mounted) return;
+      setState(() {
+        _loaded = summary;
+        _loadedMonths = _group(gifts);
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('Giving failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  /// Gifts under the month they were given in, newest first — the order the
+  /// route already returns them in.
+  static List<GivingMonth> _group(List<Gift> gifts) {
+    final buckets = <String, List<Gift>>{};
+    final order = <String>[];
+    for (final gift in gifts) {
+      final label = gift.monthLabel;
+      if (!buckets.containsKey(label)) {
+        buckets[label] = [];
+        order.add(label);
+      }
+      buckets[label]!.add(gift);
+    }
+    return [
+      for (final label in order)
+        GivingMonth(label: label, gifts: buckets[label]!),
+    ];
+  }
 
   GivingSummary get _summary =>
-      GivingDummyData.summaries[_year] ??
-      GivingSummary(year: _year, total: '', gifts: 0, ministries: 0);
+      _loaded ?? GivingSummary(year: _year, total: '', gifts: 0, ministries: 0);
 
-  List<GivingMonth> get _months => GivingDummyData.months[_year] ?? const [];
+  List<GivingMonth> get _months => _loadedMonths;
 
   void _report(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -49,7 +115,10 @@ class _GivingScreenState extends State<GivingScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => LibraryActionSheet(
         actions: [
-          for (final year in GivingDummyData.years)
+          for (final year
+              in _summary.availableYears.isEmpty
+                  ? [_year]
+                  : _summary.availableYears)
             LibraryAction(
               label: '$year',
               icon: HugeIcons.strokeRoundedCalendar03,
@@ -70,60 +139,67 @@ class _GivingScreenState extends State<GivingScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.base1,
-      body: ListView(
-        padding: EdgeInsets.only(bottom: 40.s),
-        children: [
-          _SummaryCard(summary: summary, onPickYear: _pickYear),
-          if (summary.isEmpty)
-            LibraryEmptyState(
-              icon: HugeIcons.strokeRoundedGift,
-              title: AppStrings.givingEmptyTitle,
-              body: AppStrings.givingEmptyBody,
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.brandPrimary),
             )
-          else ...[
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _report(
-                '${AppStrings.givingDownloadStatement} is not built yet',
-              ),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16.s, 16.s, 16.s, 8.s),
-                child: Row(
-                  children: [
-                    HugeIcon(
-                      icon: HugeIcons.strokeRoundedFile02,
-                      color: AppColors.linkBlue,
-                      size: 15.s,
+          : _failed
+          ? ErrorStateView(onRetry: _load)
+          : ListView(
+              padding: EdgeInsets.only(bottom: 40.s),
+              children: [
+                _SummaryCard(summary: summary, onPickYear: _pickYear),
+                if (summary.isEmpty)
+                  LibraryEmptyState(
+                    icon: HugeIcons.strokeRoundedGift,
+                    title: AppStrings.givingEmptyTitle,
+                    body: AppStrings.givingEmptyBody,
+                  )
+                else ...[
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _report(
+                      '${AppStrings.givingDownloadStatement} is not built yet',
                     ),
-                    SizedBox(width: 8.s),
-                    Text(
-                      AppStrings.givingDownloadStatement,
-                      style: AppStyles.label(
-                        13,
-                        color: AppColors.linkBlue,
-                        lineHeight: 18 / 13,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16.s, 16.s, 16.s, 8.s),
+                      child: Row(
+                        children: [
+                          HugeIcon(
+                            icon: HugeIcons.strokeRoundedFile02,
+                            color: AppColors.linkBlue,
+                            size: 15.s,
+                          ),
+                          SizedBox(width: 8.s),
+                          Text(
+                            AppStrings.givingDownloadStatement,
+                            style: AppStyles.label(
+                              13,
+                              color: AppColors.linkBlue,
+                              lineHeight: 18 / 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            for (final month in months) ...[
-              LibraryGroupLabel(label: month.label, caps: true),
-              for (final gift in month.gifts)
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.s),
-                  child: _GiftRow(
-                    gift: gift,
-                    onDocument: () =>
-                        _report('${gift.document.label}s are not built yet'),
                   ),
-                ),
-              SizedBox(height: 14.s),
-            ],
-          ],
-        ],
-      ),
+                  for (final month in months) ...[
+                    LibraryGroupLabel(label: month.label, caps: true),
+                    for (final gift in month.gifts)
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.s),
+                        child: _GiftRow(
+                          gift: gift,
+                          onDocument: () => _report(
+                            '${gift.document.label}s are not built yet',
+                          ),
+                        ),
+                      ),
+                    SizedBox(height: 14.s),
+                  ],
+                ],
+              ],
+            ),
     );
   }
 }

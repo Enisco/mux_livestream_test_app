@@ -123,6 +123,33 @@ abstract final class ApiEndpoints {
 
   static const publicTestimonies = '/v1/public/engagement/testimonies';
 
+  /// The creator's Impact inbox — prayers, testimonies and the comment
+  /// moderation queue.
+  ///
+  /// The reads hang off the creator; **the writes do not.** A `PATCH` takes
+  /// the row's own id and carries no creator segment, which is why these are
+  /// two families rather than one builder.
+  static String creatorPrayers(String creatorId) =>
+      '/v1/creator/$creatorId/engagement/prayers';
+  static String creatorPrayerSummary(String creatorId) =>
+      '/v1/creator/$creatorId/engagement/prayers/summary';
+  static String creatorPrayerAssignees(String creatorId) =>
+      '/v1/creator/$creatorId/engagement/prayers/assignees';
+  static String creatorPrayerUpdate(String prayerId) =>
+      '/v1/creator/engagement/prayers/$prayerId';
+
+  static String creatorTestimonies(String creatorId) =>
+      '/v1/creator/$creatorId/engagement/testimonies';
+  static String creatorTestimonySummary(String creatorId) =>
+      '/v1/creator/$creatorId/engagement/testimonies/summary';
+  static String creatorTestimonyModerate(String testimonyId) =>
+      '/v1/creator/engagement/testimonies/$testimonyId/moderate';
+
+  static String creatorComments(String creatorId) =>
+      '/v1/creator/$creatorId/engagement/comments';
+  static String creatorCommentModerate(String commentId) =>
+      '/v1/creator/engagement/comments/$commentId/moderate';
+
   static const recommendedCreators = '/v1/discovery/recommended-creators';
 
   /// Everyone this reader follows, with `latestContentAt` and the four
@@ -206,6 +233,53 @@ abstract final class ApiEndpoints {
 
   static const beacons = '/v1/analytics/beacons';
   static const beaconsAuth = '/v1/analytics/beacons/auth';
+
+  /// Global discovery across every indexed entity. This is **OpenSearch**,
+  /// a different mechanism from the Prisma-backed `SEARCH_*` routes used for
+  /// creator-scoped catalogue reads — do not use it to list one creator's
+  /// library.
+  static const publicSearch = '/v1/search/public/query';
+
+  /// Type-ahead over the same index. **Undocumented** — the integration
+  /// guide lists it as not yet client-integrated, so the contract below was
+  /// probed against staging on 2026-10-05: `?q=&size=1..20&entityTypes=`,
+  /// answering `{hits: [{entityType, entityId, title, subtitle}]}`.
+  static const publicSearchAutocomplete = '/v1/search/public/autocomplete';
+
+  static const continueWatching = '/v1/analytics/viewer/continue-watching';
+
+  /// The viewer's own library.
+  ///
+  /// The two history deletes are **hide-through-an-instant** operations, not
+  /// row deletions: each answers with the timestamp history is suppressed up
+  /// to, and watching the same thing again brings it back.
+  static const viewerHistory = '/v1/discovery/viewer/history';
+  static String viewerHistoryItem(String targetType, String targetId) =>
+      '/v1/discovery/viewer/history/$targetType/$targetId';
+  static const myLiked = '/v1/engagement/interactions/me/liked';
+
+  /// Playlists hold **media only**; posts, events and devotionals use the
+  /// `favorite` interaction instead. The list is a Prisma advanced search, so
+  /// it pages by number rather than by cursor.
+  /// The reader's own records, across every ministry they have dealt with.
+  static const myEvents = '/v1/content/calendar/events/mine';
+  static String eventRsvp(String id) => '/v1/content/calendar/events/$id/rsvp';
+  static String eventRsvpReminder(String id) =>
+      '/v1/content/calendar/events/$id/rsvp/reminder';
+  static const myPrayers = '/v1/engagement/prayers/mine';
+  static const myTestimonies = '/v1/engagement/testimonies/mine';
+  static String testimony(String id) => '/v1/engagement/testimonies/$id';
+  static const myGivingSummary = '/v1/payment/giving/me/summary';
+  static const myGifts = '/v1/payment/giving/me/gifts';
+
+  static const playlists = '/v1/media/playlists';
+  static const playlistSearch = '/v1/media/playlists/search';
+  static String playlist(String id) => '/v1/media/playlists/$id';
+  static String publicPlaylist(String id) => '/v1/public/media/playlists/$id';
+  static String playlistItems(String id) => '/v1/media/playlists/$id/items';
+  static String playlistItem(String id, String mediaId) =>
+      '/v1/media/playlists/$id/items/$mediaId';
+  static const mySaved = '/v1/engagement/interactions/me/saved';
 
   static const webFeed = '/v1/discovery/web-feed';
   static const verticalFeed = '/v1/discovery/vertical-feed';

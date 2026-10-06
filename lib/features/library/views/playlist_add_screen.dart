@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/playlist_dummy_data.dart';
+import 'package:test_app/core/locator.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/models/history_models/history_models.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/features/library/views/library_list_screen.dart'
     show glyphFor, metaFor;
 import 'package:test_app/shared/components/app_icons.dart';
@@ -16,10 +22,30 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// Rows already in it say so and cannot be picked again; the rest carry an Add
 /// button that stays lit once tapped. Returns the ids chosen, or null if the
 /// reader backed out.
+///
+/// What is offered is [suggestions] — anchored on what the playlist already
+/// holds — falling back to what is popular when it is empty and there is
+/// nothing to anchor on. **Playlists hold media only**, so nothing else is
+/// offered here.
 class PlaylistAddScreen extends StatefulWidget {
-  const PlaylistAddScreen({super.key, required this.playlistName});
+  const PlaylistAddScreen({
+    super.key,
+    required this.playlistName,
+    this.anchorMediaId,
+    this.alreadyIn = const {},
+    this.discovery,
+  });
 
   final String playlistName;
+
+  /// What to anchor suggestions on: the playlist's first item.
+  final String? anchorMediaId;
+
+  /// Ids already in the playlist, which cannot be picked again — a duplicate
+  /// add answers 409 rather than doing nothing.
+  final Set<String> alreadyIn;
+
+  final DiscoveryRepo? discovery;
 
   @override
   State<PlaylistAddScreen> createState() => _PlaylistAddScreenState();
@@ -27,6 +53,68 @@ class PlaylistAddScreen extends StatefulWidget {
 
 class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
   final _picked = <String>{};
+  late final _repo = widget.discovery ?? getIt<DiscoveryRepo>();
+
+  List<HistoryEntry> _options = const [];
+  bool _loading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final anchor = widget.anchorMediaId;
+      final page = anchor == null
+          // An empty playlist has nothing to suggest from, so this falls
+          // back to what is popular rather than offering nothing at all.
+          ? await _repo.searchPublic(
+              entityTypes: const ['media'],
+              sort: 'popular',
+              size: 20,
+            )
+          : await _repo.fetchContentSuggestions(
+              targetType: 'media',
+              targetId: anchor,
+              limit: 20,
+            );
+      if (!mounted) return;
+      setState(() {
+        _options = [
+          for (final item in page.items)
+            if (item.entityType == 'media')
+              HistoryEntry(
+                id: item.entityId,
+                kind: item.mediaType == 'music'
+                    ? HistoryKind.audio
+                    : HistoryKind.video,
+                title: item.title,
+                creatorName: item.creator?.displayName ?? '',
+                creatorVerified: item.creator?.isVerified ?? false,
+                age: '',
+                thumbnailUrl: item.meta.thumbnailUrl,
+                targetType: 'media',
+              ),
+        ];
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('Playlist options failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,40 +190,47 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
             ),
             SizedBox(height: 12.s),
             Expanded(
-              child: ListView.builder(
-                padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 12.s),
-                itemCount: PlaylistDummyData.recommended.length,
-                itemBuilder: (context, i) {
-                  final item = PlaylistDummyData.recommended[i];
-                  final already = PlaylistDummyData.alreadyAdded.contains(
-                    item.id,
-                  );
-                  final picked = _picked.contains(item.id);
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.brandPrimary,
+                      ),
+                    )
+                  : _failed
+                  ? ErrorStateView(onRetry: _load)
+                  : ListView.builder(
+                      padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 12.s),
+                      itemCount: _options.length,
+                      itemBuilder: (context, i) {
+                        final item = _options[i];
+                        final already = widget.alreadyIn.contains(item.id);
+                        final picked = _picked.contains(item.id);
 
-                  return ContentListRow(
-                    key: ValueKey('add-${item.id}'),
-                    compact: true,
-                    title: item.title,
-                    creatorName: item.creatorName,
-                    creatorVerified: item.creatorVerified,
-                    thumbnailAsset: item.thumbnailAsset,
-                    glyph: glyphFor(item.kind),
-                    badge: item.duration,
-                    progress: item.progress,
-                    meta: metaFor(item),
-                    trailing: _AddControl(
-                      added: already || picked,
-                      onTap: already
-                          ? null
-                          : () => setState(() {
-                              picked
-                                  ? _picked.remove(item.id)
-                                  : _picked.add(item.id);
-                            }),
+                        return ContentListRow(
+                          key: ValueKey('add-${item.id}'),
+                          compact: true,
+                          title: item.title,
+                          creatorName: item.creatorName,
+                          creatorVerified: item.creatorVerified,
+                          thumbnailAsset: item.thumbnailAsset,
+                          thumbnailUrl: item.thumbnailUrl,
+                          glyph: glyphFor(item.kind),
+                          badge: item.duration,
+                          progress: item.progress,
+                          meta: metaFor(item),
+                          trailing: _AddControl(
+                            added: already || picked,
+                            onTap: already
+                                ? null
+                                : () => setState(() {
+                                    picked
+                                        ? _picked.remove(item.id)
+                                        : _picked.add(item.id);
+                                  }),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(20.s, 0, 20.s, 20.s),

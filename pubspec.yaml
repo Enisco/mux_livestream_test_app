@@ -66,8 +66,9 @@ flutter:
   assets:
     - .env
     - assets/images/
-    # TEMPORARY: placeholder artwork for the Explore tab. Delete this line
-    # with lib/features/explore/data/explore_dummy_data.dart.
+    # TEMPORARY: placeholder artwork. Explore no longer uses it; History,
+    # Liked/Saved, Playlists and the profile header still do. Delete this
+    # line with the last of lib/features/**/data/*_dummy_data.dart.
     - assets/images/explore_dummy/
     - assets/icons/
 

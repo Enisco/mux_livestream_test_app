@@ -122,10 +122,19 @@ class _PlaylistFormScreenState extends State<PlaylistFormScreen> {
                       label: AppStrings.playlistPublic,
                       icon: HugeIcons.strokeRoundedView,
                       selected: !_private,
-                      onTap: () => setState(() => _private = false),
+                      // Not a choice yet: the API refuses `visibility` on
+                      // both create and update, so every playlist is
+                      // private. Offering it would be a switch that silently
+                      // does nothing.
+                      onTap: null,
                     ),
                   ),
                 ],
+              ),
+              SizedBox(height: 8.s),
+              Text(
+                AppStrings.playlistPublicUnavailable,
+                style: AppStyles.body(12, color: AppColors.neutral500),
               ),
               const Spacer(),
               _SubmitButton(
@@ -199,13 +208,15 @@ class _VisibilityOption extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
-    required this.onTap,
+    this.onTap,
   });
 
   final String label;
   final List<List<dynamic>> icon;
   final bool selected;
-  final VoidCallback onTap;
+
+  /// Null where the option exists in the design but not in the API.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

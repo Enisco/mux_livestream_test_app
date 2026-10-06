@@ -100,6 +100,11 @@ class WebFeedCreator {
   final bool isOwnedByViewer;
   final int subscriberCount;
 
+  /// `organization` or `individual`. It colours the avatar ring and the
+  /// verified tick — purple for an organisation, cyan otherwise — so it is
+  /// kept even though nothing else reads it.
+  final String? type;
+
   const WebFeedCreator({
     required this.creatorId,
     required this.displayName,
@@ -109,6 +114,7 @@ class WebFeedCreator {
     this.isFollowing = false,
     this.isOwnedByViewer = false,
     this.subscriberCount = 0,
+    this.type,
   });
 
   factory WebFeedCreator.fromJson(Map<String, dynamic> json) => WebFeedCreator(
@@ -120,6 +126,7 @@ class WebFeedCreator {
     isFollowing: json['isFollowing'] as bool? ?? false,
     isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
     subscriberCount: (json['subscriberCount'] as num?)?.toInt() ?? 0,
+    type: json['type'] as String? ?? json['creatorType'] as String?,
   );
 }
 
@@ -169,6 +176,13 @@ class WebFeedItemMeta {
   final DateTime? scheduledAt;
   final PromotionAttribution? promotion;
 
+  /// Which creator this row belongs to.
+  ///
+  /// A **search hit** carries only this — the index does not denormalise the
+  /// creator, so a surface spanning creators resolves names and avatars with
+  /// a second query. A **feed** row has the nested `creator` object instead.
+  final String? creatorId;
+
   /// Creator rows.
   final String? handle;
   final bool isVerified;
@@ -208,6 +222,7 @@ class WebFeedItemMeta {
     this.publishedAt,
     this.scheduledAt,
     this.promotion,
+    this.creatorId,
     this.handle,
     this.isVerified = false,
     this.avatarKey,
@@ -242,6 +257,7 @@ class WebFeedItemMeta {
         publishedAt: DateTime.tryParse(json['publishedAt'] as String? ?? ''),
         scheduledAt: DateTime.tryParse(json['scheduledAt'] as String? ?? ''),
         promotion: PromotionAttribution.tryParse(json),
+        creatorId: json['creatorId'] as String?,
         handle: json['handle'] as String?,
         isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
         avatarKey: json['avatarKey'] as String?,
@@ -296,6 +312,7 @@ class RecommendedCreator {
     this.isVerified = false,
     this.isFollowing = false,
     this.isOwnedByViewer = false,
+    this.type,
   });
 
   final String creatorId;
@@ -308,6 +325,9 @@ class RecommendedCreator {
   /// The reader's own channel — never offered to follow.
   final bool isOwnedByViewer;
 
+  /// `organization` or `individual` — the avatar ring's colour.
+  final String? type;
+
   factory RecommendedCreator.fromJson(Map<String, dynamic> json) =>
       RecommendedCreator(
         creatorId: json['creatorId'] as String? ?? '',
@@ -317,5 +337,48 @@ class RecommendedCreator {
         isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
         isFollowing: json['isFollowing'] as bool? ?? false,
         isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
+        type: json['type'] as String?,
       );
+}
+
+/// One row of `GET /v1/analytics/viewer/continue-watching`.
+///
+/// Deliberately thin, because the route is: it answers with references and
+/// positions, and nothing else. The title, artwork and creator come from a
+/// second search keyed on [mediaId].
+class ContinueWatchingRef {
+  const ContinueWatchingRef({
+    required this.mediaId,
+    this.creatorId,
+    this.positionSeconds = 0,
+    this.durationSeconds,
+    this.lastOccurredAt,
+  });
+
+  factory ContinueWatchingRef.fromJson(Map<String, dynamic> json) =>
+      ContinueWatchingRef(
+        mediaId: json['mediaId'] as String? ?? '',
+        creatorId: json['creatorId'] as String?,
+        positionSeconds: (json['positionSeconds'] as num?)?.toDouble() ?? 0,
+        durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
+        lastOccurredAt: DateTime.tryParse(
+          json['lastOccurredAt'] as String? ?? '',
+        ),
+      );
+
+  final String mediaId;
+  final String? creatorId;
+  final double positionSeconds;
+
+  /// Usually absent — the runtime comes from the hydrating search instead.
+  final double? durationSeconds;
+
+  final DateTime? lastOccurredAt;
+
+  /// How far in, 0–1, or null when nothing says how long the media runs.
+  double? progressAgainst(double? runtime) {
+    final total = runtime ?? durationSeconds;
+    if (total == null || total <= 0) return null;
+    return (positionSeconds / total).clamp(0.0, 1.0);
+  }
 }

@@ -11,7 +11,6 @@ import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/data/recent_searches.dart';
 import 'package:test_app/features/discovery/data/search_grouping.dart';
 import 'package:test_app/features/discovery/data/search_query.dart';
-import 'package:test_app/features/discovery/data/search_suggestions_dummy.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/search_field.dart';
@@ -20,7 +19,8 @@ import 'package:test_app/features/discovery/views/widgets/search_type_tabs.dart'
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
-import 'package:test_app/features/explore/data/explore_dummy_data.dart';
+import 'package:test_app/features/explore/data/explore_categories.dart';
+import 'package:test_app/models/explore_models/explore_models.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
@@ -40,19 +40,40 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// over a preview of what already matches. Committing a query swaps in the type
 /// filter and the full grouped results.
 ///
-/// The discovery API has no free-text search route, so a typed query filters
-/// the rows the feed returned rather than what it asks for. The type filter
-/// *is* a server filter, so choosing one genuinely changes the request. The
-/// only invented rows on this screen are the completions — see
-/// [SearchSuggestions].
+/// Nothing on this screen is narrowed on the device. A committed query runs
+/// `POST /v1/search/public/query`, which does the text matching, the type
+/// filter and the video/audio split; an empty field falls back to the mixed
+/// feed, because there is nothing to search for. The completions come from
+/// the same index via its autocomplete route, so every row offered is the
+/// title of something that exists.
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.initialQuery});
+  const SearchScreen({
+    super.key,
+    this.initialQuery,
+    this.initialFilter,
+    this.initialCategory,
+  });
 
   /// Opens straight to results for this term rather than to an empty field.
   ///
   /// This is how a Browse chip on Explore arrives: the reader has already said
   /// what they want, so asking them to type it again would be busywork.
   final String? initialQuery;
+
+  /// Opens on a topic rather than a phrase.
+  ///
+  /// This is how a Browse chip arrives. A chip is a category, so it narrows
+  /// by `categorySlugs` — searching for the words "Bible study" would match
+  /// whatever happens to contain them and miss everything tagged with the
+  /// slug but titled otherwise.
+  final ExploreCategory? initialCategory;
+
+  /// Opens on a type tab rather than All.
+  ///
+  /// This is how "See all" on an Explore rail arrives. A rail is a kind of
+  /// thing, not a phrase — searching for the words "Live now" would return
+  /// whatever happens to contain them.
+  final SearchFilter? initialFilter;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -66,12 +87,14 @@ class _SearchScreenState extends State<SearchScreen> {
   final _focus = FocusNode();
   final _scroll = ScrollController();
 
-  SearchFilter _filter = SearchFilter.all;
+  late SearchFilter _filter = widget.initialFilter ?? SearchFilter.all;
+  late ExploreCategory? _category = widget.initialCategory;
   String _query = '';
   bool _committed = false;
   Timer? _debounce;
 
   List<String> _recent = const [];
+  List<String> _suggestions = const [];
   List<WebFeedItem> _items = const [];
   final _store = getIt<EngagementStore>();
   late final _actions = FeedCardActions(
@@ -85,12 +108,22 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _failed = false;
 
   _Phase get _phase {
-    if (_query.isEmpty) return _Phase.browsing;
+    // Arriving on a topic or a type tab is a committed browse: there is no
+    // term, but the reader has still said what they want, so the results are
+    // the right state rather than the recent-searches list they did not ask
+    // for.
+    if (_query.isEmpty) {
+      return _browsingATopic ? _Phase.results : _Phase.browsing;
+    }
     return _committed ? _Phase.results : _Phase.typing;
   }
 
-  List<WebFeedItem> get _results =>
-      SearchMatcher.apply(_items, _query, _filter);
+  /// Opened from a Browse chip or a rail's "See all", and not since cleared.
+  bool _browsingATopic = false;
+
+  /// What is on screen. The server does the matching now, so this is the
+  /// page as it came back rather than a sifted feed.
+  List<WebFeedItem> get _results => _items;
 
   @override
   void initState() {
@@ -98,9 +131,14 @@ class _SearchScreenState extends State<SearchScreen> {
     _recent = RecentSearches.load();
     _scroll.addListener(_onScroll);
 
+    _browsingATopic =
+        widget.initialFilter != null || widget.initialCategory != null;
+
     final opening = widget.initialQuery?.trim() ?? '';
     if (opening.isEmpty) {
-      _focus.requestFocus();
+      // Arriving on a topic or a tab is already an instruction; the keyboard
+      // would only cover the results it asked for.
+      if (!_browsingATopic) _focus.requestFocus();
     } else {
       // Arriving with a term means the results are what was asked for; raising
       // the keyboard over them would only be in the way.
@@ -170,18 +208,56 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onQueryChanged(String value) {
     _debounce?.cancel();
-    // Filtering happens on rows already in hand, so this only needs to be slow
-    // enough to avoid rebuilding the list on every keystroke.
-    _debounce = Timer(const Duration(milliseconds: 200), () {
+    // Each keystroke now costs a request, so this waits a little longer than
+    // it did when matching happened on rows already in hand.
+    _debounce = Timer(const Duration(milliseconds: 280), () {
       if (!mounted) return;
       setState(() {
         _query = value.trim();
+        // Typing replaces the topic: the reader is asking for something else.
+        if (_query.isNotEmpty) {
+          _category = null;
+          _browsingATopic = false;
+        }
         // Any edit puts the reader back among the completions. Without this a
         // committed query stayed on the results list while they typed, and the
         // suggestions never came back until the field was cleared entirely.
         _committed = false;
       });
+      unawaited(_suggest(_query));
     });
+  }
+
+  /// Completions for what is half-typed.
+  ///
+  /// These are real rows from the search index — titles of things that exist —
+  /// rather than a canned vocabulary. A reply that arrives after the reader
+  /// has typed on is dropped, or the list would flicker backwards.
+  Future<void> _suggest(String query) async {
+    if (query.isEmpty) {
+      if (mounted) setState(() => _suggestions = const []);
+      return;
+    }
+    try {
+      final hits = await _repo.autocomplete(query, size: 8);
+      if (!mounted || _query != query) return;
+      final seen = <String>{};
+      setState(() {
+        _suggestions = [
+          for (final hit in hits)
+            if (hit.title.trim().isNotEmpty &&
+                seen.add(hit.title.toLowerCase()))
+              hit.title,
+        ];
+      });
+    } catch (e) {
+      logger.w('Autocomplete failed', error: e);
+      // A suggestion list is a convenience; losing it must not interrupt
+      // typing, and an error row over the keyboard would.
+      if (mounted && _query == query) {
+        setState(() => _suggestions = const []);
+      }
+    }
   }
 
   /// Runs a query for real: remembers it, closes the keyboard, shows results.
@@ -198,6 +274,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _committed = true;
     });
 
+    unawaited(_load());
     final next = await RecentSearches.add(term);
     if (mounted) setState(() => _recent = next);
   }
@@ -208,8 +285,13 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _query = '';
       _committed = false;
+      _category = null;
+      _browsingATopic = false;
+      _suggestions = const [];
     });
     _focus.requestFocus();
+    // Back to the browse feed, which is a different read from a search.
+    unawaited(_load());
   }
 
   Future<void> _forgetRecent(String term) async {
@@ -222,18 +304,49 @@ class _SearchScreenState extends State<SearchScreen> {
     if (mounted) setState(() => _recent = next);
   }
 
+  /// A committed query is a real search; an empty one is a browse.
+  ///
+  /// `POST /v1/search/public/query` does the text matching, the type filter
+  /// and the video/audio split, so nothing is narrowed on the device. With no
+  /// query there is nothing to search for, and the mixed feed is what the
+  /// design shows under the recent-searches list.
+  Future<WebFeedResponse> _fetch({String? cursor}) {
+    final query = _query.trim();
+    final topic = _category;
+
+    // Nothing asked for at all: the mixed feed is what the design shows
+    // under the recent-searches list.
+    if (query.isEmpty && topic == null) {
+      return _repo.fetchWebFeed(
+        limit: 20,
+        sort: 'recent',
+        cursor: cursor,
+        entityTypes: _filter.entityTypes,
+        liveOnly: _filter.liveOnly,
+      );
+    }
+
+    // A topic with no term is a browse, which the route wants as an omitted
+    // `q` with a sort — not as a wildcard.
+    return _repo.searchPublic(
+      q: query.isEmpty ? null : query,
+      sort: query.isEmpty ? 'recent' : 'relevance',
+      size: 20,
+      cursor: cursor,
+      entityTypes: _filter.entityTypes,
+      categorySlugs: topic == null ? null : [topic.slug],
+      liveOnly: _filter.liveOnly,
+      mediaType: _filter.mediaType,
+    );
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      final page = await _repo.fetchWebFeed(
-        limit: 20,
-        sort: 'recent',
-        entityTypes: _filter.entityTypes,
-        liveOnly: _filter.liveOnly,
-      );
+      final page = await _fetch();
       if (!mounted) return;
       setState(() {
         _items = page.items;
@@ -256,13 +369,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_loadingMore || _loading || _cursor == null) return;
     setState(() => _loadingMore = true);
     try {
-      final page = await _repo.fetchWebFeed(
-        limit: 20,
-        sort: 'recent',
-        cursor: _cursor,
-        entityTypes: _filter.entityTypes,
-        liveOnly: _filter.liveOnly,
-      );
+      final page = await _fetch(cursor: _cursor);
       if (!mounted) return;
       FeedCardActions.seedRows(_store, page.items);
       setState(() {
@@ -388,7 +495,7 @@ class _SearchScreenState extends State<SearchScreen> {
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.s),
           child: CategoryChipGrid(
-            categories: ExploreDummyData.categories,
+            categories: ExploreCategories.all,
             onSelected: (c) => _commit(c.label),
           ),
         ),
@@ -398,7 +505,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Mid-query: completions over a preview of what already matches.
   Widget _typing() {
-    final suggestions = SearchSuggestions.forQuery(_query);
+    final suggestions = _suggestions;
     return ListView(
       padding: EdgeInsets.only(top: 8.s, bottom: 110.s),
       children: [
@@ -533,7 +640,9 @@ class _SearchScreenState extends State<SearchScreen> {
                     border: Border.all(color: AppColors.neutral700),
                   ),
                   child: Text(
-                    _loadingMore ? 'Loading…' : 'Look further back',
+                    _loadingMore
+                        ? AppStrings.searchLoadingMore
+                        : AppStrings.searchShowMore,
                     style: AppStyles.label(13),
                   ),
                 ),

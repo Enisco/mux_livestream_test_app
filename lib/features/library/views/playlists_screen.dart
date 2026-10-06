@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/playlist_dummy_data.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/library/repo/playlist_repo.dart';
 import 'package:test_app/features/library/views/playlist_detail_screen.dart';
 import 'package:test_app/features/library/views/playlist_form_screen.dart';
 import 'package:test_app/models/library_models/playlist_models.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/components/library_parts.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -13,33 +17,77 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Every running order the reader has put together.
 ///
-/// Nothing here is stored — see [PlaylistDummyData]. Creating, renaming and
-/// deleting all happen in memory so the flows can be walked end to end.
+/// **Every playlist here is private.** Staging refuses `visibility` on both
+/// create and update, so the design's "Anyone with the link" group has
+/// nothing to hold and no playlist can be shared — see `docs/OPEN_ISSUES.md`.
 class PlaylistsScreen extends StatefulWidget {
-  const PlaylistsScreen({super.key});
+  const PlaylistsScreen({super.key, this.repo});
+
+  /// Defaults to the real thing; a test supplies its own.
+  final PlaylistRepo? repo;
 
   @override
   State<PlaylistsScreen> createState() => _PlaylistsScreenState();
 }
 
 class _PlaylistsScreenState extends State<PlaylistsScreen> {
+  late final _repo = widget.repo ?? PlaylistRepo();
   final _controller = TextEditingController();
-  late List<Playlist> _playlists = [...PlaylistDummyData.playlists];
+
+  List<Playlist> _playlists = const [];
   String _query = '';
+  Timer? _debounce;
+  bool _loading = true;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
-  List<Playlist> get _matches {
-    final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _playlists;
-    return _playlists
-        .where((p) => p.name.toLowerCase().contains(q))
-        .toList(growable: false);
+  /// Searching is the route's own `title.contains` filter, not a sift of
+  /// what has been loaded — a reader with fifty playlists would otherwise
+  /// only find the page they are looking at.
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final rows = await _repo.search(query: _query);
+      if (!mounted) return;
+      setState(() {
+        _playlists = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('Playlists failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
   }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    setState(() => _query = value);
+    _debounce = Timer(const Duration(milliseconds: 280), () {
+      if (mounted) unawaited(_load());
+    });
+  }
+
+  List<Playlist> get _matches => _playlists;
 
   Future<void> _create() async {
     final draft = await Navigator.push<PlaylistDraft>(
@@ -47,19 +95,31 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       MaterialPageRoute(builder: (_) => const PlaylistFormScreen()),
     );
     if (draft == null || !mounted) return;
+    try {
+      await _repo.create(title: draft.name);
+      await _load();
+    } catch (e) {
+      logger.w('Playlist create failed', error: e);
+      if (mounted) _report(AppStrings.playlistSaveFailed);
+    }
+  }
+
+  /// Take it out at once, and put it back if the write fails.
+  Future<void> _delete(Playlist playlist) async {
+    final before = _playlists;
     setState(() {
-      _playlists = [
-        Playlist(
-          id: 'new-${DateTime.now().microsecondsSinceEpoch}',
-          name: draft.name,
-          updatedAgo: AppStrings.justNow,
-          covers: const [],
-          items: const [],
-          isPrivate: draft.isPrivate,
-        ),
-        ..._playlists,
-      ];
+      _playlists = _playlists
+          .where((p) => p.id != playlist.id)
+          .toList(growable: false);
     });
+    try {
+      await _repo.delete(playlist.id);
+    } catch (e) {
+      logger.w('Playlist delete failed', error: e);
+      if (!mounted) return;
+      setState(() => _playlists = before);
+      _report(AppStrings.playlistSaveFailed);
+    }
   }
 
   void _report(String message) {
@@ -120,12 +180,18 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       MaterialPageRoute(builder: (_) => PlaylistFormScreen(existing: playlist)),
     );
     if (draft == null || !mounted) return;
-    setState(() {
-      final i = _playlists.indexWhere((p) => p.id == playlist.id);
-      if (i < 0) return;
-      _playlists = [..._playlists]
-        ..[i] = playlist.copyWith(name: draft.name, isPrivate: draft.isPrivate);
-    });
+    try {
+      await _repo.update(playlist.id, title: draft.name);
+      if (!mounted) return;
+      setState(() {
+        final i = _playlists.indexWhere((p) => p.id == playlist.id);
+        if (i < 0) return;
+        _playlists = [..._playlists]..[i] = playlist.copyWith(name: draft.name);
+      });
+    } catch (e) {
+      logger.w('Playlist rename failed', error: e);
+      if (mounted) _report(AppStrings.playlistSaveFailed);
+    }
   }
 
   void _confirmDelete(Playlist playlist) {
@@ -135,12 +201,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         playlist: playlist,
         onConfirm: () {
           Navigator.pop(dialogContext);
-          // Local only: there is no route to delete a playlist.
-          setState(() {
-            _playlists = _playlists
-                .where((p) => p.id != playlist.id)
-                .toList(growable: false);
-          });
+          unawaited(_delete(playlist));
         },
       ),
     );
@@ -182,15 +243,26 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             actionIcon: HugeIcons.strokeRoundedAddCircle,
             actionTint: AppColors.brandPrimary,
             onAction: _create,
-            // The design drops the field once there is nothing to search.
-            controller: _playlists.isEmpty ? null : _controller,
-            onQueryChanged: _playlists.isEmpty
+            // The design drops the field once there is nothing to search —
+            // but not while a search is what emptied the list.
+            controller: _playlists.isEmpty && _query.isEmpty
                 ? null
-                : (v) => setState(() => _query = v),
+                : _controller,
+            onQueryChanged: _playlists.isEmpty && _query.isEmpty
+                ? null
+                : _onQueryChanged,
             searchHint: AppStrings.playlistsSearchHint,
           ),
           Expanded(
-            child: matches.isEmpty
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  )
+                : _failed
+                ? ErrorStateView(onRetry: _load)
+                : matches.isEmpty
                 ? SingleChildScrollView(
                     child: LibraryEmptyState(
                       icon: HugeIcons.strokeRoundedMusicNote01,

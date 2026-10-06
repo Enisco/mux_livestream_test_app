@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/playlist_dummy_data.dart';
+import 'package:dio/dio.dart';
+import 'package:get_it/get_it.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/library/repo/playlist_repo.dart';
+import 'package:test_app/models/history_models/history_models.dart';
+import 'package:test_app/models/library_models/playlist_models.dart';
+import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/features/library/views/playlist_add_screen.dart';
 import 'package:test_app/features/library/views/playlist_detail_screen.dart';
 import 'package:test_app/features/library/views/playlist_form_screen.dart';
@@ -26,6 +32,150 @@ Future<void> _pump(
   await tester.pump();
 }
 
+/// Playlists as staging actually answers.
+///
+/// Worth stating because the integration guide says otherwise: `visibility`
+/// is refused on create and on update, the detail read returns
+/// `orderedMediaIds` rather than ready-to-render `items`, and there is no
+/// public read at all. These feed the real repo so the hydration — one search
+/// over the ids, then the playlist's own order restored — is exercised too.
+class _FakeApi implements ApiService {
+  _FakeApi({this.rows = const [], this.ids = const [], this.hits = const []});
+
+  /// Playlist summaries for the list read.
+  final List<Map<String, dynamic>> rows;
+
+  /// `orderedMediaIds` on the detail read.
+  final List<String> ids;
+
+  /// What the hydrating search answers with.
+  final List<Map<String, dynamic>> hits;
+
+  final List<(String, Object?)> posts = [];
+  final List<(String, Object?)> patches = [];
+  final List<String> deletes = [];
+
+  @override
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    posts.add((path, data));
+    if (path.contains('search/public/query')) {
+      // Search ranks by relevance; it will not hand back playlist order.
+      return _ok(path, {'hits': hits.reversed.toList(), 'total': hits.length});
+    }
+    if (path.contains('playlists/search')) {
+      return _ok(path, {
+        'data': rows,
+        'meta': {'total': rows.length, 'next': null},
+      });
+    }
+    if (path.contains('content-suggestions')) {
+      return _ok(path, {'items': hits});
+    }
+    return _ok(path, _playlistJson());
+  }
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async => _ok(path, _playlistJson());
+
+  @override
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    patches.add((path, data));
+    return _ok(path, _playlistJson());
+  }
+
+  @override
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    deletes.add(path);
+    return _ok(path, const <String, dynamic>{});
+  }
+
+  Map<String, dynamic> _playlistJson() => {
+    'id': 'p1',
+    'title': 'Sunday drive worship',
+    'visibility': 'private',
+    'itemCount': ids.length,
+    'orderedMediaIds': ids,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
+
+  Response<T> _ok<T>(String path, Object body) => Response<T>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: 200,
+    data: {'data': body} as T,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+Map<String, dynamic> _summaryJson({
+  String id = 'p1',
+  String title = 'Sunday drive worship',
+  int itemCount = 2,
+}) => {
+  'id': id,
+  'title': title,
+  'visibility': 'private',
+  'itemCount': itemCount,
+  'updatedAt': DateTime.now().toUtc().toIso8601String(),
+};
+
+Map<String, dynamic> _mediaHit(String id, String title) => {
+  'entityType': 'media',
+  'entityId': id,
+  'title': title,
+  'facets': const {'mediaType': 'video', 'analyticsViews': 10},
+  'meta': const {'durationSeconds': 60.0},
+  'creator': const {'creatorId': 'c1', 'displayName': 'Grace Chapel'},
+};
+
+/// A list row, as the list screen hands one to the detail screen.
+Playlist _summary({String id = 'p1', String name = 'Sunday drive worship'}) =>
+    Playlist(
+      id: id,
+      name: name,
+      updatedAgo: '2h',
+      covers: const [],
+      items: const [],
+      declaredCount: 2,
+    );
+
+_FakeApi _register({
+  List<Map<String, dynamic>> rows = const [],
+  List<String> ids = const [],
+  List<Map<String, dynamic>> hits = const [],
+}) {
+  final api = _FakeApi(rows: rows, ids: ids, hits: hits);
+  // `GetIt.reset()` is asynchronous, so resetting in a cascade races the
+  // registrations that follow it and leaves the locator half empty.
+  GetIt.instance
+    ..allowReassignment = true
+    ..registerSingleton<ApiService>(api)
+    ..registerSingleton<DiscoveryRepo>(DiscoveryRepo());
+  addTearDown(GetIt.instance.reset);
+  return api;
+}
+
 /// Tall enough that the lazy lists build every row at once.
 const _tall = Size(390, 3200);
 
@@ -34,122 +184,127 @@ void main() {
 
   group('the playlist list', () {
     testWidgets('names every playlist and what is in it', (tester) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
+      final api = _register(
+        rows: [
+          _summaryJson(),
+          _summaryJson(id: 'p2', title: 'Late night prayers', itemCount: 0),
+        ],
+      );
+      await _pump(
+        tester,
+        PlaylistsScreen(repo: PlaylistRepo(api: api)),
+        size: _tall,
+      );
 
-      expect(find.text('Playlists'), findsOneWidget);
-      expect(find.text('New playlist'), findsOneWidget);
-      for (final playlist in PlaylistDummyData.playlists) {
-        expect(find.text(playlist.name), findsOneWidget, reason: playlist.name);
-      }
-      expect(find.text('4 items · Updated 2h ago'), findsNWidgets(3));
-      expect(find.text('0 items · Updated just now'), findsOneWidget);
+      expect(find.text('Sunday drive worship'), findsOneWidget);
+      expect(find.text('Late night prayers'), findsOneWidget);
     });
 
-    testWidgets('an empty playlist gets no count badge', (tester) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
-
-      // Three filled playlists carry "4 Videos"; the empty one carries none.
-      expect(find.text('4 Videos'), findsNWidgets(3));
-    });
-
-    testWidgets('search narrows to the matching playlist', (tester) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
-
-      await tester.enterText(find.byType(TextField), 'mum');
-      await tester.pump();
-
-      expect(find.text('For Mum'), findsOneWidget);
-      expect(find.text('Sunday Worship'), findsNothing);
-    });
-
-    testWidgets('a query matching nothing says so', (tester) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
-
-      await tester.enterText(find.byType(TextField), 'zzzz');
-      await tester.pump();
-
-      expect(find.text('Nothing matched'), findsOneWidget);
-    });
-
-    testWidgets('the row overflow renames the playlist in place', (
+    testWidgets('the count is the server\'s, not the rows on hand', (
       tester,
     ) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
-
-      await tester.tap(find.byKey(const ValueKey('row-more-pl2')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('action-Edit playlist detail')),
+      // The list read carries no items at all, so counting an array would
+      // say every playlist is empty.
+      final api = _register(rows: [_summaryJson(itemCount: 12)]);
+      await _pump(
+        tester,
+        PlaylistsScreen(repo: PlaylistRepo(api: api)),
+        size: _tall,
       );
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.byType(TextField), 'For Mum and Dad');
-      await tester.pump();
-      await tester.tap(find.text('Update'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('For Mum and Dad'), findsOneWidget);
-      expect(find.text('For Mum'), findsNothing);
+      expect(find.textContaining('12'), findsWidgets);
     });
 
-    testWidgets('the row overflow deletes behind a confirmation', (
+    testWidgets('searching asks the server, not the page in hand', (
       tester,
     ) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
-
-      await tester.tap(find.byKey(const ValueKey('row-more-pl2')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('action-Delete this playlist')),
+      // A reader with fifty playlists would otherwise only ever find the
+      // ones already loaded.
+      final api = _register(rows: [_summaryJson()]);
+      await _pump(
+        tester,
+        PlaylistsScreen(repo: PlaylistRepo(api: api)),
+        size: _tall,
       );
+
+      await tester.enterText(find.byType(TextField), 'prayer');
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      expect(find.text('For Mum'), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('row-more-pl2')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const ValueKey('action-Delete this playlist')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('DELETE'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('For Mum'), findsNothing);
-      expect(find.text('Sunday Worship'), findsOneWidget);
+      final body = api.posts.last.$2! as Map<String, dynamic>;
+      expect(body['filters'], {
+        'title': {'contains': 'prayer'},
+      });
     });
 
-    testWidgets('creating one puts it at the top of the list', (tester) async {
-      await _pump(tester, const PlaylistsScreen(), size: _tall);
+    testWidgets('creating one posts it and reloads', (tester) async {
+      final api = _register(rows: [_summaryJson()]);
+      await _pump(
+        tester,
+        PlaylistsScreen(repo: PlaylistRepo(api: api)),
+        size: _tall,
+      );
 
-      await tester.tap(find.text('New playlist'));
+      await tester.tap(find.text('New playlist').first);
       await tester.pumpAndSettle();
-
-      await tester.enterText(find.byType(TextField), 'Road trip');
-      await tester.pump();
+      await tester.enterText(find.byType(TextField).last, 'Road trip');
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Create new playlist'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Road trip'), findsOneWidget);
-      expect(find.text('0 items · Updated just now'), findsNWidgets(2));
+      final created = api.posts.firstWhere(
+        (c) => c.$1 == '/v1/media/playlists',
+      );
+      expect(created.$2, {'title': 'Road trip'});
+    });
+
+    testWidgets('and never sends a visibility the API refuses', (tester) async {
+      // Staging answers "property visibility should not exist" on create and
+      // on update alike.
+      final api = _register(rows: [_summaryJson()]);
+      await _pump(
+        tester,
+        PlaylistsScreen(repo: PlaylistRepo(api: api)),
+        size: _tall,
+      );
+
+      await tester.tap(find.text('New playlist').first);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'Road trip');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create new playlist'));
+      await tester.pumpAndSettle();
+
+      for (final call in api.posts) {
+        final body = call.$2;
+        if (body is Map<String, dynamic>) {
+          expect(body.containsKey('visibility'), isFalse, reason: '$call');
+        }
+      }
+    });
+
+    testWidgets('deleting one calls the route', (tester) async {
+      final api = _register(rows: [_summaryJson()]);
+      await _pump(
+        tester,
+        PlaylistsScreen(repo: PlaylistRepo(api: api)),
+        size: _tall,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('row-more-p1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete this playlist'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DELETE').last);
+      await tester.pumpAndSettle();
+
+      expect(api.deletes, ['/v1/media/playlists/p1']);
     });
   });
 
   group('the form', () {
     testWidgets('will not submit an empty name', (tester) async {
+      _register();
       await _pump(tester, const PlaylistFormScreen());
-
-      final before = tester.widget<Opacity>(
-        find
-            .ancestor(
-              of: find.text('Create new playlist'),
-              matching: find.byType(Opacity),
-            )
-            .first,
-      );
-      expect(before.opacity, lessThan(1));
 
       await tester.tap(find.text('Create new playlist'));
       await tester.pumpAndSettle();
@@ -157,266 +312,251 @@ void main() {
       expect(find.text('New playlist'), findsOneWidget);
     });
 
-    testWidgets('visibility is one choice, not two', (tester) async {
+    testWidgets('says plainly that a public playlist is not possible', (
+      tester,
+    ) async {
+      // The design offers the choice; the API has no way to honour it, so
+      // the control is inert and the screen explains why.
+      _register();
       await _pump(tester, const PlaylistFormScreen());
 
       expect(find.text('Private'), findsOneWidget);
       expect(find.text('Public'), findsOneWidget);
+      expect(find.textContaining('stay private'), findsOneWidget);
 
       await tester.tap(find.text('Public'));
-      await tester.pump();
-      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+      // Still private: the tap does nothing rather than lying.
+      expect(find.textContaining('stay private'), findsOneWidget);
     });
 
     testWidgets('editing arrives with the name already in it', (tester) async {
-      await _pump(
-        tester,
-        PlaylistFormScreen(existing: PlaylistDummyData.playlists.first),
-      );
+      _register();
+      await _pump(tester, PlaylistFormScreen(existing: _summary()));
 
       expect(find.text('Edit playlist'), findsOneWidget);
-      expect(find.text('Update'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller?.text,
-        'Sunday Worship',
+        'Sunday drive worship',
       );
     });
   });
 
   group('the detail screen', () {
-    testWidgets('lists the items and what plays next', (tester) async {
-      await _pump(
-        tester,
-        PlaylistDetailScreen(playlist: PlaylistDummyData.playlists.first),
-        size: _tall,
-      );
-
-      expect(find.text('Sunday Worship'), findsWidgets);
-      expect(find.text('4 Items · 3h 24m'), findsOneWidget);
-      expect(find.text('Recommended for you'), findsOneWidget);
-      expect(find.text('Edit Cover Photo'), findsOneWidget);
-    });
-
-    testWidgets('an empty one says so and still recommends', (tester) async {
-      await _pump(
-        tester,
-        PlaylistDetailScreen(playlist: PlaylistDummyData.playlists.last),
-        size: _tall,
-      );
-
-      expect(find.text('This playlist is empty'), findsOneWidget);
-      expect(find.text('0 items'), findsOneWidget);
-      expect(find.text('Recommended for you'), findsOneWidget);
-    });
-
-    testWidgets('the overflow offers Play all only when there is one', (
+    testWidgets('hydrates its ids and keeps the playlist\'s own order', (
       tester,
     ) async {
+      // The read returns `orderedMediaIds` only, and the hydrating search
+      // ranks by relevance — so the order has to be put back.
+      _register(
+        ids: const ['m1', 'm2', 'm3'],
+        hits: [
+          _mediaHit('m1', 'First'),
+          _mediaHit('m2', 'Second'),
+          _mediaHit('m3', 'Third'),
+        ],
+      );
       await _pump(
         tester,
-        PlaylistDetailScreen(playlist: PlaylistDummyData.playlists.last),
+        PlaylistDetailScreen(playlist: _summary(), repo: PlaylistRepo()),
         size: _tall,
       );
 
-      await tester.tap(find.byKey(const ValueKey('playlist-more')));
-      await tester.pumpAndSettle();
-      // The sheet's own rows; the empty playlist cannot play.
-      final playAll = tester.widget<Opacity>(
-        find
-            .ancestor(of: find.text('Play all'), matching: find.byType(Opacity))
-            .first,
-      );
-      expect(playAll.opacity, lessThan(1));
-      expect(find.text('Delete this playlist'), findsOneWidget);
+      final titles = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data)
+          .whereType<String>()
+          .where((t) => ['First', 'Second', 'Third'].contains(t))
+          .toList();
+      expect(titles, ['First', 'Second', 'Third']);
     });
 
-    testWidgets('deleting asks first, then hands the deletion back', (
+    testWidgets('an id the search cannot resolve is counted, not drawn', (
       tester,
     ) async {
-      PlaylistOutcome? outcome;
+      // Content deleted or made private since it was added.
+      _register(
+        ids: const ['m1', 'gone'],
+        hits: [_mediaHit('m1', 'Still here')],
+      );
       await _pump(
         tester,
-        Builder(
-          builder: (context) => TextButton(
-            onPressed: () async {
-              outcome = await Navigator.push<PlaylistOutcome>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PlaylistDetailScreen(
-                    playlist: PlaylistDummyData.playlists.first,
-                  ),
-                ),
-              );
-            },
-            child: const Text('open'),
-          ),
+        PlaylistDetailScreen(playlist: _summary(), repo: PlaylistRepo()),
+        size: _tall,
+      );
+
+      expect(find.text('Still here'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an empty playlist says so and offers no suggestions', (
+      tester,
+    ) async {
+      // There is nothing to anchor suggestions on, and a generic list under
+      // an empty playlist is just the feed again.
+      _register();
+      await _pump(
+        tester,
+        PlaylistDetailScreen(playlist: _summary(), repo: PlaylistRepo()),
+        size: _tall,
+      );
+
+      expect(find.text('Recommended for you'), findsNothing);
+    });
+
+    testWidgets('removing an item calls the route', (tester) async {
+      final api = _register(
+        ids: const ['m1'],
+        hits: [_mediaHit('m1', 'First')],
+      );
+      await _pump(
+        tester,
+        PlaylistDetailScreen(
+          playlist: _summary(),
+          repo: PlaylistRepo(api: api),
         ),
         size: _tall,
       );
 
-      await tester.tap(find.text('open'));
+      await tester.tap(find.byKey(const ValueKey('more-m1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove from playlist'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('playlist-more')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(
-          const ValueKey(
-            'action-Delete this '
-            'playlist',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('will be removed from your'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-      expect(outcome, isNull, reason: 'cancel leaves the playlist alone');
-
-      await tester.tap(find.byKey(const ValueKey('playlist-more')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(
-          const ValueKey(
-            'action-Delete this '
-            'playlist',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('DELETE'));
-      await tester.pumpAndSettle();
-
-      expect(outcome?.deleted, isTrue);
-    });
-  });
-
-  group('a row inside a playlist', () {
-    testWidgets('the overflow asks before taking an item out', (tester) async {
-      await _pump(
-        tester,
-        PlaylistDetailScreen(playlist: PlaylistDummyData.playlists.first),
-        size: _tall,
-      );
-
-      expect(find.text('Romans, chapter'), findsWidgets);
-      await tester.tap(find.byKey(const ValueKey('more-pi3')));
-      await tester.pumpAndSettle();
-
-      // A bare tap on the overflow must not delete anything by itself.
-      expect(find.text('Remove from playlist'), findsOneWidget);
-      expect(find.byKey(const ValueKey('item-pi3')), findsOneWidget);
-
-      await tester.tap(
-        find.byKey(const ValueKey('action-Remove from playlist')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('item-pi3')), findsNothing);
-    });
-
-    testWidgets('a recommended row offers to join the playlist', (
-      tester,
-    ) async {
-      await _pump(
-        tester,
-        PlaylistDetailScreen(playlist: PlaylistDummyData.playlists.first),
-        size: _tall,
-      );
-
-      await tester.tap(find.byKey(const ValueKey('more-pr1')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Add to this playlist'), findsOneWidget);
-      expect(find.text('Remove from playlist'), findsNothing);
+      expect(api.deletes, contains('/v1/media/playlists/p1/items/m1'));
     });
   });
 
   group('adding content', () {
-    testWidgets('says which playlist it is adding to', (tester) async {
-      await _pump(
-        tester,
-        const PlaylistAddScreen(playlistName: 'Encouragement'),
-        size: _tall,
-      );
-
-      expect(find.text('Recommended contents'), findsOneWidget);
-      expect(
-        find.textContaining('Encouragement', findRichText: true),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('rows already in the playlist cannot be added again', (
+    testWidgets('offers suggestions anchored on what is already in it', (
       tester,
     ) async {
+      final api = _register(hits: [_mediaHit('m9', 'Suggested')]);
       await _pump(
         tester,
-        const PlaylistAddScreen(playlistName: 'Encouragement'),
+        PlaylistAddScreen(
+          playlistName: 'Sunday drive worship',
+          anchorMediaId: 'm1',
+          discovery: DiscoveryRepo(),
+        ),
         size: _tall,
       );
 
-      // Two of the four are already in; the other two offer Add.
-      expect(find.byKey(const ValueKey('added')), findsNWidgets(2));
-      expect(find.text('Add'), findsNWidgets(2));
+      expect(find.text('Suggested'), findsOneWidget);
+      expect(
+        api.posts.any((c) => c.$1.contains('content-suggestions')),
+        isTrue,
+      );
     });
 
-    testWidgets('picking a row turns it into an added one', (tester) async {
+    testWidgets('an empty playlist falls back to what is popular', (
+      tester,
+    ) async {
+      // There is nothing to anchor on, and offering nothing at all would
+      // leave the reader stuck.
+      final api = _register(hits: [_mediaHit('m9', 'Popular')]);
       await _pump(
         tester,
-        const PlaylistAddScreen(playlistName: 'Encouragement'),
+        PlaylistAddScreen(
+          playlistName: 'Sunday drive worship',
+          discovery: DiscoveryRepo(),
+        ),
         size: _tall,
       );
 
-      await tester.tap(find.text('Add').first);
-      await tester.pump();
-
-      expect(find.byKey(const ValueKey('added')), findsNWidgets(3));
-      expect(find.text('Add'), findsOneWidget);
+      expect(find.text('Popular'), findsOneWidget);
+      final search = api.posts.firstWhere(
+        (c) => c.$1.contains('search/public/query'),
+      );
+      expect((search.$2! as Map<String, dynamic>)['sort'], 'popular');
     });
 
-    testWidgets('nothing picked means nothing to submit', (tester) async {
+    testWidgets('something already in it cannot be picked again', (
+      tester,
+    ) async {
+      // A duplicate add answers 409 rather than quietly doing nothing.
+      _register(hits: [_mediaHit('m9', 'Already in')]);
       await _pump(
         tester,
-        const PlaylistAddScreen(playlistName: 'Encouragement'),
+        PlaylistAddScreen(
+          playlistName: 'Sunday drive worship',
+          anchorMediaId: 'm1',
+          alreadyIn: const {'m9'},
+          discovery: DiscoveryRepo(),
+        ),
         size: _tall,
       );
 
-      final button = tester.widget<Opacity>(
-        find
-            .ancestor(
-              of: find.text('Add selection'),
-              matching: find.byType(Opacity),
-            )
-            .first,
-      );
-      expect(button.opacity, lessThan(1));
+      expect(find.byKey(const ValueKey('added')), findsOneWidget);
     });
   });
 
-  group('nothing overflows', () {
-    testWidgets('the list on a narrow phone', (tester) async {
-      await _pump(tester, const PlaylistsScreen(), size: const Size(320, 3200));
-      expect(tester.takeException(), isNull);
+  group('the repo', () {
+    test('a runtime is the sum of what it holds', () {
+      final page = PlaylistRepo.debugDetail(
+        {'id': 'p', 'title': 'x', 'itemCount': 2},
+        const [
+          HistoryEntry(
+            id: '1',
+            kind: HistoryKind.video,
+            title: 'a',
+            creatorName: '',
+            age: '',
+            duration: '40:00',
+          ),
+          HistoryEntry(
+            id: '2',
+            kind: HistoryKind.video,
+            title: 'b',
+            creatorName: '',
+            age: '',
+            duration: '30:00',
+          ),
+        ],
+      );
+      expect(page.runtime, '1h 10m');
     });
 
-    testWidgets('the detail screen on a narrow phone', (tester) async {
-      await _pump(
-        tester,
-        PlaylistDetailScreen(playlist: PlaylistDummyData.playlists.first),
-        size: const Size(320, 3200),
+    test('and is left out when something has no runtime at all', () {
+      // Better no total than one quietly short of the truth.
+      final page = PlaylistRepo.debugDetail(
+        {'id': 'p', 'title': 'x', 'itemCount': 2},
+        const [
+          HistoryEntry(
+            id: '1',
+            kind: HistoryKind.video,
+            title: 'a',
+            creatorName: '',
+            age: '',
+            duration: '40:00',
+          ),
+          HistoryEntry(
+            id: '2',
+            kind: HistoryKind.video,
+            title: 'b',
+            creatorName: '',
+            age: '',
+          ),
+        ],
       );
-      expect(tester.takeException(), isNull);
+      expect(page.runtime, isEmpty);
     });
 
-    testWidgets('the form on a short phone', (tester) async {
-      await _pump(
-        tester,
-        const PlaylistFormScreen(),
-        size: const Size(320, 640),
+    test('what the search could not resolve is counted as unavailable', () {
+      final page = PlaylistRepo.debugDetail(
+        {'id': 'p', 'title': 'x', 'itemCount': 5},
+        const [
+          HistoryEntry(
+            id: '1',
+            kind: HistoryKind.video,
+            title: 'a',
+            creatorName: '',
+            age: '',
+          ),
+        ],
       );
-      expect(tester.takeException(), isNull);
+      expect(page.unavailableCount, 4);
+      expect(page.itemCount, 5);
     });
   });
 }

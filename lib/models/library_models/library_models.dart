@@ -1,8 +1,8 @@
 /// The reader's own records: events they said they would attend, prayers they
 /// asked for, and testimonies they submitted.
 ///
-/// Shaped for the screens rather than for any payload — none of these has a
-/// route yet.
+/// Shaped for the screens rather than for any one payload: these come from
+/// three different services, and `ViewerRecordsRepo` does the mapping.
 library;
 
 /// Whether an event is still to come, and whether the reader said they are
@@ -19,6 +19,7 @@ class MyEvent {
     required this.past,
     this.creatorVerified = false,
     this.going = false,
+    this.reminderMinutes,
   });
 
   final String id;
@@ -40,6 +41,11 @@ class MyEvent {
   final bool past;
 
   final bool going;
+
+  /// How long before it starts the reader asked to be reminded — **60, 120
+  /// or 1440**, or null for no reminder. The route accepts nothing else, so
+  /// the picker is fixed rather than free-form.
+  final int? reminderMinutes;
 }
 
 /// Where a prayer request stands with the ministry it went to.
@@ -59,6 +65,7 @@ class PrayerRequest {
     required this.sharedAgo,
     required this.status,
     this.authorVerified = false,
+    this.aboutGone = false,
   });
 
   final String id;
@@ -71,6 +78,10 @@ class PrayerRequest {
   final PrayerAbout aboutKind;
 
   bool get aboutIsGeneral => aboutKind == PrayerAbout.general;
+
+  /// It was raised against something that has since been deleted or made
+  /// private. The row says what it was and does not link it.
+  final bool aboutGone;
 
   final String body;
 

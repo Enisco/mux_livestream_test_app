@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/library/repo/viewer_library_repo.dart';
+import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/shared/components/library_parts.dart';
@@ -20,9 +25,9 @@ class LibraryListScreen extends StatefulWidget {
   const LibraryListScreen({
     super.key,
     required this.title,
-    required this.days,
-    required this.total,
-    required this.countSuffix,
+    required this.load,
+    required this.onRemove,
+    required this.countLabel,
     required this.emptyIcon,
     required this.emptyTitle,
     required this.emptyBody,
@@ -33,11 +38,18 @@ class LibraryListScreen extends StatefulWidget {
   });
 
   final String title;
-  final List<HistoryDay> days;
 
-  /// The whole library's size, which is larger than the rows on hand.
-  final int total;
-  final String countSuffix;
+  /// One page of the list. Liked and Saved differ only in which route this
+  /// calls — the row shape, the grouping and the narrowing are the same.
+  final Future<LibraryPage> Function({String? cursor}) load;
+
+  /// Take a row back out: the thumbs-up and the bookmark are the same
+  /// interaction that put it here.
+  final Future<void> Function(HistoryEntry entry) onRemove;
+
+  /// How the list names its own size — counted, so a library of one does
+  /// not read as "1 things".
+  final String Function(int) countLabel;
 
   final List<List<dynamic>> emptyIcon;
   final String emptyTitle;
@@ -65,12 +77,96 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
       ? ''
       : AppStrings.libraryFilterAll;
   final _removed = <String>{};
-  bool _cleared = false;
+
+  List<HistoryDay> _loaded = const [];
+  int _total = 0;
+  String? _cursor;
+  bool _loading = true;
+  bool _failed = false;
+  bool _loadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final page = await widget.load();
+      if (!mounted) return;
+      setState(() {
+        _loaded = page.days;
+        _total = page.total ?? _count(page.days);
+        _cursor = page.nextCursor;
+        _removed.clear();
+        _loading = false;
+      });
+    } catch (e) {
+      logger.w('Library list failed', error: e);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+    }
+  }
+
+  /// A page can hydrate to fewer rows than the engagement page held, because
+  /// content deleted or made private since is dropped — so keep following
+  /// the cursor rather than stopping on a short page.
+  Future<void> _loadMore() async {
+    final cursor = _cursor;
+    if (cursor == null || _loadingMore || _loading) return;
+    setState(() => _loadingMore = true);
+    try {
+      final page = await widget.load(cursor: cursor);
+      if (!mounted) return;
+      setState(() {
+        _loaded = mergeDays(_loaded, page.days);
+        _cursor = page.nextCursor;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      logger.w('Library page failed', error: e);
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  static int _count(List<HistoryDay> days) =>
+      days.fold(0, (n, d) => n + d.entries.length);
+
+  /// Take the row out at once, and put it back if the write fails.
+  Future<void> _remove(HistoryEntry entry) async {
+    setState(() => _removed.add(entry.id));
+    try {
+      await widget.onRemove(entry);
+    } catch (e) {
+      logger.w('Library remove failed', error: e);
+      if (!mounted) return;
+      setState(() => _removed.remove(entry.id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppStrings.historyClearFailed,
+            style: AppStyles.body(13),
+          ),
+          backgroundColor: AppColors.neutral800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   /// Which kinds a filter chip stands for. "All" stands for every kind.
@@ -82,12 +178,11 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
   };
 
   List<HistoryDay> get _days {
-    if (_cleared) return const [];
     final q = _query.trim().toLowerCase();
     final kinds = _kindsFor[_filter];
 
     final out = <HistoryDay>[];
-    for (final day in widget.days) {
+    for (final day in _loaded) {
       final hits = day.entries
           .where((e) {
             if (_removed.contains(e.id)) return false;
@@ -127,8 +222,7 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              // Local only: no route lists or clears these yet.
-              setState(() => _cleared = true);
+              unawaited(_clearAll());
             },
             child: Text(
               AppStrings.historyClearConfirm,
@@ -140,10 +234,23 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
     );
   }
 
+  /// There is no bulk route: clearing is one removal per row, which is what
+  /// the interaction API offers. Rows that fail stay.
+  Future<void> _clearAll() async {
+    final rows = [
+      for (final day in _loaded)
+        for (final e in day.entries)
+          if (!_removed.contains(e.id)) e,
+    ];
+    for (final entry in rows) {
+      await _remove(entry);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final days = _days;
-    final remaining = widget.total - _removed.length;
+    final remaining = _total - _removed.length;
 
     return Scaffold(
       backgroundColor: AppColors.base1,
@@ -167,54 +274,77 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
                   ),
           ),
           Expanded(
-            child: days.isEmpty
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  )
+                : _failed
+                ? ErrorStateView(onRetry: _load)
+                : days.isEmpty
                 ? SingleChildScrollView(
                     child: LibraryEmptyState(
                       icon: widget.emptyIcon,
-                      title: _narrowed && !_cleared
+                      title: _narrowed
                           ? AppStrings.libraryNoMatchTitle
                           : widget.emptyTitle,
-                      body: _narrowed && !_cleared
+                      body: _narrowed
                           ? AppStrings.libraryNoMatchBody
                           : widget.emptyBody,
                     ),
                   )
-                : ListView(
-                    padding: EdgeInsets.only(top: 12.s, bottom: 40.s),
-                    children: [
-                      if (!_cleared)
-                        LibraryCount(
-                          text:
-                              '${formatCount(remaining)} '
-                              '${widget.countSuffix}',
-                        ),
-                      for (final day in days) ...[
-                        LibraryGroupLabel(label: day.label),
-                        for (final entry in day.entries)
+                : NotificationListener<ScrollNotification>(
+                    onNotification: (n) {
+                      if (n.metrics.axis == Axis.vertical &&
+                          n.metrics.extentAfter < 400 &&
+                          _cursor != null) {
+                        unawaited(_loadMore());
+                      }
+                      return false;
+                    },
+                    child: ListView(
+                      padding: EdgeInsets.only(top: 12.s, bottom: 40.s),
+                      children: [
+                        if (remaining > 0)
+                          LibraryCount(text: widget.countLabel(remaining)),
+                        for (final day in days) ...[
+                          LibraryGroupLabel(label: day.label),
+                          for (final entry in day.entries)
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.s),
+                              child: ContentListRow(
+                                title: entry.title,
+                                creatorName: entry.creatorName,
+                                creatorVerified: entry.creatorVerified,
+                                thumbnailAsset: entry.thumbnailAsset,
+                                thumbnailUrl: entry.thumbnailUrl,
+                                glyph: glyphFor(entry.kind),
+                                badge: entry.duration,
+                                progress: entry.progress,
+                                meta: entry.isEvent ? null : metaFor(entry),
+                                eventDate: entry.eventDate,
+                                eventVenue: entry.eventVenue,
+                                eventTime: entry.eventTime,
+                                trailing: _TrailingAction(
+                                  icon: widget.trailingIcon,
+                                  onTap: () => unawaited(_remove(entry)),
+                                ),
+                              ),
+                            ),
+                          SizedBox(height: 22.s),
+                        ],
+                        if (_loadingMore)
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.s),
-                            child: ContentListRow(
-                              title: entry.title,
-                              creatorName: entry.creatorName,
-                              creatorVerified: entry.creatorVerified,
-                              thumbnailAsset: entry.thumbnailAsset,
-                              glyph: glyphFor(entry.kind),
-                              badge: entry.duration,
-                              progress: entry.progress,
-                              meta: entry.isEvent ? null : metaFor(entry),
-                              eventDate: entry.eventDate,
-                              eventVenue: entry.eventVenue,
-                              eventTime: entry.eventTime,
-                              trailing: _TrailingAction(
-                                icon: widget.trailingIcon,
-                                onTap: () =>
-                                    setState(() => _removed.add(entry.id)),
+                            padding: EdgeInsets.symmetric(vertical: 24.s),
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.brandPrimary,
                               ),
                             ),
                           ),
-                        SizedBox(height: 22.s),
                       ],
-                    ],
+                    ),
                   ),
           ),
         ],

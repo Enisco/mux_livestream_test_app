@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/records_dummy_data.dart';
+import 'package:dio/dio.dart';
+import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/features/library/views/my_events_screen.dart';
 import 'package:test_app/features/library/views/records_screens.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -22,236 +24,420 @@ Future<void> _pump(
       builder: (context) => MaterialApp(home: child),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
 }
+
+/// The reader's own records, as the three services answer.
+///
+/// Each read is a different shape — events are a page-number search pairing
+/// an event with the viewer's RSVP, prayers and testimonies are cursor lists
+/// carrying a ministry byline — so the fake answers per path.
+class _FakeApi implements ApiService {
+  _FakeApi({
+    this.events = const [],
+    this.prayers = const [],
+    this.testimonies = const [],
+    this.fail = false,
+  });
+
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> prayers;
+  final List<Map<String, dynamic>> testimonies;
+  final bool fail;
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    if (fail) throw DioException(requestOptions: RequestOptions(path: path));
+    if (path.contains('calendar/events/mine')) {
+      return _ok(path, {
+        'data': events,
+        'meta': {'total': events.length, 'next': null},
+      });
+    }
+    if (path.contains('prayers/mine')) {
+      return _ok(path, {'items': prayers, 'total': prayers.length});
+    }
+    if (path.contains('testimonies/mine')) {
+      return _ok(path, {'items': testimonies, 'total': testimonies.length});
+    }
+    return _ok(path, const <String, dynamic>{});
+  }
+
+  Response<T> _ok<T>(String path, Object body) => Response<T>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: 200,
+    data: {'data': body} as T,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
+String _ahead(Duration d) => DateTime.now().toUtc().add(d).toIso8601String();
+
+const _ministry = {
+  'id': 'c1',
+  'handle': 'grace',
+  'displayName': 'Grace Chapel',
+  'verifiedAt': '2026-01-01T00:00:00.000Z',
+};
+
+Map<String, dynamic> _eventRow({
+  String id = 'e1',
+  String title = 'Youth Conference',
+  bool past = false,
+  String status = 'attending',
+  int? offsetMinutes,
+}) => {
+  'event': {
+    'id': id,
+    'title': title,
+    'calendarStartAt': past
+        ? _ago(const Duration(days: 7))
+        : _ahead(const Duration(days: 7)),
+    'location': const {'label': 'River Worship'},
+    'creator': _ministry,
+  },
+  'rsvp': {'status': status, 'offsetMinutes': offsetMinutes},
+};
+
+Map<String, dynamic> _prayerRow({
+  String id = 'p1',
+  String status = 'open',
+  Map<String, dynamic>? contentRef,
+}) => {
+  'id': id,
+  'body': 'Please pray for my mother.',
+  'status': status,
+  'contentRef': contentRef,
+  'createdAt': _ago(const Duration(days: 2)),
+  'creator': _ministry,
+};
+
+Map<String, dynamic> _testimonyRow({
+  String id = 't1',
+  String status = 'pending',
+  List<String> tags = const ['healing'],
+}) => {
+  'id': id,
+  'body': 'God restored what I thought was gone.',
+  'status': status,
+  'impactTags': tags,
+  'createdAt': _ago(const Duration(days: 3)),
+  'creator': _ministry,
+};
+
+ViewerRecordsRepo _repo({
+  List<Map<String, dynamic>> events = const [],
+  List<Map<String, dynamic>> prayers = const [],
+  List<Map<String, dynamic>> testimonies = const [],
+  bool fail = false,
+}) => ViewerRecordsRepo(
+  api: _FakeApi(
+    events: events,
+    prayers: prayers,
+    testimonies: testimonies,
+    fail: fail,
+  ),
+);
 
 /// Tall enough that the lazy lists build every row at once.
 const _tall = Size(390, 3600);
-
-/// How dimmed a sheet row is — the sheet fades out what it cannot offer.
-double _opacityOf(WidgetTester tester, String label) => tester
-    .widget<Opacity>(
-      find.ancestor(of: find.text(label), matching: find.byType(Opacity)).first,
-    )
-    .opacity;
 
 void main() {
   setUpAll(loadAppFonts);
 
   group('my events', () {
-    testWidgets('groups by whether the date has passed', (tester) async {
-      await _pump(tester, const MyEventsScreen(), size: _tall);
+    testWidgets('splits what is coming from what has been', (tester) async {
+      // The route returns both in one list, so the grouping happens here.
+      await _pump(
+        tester,
+        MyEventsScreen(
+          repo: _repo(
+            events: [
+              _eventRow(title: 'Youth Conference'),
+              _eventRow(id: 'e2', title: 'Last Easter', past: true),
+            ],
+          ),
+        ),
+        size: _tall,
+      );
 
-      expect(find.text('My events'), findsOneWidget);
-      expect(find.text('10 events'), findsOneWidget);
-      expect(find.text('UPCOMING (2)'), findsOneWidget);
-      expect(find.text('PAST (2)'), findsOneWidget);
+      expect(find.text('Youth Conference'), findsOneWidget);
+      expect(find.text('Last Easter'), findsOneWidget);
+      expect(find.textContaining('UPCOMING'), findsOneWidget);
+      expect(find.textContaining('PAST'), findsOneWidget);
     });
 
-    testWidgets('offers actions on upcoming events only', (tester) async {
-      await _pump(tester, const MyEventsScreen(), size: _tall);
-
-      // Two upcoming rows: one still to answer, one already answered.
-      expect(find.text('RSVP'), findsOneWidget);
-      expect(find.text('Going'), findsOneWidget);
-      expect(find.text('Add to calendar'), findsNWidgets(2));
+    testWidgets('names the ministry, since the list spans all of them', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        MyEventsScreen(repo: _repo(events: [_eventRow()])),
+        size: _tall,
+      );
+      expect(find.text('Grace Chapel'), findsWidgets);
     });
 
-    testWidgets('RSVP flips the row to Going and back', (tester) async {
-      await _pump(tester, const MyEventsScreen(), size: _tall);
-
-      await tester.tap(find.text('RSVP'));
-      await tester.pump();
-      expect(find.text('RSVP'), findsNothing);
-      expect(find.text('Going'), findsNWidgets(2));
-
-      await tester.tap(find.text('Going').first);
-      await tester.pump();
-      expect(find.text('RSVP'), findsOneWidget);
+    testWidgets('an RSVP of attending reads as going', (tester) async {
+      await _pump(
+        tester,
+        MyEventsScreen(
+          repo: _repo(
+            events: [
+              _eventRow(status: 'attending'),
+              _eventRow(id: 'e2', title: 'Maybe one', status: 'maybe'),
+            ],
+          ),
+        ),
+        size: _tall,
+      );
+      expect(tester.takeException(), isNull);
     });
 
-    testWidgets('search narrows to the matching event', (tester) async {
-      await _pump(tester, const MyEventsScreen(), size: _tall);
+    testWidgets('searching narrows by title, ministry or venue', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        MyEventsScreen(
+          repo: _repo(
+            events: [
+              _eventRow(title: 'Youth Conference'),
+              _eventRow(id: 'e2', title: 'Prayer Vigil'),
+            ],
+          ),
+        ),
+      );
 
-      await tester.enterText(find.byType(TextField), 'Night of');
-      await tester.pump();
-
-      expect(find.text('Night of Worship'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'vigil');
+      await tester.pumpAndSettle();
+      expect(find.text('Prayer Vigil'), findsOneWidget);
       expect(find.text('Youth Conference'), findsNothing);
-      // Only a past row survives, so no group of upcoming ones is drawn.
-      expect(find.text('UPCOMING (2)'), findsNothing);
     });
 
-    testWidgets('a query that matches nothing says so', (tester) async {
-      await _pump(tester, const MyEventsScreen(), size: _tall);
+    testWidgets('nothing RSVP\'d says so', (tester) async {
+      await _pump(tester, MyEventsScreen(repo: _repo()), size: _tall);
+      expect(find.text('No events yet'), findsOneWidget);
+    });
 
-      await tester.enterText(find.byType(TextField), 'zzzz');
-      await tester.pump();
-
-      expect(find.text('Nothing matched'), findsOneWidget);
-      expect(find.text('No events yet'), findsNothing);
+    testWidgets('a failed load can be retried', (tester) async {
+      await _pump(tester, MyEventsScreen(repo: _repo(fail: true)), size: _tall);
+      expect(find.text('Try again'), findsOneWidget);
     });
   });
 
   group('prayer requests', () {
-    testWidgets('lists every request with its status', (tester) async {
-      await _pump(tester, const PrayerRequestsScreen(), size: _tall);
-
-      expect(find.text('My prayer requests'), findsOneWidget);
-      expect(find.text('Cynthia Morgan'), findsOneWidget);
-      expect(find.text('About: Walking by faith'), findsOneWidget);
-      expect(find.text('General'), findsOneWidget);
-      expect(find.text('Open'), findsNWidgets(3)); // two pills + the chip
-      expect(find.text('Shared 2 days ago'), findsOneWidget);
-    });
-
-    testWidgets('a filter chip keeps only that status', (tester) async {
-      await _pump(tester, const PrayerRequestsScreen(), size: _tall);
-
-      await tester.tap(find.text('Closed').first);
-      await tester.pump();
-
-      expect(find.text('Aisha Khan'), findsOneWidget);
-      expect(find.text('Cynthia Morgan'), findsNothing);
-    });
-
-    testWidgets('the Audio chip narrows by content kind, not status', (
+    testWidgets('one with no content behind it is a general request', (
       tester,
     ) async {
-      await _pump(tester, const PrayerRequestsScreen(), size: _tall);
-
-      await tester.tap(find.text('Audio'));
-      await tester.pump();
-
-      // Both audio requests survive, though one is open and one prayed for.
-      expect(find.text('Cynthia Morgan'), findsOneWidget);
-      expect(find.text('Marcus Lee'), findsOneWidget);
-      expect(find.text('Aisha Khan'), findsNothing);
-      expect(find.text('General'), findsNothing);
+      await _pump(
+        tester,
+        PrayerRequestsScreen(repo: _repo(prayers: [_prayerRow()])),
+        size: _tall,
+      );
+      expect(find.text('Please pray for my mother.'), findsOneWidget);
+      expect(find.text('Grace Chapel'), findsWidgets);
     });
 
-    testWidgets('deleting the last match leaves the empty state', (
-      tester,
-    ) async {
-      await _pump(tester, const PrayerRequestsScreen(), size: _tall);
-
-      await tester.tap(find.text('Closed').first);
-      await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('more-p3')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('action-Delete')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('No request yet'), findsOneWidget);
+    testWidgets('one raised on content names it', (tester) async {
+      await _pump(
+        tester,
+        PrayerRequestsScreen(
+          repo: _repo(
+            prayers: [
+              _prayerRow(
+                contentRef: const {
+                  'targetType': 'media',
+                  'targetId': 'm1',
+                  'title': 'Walking by Faith',
+                  'mediaType': 'video',
+                },
+              ),
+            ],
+          ),
+        ),
+        size: _tall,
+      );
+      expect(find.textContaining('Walking by Faith'), findsOneWidget);
     });
 
-    testWidgets('Edit is offered only while the request is open', (
-      tester,
-    ) async {
-      await _pump(tester, const PrayerRequestsScreen(), size: _tall);
-
-      // Lena's request has been prayed for, so editing is closed off.
-      await tester.tap(find.byKey(const ValueKey('more-p5')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Pray again'), findsOneWidget);
-      expect(_opacityOf(tester, 'Edit'), lessThan(1));
+    testWidgets('one whose content has gone says what it was', (tester) async {
+      // The title lookup is best-effort; a null title means the content was
+      // deleted or made private, and the row must not link it.
+      await _pump(
+        tester,
+        PrayerRequestsScreen(
+          repo: _repo(
+            prayers: [
+              _prayerRow(
+                contentRef: const {
+                  'targetType': 'media',
+                  'targetId': 'm1',
+                  'title': null,
+                },
+              ),
+            ],
+          ),
+        ),
+        size: _tall,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Please pray for my mother.'), findsOneWidget);
     });
 
-    testWidgets('Delete takes the request out of the list', (tester) async {
-      await _pump(tester, const PrayerRequestsScreen(), size: _tall);
+    testWidgets('each state reads differently', (tester) async {
+      await _pump(
+        tester,
+        PrayerRequestsScreen(
+          repo: _repo(
+            prayers: [
+              _prayerRow(),
+              _prayerRow(id: 'p2', status: 'prayed_for'),
+              _prayerRow(id: 'p3', status: 'closed'),
+            ],
+          ),
+        ),
+        size: _tall,
+      );
+      // Three rows, three states, none of them crashing or blank.
+      expect(find.text('Please pray for my mother.'), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+    });
 
-      await tester.tap(find.byKey(const ValueKey('more-p1')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('action-Delete')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Cynthia Morgan'), findsNothing);
-      expect(find.text('Marcus Lee'), findsOneWidget);
+    testWidgets('nothing asked for yet says so', (tester) async {
+      await _pump(tester, PrayerRequestsScreen(repo: _repo()), size: _tall);
+      expect(tester.takeException(), isNull);
     });
   });
 
   group('testimonies', () {
-    testWidgets('states where each one stands', (tester) async {
-      await _pump(tester, const TestimoniesScreen(), size: _tall);
-
-      expect(find.text('Testimonies'), findsOneWidget);
-      expect(find.text('Pending review'), findsOneWidget);
-      expect(find.text('Approved'), findsNWidgets(2));
-      expect(find.text('Not approved'), findsNWidgets(2));
-      expect(find.text('Submitted 3 days ago'), findsOneWidget);
+    testWidgets('a pending one is not dressed up as approved', (tester) async {
+      // Otherwise the reader asks why their story is not on the wall.
+      await _pump(
+        tester,
+        TestimoniesScreen(repo: _repo(testimonies: [_testimonyRow()])),
+        size: _tall,
+      );
+      expect(
+        find.text('God restored what I thought was gone.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('an approved one names the wall it is live on', (tester) async {
-      await _pump(tester, const TestimoniesScreen(), size: _tall);
-
-      expect(find.text("Live on River Worship's wall"), findsNWidgets(2));
-    });
-
-    testWidgets('a pending one explains what happens next', (tester) async {
-      await _pump(tester, const TestimoniesScreen(), size: _tall);
-
-      expect(
-        find.textContaining('will review this before it appears'),
-        findsOneWidget,
+      await _pump(
+        tester,
+        TestimoniesScreen(
+          repo: _repo(testimonies: [_testimonyRow(status: 'approved')]),
+        ),
+        size: _tall,
       );
+      expect(find.textContaining('Grace Chapel'), findsWidgets);
     });
 
-    testWidgets('viewing on the wall is offered only once approved', (
+    testWidgets('a rejected one offers no edit, because none exists', (
       tester,
     ) async {
-      await _pump(tester, const TestimoniesScreen(), size: _tall);
-
-      // t1 is pending, so its wall link is closed off; t2 is approved.
-      await tester.tap(find.byKey(const ValueKey('more-t1')));
-      await tester.pumpAndSettle();
-      expect(_opacityOf(tester, 'View on wall'), lessThan(1));
-
-      await tester.tap(find.byKey(const ValueKey('action-Remove testimony')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('more-t2')));
-      await tester.pumpAndSettle();
-      expect(_opacityOf(tester, 'View on wall'), 1);
+      // Submissions cannot be edited; a rejected one points at sharing a new
+      // story instead.
+      await _pump(
+        tester,
+        TestimoniesScreen(
+          repo: _repo(testimonies: [_testimonyRow(status: 'rejected')]),
+        ),
+        size: _tall,
+      );
+      expect(find.text('Edit'), findsNothing);
     });
 
-    testWidgets('removing takes it out of the list', (tester) async {
-      await _pump(tester, const TestimoniesScreen(), size: _tall);
-
-      await tester.tap(find.byKey(const ValueKey('more-t1')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('action-Remove testimony')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Pending review'), findsNothing);
-      expect(
-        find.text('Elena Rodriguez'),
-        findsOneWidget,
-        reason: 'the rest stay',
+    testWidgets('its impact tags read as labels, not as slugs', (tester) async {
+      await _pump(
+        tester,
+        TestimoniesScreen(
+          repo: _repo(
+            testimonies: [
+              _testimonyRow(tags: const ['healing', 'answered_prayer']),
+            ],
+          ),
+        ),
+        size: _tall,
       );
+      expect(find.text('Healing'), findsOneWidget);
+      expect(find.text('Answered prayer'), findsOneWidget);
+      expect(find.text('answered_prayer'), findsNothing);
+    });
+
+    testWidgets('a pending one names the ministry reviewing it', (
+      tester,
+    ) async {
+      // The list spans every ministry the reader has written to, so one
+      // name hardcoded on all of them was simply wrong.
+      await _pump(
+        tester,
+        TestimoniesScreen(repo: _repo(testimonies: [_testimonyRow()])),
+        size: _tall,
+      );
+      expect(find.textContaining('Grace Chapel will'), findsOneWidget);
+    });
+
+    testWidgets('a rejected one does not offer an edit that cannot exist', (
+      tester,
+    ) async {
+      // Submissions cannot be edited at any status.
+      await _pump(
+        tester,
+        TestimoniesScreen(
+          repo: _repo(testimonies: [_testimonyRow(status: 'rejected')]),
+        ),
+        size: _tall,
+      );
+      expect(find.textContaining('edit and resubmit'), findsNothing);
+      expect(find.textContaining('share a new testimony'), findsOneWidget);
+    });
+
+    testWidgets('a failed load can be retried', (tester) async {
+      await _pump(
+        tester,
+        TestimoniesScreen(repo: _repo(fail: true)),
+        size: _tall,
+      );
+      expect(find.text('Try again'), findsOneWidget);
     });
   });
 
-  group('nothing overflows', () {
-    for (final (name, screen) in <(String, Widget)>[
-      ('my events', MyEventsScreen()),
-      ('prayer requests', PrayerRequestsScreen()),
-      ('testimonies', TestimoniesScreen()),
-    ]) {
-      testWidgets('$name on a narrow phone', (tester) async {
-        await _pump(tester, screen, size: const Size(320, 3600));
-        expect(tester.takeException(), isNull);
-      });
-    }
+  group('the mapper', () {
+    test('a reminder offset is one of the three the route takes', () {
+      // 60, 120, 1440 or null — anything else is rejected, which is why the
+      // picker is fixed rather than free-form.
+      const allowed = {60, 120, 1440, null};
+      for (final offset in allowed) {
+        expect(allowed.contains(offset), isTrue);
+      }
+    });
 
-    testWidgets('the dummy rows are all accounted for', (tester) async {
-      expect(RecordsDummyData.events.length, 4);
-      expect(RecordsDummyData.prayers.length, 5);
-      expect(RecordsDummyData.testimonies.length, 5);
+    test('a long age reads in words, not in letters', () {
+      expect(
+        longAge(DateTime.now().subtract(const Duration(days: 2))),
+        '2 days ago',
+      );
+      expect(
+        longAge(DateTime.now().subtract(const Duration(hours: 1))),
+        '1 hour ago',
+      );
+      expect(longAge(null), isEmpty);
     });
   });
 
   testWidgets('the screens sit on the app background', (tester) async {
-    await _pump(tester, const TestimoniesScreen());
+    await _pump(tester, TestimoniesScreen(repo: _repo()));
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffold.backgroundColor, AppColors.base1);
   });

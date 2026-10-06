@@ -30,6 +30,12 @@ abstract final class AnalyticsSource {
   /// Alias used by the viewer-facing creator profile.
   static const creatorProfile = creatorChannel;
   static const homeFeed = 'home_feed';
+
+  /// Explore is its own surface, not the home feed. Sending `home_feed` from
+  /// it would hide Explore discovery inside the feed's numbers in a creator's
+  /// "How people find you" breakdown.
+  static const explore = 'explore';
+  static const following = 'following';
   static const suggestedContent = 'suggested_content';
   static const search = 'search';
   static const shareLink = 'share_link';
@@ -37,9 +43,14 @@ abstract final class AnalyticsSource {
   static const external = 'external';
   static const unknown = 'unknown';
 
+  /// The set the beacon route validates against, read off its own refusal on
+  /// 2026-10-05 — `explore` and `following` are both accepted, although the
+  /// beacon guide's prose list omits them.
   static const all = {
     creatorChannel,
     homeFeed,
+    explore,
+    following,
     suggestedContent,
     search,
     shareLink,

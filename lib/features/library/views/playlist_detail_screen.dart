@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/library/data/playlist_dummy_data.dart';
+import 'package:test_app/core/locator.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/library/repo/playlist_repo.dart';
 import 'package:test_app/features/library/views/playlist_add_screen.dart';
 import 'package:test_app/features/library/views/playlist_form_screen.dart';
 import 'package:test_app/features/library/views/library_list_screen.dart'
@@ -36,17 +41,92 @@ class PlaylistOutcome {
 /// greys the play button, says so in the middle, and leans on the
 /// recommendations underneath.
 class PlaylistDetailScreen extends StatefulWidget {
-  const PlaylistDetailScreen({super.key, required this.playlist});
+  const PlaylistDetailScreen({
+    super.key,
+    required this.playlist,
+    this.repo,
+    this.discovery,
+  });
 
+  /// What the list already knows: a title and a count, but no items. The
+  /// full read happens here.
   final Playlist playlist;
+
+  final PlaylistRepo? repo;
+  final DiscoveryRepo? discovery;
 
   @override
   State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
 }
 
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  late final _repo = widget.repo ?? PlaylistRepo();
   late Playlist _playlist = widget.playlist;
   bool _changed = false;
+  bool _loading = true;
+  List<HistoryEntry> _recommended = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  /// The list read carries no items, so the first thing this screen does is
+  /// fetch them. Failing leaves the title and the count that got us here
+  /// rather than an error page over a playlist that plainly exists.
+  Future<void> _load() async {
+    try {
+      final full = await _repo.fetch(widget.playlist.id);
+      if (!mounted) return;
+      setState(() {
+        _playlist = full;
+        _loading = false;
+      });
+      unawaited(_loadRecommended());
+    } catch (e) {
+      logger.w('Playlist failed', error: e);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// "Recommended for you", anchored on the first item.
+  ///
+  /// An empty playlist has nothing to anchor on, so it gets no rail — a
+  /// generic suggestion list under an empty playlist is just the feed again.
+  Future<void> _loadRecommended() async {
+    final first = _playlist.items.firstOrNull;
+    if (first == null) return;
+    try {
+      final page = await (widget.discovery ?? getIt<DiscoveryRepo>())
+          .fetchContentSuggestions(
+            targetType: 'media',
+            targetId: first.id,
+            limit: 4,
+          );
+      if (!mounted) return;
+      setState(() {
+        _recommended = [
+          for (final item in page.items)
+            if (!_playlist.items.any((e) => e.id == item.entityId))
+              HistoryEntry(
+                id: item.entityId,
+                kind: item.mediaType == 'music'
+                    ? HistoryKind.audio
+                    : HistoryKind.video,
+                title: item.title,
+                creatorName: item.creator?.displayName ?? '',
+                creatorVerified: item.creator?.isVerified ?? false,
+                age: '',
+                thumbnailUrl: item.meta.thumbnailUrl,
+                targetType: 'media',
+              ),
+        ];
+      });
+    } catch (e) {
+      logger.w('Playlist suggestions failed', error: e);
+    }
+  }
 
   void _report(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -118,13 +198,17 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ),
     );
     if (draft == null || !mounted) return;
-    setState(() {
-      _playlist = _playlist.copyWith(
-        name: draft.name,
-        isPrivate: draft.isPrivate,
-      );
-      _changed = true;
-    });
+    try {
+      await _repo.update(_playlist.id, title: draft.name);
+      if (!mounted) return;
+      setState(() {
+        _playlist = _playlist.copyWith(name: draft.name);
+        _changed = true;
+      });
+    } catch (e) {
+      logger.w('Playlist rename failed', error: e);
+      if (mounted) _report(AppStrings.playlistSaveFailed);
+    }
   }
 
   void _confirmDelete() {
@@ -132,10 +216,15 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       context: context,
       builder: (dialogContext) => PlaylistDeleteDialog(
         playlist: _playlist,
-        onConfirm: () {
+        onConfirm: () async {
           Navigator.pop(dialogContext);
-          // Local only: there is no route to delete a playlist.
-          _leave(deleted: true);
+          try {
+            await _repo.delete(_playlist.id);
+            if (mounted) _leave(deleted: true);
+          } catch (e) {
+            logger.w('Playlist delete failed', error: e);
+            if (mounted) _report(AppStrings.playlistSaveFailed);
+          }
         },
       ),
     );
@@ -145,28 +234,55 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final picked = await Navigator.push<Set<String>>(
       context,
       MaterialPageRoute(
-        builder: (_) => PlaylistAddScreen(playlistName: _playlist.name),
+        builder: (_) => PlaylistAddScreen(
+          playlistName: _playlist.name,
+          anchorMediaId: _playlist.items.firstOrNull?.id,
+          alreadyIn: {for (final e in _playlist.items) e.id},
+        ),
       ),
     );
     if (picked == null || picked.isEmpty || !mounted) return;
+    await _add(picked);
+  }
 
-    final added = PlaylistDummyData.recommended
-        .where((e) => picked.contains(e.id))
-        .toList(growable: false);
+  /// Add media, one call each.
+  ///
+  /// A duplicate answers 409 rather than quietly doing nothing, and the
+  /// ceiling is [PlaylistRepo.maxItems] — so a failure is reported instead of
+  /// being folded into a silent partial add.
+  Future<void> _add(Set<String> mediaIds) async {
+    var added = 0;
+    for (final id in mediaIds) {
+      try {
+        await _repo.addItem(_playlist.id, id);
+        added++;
+      } catch (e) {
+        logger.w('Playlist add failed', error: e);
+      }
+    }
+    if (!mounted) return;
+    _changed = true;
+    if (added < mediaIds.length) _report(AppStrings.playlistAddFailed);
+    await _load();
+  }
+
+  Future<void> _remove(HistoryEntry item) async {
+    final before = _playlist;
     setState(() {
-      _playlist = Playlist(
-        id: _playlist.id,
-        name: _playlist.name,
-        updatedAgo: AppStrings.justNow,
-        covers: [..._playlist.covers, for (final e in added) ?e.thumbnailAsset],
-        items: [..._playlist.items, ...added],
-        isPrivate: _playlist.isPrivate,
-        runtime: _playlist.runtime,
-        ownerName: _playlist.ownerName,
-        ownerVerified: _playlist.ownerVerified,
+      _playlist = _playlist.copyWith(
+        items: _playlist.items.where((e) => e.id != item.id).toList(),
+        declaredCount: (_playlist.itemCount - 1).clamp(0, 1 << 30),
       );
       _changed = true;
     });
+    try {
+      await _repo.removeItem(before.id, item.id);
+    } catch (e) {
+      logger.w('Playlist remove failed', error: e);
+      if (!mounted) return;
+      setState(() => _playlist = before);
+      _report(AppStrings.playlistSaveFailed);
+    }
   }
 
   @override
@@ -195,7 +311,16 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 'is not built yet',
               ),
             ),
-            if (playlist.isEmpty)
+            if (_loading)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 40.s),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                ),
+              )
+            else if (playlist.isEmpty)
               LibraryEmptyState(
                 icon: HugeIcons.strokeRoundedMusicNote01,
                 title: AppStrings.playlistEmptyTitle,
@@ -208,18 +333,19 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   child: _itemRow(item, onMore: () => _openItemActions(item)),
                 ),
             SizedBox(height: playlist.isEmpty ? 8.s : 18.s),
-            Padding(
-              padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 10.s),
-              child: Text(
-                AppStrings.playlistRecommended,
-                style: AppStyles.label(
-                  14,
-                  weight: AppStyles.bold,
-                  lineHeight: 20 / 14,
+            if (_recommended.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 10.s),
+                child: Text(
+                  AppStrings.playlistRecommended,
+                  style: AppStyles.label(
+                    14,
+                    weight: AppStyles.bold,
+                    lineHeight: 20 / 14,
+                  ),
                 ),
               ),
-            ),
-            for (final item in PlaylistDummyData.recommended.take(2))
+            for (final item in _recommended.take(2))
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.s),
                 child: _itemRow(
@@ -292,24 +418,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     );
   }
 
-  /// Takes one item out. Local only — nothing stores a playlist yet.
-  void _remove(HistoryEntry item) {
-    setState(() {
-      _playlist = Playlist(
-        id: _playlist.id,
-        name: _playlist.name,
-        updatedAgo: AppStrings.justNow,
-        covers: _playlist.covers,
-        items: _playlist.items.where((e) => e.id != item.id).toList(),
-        isPrivate: _playlist.isPrivate,
-        runtime: _playlist.runtime,
-        ownerName: _playlist.ownerName,
-        ownerVerified: _playlist.ownerVerified,
-      );
-      _changed = true;
-    });
-  }
-
   Widget _itemRow(HistoryEntry item, {required VoidCallback onMore}) {
     return ContentListRow(
       key: ValueKey('item-${item.id}'),
@@ -319,6 +427,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       creatorName: item.creatorName,
       creatorVerified: item.creatorVerified,
       thumbnailAsset: item.thumbnailAsset,
+      thumbnailUrl: item.thumbnailUrl,
       glyph: glyphFor(item.kind),
       badge: item.duration,
       progress: item.progress,

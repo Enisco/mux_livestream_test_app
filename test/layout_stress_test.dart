@@ -6,7 +6,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/discovery/data/search_query.dart';
 import 'package:test_app/features/discovery/views/widgets/search_result_rows.dart';
 import 'package:test_app/features/discovery/views/widgets/search_type_tabs.dart';
-import 'package:test_app/features/explore/data/explore_dummy_data.dart';
+import 'package:test_app/features/explore/data/explore_categories.dart';
 import 'package:test_app/features/explore/views/widgets/explore_cards.dart';
 import 'package:test_app/features/explore/views/widgets/explore_category_chips.dart';
 import 'package:test_app/features/explore/views/widgets/explore_creator_card.dart';
@@ -14,7 +14,6 @@ import 'package:test_app/features/explore/views/widgets/explore_event_row.dart';
 import 'package:test_app/features/explore/views/widgets/explore_hero.dart';
 import 'package:test_app/features/explore/views/widgets/explore_rail.dart';
 import 'package:test_app/features/history/views/widgets/history_parts.dart';
-import 'package:test_app/features/profile/data/profile_dummy_data.dart';
 import 'package:test_app/features/profile/views/widgets/profile_header_card.dart';
 import 'package:test_app/features/profile/views/widgets/profile_menu.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
@@ -22,6 +21,7 @@ import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/models/explore_models/explore_models.dart';
+import 'package:test_app/models/history_models/profile_watch_progress.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'helpers/load_app_fonts.dart';
@@ -114,6 +114,20 @@ Future<void> _stress(
   await tester.pump();
   expect(tester.takeException(), isNull);
 }
+
+/// A hero panel's worth of content, built here rather than shipped in the
+/// app: these tests are about the panel's layout, not about any real row.
+ExploreHero _sampleHero() => const ExploreHero(
+  id: 'm1',
+  title: 'The Weight of Worship',
+  description: 'A night of praise from the Lagos auditorium.',
+  creator: ExploreCreatorRef(
+    id: 'c1',
+    name: 'Grace Chapel',
+    handle: 'gracechapel',
+    isOrganisation: true,
+  ),
+);
 
 void main() {
   setUpAll(loadAppFonts);
@@ -278,7 +292,7 @@ void main() {
     testWidgets('the hero survives a 320pt phone', (tester) async {
       await _stress(
         tester,
-        ExploreHeroPanel(hero: ExploreDummyData.hero, topInset: 54),
+        ExploreHeroPanel(hero: _sampleHero(), topInset: 54),
         size: _small,
       );
     });
@@ -286,7 +300,7 @@ void main() {
     testWidgets('the chips wrap on a 320pt phone', (tester) async {
       await _stress(
         tester,
-        ExploreCategoryChips(categories: ExploreDummyData.categories),
+        ExploreCategoryChips(categories: ExploreCategories.all),
         size: _small,
         scroll: true,
       );

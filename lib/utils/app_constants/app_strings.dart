@@ -556,7 +556,10 @@ abstract final class AppStrings {
   // Liked and Saved — two libraries built on the History skeleton.
   static const likedTitle = 'Liked';
   static const likedSearchHint = 'Search...';
-  static const likedCountSuffix = "things you've appreciated";
+
+  /// Counted, because a library of one reads badly otherwise.
+  static String likedCount(int n) =>
+      n == 1 ? "1 thing you've appreciated" : "$n things you've appreciated";
   static const likedEmptyTitle = 'Nothing liked yet';
   static const likedEmptyBody =
       "Tap the heart on a sermon, song, or message you appreciate, and it'll "
@@ -567,7 +570,8 @@ abstract final class AppStrings {
       'itself.';
 
   static const savedTitle = 'Save';
-  static const savedCountSuffix = 'contents saved';
+  static String savedCount(int n) =>
+      n == 1 ? '1 thing saved' : '$n things saved';
   static const savedEmptyTitle = 'Nothing saved yet';
   static const savedEmptyBody =
       'Tap the bookmark on any sermon, song, article, devotional, or event '
@@ -589,7 +593,7 @@ abstract final class AppStrings {
   // My events, prayer requests and testimonies.
   static const myEventsTitle = 'My events';
   static const myEventsSort = 'Recent';
-  static const myEventsCountSuffix = 'events';
+  static String myEventsCount(int n) => n == 1 ? '1 event' : '$n events';
   static const myEventsUpcoming = 'UPCOMING';
   static const myEventsPast = 'PAST';
   static const myEventsRsvp = 'RSVP';
@@ -626,14 +630,21 @@ abstract final class AppStrings {
   static const testimonyPending = 'Pending review';
   static const testimonyApproved = 'Approved';
   static const testimonyRejected = 'Not approved';
-  static const testimonyPendingNote =
-      'A Leader at Grace chapel will review this before it appears on their '
-      'testimony wall';
+
+  /// Named, not hardcoded: this list spans every ministry the reader has
+  /// written to, so one ministry's name on all of them was simply wrong.
+  static String testimonyPendingNote(String ministry) =>
+      'A leader at ${ministry.isEmpty ? 'the ministry' : ministry} will '
+      'review this before it appears on their testimony wall';
   static const testimonyLivePrefix = 'Live on';
   static const testimonyLiveSuffix = "'s wall";
+
+  /// Deliberately not "edit and resubmit": submissions cannot be edited at
+  /// all, so offering it would send the reader looking for a control that
+  /// does not exist.
   static const testimonyRejectedNote =
-      "This wasn't published to the wall. You can edit and resubmit, or reach "
-      'the ministry if you have questions.';
+      "This wasn't published to the wall. You can share a new testimony, or "
+      'reach the ministry if you have questions.';
   static const testimonyActionView = 'View on wall';
   static const testimonyActionRemove = 'Remove testimony';
   static const testimoniesEmptyTitle = 'No testimonies yet';
@@ -662,6 +673,13 @@ abstract final class AppStrings {
       'here.';
 
   // What a playlist's overflow offers.
+  /// The design offers a public playlist; the API has no way to make one.
+  static const playlistPublicUnavailable =
+      'Sharing a playlist is not available yet — yours stay private.';
+  static const playlistAddFailed =
+      'Some of those could not be added. They may already be in this '
+      'playlist.';
+  static const playlistSaveFailed = 'That did not save. Try again.';
   static const playlistPlayAll = 'Play all';
   static const playlistUpdateCover = 'Update cover photo';
   static const playlistEditDetail = 'Edit playlist detail';
@@ -1104,11 +1122,21 @@ abstract final class AppStrings {
   static const studioStepOnWeb = 'Open the web studio to finish this step.';
 
   /// Likewise for the "needs you" rows.
+  /// `dashboard/attention` sends keys and counts, never copy, so the words
+  /// live here and an unknown key falls back to the key itself.
+  ///
+  /// The first three are what staging actually sends, confirmed on a live
+  /// studio 2026-10-05 — before that this map guessed, and a creator saw
+  /// `open_prayers` on their dashboard. The rest are kept as aliases in case
+  /// the backend's vocabulary shifts.
   static const studioAttentionTitles = <String, String>{
-    'prayer_requests': 'Prayer request',
-    'prayers': 'Prayer request',
-    'testimonies': 'Testimonies',
-    'comments': 'Comments',
+    'open_prayers': 'Prayer requests',
+    'pending_testimonies': 'Testimonies to review',
+    'flagged_comments': 'Comments to review',
+    'prayer_requests': 'Prayer requests',
+    'prayers': 'Prayer requests',
+    'testimonies': 'Testimonies to review',
+    'comments': 'Comments to review',
   };
   static String studioAttentionNew(int n) => '$n New';
   static String studioAttentionWaiting(int n) => '$n waiting';
@@ -1152,10 +1180,15 @@ abstract final class AppStrings {
   static const historyNoMatchTitle = 'Nothing matched';
   static const historyNoMatchBody =
       'Try a different word, or clear the search to see everything.';
+  static const historyClearFailed = 'That did not save. Try again.';
   static const historyClearTitle = 'Clear your history?';
+
+  /// Deliberately not "cannot be undone". The route suppresses history up to
+  /// an instant rather than deleting rows, so anything watched again comes
+  /// back — promising permanence would be a lie.
   static const historyClearBody =
-      'This removes everything you have watched and read. It cannot be '
-      'undone.';
+      'This hides everything you have watched and read so far. Anything you '
+      'open again will reappear.';
   static const historyClearConfirm = 'Clear all';
 
   // You — the reader's own profile and its menu.
@@ -1215,6 +1248,16 @@ abstract final class AppStrings {
   static const exploreMinistries = 'Ministries to follow';
   static const exploreUpcomingEvent = 'Upcoming event';
   static const exploreBrowse = 'Browse';
+
+  /// The results list's own "there is more" control. It used to read "Look
+  /// further back", because a query only reached as far as the feed pages
+  /// already loaded; the search is server-side now, so this is simply the
+  /// next page of results.
+  static const searchShowMore = 'Show more results';
+  static const searchLoadingMore = 'Loading…';
+
+  static const explorePlaylistsNotReady = 'Playlists are not connected yet.';
+
   static const exploreWatch = 'Watch';
   static const exploreAddToPlaylist = 'Add to playlist';
   static const exploreSponsored = 'Sponsored';
@@ -1274,6 +1317,172 @@ abstract final class AppStrings {
   static const streamNotLiveDesc =
       'The stream hasn\'t started. Try again in a moment.';
   static const goBack = 'Go Back';
+
+  // ---- Impact -----------------------------------------------------------
+
+  static const impactTitle = 'Impact';
+  static const impactSubtitle = 'What your congregation is sending you';
+  static const impactTabPrayer = 'Prayer';
+  static const impactTabTestimony = 'Testimony';
+  static const impactTabComments = 'Comments';
+
+  static const impactViewingPrayers = 'VIEWING ALL PRAYERS';
+  static const impactViewingTestimonies = 'VIEWING ALL TESTIMONIES';
+  static const impactViewingComments = 'VIEWING ALL COMMENTS';
+
+  /// The prayer filter sheet.
+  static const prayerStateTitle = 'Prayer request state';
+  static const prayerStateOpen = 'Open prayers';
+  static const prayerStatePrayed = 'Prayed for';
+  static const prayerStateResolved = 'Resolved';
+
+  /// The source line when a prayer came from content whose title the gateway
+  /// could not resolve. Absence is normal — deleted content, another
+  /// creator's, or a type with no title at all — so every type the inbox can
+  /// show needs a word of its own rather than a blank line.
+  static String prayerFromType(String targetType) => switch (targetType) {
+    'media' => 'From a video',
+    'post' => 'From an article',
+    'event' => 'From an event',
+    'devotional' || 'devotional_entry' => 'From a devotional',
+    'testimony' => 'From a testimony',
+    'verse_of_day' => 'From the verse of the day',
+    'livestream' => 'From a livestream',
+    _ => 'From your content',
+  };
+  static const prayerNotAssigned = 'Not assigned';
+  static String prayerAssignedTo(String who) => 'Assigned to $who';
+  static const prayerFromWall = 'From your wall';
+  static String prayerOnContent(String title) => 'On "$title"';
+
+  /// The card's primary action, which changes with the prayer's state:
+  /// an open one is prayed for, a prayed one is resolved, and a resolved
+  /// one has no action left but the overflow menu.
+  static const prayerMarkPrayed = 'Mark as prayed';
+  static const prayerResolve = 'Resolve prayer';
+
+  /// The filter row's right-hand word. The design writes the resolved
+  /// state as **CLOSED** here and **RESOLVED** in the sheet that sets it;
+  /// both are kept as drawn.
+  static const prayerViewingOpen = 'Open';
+  static const prayerViewingPrayed = 'Prayed for';
+  static const prayerViewingResolved = 'Closed';
+
+  /// The card's overflow menu.
+  static const prayerMenuAssign = 'Assign';
+  static const prayerMenuReopen = 'Re-open';
+  static const prayerMenuResolve = 'Resolved';
+
+  /// The sheet the Assign row opens.
+  static const prayerAssignTitle = 'Assign prayer to:';
+  static const prayerAssignNoTeam = 'No one to assign to yet';
+
+  /// Only owners, admins and editors can carry a prayer, so a personal
+  /// channel or an organisation with no team yet has an empty picker.
+  static const prayerAssignNoTeamBody =
+      'Only owners, admins and editors can be assigned a prayer. Invite '
+      'someone to your team to share the load.';
+  static const prayerUnassign = 'Remove assignment';
+
+  /// The toast the design shows after a prayer changes state.
+  static const prayerMarkedPrayed = 'Marked as prayed';
+  static const prayerMarkedResolved = 'Prayer resolved';
+  static const prayerReopened = 'Prayer re-opened';
+  static String prayerAssignedToast(String who) => 'Assigned to $who';
+  static const impactUndo = 'Undo';
+  static const prayerUndone = 'Put back';
+  static const prayerUnassigned = 'Assignment removed';
+
+  /// The testimony filter sheet.
+  static const testimonyStateTitle = 'Testimonies state';
+  static const testimonyStatePending = 'Pending';
+  static const testimonyStateApproved = 'Approved';
+  static const testimonyStateRejected = 'Rejected';
+  static const testimonyApprove = 'Approve & Share';
+  static const testimonyRemove = 'Remove';
+  static const testimonyRestore = 'Restore';
+
+  /// The toast after a testimony changes state.
+  static const testimonyApprovedToast = 'Testimony approved';
+  static const testimonyRejectedToast = 'Testimony rejected';
+  static const testimonyRestoredToast = 'Back in your review queue';
+
+  /// Approving is what puts a story on the public wall — nothing a viewer
+  /// submits is visible before it.
+  static const testimonyNowLive = "It is now live on your ministry's wall.";
+
+  /// The comment filter sheet.
+  static const commentStateTitle = 'Comments state';
+  static const commentStateAll = 'All';
+  static const commentStateFlagged = 'Flagged Comment';
+  static const commentStateHidden = 'Hidden Comments';
+  static const commentFlaggedPill = 'Flagged comment';
+  static const commentHiddenPill = 'Hidden comment';
+
+  /// This tab is a moderation queue, not the whole conversation. Said on the
+  /// screen because "Comments" reads like every comment on your content, and
+  /// a creator who assumes that will think a busy video's empty queue is a
+  /// bug.
+  static const commentQueueNote =
+      'Only comments reported by viewers or hidden by your team appear here '
+      '— not every comment on your content.';
+
+  static const commentIsReply = 'In reply to another comment';
+  static const commentHide = 'Hide';
+  static const commentUnhide = 'Restore';
+  static const commentKeepPublic = 'Keep public';
+  static const commentFlag = 'Report';
+
+  /// What a decision did, in the toast.
+  static const commentHidden = 'Comment hidden';
+  static const commentUnhidden = 'Comment restored';
+  static const commentKeptPublic = 'Comment kept public';
+  static const commentReported = 'Reported to GospelTube';
+
+  /// Said when a decision takes the row out of the queue, which is the
+  /// queue working rather than the row going missing.
+  static const commentLeavesQueue = 'It has left your review queue.';
+
+  /// The report sheet.
+  static const reportTitle = 'Report';
+  static const reportSubtitle = "What's the issue with this comment?";
+  static const reportNext = 'Next';
+  static const reportSubmit = 'Report';
+  static const reportTellMore = 'Tell us more';
+  static const reportOptional = 'optional';
+  static const reportHint = 'Add anything that helps our team review this...';
+  static const reportPrivacy =
+      "Your report is private. The creator won't know who reported. Our "
+      'team reviews every report.';
+  static const reportSpam = 'Spam or misleading';
+  static const reportHate = 'Hateful or abusive';
+  static const reportHarassment = 'Harassment or bullying';
+  static const reportSexual = 'Sexual or explicit content';
+  static const reportViolence = 'Violence or dangerous act';
+  static const reportMisinformation = 'False teaching & misinformation';
+  static const reportImpersonation = 'Copyright or impersonation';
+  static const reportOther = 'Something else';
+
+  /// Empty states. The design writes one headline for all three tabs and
+  /// changes only the line under it.
+  static const impactNothingYet = 'Nothing shared yet';
+  static const impactNoPrayers = impactNothingYet;
+  static const impactNoPrayersBody =
+      'When viewers submit prayer request they appear here';
+  static const impactNoTestimonies = impactNothingYet;
+  static const impactNoTestimoniesBody =
+      'When viewers share what God has done, it appears here';
+  static const impactNoComments = 'Nothing to review';
+  static const impactNoCommentsBody =
+      'Comments reported by viewers, or hidden by your team, appear here';
+
+  /// Said where the design offers an action the API cannot carry out yet.
+  static const impactAwaitingApi = 'Not available yet — waiting on the API.';
+
+  /// Said when a write fails and the card has to be put back.
+  static const impactActionFailed = 'That did not save. Try again.';
+  static String impactReplyCount(int n) => n == 1 ? '1 reply' : '$n replies';
+  static const impactSomeone = 'Someone';
   static const subscribersLabel = 'Subscribers';
 
   /// An event's location, and getting there.

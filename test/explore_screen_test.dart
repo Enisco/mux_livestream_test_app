@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/explore/data/explore_dummy_data.dart';
+import 'package:test_app/features/explore/data/explore_categories.dart';
+import 'package:test_app/features/explore/repo/explore_repo.dart';
+import 'package:test_app/features/explore/views/explore_screen.dart';
 import 'package:test_app/features/explore/views/widgets/card_bits.dart';
 import 'package:test_app/features/explore/views/widgets/explore_category_chips.dart';
 import 'package:test_app/features/explore/views/widgets/explore_cards.dart';
@@ -12,9 +14,11 @@ import 'package:test_app/features/explore/views/widgets/explore_hero.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
 import 'package:test_app/models/explore_models/explore_models.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 const _creator = ExploreCreatorRef(
@@ -53,8 +57,23 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pump();
 }
 
+/// A hero panel's worth of content, built here rather than shipped in the
+/// app: these tests are about the panel's layout, not about any real row.
+ExploreHero _sampleHero() => const ExploreHero(
+  id: 'm1',
+  title: 'The Weight of Worship',
+  description: 'A night of praise from the Lagos auditorium.',
+  creator: ExploreCreatorRef(
+    id: 'c1',
+    name: 'Grace Chapel',
+    handle: 'gracechapel',
+    isOrganisation: true,
+  ),
+);
+
 void main() {
   setUpAll(loadAppFonts);
+  _screenTests();
 
   group('a card names what it is showing', () {
     testWidgets('the title and the creator both appear', (tester) async {
@@ -173,6 +192,23 @@ void main() {
   });
 
   group('a ministry card', () {
+    testWidgets('shows a tick once the viewer follows, not a bare plus', (
+      tester,
+    ) async {
+      // Without this the badge is an action with no feedback: you tap it and
+      // nothing says whether it took.
+      await _pump(
+        tester,
+        const ExploreCreatorCard(creator: _creator, isFollowing: true),
+      );
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    });
+
+    testWidgets('and a plus while they do not', (tester) async {
+      await _pump(tester, const ExploreCreatorCard(creator: _creator));
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
+    });
+
     testWidgets('shows the handle and a rounded subscriber count', (
       tester,
     ) async {
@@ -253,12 +289,12 @@ void main() {
         tester,
         SizedBox(
           width: 390,
-          child: ExploreCategoryChips(categories: ExploreDummyData.categories),
+          child: ExploreCategoryChips(categories: ExploreCategories.all),
         ),
       );
 
       expect(find.text('Browse'), findsOneWidget);
-      for (final c in ExploreDummyData.categories) {
+      for (final c in ExploreCategories.all) {
         expect(find.text(c.label), findsOneWidget, reason: c.slug);
       }
     });
@@ -270,7 +306,7 @@ void main() {
         SizedBox(
           width: 390,
           child: ExploreCategoryChips(
-            categories: ExploreDummyData.categories,
+            categories: ExploreCategories.all,
             onSelected: (c) => picked = c,
           ),
         ),
@@ -283,8 +319,8 @@ void main() {
     });
 
     test('no two categories share a slug', () {
-      final slugs = ExploreDummyData.categories.map((c) => c.slug).toSet();
-      expect(slugs.length, ExploreDummyData.categories.length);
+      final slugs = ExploreCategories.all.map((c) => c.slug).toSet();
+      expect(slugs.length, ExploreCategories.all.length);
     });
   });
 
@@ -297,7 +333,7 @@ void main() {
         SizedBox(
           width: 390,
           child: ExploreHeroPanel(
-            hero: ExploreDummyData.hero,
+            hero: _sampleHero(),
             topInset: 54,
             onWatch: () => watched++,
             onAddToPlaylist: () => saved++,
@@ -305,7 +341,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Walking by Faith'), findsOneWidget);
+      expect(find.text('The Weight of Worship'), findsOneWidget);
 
       await tester.tap(find.text('Watch'));
       await tester.tap(find.text('Add to playlist'));
@@ -324,12 +360,136 @@ void main() {
         tester,
         SizedBox(
           width: 390,
-          child: ExploreHeroPanel(hero: ExploreDummyData.hero, topInset: 54),
+          child: ExploreHeroPanel(hero: _sampleHero(), topInset: 54),
         ),
       );
 
       final box = tester.getSize(find.byType(ExploreHeroPanel));
       expect(box.height, greaterThan(ExploreHeroPanel.height));
+    });
+  });
+}
+
+ExploreCard _railCard(String id, String title) =>
+    ExploreCard(id: id, title: title, creator: _creator);
+
+/// An Explore page with exactly the rails a test wants, and no network.
+class _StubRepo implements ExploreRepo {
+  _StubRepo(this.page);
+
+  final ExplorePage page;
+  int loads = 0;
+
+  @override
+  Future<ExplorePage> load() async {
+    loads++;
+    return page;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+Future<void> _pumpScreen(WidgetTester tester, ExplorePage page) async {
+  tester.view.physicalSize = const Size(390 * 3, 2400 * 3);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    SizingBuilder(
+      baseSize: const Size(390, 844),
+      builder: (_) => MaterialApp(home: ExploreScreen(repo: _StubRepo(page))),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void _screenTests() {
+  group('the page', () {
+    testWidgets('draws only the rails that have something in them', (
+      tester,
+    ) async {
+      // A browse that comes back empty means "not right now". A heading over
+      // no cards reads as a claim that the whole category is empty.
+      await _pumpScreen(
+        tester,
+        ExplorePage(
+          trending: [_railCard('m1', 'Most watched')],
+          articles: [_railCard('p1', 'An article')],
+        ),
+      );
+
+      expect(find.text(AppStrings.exploreTrendingToday), findsOneWidget);
+      expect(find.text(AppStrings.exploreArticles), findsOneWidget);
+      expect(find.text(AppStrings.exploreLive), findsNothing);
+      expect(find.text(AppStrings.exploreContinueWatching), findsNothing);
+      expect(find.text(AppStrings.exploreUpcomingEvent), findsNothing);
+    });
+
+    testWidgets('with nothing at all, says so rather than drawing a shell', (
+      tester,
+    ) async {
+      await _pumpScreen(tester, const ExplorePage());
+      expect(find.text(AppStrings.feedRetry), findsOneWidget);
+    });
+
+    testWidgets('a rail with nowhere to go shows no See all', (tester) async {
+      // Trending is an ordering, not a kind — no type tab means it, so the
+      // chevron would be an affordance that leads nowhere.
+      await _pumpScreen(
+        tester,
+        ExplorePage(
+          trending: [_railCard('m1', 'Top')],
+          articles: [_railCard('p1', 'An article')],
+        ),
+      );
+      final chevrons = find.byWidgetPredicate(
+        (w) => w is Icon && w.icon == AppIcons.chevronRight,
+      );
+      // Articles has one; Trending does not.
+      expect(chevrons, findsOneWidget);
+    });
+
+    testWidgets('the banner is the top trending item', (tester) async {
+      await _pumpScreen(
+        tester,
+        ExplorePage(
+          hero: const ExploreHero(
+            id: 'm1',
+            title: 'Most watched',
+            description: '',
+            creator: _creator,
+          ),
+          trending: [_railCard('m1', 'Most watched')],
+        ),
+      );
+      expect(find.text('Most watched'), findsWidgets);
+      expect(find.text(AppStrings.exploreWatch), findsOneWidget);
+    });
+
+    testWidgets('the browse chips carry the real platform slugs', (
+      tester,
+    ) async {
+      // An earlier version offered `preaching`, `fellowship`, `missions` and
+      // `discipleship`, none of which the platform has — a filter on one
+      // would have matched nothing.
+      await _pumpScreen(
+        tester,
+        ExplorePage(trending: [_railCard('m1', 'Top')]),
+      );
+      const real = {
+        'worship',
+        'sermons',
+        'bible-study',
+        'prayer',
+        'gospel-music',
+        'live-services',
+        'testimonies',
+        'youth',
+        'family',
+        'devotionals',
+      };
+      expect(ExploreCategories.all.map((c) => c.slug).toSet(), real);
     });
   });
 }
