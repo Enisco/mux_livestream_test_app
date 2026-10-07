@@ -578,15 +578,21 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _row(SearchGroupKind kind, WebFeedItem item) => switch (kind) {
-    SearchGroupKind.ministries => SearchMinistryRow(
-      item: item,
-      following: _store.isFollowing(
-        item.profileCreatorId ?? '',
-        fallback: item.isFollowingCreator,
+    // The store is where a follow lands, and it notifies — but a row that
+    // only reads it once keeps showing whatever was true when the list was
+    // built, so the button stayed on "Follow" until the screen reloaded.
+    SearchGroupKind.ministries => ListenableBuilder(
+      listenable: _store,
+      builder: (_, _) => SearchMinistryRow(
+        item: item,
+        following: _store.isFollowing(
+          item.profileCreatorId ?? '',
+          fallback: item.isFollowingCreator,
+        ),
+        onTap: () => _open(item),
+        onFollow: _actions.follow(item),
+        onMore: () => _requireAccount('use that'),
       ),
-      onTap: () => _open(item),
-      onFollow: _actions.follow(item),
-      onMore: () => _requireAccount('use that'),
     ),
     SearchGroupKind.events => SearchEventRow(
       item: item,

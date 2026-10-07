@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
@@ -177,6 +178,10 @@ class ViewerLibraryRepo {
       duration: seconds == null ? null : clock(seconds),
       progress: progress,
       targetType: targetType,
+      // The hit kept whole, so tapping the row opens the thing it stands
+      // for. Only the fields the design draws are unpacked above; the entity
+      // type a post, event or series is opened by is not one of them.
+      source: WebFeedItem.fromJson(json),
     );
   }
 

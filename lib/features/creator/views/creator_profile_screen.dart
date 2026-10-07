@@ -40,6 +40,7 @@ void openCreatorProfile(
   BuildContext context, {
   String? creatorId,
   String? handle,
+  CreatorTab? tab,
 }) {
   if ((creatorId == null || creatorId.isEmpty) &&
       (handle == null || handle.isEmpty)) {
@@ -47,7 +48,7 @@ void openCreatorProfile(
   }
   context.push(
     creatorId != null && creatorId.isNotEmpty
-        ? AppRouter.creatorProfileById(creatorId)
+        ? AppRouter.creatorProfileById(creatorId, tab: tab?.name)
         : AppRouter.creatorProfileByHandle(handle!),
   );
 }
@@ -56,14 +57,22 @@ void openCreatorProfile(
 ///
 /// Reachable by id from anywhere a creator is named, or by handle from a link.
 class CreatorProfileScreen extends StatefulWidget {
-  const CreatorProfileScreen({super.key, this.creatorId, this.handle})
-    : assert(
-        creatorId != null || handle != null,
-        'need a creator id or a handle',
-      );
+  const CreatorProfileScreen({
+    super.key,
+    this.creatorId,
+    this.handle,
+    this.initialTab,
+  }) : assert(
+         creatorId != null || handle != null,
+         'need a creator id or a handle',
+       );
 
   final String? creatorId;
   final String? handle;
+
+  /// Which tab to open on, for a link that points at one part of a profile —
+  /// "View on wall" wants the testimonies, not the latest uploads.
+  final CreatorTab? initialTab;
 
   @override
   State<CreatorProfileScreen> createState() => _CreatorProfileScreenState();
@@ -85,7 +94,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   bool _authed = false;
   bool _followBusy = false;
 
-  CreatorTab _tab = CreatorTab.latest;
+  late CreatorTab _tab = widget.initialTab ?? CreatorTab.latest;
 
   /// Rows per tab, so switching back does not refetch.
   final Map<CreatorTab, List<WebFeedItem>> _rows = {};

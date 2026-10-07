@@ -47,7 +47,12 @@ class AppRouter {
   static const String creatorProfile = '/creator';
 
   /// Profile by id — the form every in-app creator affordance uses.
-  static String creatorProfileById(String id) => '/creator?id=$id';
+  ///
+  /// [tab] names the tab to open on, for the affordances that point at one
+  /// part of a profile rather than the whole of it — "View on wall" wants the
+  /// testimonies, not the latest uploads.
+  static String creatorProfileById(String id, {String? tab}) =>
+      '/creator?id=$id${tab == null ? '' : '&tab=$tab'}';
 
   static String creatorProfileByHandle(String handle) =>
       '/creator?handle=${handle.replaceFirst('@', '')}';

@@ -5,10 +5,13 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/viewer_library_repo.dart';
 import 'package:test_app/features/history/views/widgets/history_parts.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
+import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
@@ -165,6 +168,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               progress: e.progress!,
               thumbnailUrl: e.thumbnailUrl,
               isAudio: e.kind == HistoryKind.audio,
+              source: e.source,
             ),
     ];
   }
@@ -200,6 +204,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
     );
+  }
+
+  /// Open what the row is a picture of.
+  ///
+  /// The library is not one of the surfaces the beacon's `source` enum knows,
+  /// so these clicks are reported as `unknown` rather than invented — sending
+  /// a value the route refuses would lose the click altogether.
+  void _open(WebFeedItem? item) {
+    if (!openFeedItem(context, item, source: AnalyticsSource.unknown)) {
+      _say(AppStrings.libraryRowGone);
+    }
   }
 
   void _todo(String what) {
@@ -352,7 +367,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             children: [
               for (final (i, item) in items.indexed) ...[
                 if (i > 0) SizedBox(width: 16.s),
-                HistoryResumeCard(item: item, onTap: () => _todo(item.title)),
+                HistoryResumeCard(item: item, onTap: () => _open(item.source)),
               ],
             ],
           ),
@@ -380,7 +395,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           eventDate: entry.eventDate,
           eventVenue: entry.eventVenue,
           eventTime: entry.eventTime,
-          onTap: () => _todo(entry.title),
+          onTap: () => _open(entry.source),
           onMore: () => _todo('History actions'),
         ),
       ),

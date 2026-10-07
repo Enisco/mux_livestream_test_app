@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/settings/data/settings_dummy_data.dart';
+import 'package:test_app/features/settings/repo/account_repo.dart';
 import 'package:test_app/features/settings/views/account_forms.dart';
 import 'package:test_app/features/settings/views/account_sheets.dart';
 import 'package:test_app/features/settings/views/event_reminders_screen.dart';
@@ -10,6 +14,7 @@ import 'package:test_app/features/settings/data/two_factor_dummy_data.dart';
 import 'package:test_app/features/settings/views/two_factor_screens.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
 import 'package:test_app/shared/components/app_icons.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -18,12 +23,34 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 /// The account menu: everything about the reader's own account, and the way
 /// into each thing that can be changed.
 ///
-/// This is the entry point of a larger section — name, email, phone, password,
-/// topics, reminders, two-factor and deactivation each have screens of their
-/// own in the design that are not built yet. Every row here says so rather than
-/// going nowhere.
-class SettingsScreen extends StatelessWidget {
+/// What it reads is the cached account, refreshed from `GET /v1/user/profile`
+/// on open so a change made on another device shows here. Profile info is the
+/// one row behind it that writes; see `ProfileInfoScreen` for which fields the
+/// account route will take.
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refresh());
+  }
+
+  /// Not worth an error state: a read that fails leaves the cached account on
+  /// screen, which is what was true at the last login.
+  Future<void> _refresh() async {
+    try {
+      await AccountRepo().fetchProfile();
+      if (mounted) setState(() {});
+    } catch (e) {
+      logger.w('Account profile unavailable', error: e);
+    }
+  }
 
   void _todo(BuildContext context, String what) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -42,6 +69,7 @@ class SettingsScreen extends StatelessWidget {
         LocalStorage.cachedFirstName ??
         AppStrings.accountFallbackName;
     final email = SettingsDummyData.email;
+    final avatar = AssetUrlResolver.resolve(LocalStorage.cachedAvatarKey);
 
     return Scaffold(
       backgroundColor: AppColors.base1,
@@ -75,16 +103,21 @@ class SettingsScreen extends StatelessWidget {
                     caption: AppStrings.settingsProfile,
                     children: [
                       SettingsRow(
-                        leading: SettingsAvatar(name: name),
+                        leading: SettingsAvatar(name: name, imageUrl: avatar),
                         title: name,
                         subtitle: AppStrings.settingsDisplayNamePhoto,
                         action: AppStrings.settingsEdit,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ProfileInfoScreen(),
-                          ),
-                        ),
+                        // The form writes the account and replaces the
+                        // cache, so this rebuilds from it on the way back.
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute<bool>(
+                              builder: (_) => const ProfileInfoScreen(),
+                            ),
+                          );
+                          if (mounted) setState(() {});
+                        },
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedMail01,

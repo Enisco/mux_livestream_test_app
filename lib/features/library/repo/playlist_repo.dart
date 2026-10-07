@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 
 import 'package:test_app/features/library/repo/viewer_library_repo.dart';
 import 'package:test_app/models/history_models/history_models.dart';
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/library_models/playlist_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
@@ -211,6 +212,7 @@ class PlaylistRepo {
       count: (facets['analyticsViews'] as num?)?.toInt() ?? 0,
       duration: seconds == null ? null : clock(seconds),
       targetType: 'media',
+      source: WebFeedItem.fromJson(json),
     );
   }
 

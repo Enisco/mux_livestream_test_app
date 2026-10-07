@@ -427,6 +427,13 @@ abstract final class AppStrings {
   static const settingsUpdate = 'Update';
   static const settingsProfileInfo = 'Profile info';
   static const settingsChangePhoto = 'Change photo';
+  static const settingsNameSaved = 'Your profile is updated';
+  static const settingsPhotoSaved = 'Your photo is updated';
+  static const settingsSaveFailed = 'That did not save. Try again.';
+  static const settingsPhotoTooLarge = 'Pick a photo under 2 MB';
+  static const settingsPhotoUnreadable = 'That photo could not be read';
+  static const settingsPhotoOffline =
+      'No connection — your photo was not uploaded';
   static const settingsDisplayName = 'Display name';
   static const settingsFirstNameHint = 'First name';
   static const settingsLastNameHint = 'Last name';
@@ -590,6 +597,11 @@ abstract final class AppStrings {
   static const libraryNoMatchBody =
       'Try a different word, or clear the search to see everything.';
 
+  /// A library row whose content has since been deleted or made private comes
+  /// back without the hit the detail screens need. The row stays — it is a
+  /// true record of what was watched — but there is nothing left to open.
+  static const libraryRowGone = 'That content is no longer available';
+
   // My events, prayer requests and testimonies.
   static const myEventsTitle = 'My events';
   static const myEventsSort = 'Recent';
@@ -619,7 +631,6 @@ abstract final class AppStrings {
   static const prayerActionEdit = 'Edit';
   static const prayerActionPrayAgain = 'Pray again';
   static const prayerActionGoToContent = 'Go to content';
-  static const prayerActionDelete = 'Delete';
   static const prayerEmptyTitle = 'No request yet';
   static const prayerEmptyBody =
       "When something weighs on you, any ministry's page has a place to ask, "
@@ -645,6 +656,17 @@ abstract final class AppStrings {
   static const testimonyRejectedNote =
       "This wasn't published to the wall. You can share a new testimony, or "
       'reach the ministry if you have questions.';
+  static const testimonyWithdrawTitle = 'Withdraw this testimony?';
+  static const testimonyWithdrawBody =
+      'It will be removed from your submissions. You can always share a new '
+      'one.';
+
+  /// An approved testimony is already public, so withdrawing takes it down.
+  static const testimonyWithdrawLiveBody =
+      "This will take it off the ministry's wall as well as out of your "
+      'submissions. You can always share a new one.';
+  static const testimonyWithdrawConfirm = 'Withdraw';
+
   static const testimonyActionView = 'View on wall';
   static const testimonyActionRemove = 'Remove testimony';
   static const testimoniesEmptyTitle = 'No testimonies yet';

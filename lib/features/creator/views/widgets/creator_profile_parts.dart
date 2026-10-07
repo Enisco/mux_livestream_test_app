@@ -22,6 +22,13 @@ enum CreatorTab {
   testimonies,
   about;
 
+  /// The tab a link asked for, or null for whatever a fresh profile opens on.
+  ///
+  /// A name that is not a tab is treated as no name at all rather than
+  /// throwing: it arrives from a URL, which anything can write.
+  static CreatorTab? byName(String? name) =>
+      values.where((t) => t.name == name).firstOrNull;
+
   static const librarySections = [
     'series',
     'videos',

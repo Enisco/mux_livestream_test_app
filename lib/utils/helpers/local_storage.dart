@@ -72,6 +72,68 @@ class LocalStorage {
     }
   }
 
+  /// The account's own id, which `PATCH /v1/user/{id}` is addressed by.
+  static String? get cachedUserId {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final id = (jsonDecode(raw) as Map<String, dynamic>)['id'] as String?;
+      return id == null || id.isEmpty ? null : id;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Where the account's photo lives, once one has been confirmed. The key is
+  /// resolved to a URL the same way every other asset key is.
+  static String? get cachedAvatarKey {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final key =
+          (jsonDecode(raw) as Map<String, dynamic>)['avatarKey'] as String?;
+      return key == null || key.isEmpty ? null : key;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String? get cachedPhone {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final phone =
+          (jsonDecode(raw) as Map<String, dynamic>)['phone'] as String?;
+      return phone == null || phone.isEmpty ? null : phone;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The topics the reader picked during onboarding.
+  static List<String> get cachedTopicSlugs {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return const [];
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      return [
+        for (final s
+            in map['viewerPreferenceCategorySlugs'] as List? ?? const [])
+          if (s is String) s,
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Replace the cached account wholesale.
+  ///
+  /// Every `cached…` getter above reads one blob, so the way to keep them in
+  /// step after a write is to store the `User` the route answered with rather
+  /// than patching fields in.
+  static Future<bool> cacheUser(Map<String, dynamic> user) =>
+      setString(cachedUserKey, jsonEncode(user));
+
   static String? get cachedEmail {
     final raw = getString(cachedUserKey);
     if (raw == null) return null;

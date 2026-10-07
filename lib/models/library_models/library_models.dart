@@ -5,6 +5,8 @@
 /// three different services, and `ViewerRecordsRepo` does the mapping.
 library;
 
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
+
 /// Whether an event is still to come, and whether the reader said they are
 /// going.
 class MyEvent {
@@ -20,6 +22,7 @@ class MyEvent {
     this.creatorVerified = false,
     this.going = false,
     this.reminderMinutes,
+    this.source,
   });
 
   final String id;
@@ -46,6 +49,12 @@ class MyEvent {
   /// or 1440**, or null for no reminder. The route accepts nothing else, so
   /// the picker is fixed rather than free-form.
   final int? reminderMinutes;
+
+  /// The event as a row the detail screens take, so the tile opens it.
+  ///
+  /// This read is an RSVP list rather than a search, so there is no hit to
+  /// keep whole — it is assembled from the nested `event` and nothing more.
+  final WebFeedItem? source;
 }
 
 /// Where a prayer request stands with the ministry it went to.
@@ -66,6 +75,7 @@ class PrayerRequest {
     required this.status,
     this.authorVerified = false,
     this.aboutGone = false,
+    this.aboutItem,
   });
 
   final String id;
@@ -89,6 +99,13 @@ class PrayerRequest {
   final String sharedAgo;
 
   final PrayerStatus status;
+
+  /// What it was asked about, as a row the detail screens take.
+  ///
+  /// Null for a request raised against the ministry itself, and null for one
+  /// whose content has since gone — in both cases there is nothing to open,
+  /// which is why "Go to content" stands down.
+  final WebFeedItem? aboutItem;
 }
 
 /// Whether a testimony has made it onto a ministry's wall.
@@ -104,6 +121,7 @@ class Testimony {
     required this.status,
     this.authorVerified = false,
     this.wall = '',
+    this.creatorId = '',
   });
 
   final String id;
@@ -121,4 +139,7 @@ class Testimony {
 
   /// The ministry whose wall it is live on. Only meaningful once approved.
   final String wall;
+
+  /// Whose wall that is — what "View on wall" opens.
+  final String creatorId;
 }

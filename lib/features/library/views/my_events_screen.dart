@@ -5,8 +5,10 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/viewer_records_repo.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
@@ -20,8 +22,8 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 ///
 /// The list spans every ministry the reader has RSVP'd to and includes past
 /// events, so the grouping into Upcoming and Past happens here rather than in
-/// two reads. Tapping RSVP flips the row
-/// locally so the two states can be seen; it posts nothing.
+/// two reads. Tapping a row opens the event; RSVP posts and rolls back if the
+/// write is refused.
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key, this.repo});
 
@@ -94,6 +96,41 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
               e.venue.toLowerCase().contains(q),
         )
         .toList(growable: false);
+  }
+
+  /// Going, or no longer going.
+  ///
+  /// The row turns over at once and goes back if the write fails — tapping
+  /// it used to flip the button and tell the server nothing, so the RSVP
+  /// came back on the next load.
+  Future<void> _toggleRsvp(MyEvent event, {required bool going}) async {
+    setState(() {
+      going ? _going.remove(event.id) : _going.add(event.id);
+    });
+    try {
+      if (going) {
+        await _repo.cancelRsvp(event.id);
+      } else {
+        await _repo.rsvp(event.id);
+      }
+    } catch (e) {
+      logger.w('RSVP failed', error: e);
+      if (!mounted) return;
+      setState(() {
+        going ? _going.add(event.id) : _going.remove(event.id);
+      });
+      _report(AppStrings.historyClearFailed);
+    }
+  }
+
+  /// Open the event this tile stands for.
+  ///
+  /// The library is not one of the surfaces the beacon's `source` enum knows,
+  /// so the click is reported as `unknown` rather than invented.
+  void _open(MyEvent event) {
+    if (!openFeedItem(context, event.source, source: AnalyticsSource.unknown)) {
+      _report(AppStrings.libraryRowGone);
+    }
   }
 
   void _report(String message) {
@@ -191,7 +228,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _report(event.title),
+            onTap: () => _open(event),
             child: Row(
               children: [
                 _DateTile(day: event.day, month: event.month),
@@ -219,9 +256,7 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
                         ? HugeIcons.strokeRoundedCheckmarkCircle02
                         : null,
                     tint: going ? AppColors.green500 : null,
-                    onTap: () => setState(() {
-                      going ? _going.remove(event.id) : _going.add(event.id);
-                    }),
+                    onTap: () => unawaited(_toggleRsvp(event, going: going)),
                   ),
                 ),
                 SizedBox(width: 12.s),

@@ -13,6 +13,7 @@ import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/history/views/history_screen.dart';
 import 'package:test_app/features/library/views/liked_saved_screens.dart';
@@ -24,9 +25,11 @@ import 'dart:async';
 
 import 'package:test_app/features/library/repo/viewer_library_repo.dart';
 import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/models/history_models/profile_watch_progress.dart';
 import 'package:test_app/features/profile/views/widgets/profile_header_card.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/features/profile/views/widgets/profile_menu.dart';
 import 'package:test_app/features/settings/views/settings_screen.dart';
 import 'package:test_app/models/creator_models/creator_profile.dart';
@@ -174,10 +177,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Nothing behind these yet. They are wired so the rows are not dead, and
   /// so the screen names exactly what is still missing.
-  void _todo(String what) {
+  void _todo(String what) => _say('$what is not built yet');
+
+  void _say(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$what is not built yet', style: AppStyles.body(13)),
+        content: Text(message, style: AppStyles.body(13)),
         backgroundColor: AppColors.neutral800,
         behavior: SnackBarBehavior.floating,
       ),
@@ -201,10 +207,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ProfileHeaderCard(
               name: name,
               handle: LocalStorage.cachedHandle,
+              avatarUrl: AssetUrlResolver.resolve(LocalStorage.cachedAvatarKey),
               // Nothing reports unread notifications — there is no route —
               // so the bell carries no dot rather than a permanent one.
               hasNotifications: false,
-              onTap: () => _todo(AppStrings.profileAccountInfo),
+              // The card names the account, so it opens the account — the
+              // same screen the Account row at the bottom leads to.
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SettingsScreen(),
+                  ),
+                );
+                if (mounted) setState(() {});
+              },
               onNotifications: () => _todo('Notifications'),
             ),
             SizedBox(height: 26.s),
@@ -248,7 +265,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SizedBox(height: 10.s),
         ContinueWatchingCard(
           progress: progress,
-          onTap: () => _todo(progress.title),
+          // The library is not one of the surfaces the beacon's `source` enum
+          // knows, so the click is reported as `unknown` rather than invented.
+          onTap: () {
+            if (!openFeedItem(
+              context,
+              row.source,
+              source: AnalyticsSource.unknown,
+            )) {
+              _say(AppStrings.libraryRowGone);
+            }
+          },
         ),
         SizedBox(height: 24.s),
       ],

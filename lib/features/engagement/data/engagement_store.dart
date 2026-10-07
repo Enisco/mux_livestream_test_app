@@ -184,6 +184,21 @@ class EngagementStore extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
+  /// Record a follow this viewer has just changed on another surface.
+  ///
+  /// Unlike [seedFollowing], this wins over whatever the store holds —
+  /// including an id the viewer changed here earlier, which [seedFollowing]
+  /// deliberately refuses to overwrite. Without it, unfollowing from the
+  /// Manage-following list left every other surface showing "Following",
+  /// and no later refetch could correct it.
+  void adoptFollowing(String creatorId, bool following) {
+    if (creatorId.isEmpty) return;
+    _followOwned.add(creatorId);
+    if (_following[creatorId] == following) return;
+    _following[creatorId] = following;
+    notifyListeners();
+  }
+
   void seedFollowing(String creatorId, bool following) {
     if (creatorId.isEmpty || _followOwned.contains(creatorId)) return;
     if (_following[creatorId] == following) return;

@@ -7,6 +7,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/subscriptions/repo/following_repo.dart';
 import 'package:test_app/models/creator_models/livestream_models.dart';
 import 'package:test_app/models/subscription_models/subscription_models.dart';
@@ -186,17 +187,28 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
     });
     try {
       await _repo.unfollow(ministry.id);
-      // Stop listening for a ministry that is no longer on the list.
-      if (GetIt.instance.isRegistered<LiveSocketService>()) {
-        GetIt.instance<LiveSocketService>().unsubscribeCreator(ministry.id);
-      }
-      if (mounted && _ministries.isEmpty) unawaited(_loadSuggestions());
     } catch (e) {
       logger.w('Could not unfollow ${ministry.id}', error: e);
       if (!mounted) return;
       setState(() => _ministries = before);
       _report(AppStrings.followingUnfollowFailed);
+      return;
     }
+
+    // The write landed. What follows is housekeeping, and none of it may
+    // undo it — an unfollow that succeeded on the server must not reappear
+    // because a listener was missing.
+    if (GetIt.instance.isRegistered<EngagementStore>()) {
+      // Every other surface reads the store, so it has to hear about this
+      // too, or search, Explore and the feed keep showing "Following" for
+      // someone the viewer has just dropped.
+      GetIt.instance<EngagementStore>().adoptFollowing(ministry.id, false);
+    }
+    // Stop listening for a ministry that is no longer on the list.
+    if (GetIt.instance.isRegistered<LiveSocketService>()) {
+      GetIt.instance<LiveSocketService>().unsubscribeCreator(ministry.id);
+    }
+    if (mounted && _ministries.isEmpty) unawaited(_loadSuggestions());
   }
 
   Future<void> _setNotify(FollowedMinistry ministry, NotifyLevel level) async {

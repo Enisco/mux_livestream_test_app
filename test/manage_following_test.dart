@@ -6,6 +6,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/subscriptions/repo/following_repo.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/subscriptions/views/manage_following_screen.dart';
 import 'package:test_app/models/subscription_models/subscription_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
@@ -132,6 +133,19 @@ Future<_FakeApi> _pump(WidgetTester tester, _FakeApi api) async {
   GetIt.instance.registerSingleton<ApiService>(api);
   GetIt.instance.registerLazySingleton<FollowingRepo>(FollowingRepo.new);
   GetIt.instance.registerLazySingleton<DiscoveryRepo>(DiscoveryRepo.new);
+  // Its default constructor resolves repos from the locator eagerly, which
+  // this test does not register; the screen only ever records state on it.
+  GetIt.instance.registerSingleton<EngagementStore>(
+    EngagementStore(
+      toggle:
+          ({
+            required String targetType,
+            required String targetId,
+            required String interactionType,
+          }) async => true,
+      setFollowing: (String creatorId, {required bool follow}) async {},
+    ),
+  );
   addTearDown(GetIt.instance.reset);
 
   tester.view.physicalSize = const Size(390 * 3, 4000 * 3);
@@ -265,6 +279,23 @@ void main() {
     );
     // From recommended-creators, not a hardcoded trio.
     expect(find.text('CCI International'), findsOneWidget);
+  });
+
+  testWidgets('unfollowing tells every other surface, not just this list', (
+    tester,
+  ) async {
+    // The store is what search, Explore and the feed read, and it refuses a
+    // later correction for an id the viewer changed through it — so without
+    // this, unfollowing here left "Following" on every other screen with no
+    // way back.
+    await _pump(tester, _FakeApi(following: [_row('c1', 'Living Faith')]));
+    final store = GetIt.instance<EngagementStore>()..adoptFollowing('c1', true);
+    expect(store.isFollowing('c1'), isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('unfollow-c1')));
+    await tester.pumpAndSettle();
+
+    expect(store.isFollowing('c1'), isFalse);
   });
 
   testWidgets('a failed load can be retried and left', (tester) async {

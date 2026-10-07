@@ -45,6 +45,31 @@ class _FakeApi implements ApiService {
   final List<Map<String, dynamic>> testimonies;
   final bool fail;
 
+  final List<String> posts = [];
+  final List<String> deletes = [];
+
+  @override
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    posts.add(path);
+    return _ok(path, const <String, dynamic>{});
+  }
+
+  @override
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    deletes.add(path);
+    return _ok(path, const <String, dynamic>{});
+  }
+
   @override
   Future<Response<T>> get<T>(
     String path, {
@@ -133,19 +158,23 @@ Map<String, dynamic> _testimonyRow({
   'creator': _ministry,
 };
 
+_FakeApi? _lastApi;
+
 ViewerRecordsRepo _repo({
   List<Map<String, dynamic>> events = const [],
   List<Map<String, dynamic>> prayers = const [],
   List<Map<String, dynamic>> testimonies = const [],
   bool fail = false,
-}) => ViewerRecordsRepo(
-  api: _FakeApi(
+}) {
+  final api = _FakeApi(
     events: events,
     prayers: prayers,
     testimonies: testimonies,
     fail: fail,
-  ),
-);
+  );
+  _lastApi = api;
+  return ViewerRecordsRepo(api: api);
+}
 
 /// Tall enough that the lazy lists build every row at once.
 const _tall = Size(390, 3600);
@@ -221,6 +250,41 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Prayer Vigil'), findsOneWidget);
       expect(find.text('Youth Conference'), findsNothing);
+    });
+
+    testWidgets('cancelling an RSVP tells the server, not just the button', (
+      tester,
+    ) async {
+      // The toggle used to flip local state and send nothing, so the RSVP
+      // came back on the next load.
+      await _pump(
+        tester,
+        MyEventsScreen(repo: _repo(events: [_eventRow()])),
+        size: _tall,
+      );
+      expect(find.text('Going'), findsOneWidget);
+
+      await tester.tap(find.text('Going'));
+      await tester.pumpAndSettle();
+
+      expect(_lastApi!.deletes, ['/v1/content/calendar/events/e1/rsvp']);
+      expect(find.text('RSVP'), findsOneWidget);
+    });
+
+    testWidgets('and RSVPing again posts it', (tester) async {
+      await _pump(
+        tester,
+        MyEventsScreen(
+          repo: _repo(events: [_eventRow(status: 'not_attending')]),
+        ),
+        size: _tall,
+      );
+
+      await tester.tap(find.text('RSVP'));
+      await tester.pumpAndSettle();
+
+      expect(_lastApi!.posts, ['/v1/content/calendar/events/e1/rsvp']);
+      expect(find.text('Going'), findsOneWidget);
     });
 
     testWidgets('nothing RSVP\'d says so', (tester) async {
@@ -310,6 +374,21 @@ void main() {
       // Three rows, three states, none of them crashing or blank.
       expect(find.text('Please pray for my mother.'), findsNWidgets(3));
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('offers no way to withdraw one', (tester) async {
+      // A viewer cannot withdraw a prayer request — only the receiving
+      // ministry changes its status — so the affordance must not be drawn.
+      // It used to be, and only ever hid the row until the next load.
+      await _pump(
+        tester,
+        PrayerRequestsScreen(repo: _repo(prayers: [_prayerRow()])),
+        size: _tall,
+      );
+
+      await tester.tap(find.byType(GestureDetector).last);
+      await tester.pumpAndSettle();
+      expect(find.text('Delete'), findsNothing);
     });
 
     testWidgets('nothing asked for yet says so', (tester) async {
@@ -410,6 +489,46 @@ void main() {
         size: _tall,
       );
       expect(find.text('Try again'), findsOneWidget);
+    });
+
+    testWidgets('withdrawing asks first, then calls the route', (tester) async {
+      // It used to hide the row locally and tell the server nothing.
+      await _pump(
+        tester,
+        TestimoniesScreen(repo: _repo(testimonies: [_testimonyRow()])),
+        size: _tall,
+      );
+
+      await tester.tap(find.byType(GestureDetector).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove testimony'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Withdraw this testimony?'), findsOneWidget);
+      expect(_lastApi!.deletes, isEmpty);
+
+      await tester.tap(find.text('Withdraw'));
+      await tester.pumpAndSettle();
+      expect(_lastApi!.deletes, ['/v1/engagement/testimonies/t1']);
+    });
+
+    testWidgets('and says it comes off the wall when it is already on one', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        TestimoniesScreen(
+          repo: _repo(testimonies: [_testimonyRow(status: 'approved')]),
+        ),
+        size: _tall,
+      );
+
+      await tester.tap(find.byType(GestureDetector).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove testimony'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("off the ministry's wall"), findsOneWidget);
     });
   });
 

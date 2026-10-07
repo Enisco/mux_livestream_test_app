@@ -3,30 +3,48 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The values the account menu reads out.
 ///
-/// TEMPORARY, and only partly invented. The reader's name comes from the
-/// cached account, and so does the email — the sign-up payload carries it.
-/// What has nothing behind it is everything the account menu would need a
-/// settings route to know:
+/// `GET /v1/user/profile` is now read on open, so most of this is real: the
+/// name, the email, the phone and the chosen topics all come off the account
+/// the server holds.
 ///
-///  * the phone number, which is collected at sign-up but not cached
-///  * when the password last changed
-///  * the reader's chosen topics, picked during onboarding but not stored
+/// What is left invented is what the profile payload has **no field for**,
+/// confirmed against staging on 2026-10-07 — there is no `passwordChangedAt`,
+/// no reminder lead time and no `twoFactorEnabled`:
+///
+///  * when the password last changed — now shown as nothing rather than a
+///    date that was made up
 ///  * the event-reminder lead time
 ///  * whether two-factor is on
 ///
-/// `GET /v1/user/profile` exists in the spec and is the route to wire first —
-/// it should carry most of these. To retire this file: delete it and fix the
-/// import errors in `settings_screen.dart`.
+/// To retire the rest: a profile payload that carries them, or the routes in
+/// `docs/OPEN_ISSUES.md` #33.
 abstract final class SettingsDummyData {
-  /// Real: the cached account carries it. Falls back only if it is missing.
+  /// Real: the cached account carries it.
   static String get email =>
       LocalStorage.cachedEmail ?? AppStrings.settingsNotSet;
 
   static const emailVerified = true;
 
-  static const phone = '+234 80 123 234 5678';
-  static const passwordChanged = 'Last changed 3 months ago';
-  static const topics = 'Preaching, Worship, Gospel music';
+  /// Real: collected at sign-up and carried on the profile.
+  static String get phone =>
+      LocalStorage.cachedPhone ?? AppStrings.settingsNotSet;
+
+  /// Real: `viewerPreferenceCategorySlugs`, named by the category list.
+  static String get topics {
+    final slugs = LocalStorage.cachedTopicSlugs;
+    if (slugs.isEmpty) return AppStrings.settingsNotSet;
+    return slugs.map(_titleCase).join(', ');
+  }
+
+  static String _titleCase(String slug) => slug
+      .split('-')
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
+  /// The profile carries no `passwordChangedAt`, so this says nothing rather
+  /// than naming a date nobody recorded.
+  static const passwordChanged = '';
+
   static const eventReminder = '1 hour before';
   static const twoFactorStatus = 'Off · uses an authenticator app';
 }

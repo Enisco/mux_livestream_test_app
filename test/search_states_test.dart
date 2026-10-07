@@ -5,7 +5,17 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/discovery/data/recent_searches.dart';
 import 'package:test_app/features/discovery/data/search_grouping.dart';
+import 'package:dio/dio.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+import 'package:get_it/get_it.dart';
+import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/discovery/views/search_screen.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/shared/services/analytics_service.dart';
+import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/features/discovery/data/search_query.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/discovery/views/widgets/search_result_rows.dart';
 import 'package:test_app/features/discovery/views/widgets/search_type_tabs.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -63,6 +73,114 @@ Future<void> _pump(
     ),
   );
   await tester.pump();
+}
+
+/// A search answering with one ministry, so following it can be watched.
+class _FollowApi implements ApiService {
+  int subscribes = 0;
+  int unsubscribes = 0;
+
+  @override
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    if (path.endsWith('/subscribe')) {
+      subscribes++;
+      return _ok(path, const <String, dynamic>{});
+    }
+    return _ok(path, {
+      'hits': [
+        {
+          'entityType': 'creator',
+          'entityId': 'c1',
+          'title': 'GospelTube',
+          'subtitle': '@gospeltube',
+          'meta': const {'handle': 'gospeltube', 'isVerified': true},
+        },
+      ],
+      'total': 1,
+    });
+  }
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async => _ok(path, const {'interactions': <String, dynamic>{}});
+
+  @override
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    if (path.endsWith('/subscribe')) unsubscribes++;
+    return _ok(path, const <String, dynamic>{});
+  }
+
+  Response<T> _ok<T>(String path, Object body) => Response<T>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: 200,
+    data: {'data': body} as T,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+/// `flutter_secure_storage` has no platform channel in a widget test, and a
+/// throw here aborts the screen's whole init before it ever searches.
+class _SignedIn implements TokenStorageService {
+  @override
+  Future<bool> get hasSession async => true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+/// Only `trackContentClick` is reachable from this test, and it is not
+/// reached — nothing here opens a row.
+class _NoopAnalytics implements AnalyticsService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+/// The whole search screen, on a committed query, with the locator filled.
+Future<void> _pumpSearch(WidgetTester tester, _FollowApi api) async {
+  // The impression tracker's visibility detector leaves a pending timer
+  // otherwise, which fails the test at teardown rather than in its body.
+  VisibilityDetectorController.instance.updateInterval = Duration.zero;
+  SharedPreferences.setMockInitialValues({});
+  await LocalStorage.init();
+
+  GetIt.instance
+    ..allowReassignment = true
+    ..registerSingleton<ApiService>(api)
+    ..registerSingleton<DiscoveryRepo>(DiscoveryRepo())
+    ..registerSingleton<EngagementRepo>(EngagementRepo())
+    ..registerSingleton<EngagementStore>(EngagementStore())
+    ..registerSingleton<TokenStorageService>(_SignedIn())
+    ..registerSingleton<AnalyticsService>(_NoopAnalytics());
+  addTearDown(GetIt.instance.reset);
+
+  tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(
+    SizingBuilder(
+      baseSize: const Size(390, 844),
+      builder: (_) => const MaterialApp(home: SearchScreen(initialQuery: 'g')),
+    ),
+  );
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -251,6 +369,39 @@ void main() {
       await tester.pump();
 
       expect(picked, SearchFilter.events);
+    });
+  });
+
+  group('following from the results list', () {
+    testWidgets('the button turns over without reloading the screen', (
+      tester,
+    ) async {
+      // The POST landed and the store notified, but the row read the store
+      // only once — so the button stayed on "Follow" until the whole screen
+      // was rebuilt.
+      final api = _FollowApi();
+      await _pumpSearch(tester, api);
+
+      expect(find.text('Follow'), findsOneWidget);
+      await tester.tap(find.text('Follow'));
+      await tester.pumpAndSettle();
+
+      expect(api.subscribes, 1);
+      expect(find.text('Following'), findsOneWidget);
+      expect(find.text('Follow'), findsNothing);
+    });
+
+    testWidgets('and back again when they unfollow', (tester) async {
+      final api = _FollowApi();
+      await _pumpSearch(tester, api);
+
+      await tester.tap(find.text('Follow'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Following'));
+      await tester.pumpAndSettle();
+
+      expect(api.unsubscribes, 1);
+      expect(find.text('Follow'), findsOneWidget);
     });
   });
 

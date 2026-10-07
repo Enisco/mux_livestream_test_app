@@ -92,6 +92,15 @@ abstract final class ApiEndpoints {
 
   static const userCategories = '/v1/user/categories';
   static const userProfile = '/v1/user/profile';
+
+  /// The account's own record. Probed on 2026-10-07: it takes `firstName`,
+  /// `lastName`, `phone`, `gender` and `countryCode`, and **refuses**
+  /// `email`, `password`, `language` and `avatarFileId` — a photo goes
+  /// through the two avatar routes instead.
+  static String user(String id) => '/v1/user/$id';
+
+  static const userAvatarUploadUrl = '/v1/user/avatar/upload-url';
+  static const userAvatarConfirm = '/v1/user/avatar/confirm';
   static const viewerPreferences = '/v1/user/me/viewer-preferences';
   static const onboardingState = '/v1/user/me/onboarding-state';
 

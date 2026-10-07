@@ -7,6 +7,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/playlist_repo.dart';
 import 'package:test_app/features/library/views/playlist_add_screen.dart';
 import 'package:test_app/features/library/views/playlist_form_screen.dart';
@@ -14,6 +15,7 @@ import 'package:test_app/features/library/views/library_list_screen.dart'
     show glyphFor, metaFor;
 import 'package:test_app/features/library/views/playlists_screen.dart'
     show PlaylistMosaic;
+import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/models/library_models/playlist_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
@@ -302,9 +304,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             _Hero(
               playlist: playlist,
               onBack: _leave,
-              onPlay: playlist.isEmpty
+              // There is no queue to hand a whole playlist to, so Play opens
+              // the first item — which is what playing one starts with. It
+              // stands down on a playlist whose items have not arrived.
+              onPlay: playlist.items.isEmpty
                   ? null
-                  : () => _report('Playing a playlist is not built yet'),
+                  : () => _open(playlist.items.first),
               onMore: _openActions,
               onEditCover: () => _report(
                 '${AppStrings.playlistEditCover} '
@@ -418,6 +423,16 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     );
   }
 
+  /// Open what the row is a picture of.
+  ///
+  /// The library is not one of the surfaces the beacon's `source` enum knows,
+  /// so these clicks are reported as `unknown` rather than invented.
+  void _open(HistoryEntry item) {
+    if (!openFeedItem(context, item.source, source: AnalyticsSource.unknown)) {
+      _report(AppStrings.libraryRowGone);
+    }
+  }
+
   Widget _itemRow(HistoryEntry item, {required VoidCallback onMore}) {
     return ContentListRow(
       key: ValueKey('item-${item.id}'),
@@ -432,7 +447,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       badge: item.duration,
       progress: item.progress,
       meta: metaFor(item),
-      onTap: () => _report(item.title),
+      onTap: () => _open(item),
       onMore: onMore,
     );
   }

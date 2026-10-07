@@ -5,10 +5,15 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/creator/views/creator_profile_screen.dart';
+import 'package:test_app/features/creator/views/widgets/creator_profile_parts.dart'
+    show CreatorTab;
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/viewer_records_repo.dart';
 import 'package:test_app/models/creator_models/impact_models.dart'
     show testimonyImpactTagLabel;
 import 'package:test_app/shared/components/error_state_view.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/components/library_parts.dart';
@@ -21,8 +26,7 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// ministry, and what became of each.
 ///
 /// They share a card — avatar, author, a status pill, a body, a footer — and
-/// differ in what the pill means and what the footer says. Neither is wired;
-/// see [RecordsDummyData].
+/// differ in what the pill means and what the footer says.
 
 void _report(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -81,8 +85,6 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
     }
   }
 
-  final _deleted = <String>{};
-
   /// The chips mix two axes — three statuses and one content kind — so each
   /// one says which axis it narrows.
   static const _statusFor = <String, PrayerStatus>{
@@ -92,7 +94,6 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
   };
 
   bool _keeps(PrayerRequest p) {
-    if (_deleted.contains(p.id)) return false;
     if (_filter == AppStrings.prayerFilterAudio) {
       return p.aboutKind == PrayerAbout.audio;
     }
@@ -125,22 +126,36 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
             icon: HugeIcons.strokeRoundedLinkSquare01,
             enabled: !request.aboutIsGeneral,
           ),
-          LibraryAction(
-            label: AppStrings.prayerActionDelete,
-            icon: HugeIcons.strokeRoundedDelete02,
-            destructive: true,
-          ),
+          // No delete. A viewer cannot withdraw a prayer request — only the
+          // receiving ministry changes its status — and the guide is explicit
+          // that the affordance should not be drawn. It used to be here, and
+          // it only ever hid the row until the next load.
         ],
         onSelected: (label) {
           Navigator.pop(sheetContext);
-          if (label == AppStrings.prayerActionDelete) {
-            setState(() => _deleted.add(request.id));
+          if (label == AppStrings.prayerActionGoToContent) {
+            _goToContent(request);
           } else {
             _report(context, '$label is not built yet');
           }
         },
       ),
     );
+  }
+
+  /// Open what the request was raised against.
+  ///
+  /// A context-menu action is explicitly not a card click, so no beacon goes
+  /// out — the guide says to count clicks at the surface, not in a menu.
+  void _goToContent(PrayerRequest request) {
+    if (!openFeedItem(
+      context,
+      request.aboutItem,
+      source: AnalyticsSource.unknown,
+      beacon: false,
+    )) {
+      _report(context, AppStrings.libraryRowGone);
+    }
   }
 
   @override
@@ -305,6 +320,71 @@ class _TestimoniesScreenState extends State<TestimoniesScreen> {
   List<Testimony> get _matches =>
       _rows.where((t) => !_removed.contains(t.id)).toList(growable: false);
 
+  /// Withdrawing takes a story off the ministry's wall as well as out of
+  /// this list, so it asks first.
+  void _confirmWithdraw(Testimony testimony) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.fieldBg,
+        title: Text(
+          AppStrings.testimonyWithdrawTitle,
+          style: AppStyles.heading(16),
+        ),
+        content: Text(
+          testimony.status == TestimonyStatus.approved
+              ? AppStrings.testimonyWithdrawLiveBody
+              : AppStrings.testimonyWithdrawBody,
+          style: AppStyles.body(13, color: AppColors.neutral400),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              AppStrings.notNow,
+              style: AppStyles.button(13, color: AppColors.neutral400),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              unawaited(_withdraw(testimony));
+            },
+            child: Text(
+              AppStrings.testimonyWithdrawConfirm,
+              style: AppStyles.button(13, color: AppColors.destructive),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _withdraw(Testimony testimony) async {
+    setState(() => _removed.add(testimony.id));
+    try {
+      await _repo.withdrawTestimony(testimony.id);
+    } catch (e) {
+      logger.w('Testimony withdraw failed', error: e);
+      if (!mounted) return;
+      setState(() => _removed.remove(testimony.id));
+      _report(context, AppStrings.historyClearFailed);
+    }
+  }
+
+  /// Open the ministry's wall, on the tab the testimony is on.
+  void _viewOnWall(Testimony testimony) {
+    if (testimony.creatorId.isEmpty) {
+      _report(context, AppStrings.libraryRowGone);
+      return;
+    }
+    openCreatorProfile(
+      context,
+      creatorId: testimony.creatorId,
+      tab: CreatorTab.testimonies,
+    );
+  }
+
   void _openActions(Testimony testimony) {
     showModalBottomSheet<void>(
       context: context,
@@ -325,7 +405,9 @@ class _TestimoniesScreenState extends State<TestimoniesScreen> {
         onSelected: (label) {
           Navigator.pop(sheetContext);
           if (label == AppStrings.testimonyActionRemove) {
-            setState(() => _removed.add(testimony.id));
+            _confirmWithdraw(testimony);
+          } else if (label == AppStrings.testimonyActionView) {
+            _viewOnWall(testimony);
           } else {
             _report(context, '$label is not built yet');
           }

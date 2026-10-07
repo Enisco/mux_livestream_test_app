@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/router.dart';
+import 'package:test_app/features/creator/views/widgets/creator_profile_parts.dart'
+    show CreatorTab;
 import 'package:test_app/core/transitions.dart';
 import 'package:test_app/features/creator/views/creator_live_screen.dart';
 import 'package:test_app/features/creator/views/creator_polish_screens.dart';
@@ -40,6 +42,7 @@ final List<RouteBase> creatorRoutes = [
       CreatorProfileScreen(
         creatorId: state.uri.queryParameters['id'],
         handle: state.uri.queryParameters['handle'],
+        initialTab: CreatorTab.byName(state.uri.queryParameters['tab']),
       ),
     ),
   ),

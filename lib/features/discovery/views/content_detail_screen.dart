@@ -79,6 +79,45 @@ void openContentDetail(
   Navigator.push(context, MaterialPageRoute(builder: builder));
 }
 
+/// Open whatever a row stands for, reporting the click first.
+///
+/// Every surface that lists content does the same two things in the same
+/// order — report the click against the surface that was activated, then push
+/// the right screen for the entity type — so they share this rather than each
+/// keeping a copy that drifts.
+///
+/// Returns false when the row carries nothing to open, which is what a caller
+/// says something about: a library row whose content has been deleted or made
+/// private comes back without its hit, and a tap that silently did nothing
+/// would read as a broken screen.
+bool openFeedItem(
+  BuildContext context,
+  WebFeedItem? item, {
+  required String source,
+
+  /// A context-menu action is explicitly **not** a card click — the beacon
+  /// guide says so — so "Go to content" navigates without reporting one.
+  bool beacon = true,
+}) {
+  if (item == null || item.entityId.isEmpty) return false;
+  if (beacon) {
+    GetIt.instance<AnalyticsService>().trackContentClick(
+      mediaId: item.entityId,
+      contentType: ContentTypes.fromEntityType(item.entityType),
+      creatorId: item.creator?.creatorId ?? '',
+      mediaType: item.mediaType,
+      source: source,
+      promotion: item.promotion,
+    );
+  }
+  if (item.isCreatorRow) {
+    openCreatorProfile(context, creatorId: item.profileCreatorId);
+    return true;
+  }
+  openContentDetail(context, item, source: source);
+  return true;
+}
+
 enum ContentDetailKind { post, devotional, event }
 
 /// Detail for the non-media content types. They share the anatomy the design

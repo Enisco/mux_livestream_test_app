@@ -28,6 +28,7 @@ class Gift {
     required this.amount,
     required this.document,
     this.ministryVerified = false,
+    this.creatorId = '',
     this.converted = '',
     this.refunded = false,
     this.monthLabel = '',
@@ -36,6 +37,10 @@ class Gift {
   final String id;
   final String ministry;
   final bool ministryVerified;
+
+  /// Which ministry it went to — what tapping the byline opens. Empty when the
+  /// creator lookup degraded and only the legal name on the charge survived.
+  final String creatorId;
 
   /// "General Fund", "Special Projects" — what it was given towards.
   final String fund;

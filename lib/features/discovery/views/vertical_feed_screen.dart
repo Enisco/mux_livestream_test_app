@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
@@ -956,6 +957,13 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     );
   }
 
+  /// The avatar and the handle both name a ministry, so both open it.
+  void _openCreator() => openCreatorProfile(
+    context,
+    creatorId: widget.item.creatorId,
+    handle: _creatorHandle,
+  );
+
   Widget _buildRightActions() {
     final item = widget.item;
     return Positioned(
@@ -970,6 +978,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
             children: [
               _AvatarButton(
                 displayName: _creatorDisplayName ?? _creatorHandle ?? '',
+                onTap: _openCreator,
                 onFollow: () {
                   if (!widget.isLoggedIn) {
                     showAuthSheet(context, 'follow this creator');
@@ -1052,13 +1061,16 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                   child: _PromotedBadge(),
                 ),
               if (channelLabel != null)
-                Text(
-                  channelLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                GestureDetector(
+                  onTap: _openCreator,
+                  child: Text(
+                    channelLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                    ),
                   ),
                 ),
               const SizedBox(height: 4),
@@ -1132,7 +1144,14 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 class _AvatarButton extends StatelessWidget {
   final String displayName;
   final VoidCallback onFollow;
-  const _AvatarButton({required this.displayName, required this.onFollow});
+
+  /// The avatar itself opens the channel; the plus on it follows.
+  final VoidCallback onTap;
+  const _AvatarButton({
+    required this.displayName,
+    required this.onFollow,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1144,21 +1163,24 @@ class _AvatarButton extends StatelessWidget {
         clipBehavior: Clip.none,
         alignment: Alignment.topCenter,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1.5),
-              color: AppColors.neutral800,
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+                color: AppColors.neutral800,
+              ),
+              child: Center(
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
                 ),
               ),
             ),

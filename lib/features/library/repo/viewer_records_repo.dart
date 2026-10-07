@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/library_models/giving_models.dart';
 import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
@@ -45,6 +46,13 @@ class ViewerRecordsRepo {
     data: {'offsetMinutes': offsetMinutes},
   );
 
+  /// `POST …/:id/rsvp` — `attending`, `maybe` or `not_attending`.
+  ///
+  /// The viewer's own RSVP, not a creator-management action, even though the
+  /// two share a controller.
+  Future<void> rsvp(String eventId, {String status = 'attending'}) =>
+      _api.post(ApiEndpoints.eventRsvp(eventId), data: {'status': status});
+
   /// `DELETE …/:id/rsvp`. This also clears the reminder, so nothing should
   /// leave a reminder toggle lit afterwards.
   Future<void> cancelRsvp(String eventId) =>
@@ -74,6 +82,17 @@ class ViewerRecordsRepo {
       past: at != null && at.isBefore(DateTime.now()),
       going: rsvp['status'] == 'attending',
       reminderMinutes: (rsvp['offsetMinutes'] as num?)?.toInt(),
+      // Assembled rather than kept whole: this is the RSVP list, not a search,
+      // so there is no hit to carry. The event detail screen reads it back by
+      // id, so the identity and the type are what have to be right.
+      source: WebFeedItem(
+        entityType: 'event',
+        entityId: event['id'] as String? ?? '',
+        title: event['title'] as String? ?? '',
+        creator: creator == null ? null : WebFeedCreator.fromJson(creator),
+        meta: WebFeedItemMeta(locationLabel: location?['label'] as String?),
+        calendarStartAt: at,
+      ),
     );
   }
 
@@ -109,6 +128,20 @@ class ViewerRecordsRepo {
           ? PrayerAbout.general
           : _about(ref['targetType'] as String?, ref['mediaType'] as String?),
       aboutGone: ref != null && title == null,
+      // Nothing to open for a request raised against the ministry itself, or
+      // for one whose content has gone — the title is how the server says so.
+      aboutItem: ref == null || title == null
+          ? null
+          : WebFeedItem(
+              entityType: ref['targetType'] as String? ?? '',
+              entityId: ref['targetId'] as String? ?? '',
+              title: title,
+              creator: creator == null
+                  ? null
+                  : WebFeedCreator.fromJson(creator),
+              meta: const WebFeedItemMeta(),
+              facets: WebFeedFacets(mediaType: ref['mediaType'] as String?),
+            ),
       body: json['body'] as String? ?? '',
       sharedAgo: longAge(DateTime.tryParse(json['createdAt'] as String? ?? '')),
       status: switch (json['status']) {
@@ -173,6 +206,14 @@ class ViewerRecordsRepo {
       wall: status == TestimonyStatus.approved
           ? (creator?['displayName'] as String? ?? '')
           : '',
+      // Whose wall it is on — what "View on wall" opens. The row names the
+      // ministry by `creatorId` at the top level and repeats its identity in
+      // the nested object; either will do, and one of them may be absent.
+      creatorId:
+          json['creatorId'] as String? ??
+          creator?['id'] as String? ??
+          creator?['creatorId'] as String? ??
+          '',
     );
   }
 
@@ -230,6 +271,11 @@ class ViewerRecordsRepo {
           '',
       ministryVerified:
           creator?['isVerified'] as bool? ?? creator?['verifiedAt'] != null,
+      // The guide names the `creator` byline but not which key holds its id,
+      // and the other reads use both spellings. Absent means no tap, rather
+      // than a guessed key.
+      creatorId:
+          creator?['id'] as String? ?? creator?['creatorId'] as String? ?? '',
       fund: json['fundName'] as String? ?? '',
       date: at == null ? '' : '${_shortMonths[at.month - 1]} ${at.day}',
       // Gifts are not charged in USD. The charge currency is the figure; the

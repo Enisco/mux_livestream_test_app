@@ -35,8 +35,8 @@ void main() {
     await LocalStorage.init();
     await LocalStorage.setString(
       LocalStorage.cachedUserKey,
-      '{"firstName":"Ayomide","lastName":"John",'
-      '"email":"ayomide.john@mail.com"}',
+      '{"id":"u1","firstName":"Ayomide","lastName":"John",'
+      '"email":"ayomide.john@mail.com","phone":"+234 80 123 234 5678"}',
     );
   });
 

@@ -7,8 +7,10 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/viewer_library_repo.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
+import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/shared/components/library_parts.dart';
@@ -147,6 +149,27 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
   static int _count(List<HistoryDay> days) =>
       days.fold(0, (n, d) => n + d.entries.length);
 
+  /// Open what the row is a picture of.
+  ///
+  /// The library is not one of the surfaces the beacon's `source` enum knows,
+  /// so these clicks are reported as `unknown` rather than invented.
+  void _open(HistoryEntry entry) {
+    if (!openFeedItem(context, entry.source, source: AnalyticsSource.unknown)) {
+      _say(AppStrings.libraryRowGone);
+    }
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: AppStyles.body(13)),
+        backgroundColor: AppColors.neutral800,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   /// Take the row out at once, and put it back if the write fails.
   Future<void> _remove(HistoryEntry entry) async {
     setState(() => _removed.add(entry.id));
@@ -156,16 +179,7 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
       logger.w('Library remove failed', error: e);
       if (!mounted) return;
       setState(() => _removed.remove(entry.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppStrings.historyClearFailed,
-            style: AppStyles.body(13),
-          ),
-          backgroundColor: AppColors.neutral800,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _say(AppStrings.historyClearFailed);
     }
   }
 
@@ -326,6 +340,7 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
                                 eventDate: entry.eventDate,
                                 eventVenue: entry.eventVenue,
                                 eventTime: entry.eventTime,
+                                onTap: () => _open(entry),
                                 trailing: _TrailingAction(
                                   icon: widget.trailingIcon,
                                   onTap: () => unawaited(_remove(entry)),

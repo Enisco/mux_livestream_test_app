@@ -185,10 +185,19 @@ class SettingsRow extends StatelessWidget {
 /// The reader's initials in a softly lit disc — the design's stand-in for a
 /// photo, and what shows when there is no photo to draw.
 class SettingsAvatar extends StatelessWidget {
-  const SettingsAvatar({super.key, required this.name, this.size = 48});
+  const SettingsAvatar({
+    super.key,
+    required this.name,
+    this.size = 48,
+    this.imageUrl,
+  });
 
   final String name;
   final double size;
+
+  /// The account's confirmed photo. Initials stand in until there is one, and
+  /// again if it cannot be fetched — a broken image says less than a name.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +205,31 @@ class SettingsAvatar extends StatelessWidget {
     final initials = parts.isEmpty
         ? '?'
         : parts.take(2).map((p) => p[0].toUpperCase()).join();
+
+    final photo = imageUrl?.trim();
+    if (photo != null && photo.isNotEmpty) {
+      return Container(
+        width: size.s,
+        height: size.s,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.fieldBg,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brandPrimary.withValues(alpha: 0.34),
+              blurRadius: 27.2.s,
+              spreadRadius: -6,
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(
+          photo,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => SettingsAvatar(name: name, size: size),
+        ),
+      );
+    }
 
     return Container(
       width: size.s,

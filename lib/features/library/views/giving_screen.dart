@@ -5,6 +5,7 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/library/repo/viewer_records_repo.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/models/library_models/giving_models.dart';
@@ -350,25 +351,40 @@ class _GiftRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            gift.ministry,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppStyles.label(13, weight: AppStyles.bold),
+                    // A ministry named anywhere opens that ministry. The id is
+                    // absent when only the legal name on the charge survived,
+                    // and then there is nothing to open.
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: gift.creatorId.isEmpty
+                          ? null
+                          : () => openCreatorProfile(
+                              context,
+                              creatorId: gift.creatorId,
+                            ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              gift.ministry,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppStyles.label(
+                                13,
+                                weight: AppStyles.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                        if (gift.ministryVerified) ...[
-                          SizedBox(width: 4.s),
-                          DesignIcon(
-                            AppAssets.iconFeedVerified,
-                            width: 13.s,
-                            height: 13.s,
-                          ),
+                          if (gift.ministryVerified) ...[
+                            SizedBox(width: 4.s),
+                            DesignIcon(
+                              AppAssets.iconFeedVerified,
+                              width: 13.s,
+                              height: 13.s,
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                     SizedBox(height: 3.s),
                     Text(

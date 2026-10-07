@@ -1,7 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/creator/repo/creator_asset_repo.dart'
+    show AssetUploadFailure;
+import 'package:test_app/features/creator/services/creator_image_picker.dart';
+import 'package:test_app/features/settings/repo/account_repo.dart';
 import 'package:test_app/features/settings/data/account_form_rules.dart';
 import 'package:test_app/features/settings/data/settings_dummy_data.dart';
 import 'package:test_app/features/settings/views/confirm_change_screen.dart';
@@ -10,14 +17,17 @@ import 'package:test_app/features/settings/views/widgets/settings_row.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The four screens the account menu's rows lead to.
 ///
-/// Each validates what it can on the device and then stops: the routes exist —
-/// `PATCH /v1/user/{id}` for name, email and phone, the avatar upload pair for
-/// a photo — but their payloads are not published and they are auth-gated, so
-/// none of them is wired. Every Update says so rather than pretending.
+/// **Profile info is wired; the other three are not, and cannot be.** Probed
+/// on 2026-10-07: `PATCH /v1/user/{id}` takes `firstName`, `lastName` and
+/// `phone`, and the avatar pair takes a photo — so a name and a picture save
+/// for real. It **refuses** `email` and `password`, and there is no
+/// `.../email/change` or password-change route of any kind, so those two
+/// forms validate and then say so. See `docs/OPEN_ISSUES.md`.
 
 /// Reports that a form is as far as the app can currently take it.
 void _notWired(BuildContext context, String what) {
@@ -46,7 +56,10 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
     text: LocalStorage.cachedFirstName ?? '',
   );
   late final _last = TextEditingController(text: _lastNameFromCache());
+  final _repo = AccountRepo();
   String? _error;
+  bool _busy = false;
+  String? _avatarUrl = AssetUrlResolver.resolve(LocalStorage.cachedAvatarKey);
 
   static String _lastNameFromCache() {
     final full = LocalStorage.cachedFullName ?? '';
@@ -61,10 +74,74 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  /// `PATCH /v1/user/{id}` with the two fields it accepts.
+  ///
+  /// The screen pops on success so the account menu behind it rebuilds from
+  /// the cache the write just replaced.
+  Future<void> _submit() async {
     final problem = AccountFormRules.name(first: _first.text, last: _last.text);
     setState(() => _error = problem);
-    if (problem == null) _notWired(context, 'Updating your name');
+    if (problem != null || _busy) return;
+
+    setState(() => _busy = true);
+    try {
+      await _repo.updateAccount(
+        firstName: _first.text.trim(),
+        lastName: _last.text.trim(),
+      );
+      if (!mounted) return;
+      _say(AppStrings.settingsNameSaved);
+      Navigator.pop(context, true);
+    } catch (e) {
+      logger.w('Name update failed', error: e);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _say(AppStrings.settingsSaveFailed);
+    }
+  }
+
+  /// Pick, upload, confirm. The photo only exists once it is confirmed, so
+  /// nothing is shown as changed until the route has answered.
+  Future<void> _changePhoto() async {
+    if (_busy) return;
+    final picked = await CreatorImagePicker.pick(
+      maxBytes: AccountRepo.avatarMaxBytes,
+    );
+    if (picked.isCancelled || !mounted) return;
+    if (picked.failure case final why?) {
+      _say(switch (why) {
+        PickFailure.tooLarge => AppStrings.settingsPhotoTooLarge,
+        _ => AppStrings.settingsPhotoUnreadable,
+      });
+      return;
+    }
+
+    setState(() => _busy = true);
+    final result = await _repo.uploadAvatar(picked.image!);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.fileId != null) {
+        _avatarUrl = AssetUrlResolver.resolve(LocalStorage.cachedAvatarKey);
+      }
+    });
+    _say(switch (result.failure) {
+      null => AppStrings.settingsPhotoSaved,
+      AssetUploadFailure.tooLarge => AppStrings.settingsPhotoTooLarge,
+      AssetUploadFailure.network => AppStrings.settingsPhotoOffline,
+      AssetUploadFailure.rejected => AppStrings.settingsSaveFailed,
+    });
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: AppStyles.body(13)),
+        backgroundColor: AppColors.neutral800,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -73,7 +150,8 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
 
     return SettingsFormScaffold(
       title: AppStrings.settingsProfileInfo,
-      onAction: _submit,
+      onAction: () => unawaited(_submit()),
+      busy: _busy,
       children: [
         Center(
           child: Column(
@@ -85,6 +163,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
                   SettingsAvatar(
                     name: name.isEmpty ? AppStrings.accountFallbackName : name,
                     size: 80,
+                    imageUrl: _avatarUrl,
                   ),
                   Positioned(
                     right: 2.s,
@@ -110,7 +189,7 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
               SizedBox(height: 10.s),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => _notWired(context, 'Changing your photo'),
+                onTap: () => unawaited(_changePhoto()),
                 child: Text(
                   AppStrings.settingsChangePhoto,
                   style: AppStyles.label(13, color: AppColors.neutral400),

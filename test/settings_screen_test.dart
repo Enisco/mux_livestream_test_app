@@ -88,7 +88,10 @@ void main() {
       await _pump(tester, const SettingsScreen(), size: _tall);
 
       expect(find.text('User'), findsOneWidget);
-      expect(find.text('Not set'), findsOneWidget);
+      // Email, phone and topics all read the cached account now, so with no
+      // account cached all three fall back rather than printing a value
+      // nobody supplied — the phone used to show an invented number.
+      expect(find.text('Not set'), findsNWidgets(3));
     });
   });
 

@@ -5,6 +5,8 @@
 /// model feeds all three and `ViewerLibraryRepo` does the mapping.
 library;
 
+import 'package:test_app/models/discovery_models/web_feed_item.dart';
+
 /// The kinds of thing history remembers. Each names itself on its own row.
 enum HistoryKind {
   video('Video', 'views'),
@@ -41,6 +43,7 @@ class HistoryEntry {
     this.eventVenue,
     this.eventTime,
     this.targetType = '',
+    this.source,
   });
 
   final String id;
@@ -75,6 +78,14 @@ class HistoryEntry {
   /// a devotional entry is not a devotional series.
   final String targetType;
 
+  /// The row as discovery sent it, kept whole so a tap can open the thing.
+  ///
+  /// History, Liked, Saved and a playlist's running order are all enriched
+  /// search hits, which is exactly what the detail screens take — so the hit
+  /// is carried rather than reassembled from the fields above, which would
+  /// lose the entity type a post, event or series is opened by.
+  final WebFeedItem? source;
+
   bool get isEvent => kind == HistoryKind.event;
 }
 
@@ -99,6 +110,7 @@ class HistoryResumeItem {
     this.thumbnailAsset,
     this.thumbnailUrl,
     this.isAudio = false,
+    this.source,
   });
 
   final String id;
@@ -114,4 +126,8 @@ class HistoryResumeItem {
 
   /// Audio resumes show a music note where video shows nothing.
   final bool isAudio;
+
+  /// Carried through from the history row this was taken from, so the card
+  /// opens what it is a picture of.
+  final WebFeedItem? source;
 }
