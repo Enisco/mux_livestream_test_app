@@ -89,7 +89,7 @@ class NotificationPage {
 /// The three channel switches `GET /v1/notification/preferences` returns.
 ///
 /// There is nothing per-type and no reminder lead time — see
-/// `docs/API_REQUESTS.md` §3.4.
+/// `docs/MOBILE_API_REQUESTS.md` §3.4.
 class NotificationPrefs {
   const NotificationPrefs({
     this.email = true,
