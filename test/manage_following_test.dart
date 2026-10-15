@@ -88,7 +88,11 @@ class _FakeApi implements ApiService {
   }
 
   @override
-  Future<Response<T>> delete<T>(String path, {Options? options}) async {
+  Future<Response<T>> delete<T>(
+    String path, {
+    Object? data,
+    Options? options,
+  }) async {
     if (failWrite) {
       throw DioException(requestOptions: RequestOptions(path: path));
     }

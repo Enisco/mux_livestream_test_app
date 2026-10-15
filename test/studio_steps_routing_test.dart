@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/notifications/data/notification_store.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/views/studio_screen.dart';
 import 'package:test_app/shared/services/api_service.dart';
@@ -87,6 +88,12 @@ Future<GoRouter> _pumpStudio(
 
   await GetIt.instance.reset();
   GetIt.instance.registerSingleton<ApiService>(_FakeApi(steps: steps));
+  // Both bells read one store; the screens listen to it from `initState`.
+  // Its first read fails without an ApiService and is swallowed, which is the
+  // behaviour under test here — a bell that cannot be counted draws no dot.
+  GetIt.instance.registerLazySingleton<NotificationStore>(
+    NotificationStore.new,
+  );
   addTearDown(GetIt.instance.reset);
 
   tester.view.physicalSize = const Size(390 * 3, 1400 * 3);

@@ -51,6 +51,12 @@ class DeviceInfoService {
     _deviceId = storedId;
   }
 
+  /// A stable id for this install, minted once and kept in secure storage.
+  /// The notification service keys a device's push token on it.
+  String get deviceId => _deviceId;
+
+  /// `ios` or `android` on a phone — the two values the device-token route
+  /// takes, alongside `web`.
   String get platform => _platform;
   String get appVersion => _appVersion;
 

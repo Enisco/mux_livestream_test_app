@@ -272,6 +272,12 @@ class ApiService {
   Future<Response<T>> patch<T>(String path, {dynamic data, Options? options}) =>
       _dio.patch<T>(path, data: data, options: options);
 
-  Future<Response<T>> delete<T>(String path, {Options? options}) =>
-      _dio.delete<T>(path, options: options);
+  /// `data` is unusual on a DELETE but the notification service's
+  /// `device-token` route takes its `deviceId` in the body rather than the
+  /// path, so the body has to be sendable.
+  Future<Response<T>> delete<T>(
+    String path, {
+    Object? data,
+    Options? options,
+  }) => _dio.delete<T>(path, data: data, options: options);
 }

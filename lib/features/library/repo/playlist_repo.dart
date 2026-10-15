@@ -11,25 +11,24 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// The reader's own running orders.
 ///
-/// **Staging and the integration guide disagree about these routes**, and
-/// what follows matches staging, probed on 2026-10-06. See
-/// `docs/OPEN_ISSUES.md`; the differences are not small:
+/// Staging departed from the guide in three ways when this was written on
+/// 2026-10-06. **All three were fixed server-side on 2026-10-15** and this
+/// class now matches the guide:
 ///
-/// - **`visibility` cannot be written.** The guide documents it on create and
-///   on PATCH; both answer "property visibility should not exist". Every
-///   playlist is `private`, so the design's "Anyone with the link" group has
-///   nothing to hold.
-/// - **The detail read does not carry its items.** The guide says `items`
-///   arrive as media search hits ready to render; staging returns
-///   `orderedMediaIds` and nothing else, so this class hydrates them the way
-///   the Explore rails hydrate continue-watching — one search, then the
-///   playlist's own order put back.
-/// - **There is no public read.** `/v1/public/media/playlists/:id` answers
-///   `Cannot GET`, so a playlist cannot be shared at all yet.
-/// - **No `owner` or `unavailableCount`** comes back either, so the detail
-///   screen cannot name whose list it is or say how much of it has gone.
+/// - `visibility` is writable on create and on PATCH, so a playlist can be
+///   made public and the design's "Anyone with the link" group has something
+///   to hold.
+/// - The detail read carries its `items` as media search hits — the same
+///   shape `public/query` returns, `meta` and `creator` included — so they
+///   are mapped straight through. This used to cost a second search to put
+///   titles and artwork on `orderedMediaIds`; that hydration is gone.
+/// - `GET /v1/public/media/playlists/{id}` serves a public playlist with no
+///   auth header. Nothing here calls it: a stranger's link has nowhere to
+///   land until there is a share URL and a route for one
+///   (`docs/MOBILE_API_REQUESTS.md` §1.1). It answers 404 for a private
+///   playlist, the same as for one that does not exist.
 ///
-/// What the guide gets right:
+/// What is still true:
 ///
 /// - The list is a Prisma advanced search, so it pages by number
 ///   (`?page=&limit=`) with a `{data, meta}` envelope — not the cursor the
@@ -37,6 +36,10 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 /// - **Adding is not idempotent.** A duplicate answers 409 "Media is already
 ///   in this playlist" rather than quietly doing nothing, and a playlist
 ///   holds at most 500 items.
+/// - **A playlist holds media only.** `items` takes `mediaId`; a post or an
+///   event is refused.
+/// - There is a `cover` field but nothing uploads to one — see
+///   `docs/MOBILE_API_REQUESTS.md` §2.1.
 class PlaylistRepo {
   PlaylistRepo({ApiService? api}) : _injected = api;
 
@@ -65,50 +68,28 @@ class PlaylistRepo {
     return _rows(data['data']).map(_summary).toList();
   }
 
-  /// `GET /v1/media/playlists/:id` — the owner read, items included.
-  /// `GET /v1/media/playlists/:id`, then one search to put titles and
-  /// artwork on the ids it returns.
+  /// `GET /v1/media/playlists/:id` — the owner read, items already hydrated.
   ///
-  /// Search ranks by relevance, so the playlist's own order is restored
-  /// afterwards — and an id the search cannot resolve is dropped and counted
-  /// as unavailable rather than drawn blank.
+  /// The rows arrive in the playlist's own order, so nothing is re-sorted.
   Future<Playlist> fetch(String id) async {
     final response = await _api.get(ApiEndpoints.playlist(id));
-    final json = _data(response.data);
-    final ids = [
-      for (final v in json['orderedMediaIds'] as List? ?? const [])
-        if (v is String) v,
-    ];
-    return _detail(json, await _hydrate(ids));
+    return _detail(_data(response.data));
   }
 
-  /// Turn ids into rows, in the order the playlist holds them.
-  Future<List<HistoryEntry>> _hydrate(List<String> ids) async {
-    if (ids.isEmpty) return const [];
-    final response = await _api.post(
-      ApiEndpoints.publicSearch,
-      data: {
-        'entityTypes': ['media'],
-        'filters': [
-          {'field': 'entityId', 'values': ids},
-        ],
-        'size': ids.length,
-      },
-    );
-    final byId = {
-      for (final row in _rows(_data(response.data)['hits']))
-        row['entityId'] as String? ?? '': _item(row),
-    };
-    return [for (final id in ids) ?byId[id]];
-  }
-
-  Future<Playlist> create({required String title, String? description}) async {
+  Future<Playlist> create({
+    required String title,
+    String? description,
+    bool isPrivate = true,
+  }) async {
     final response = await _api.post(
       ApiEndpoints.playlists,
-      // No `visibility`: staging refuses it, and every playlist is private.
-      data: {'title': title, 'description': ?description},
+      data: {
+        'title': title,
+        'description': ?description,
+        'visibility': isPrivate ? 'private' : 'public',
+      },
     );
-    return _detail(_data(response.data), const []);
+    return _detail(_data(response.data));
   }
 
   /// `PATCH /v1/media/playlists/:id`.
@@ -120,11 +101,17 @@ class PlaylistRepo {
     String? title,
     String? description,
     bool clearDescription = false,
+    bool? isPrivate,
   }) async {
     await _api.patch(
       ApiEndpoints.playlist(id),
       data: {
         'title': ?title,
+        'visibility': ?switch (isPrivate) {
+          null => null,
+          true => 'private',
+          false => 'public',
+        },
         if (clearDescription)
           'description': null
         else
@@ -170,8 +157,9 @@ class PlaylistRepo {
     );
   }
 
-  /// A detail read, with the rows its ids hydrated to.
-  static Playlist _detail(Map<String, dynamic> json, List<HistoryEntry> items) {
+  /// A detail read. `items` arrives as media search hits in playlist order.
+  static Playlist _detail(Map<String, dynamic> json) {
+    final items = _rows(json['items']).map(_item).toList();
     final declared = (json['itemCount'] as num?)?.toInt() ?? items.length;
     return Playlist(
       id: json['id'] as String? ?? '',
@@ -184,8 +172,12 @@ class PlaylistRepo {
       isPrivate: json['visibility'] != 'public',
       declaredCount: declared,
       runtime: _runtime(items),
-      // Nothing the search could not resolve: deleted, or no longer public.
-      unavailableCount: (declared - items.length).clamp(0, declared),
+      // The server counts these now — content deleted or made private since
+      // it was added. It used to be inferred from how many ids the hydrating
+      // search could not resolve.
+      unavailableCount:
+          (json['unavailableCount'] as num?)?.toInt() ??
+          (declared - items.length).clamp(0, declared),
       description: json['description'] as String?,
     );
   }
@@ -239,10 +231,7 @@ class PlaylistRepo {
 
   /// Build a detail without a network, for tests that pin the arithmetic.
   @visibleForTesting
-  static Playlist debugDetail(
-    Map<String, dynamic> json,
-    List<HistoryEntry> items,
-  ) => _detail(json, items);
+  static Playlist debugDetail(Map<String, dynamic> json) => _detail(json);
 
   static Map<String, dynamic> _data(Object? body) {
     final data = (body as Map<String, dynamic>?)?['data'];

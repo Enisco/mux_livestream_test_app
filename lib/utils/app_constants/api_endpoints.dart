@@ -99,6 +99,16 @@ abstract final class ApiEndpoints {
   /// through the two avatar routes instead.
   static String user(String id) => '/v1/user/$id';
 
+  // ---- Notifications ----------------------------------------------------
+
+  /// Prisma-style advanced search: `{filters, sort}` in the body, `page` and
+  /// `limit` as **query parameters** — the body refuses both.
+  static const notificationSearch = '/v1/notification/search';
+  static const notificationMarkRead = '/v1/notification/mark-read';
+  static const notificationMarkAllRead = '/v1/notification/mark-all-read';
+  static const notificationPreferences = '/v1/notification/preferences';
+  static const notificationDeviceToken = '/v1/notification/device-token';
+
   static const userAvatarUploadUrl = '/v1/user/avatar/upload-url';
   static const userAvatarConfirm = '/v1/user/avatar/confirm';
   static const viewerPreferences = '/v1/user/me/viewer-preferences';

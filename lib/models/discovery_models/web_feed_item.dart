@@ -118,7 +118,11 @@ class WebFeedCreator {
   });
 
   factory WebFeedCreator.fromJson(Map<String, dynamic> json) => WebFeedCreator(
-    creatorId: json['creatorId'] as String? ?? '',
+    // A feed row keys this `creatorId`; a **search hit** — which is what a
+    // playlist's items and the library rows are — keys it `id`. Reading only
+    // the first left every click beacon from those surfaces with no creator
+    // attributed at all.
+    creatorId: json['creatorId'] as String? ?? json['id'] as String? ?? '',
     displayName: json['displayName'] as String? ?? '',
     handle: json['handle'] as String? ?? '',
     avatarKey: json['avatarKey'] as String?,
@@ -328,17 +332,22 @@ class RecommendedCreator {
   /// `organization` or `individual` — the avatar ring's colour.
   final String? type;
 
-  factory RecommendedCreator.fromJson(Map<String, dynamic> json) =>
-      RecommendedCreator(
-        creatorId: json['creatorId'] as String? ?? '',
-        displayName: json['displayName'] as String? ?? '',
-        handle: (json['handle'] as String? ?? '').replaceFirst('@', ''),
-        avatarKey: json['avatarKey'] as String?,
-        isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
-        isFollowing: json['isFollowing'] as bool? ?? false,
-        isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
-        type: json['type'] as String?,
-      );
+  factory RecommendedCreator.fromJson(
+    Map<String, dynamic> json,
+  ) => RecommendedCreator(
+    // A feed row keys this `creatorId`; a **search hit** — which is what a
+    // playlist's items and the library rows are — keys it `id`. Reading only
+    // the first left every click beacon from those surfaces with no creator
+    // attributed at all.
+    creatorId: json['creatorId'] as String? ?? json['id'] as String? ?? '',
+    displayName: json['displayName'] as String? ?? '',
+    handle: (json['handle'] as String? ?? '').replaceFirst('@', ''),
+    avatarKey: json['avatarKey'] as String?,
+    isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
+    isFollowing: json['isFollowing'] as bool? ?? false,
+    isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
+    type: json['type'] as String?,
+  );
 }
 
 /// One row of `GET /v1/analytics/viewer/continue-watching`.

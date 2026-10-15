@@ -426,6 +426,19 @@ abstract final class AppStrings {
   // Settings forms — the screens each account row leads to.
   static const settingsUpdate = 'Update';
   static const settingsProfileInfo = 'Profile info';
+  // Notifications.
+  static const notificationsTitle = 'Notifications';
+  static const notificationsMarkAll = 'Mark all read';
+  static const notificationsEmptyTitle = 'Nothing yet';
+  static const notificationsEmptyBody =
+      'Replies, uploads from ministries you follow and reminders for events '
+      'you are going to will show up here.';
+  static const notificationsLoadFailed = 'Notifications could not be loaded';
+  static const notificationsMarkAllFailed = 'That did not save. Try again.';
+  static String notificationsMarkedAll(int n) =>
+      n == 1 ? '1 marked as read' : '$n marked as read';
+  static const notificationsNew = 'New';
+
   static const settingsChangePhoto = 'Change photo';
   static const settingsNameSaved = 'Your profile is updated';
   static const settingsPhotoSaved = 'Your photo is updated';
@@ -696,8 +709,9 @@ abstract final class AppStrings {
 
   // What a playlist's overflow offers.
   /// The design offers a public playlist; the API has no way to make one.
-  static const playlistPublicUnavailable =
-      'Sharing a playlist is not available yet — yours stay private.';
+  static const playlistPrivateNote = 'Only you can see this playlist.';
+  static const playlistPublicNote =
+      'Anyone with the link can see this playlist.';
   static const playlistAddFailed =
       'Some of those could not be added. They may already be in this '
       'playlist.';

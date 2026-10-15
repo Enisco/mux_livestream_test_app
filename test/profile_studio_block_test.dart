@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/notifications/data/notification_store.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/auth/repo/auth_repo.dart';
@@ -89,6 +90,12 @@ Future<void> _pumpProfile(
   GetIt.instance.registerLazySingleton<CreatorRepo>(CreatorRepo.new);
   GetIt.instance.registerLazySingleton<DiscoveryRepo>(DiscoveryRepo.new);
   GetIt.instance.registerLazySingleton<AuthRepo>(AuthRepo.new);
+  // Both bells read one store; the screens listen to it from `initState`.
+  // Its first read fails without an ApiService and is swallowed, which is the
+  // behaviour under test here — a bell that cannot be counted draws no dot.
+  GetIt.instance.registerLazySingleton<NotificationStore>(
+    NotificationStore.new,
+  );
   addTearDown(GetIt.instance.reset);
 
   tester.view.physicalSize = const Size(390 * 3, 1600 * 3);

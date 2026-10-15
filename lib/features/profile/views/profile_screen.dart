@@ -14,6 +14,8 @@ import 'package:test_app/features/auth/bloc/auth_bloc.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
+import 'package:test_app/features/notifications/data/notification_store.dart';
+import 'package:test_app/features/notifications/views/notifications_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/history/views/history_screen.dart';
 import 'package:test_app/features/library/views/liked_saved_screens.dart';
@@ -81,6 +83,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _loadChannel();
     unawaited(_loadLibrary());
+    unawaited(_notifications.refresh());
+    // The dot is drawn from the store, which the notifications screen also
+    // writes — reading it once would leave a stale dot behind that screen.
+    _notifications.addListener(_onNotifications);
+  }
+
+  final _notifications = getIt<NotificationStore>();
+
+  void _onNotifications() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _notifications.removeListener(_onNotifications);
+    super.dispose();
   }
 
   /// Neither of these is worth an error state: a missing resume card or a
@@ -175,10 +193,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Nothing behind these yet. They are wired so the rows are not dead, and
-  /// so the screen names exactly what is still missing.
-  void _todo(String what) => _say('$what is not built yet');
-
   void _say(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -208,9 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               name: name,
               handle: LocalStorage.cachedHandle,
               avatarUrl: AssetUrlResolver.resolve(LocalStorage.cachedAvatarKey),
-              // Nothing reports unread notifications — there is no route —
-              // so the bell carries no dot rather than a permanent one.
-              hasNotifications: false,
+              hasNotifications: _notifications.hasUnread,
               // The card names the account, so it opens the account — the
               // same screen the Account row at the bottom leads to.
               onTap: () async {
@@ -222,7 +234,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
                 if (mounted) setState(() {});
               },
-              onNotifications: () => _todo('Notifications'),
+              onNotifications: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                );
+                if (mounted) setState(() {});
+              },
             ),
             SizedBox(height: 26.s),
             // Nothing part-watched means no section at all, which is what a

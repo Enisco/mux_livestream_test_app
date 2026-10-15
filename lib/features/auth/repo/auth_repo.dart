@@ -100,6 +100,13 @@ class AuthRepo {
       refreshToken: result.refreshToken,
       sessionId: result.session.id,
     );
+    // Anything keyed to whoever was signed in before has to go, even though
+    // `logout` already clears it: a session that simply expired never runs
+    // `logout`, so the next person to sign in on this device inherited the
+    // previous account's `creatorId` — and with it their studio, which the
+    // studio screens key off entirely. `resolveChannel` asks the server
+    // again when the cache is empty, so dropping it costs one request.
+    await LocalStorage.clearCreatorData();
     await LocalStorage.setString(
       LocalStorage.cachedUserKey,
       result.user.toJsonString(),

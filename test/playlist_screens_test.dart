@@ -4,9 +4,9 @@ import 'package:sizing/sizing.dart';
 
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/library/repo/playlist_repo.dart';
-import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/models/library_models/playlist_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/features/library/views/playlist_add_screen.dart';
@@ -32,24 +32,31 @@ Future<void> _pump(
   await tester.pump();
 }
 
-/// Playlists as staging actually answers.
+/// Playlists as staging answers them since 2026-10-15.
 ///
-/// Worth stating because the integration guide says otherwise: `visibility`
-/// is refused on create and on update, the detail read returns
-/// `orderedMediaIds` rather than ready-to-render `items`, and there is no
-/// public read at all. These feed the real repo so the hydration — one search
-/// over the ids, then the playlist's own order restored — is exercised too.
+/// Three things changed that day and all three are encoded here: `visibility`
+/// is writable, the detail read carries hydrated `items` (so the client no
+/// longer runs a second search over `orderedMediaIds`), and the server counts
+/// `unavailableCount` itself.
 class _FakeApi implements ApiService {
-  _FakeApi({this.rows = const [], this.ids = const [], this.hits = const []});
+  _FakeApi({
+    this.rows = const [],
+    this.ids = const [],
+    this.hits = const [],
+    this.unavailable = 0,
+  });
 
   /// Playlist summaries for the list read.
   final List<Map<String, dynamic>> rows;
 
-  /// `orderedMediaIds` on the detail read.
+  /// Which ids the playlist holds, in its own order.
   final List<String> ids;
 
-  /// What the hydrating search answers with.
+  /// The hydrated rows the detail read returns, keyed by `entityId`.
   final List<Map<String, dynamic>> hits;
+
+  /// What the server says has gone since it was added.
+  final int unavailable;
 
   final List<(String, Object?)> posts = [];
   final List<(String, Object?)> patches = [];
@@ -64,8 +71,7 @@ class _FakeApi implements ApiService {
   }) async {
     posts.add((path, data));
     if (path.contains('search/public/query')) {
-      // Search ranks by relevance; it will not hand back playlist order.
-      return _ok(path, {'hits': hits.reversed.toList(), 'total': hits.length});
+      return _ok(path, {'hits': hits, 'total': hits.length});
     }
     if (path.contains('playlists/search')) {
       return _ok(path, {
@@ -108,14 +114,20 @@ class _FakeApi implements ApiService {
     return _ok(path, const <String, dynamic>{});
   }
 
-  Map<String, dynamic> _playlistJson() => {
-    'id': 'p1',
-    'title': 'Sunday drive worship',
-    'visibility': 'private',
-    'itemCount': ids.length,
-    'orderedMediaIds': ids,
-    'updatedAt': DateTime.now().toUtc().toIso8601String(),
-  };
+  Map<String, dynamic> _playlistJson() {
+    final byId = {for (final h in hits) h['entityId'] as String? ?? '': h};
+    return {
+      'id': 'p1',
+      'title': 'Sunday drive worship',
+      'visibility': 'private',
+      'itemCount': ids.length + unavailable,
+      'orderedMediaIds': ids,
+      // In the playlist's own order, already hydrated — no second search.
+      'items': [for (final id in ids) ?byId[id]],
+      'unavailableCount': unavailable,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
 
   Response<T> _ok<T>(String path, Object body) => Response<T>(
     requestOptions: RequestOptions(path: path),
@@ -164,8 +176,14 @@ _FakeApi _register({
   List<Map<String, dynamic>> rows = const [],
   List<String> ids = const [],
   List<Map<String, dynamic>> hits = const [],
+  int unavailable = 0,
 }) {
-  final api = _FakeApi(rows: rows, ids: ids, hits: hits);
+  final api = _FakeApi(
+    rows: rows,
+    ids: ids,
+    hits: hits,
+    unavailable: unavailable,
+  );
   // `GetIt.reset()` is asynchronous, so resetting in a cascade races the
   // registrations that follow it and leaves the locator half empty.
   GetIt.instance
@@ -254,12 +272,12 @@ void main() {
       final created = api.posts.firstWhere(
         (c) => c.$1 == '/v1/media/playlists',
       );
-      expect(created.$2, {'title': 'Road trip'});
+      expect(created.$2, {'title': 'Road trip', 'visibility': 'private'});
     });
 
-    testWidgets('and never sends a visibility the API refuses', (tester) async {
-      // Staging answers "property visibility should not exist" on create and
-      // on update alike.
+    testWidgets('and a public one is created public', (tester) async {
+      // `visibility` was refused on create and update until 2026-10-15. It
+      // is writable now, so the choice on the form has to reach the route.
       final api = _register(rows: [_summaryJson()]);
       await _pump(
         tester,
@@ -270,16 +288,15 @@ void main() {
       await tester.tap(find.text('New playlist').first);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, 'Road trip');
+      await tester.tap(find.text('Public'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Create new playlist'));
       await tester.pumpAndSettle();
 
-      for (final call in api.posts) {
-        final body = call.$2;
-        if (body is Map<String, dynamic>) {
-          expect(body.containsKey('visibility'), isFalse, reason: '$call');
-        }
-      }
+      final created = api.posts.firstWhere(
+        (c) => c.$1 == '/v1/media/playlists',
+      );
+      expect(created.$2, {'title': 'Road trip', 'visibility': 'public'});
     });
 
     testWidgets('deleting one calls the route', (tester) async {
@@ -312,22 +329,19 @@ void main() {
       expect(find.text('New playlist'), findsOneWidget);
     });
 
-    testWidgets('says plainly that a public playlist is not possible', (
-      tester,
-    ) async {
-      // The design offers the choice; the API has no way to honour it, so
-      // the control is inert and the screen explains why.
+    testWidgets('offers a real choice of visibility', (tester) async {
+      // The control was inert until 2026-10-15, with a line saying sharing
+      // was unavailable. Both halves of that are now false.
       _register();
       await _pump(tester, const PlaylistFormScreen());
 
-      expect(find.text('Private'), findsOneWidget);
-      expect(find.text('Public'), findsOneWidget);
-      expect(find.textContaining('stay private'), findsOneWidget);
+      expect(find.text(AppStrings.playlistPrivateNote), findsOneWidget);
 
       await tester.tap(find.text('Public'));
       await tester.pumpAndSettle();
-      // Still private: the tap does nothing rather than lying.
-      expect(find.textContaining('stay private'), findsOneWidget);
+
+      expect(find.text(AppStrings.playlistPublicNote), findsOneWidget);
+      expect(find.text(AppStrings.playlistPrivateNote), findsNothing);
     });
 
     testWidgets('editing arrives with the name already in it', (tester) async {
@@ -343,11 +357,10 @@ void main() {
   });
 
   group('the detail screen', () {
-    testWidgets('hydrates its ids and keeps the playlist\'s own order', (
-      tester,
-    ) async {
-      // The read returns `orderedMediaIds` only, and the hydrating search
-      // ranks by relevance — so the order has to be put back.
+    testWidgets('draws its items in the playlist\'s own order', (tester) async {
+      // The read carries `items` already hydrated and already in order, so
+      // nothing is fetched twice and nothing is re-sorted. It used to cost a
+      // second search whose relevance ranking had to be undone.
       _register(
         ids: const ['m1', 'm2', 'm3'],
         hits: [
@@ -371,13 +384,13 @@ void main() {
       expect(titles, ['First', 'Second', 'Third']);
     });
 
-    testWidgets('an id the search cannot resolve is counted, not drawn', (
-      tester,
-    ) async {
-      // Content deleted or made private since it was added.
+    testWidgets('content that has gone is counted, not drawn', (tester) async {
+      // Deleted or made private since it was added. The server leaves it out
+      // of `items` and says so in `unavailableCount`.
       _register(
-        ids: const ['m1', 'gone'],
+        ids: const ['m1'],
         hits: [_mediaHit('m1', 'Still here')],
+        unavailable: 1,
       );
       await _pump(
         tester,
@@ -492,71 +505,98 @@ void main() {
   });
 
   group('the repo', () {
-    test('a runtime is the sum of what it holds', () {
-      final page = PlaylistRepo.debugDetail(
-        {'id': 'p', 'title': 'x', 'itemCount': 2},
-        const [
-          HistoryEntry(
-            id: '1',
-            kind: HistoryKind.video,
-            title: 'a',
-            creatorName: '',
-            age: '',
-            duration: '40:00',
-          ),
-          HistoryEntry(
-            id: '2',
-            kind: HistoryKind.video,
-            title: 'b',
-            creatorName: '',
-            age: '',
-            duration: '30:00',
-          ),
-        ],
+    /// One `items` entry, as the detail read now sends it: a media search
+    /// hit, `meta` and `creator` included. Before 2026-10-15 the read gave
+    /// `orderedMediaIds` alone and the client hydrated them with a second
+    /// search; it does not any more.
+    Map<String, dynamic> item(String id, {double? seconds, String? title}) => {
+      'entityType': 'media',
+      'entityId': id,
+      'title': title ?? id,
+      'facets': const {'mediaType': 'video'},
+      'meta': {'durationSeconds': seconds},
+      'creator': const {'id': 'c1', 'displayName': 'Grace Community'},
+    };
+
+    testWidgets('a cover URL is fetched, not looked up as an asset', (
+      tester,
+    ) async {
+      // `covers` holds URLs. The mosaic drew them with `Image.asset`, left
+      // over from the dummy artwork, so every real cover threw "Unable to
+      // load asset" and painted a red plate over the card.
+      _register();
+      await _pump(
+        tester,
+        const PlaylistMosaic(
+          covers: ['https://cdn.example/cover.jpg'],
+          width: 100,
+          height: 100,
+        ),
       );
+
+      expect(find.byType(Image), findsOneWidget);
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(image.image, isA<NetworkImage>());
+      expect(tester.takeException(), isNull);
+    });
+
+    test('items are read straight off the detail payload', () {
+      final page = PlaylistRepo.debugDetail({
+        'id': 'p',
+        'title': 'x',
+        'itemCount': 1,
+        'items': [item('m1', seconds: 60, title: 'Romans')],
+      });
+
+      expect(page.items.single.title, 'Romans');
+      expect(page.items.single.creatorName, 'Grace Community');
+      // Carried whole so a tap can open it — the same hit the feeds send.
+      expect(page.items.single.source?.entityId, 'm1');
+    });
+
+    test('a runtime is the sum of what it holds', () {
+      final page = PlaylistRepo.debugDetail({
+        'id': 'p',
+        'title': 'x',
+        'itemCount': 2,
+        'items': [item('1', seconds: 2400), item('2', seconds: 1800)],
+      });
       expect(page.runtime, '1h 10m');
     });
 
     test('and is left out when something has no runtime at all', () {
       // Better no total than one quietly short of the truth.
-      final page = PlaylistRepo.debugDetail(
-        {'id': 'p', 'title': 'x', 'itemCount': 2},
-        const [
-          HistoryEntry(
-            id: '1',
-            kind: HistoryKind.video,
-            title: 'a',
-            creatorName: '',
-            age: '',
-            duration: '40:00',
-          ),
-          HistoryEntry(
-            id: '2',
-            kind: HistoryKind.video,
-            title: 'b',
-            creatorName: '',
-            age: '',
-          ),
-        ],
-      );
+      final page = PlaylistRepo.debugDetail({
+        'id': 'p',
+        'title': 'x',
+        'itemCount': 2,
+        'items': [item('1', seconds: 2400), item('2')],
+      });
       expect(page.runtime, isEmpty);
     });
 
-    test('what the search could not resolve is counted as unavailable', () {
-      final page = PlaylistRepo.debugDetail(
-        {'id': 'p', 'title': 'x', 'itemCount': 5},
-        const [
-          HistoryEntry(
-            id: '1',
-            kind: HistoryKind.video,
-            title: 'a',
-            creatorName: '',
-            age: '',
-          ),
-        ],
-      );
+    test('the server says how many have gone', () {
+      // It used to be inferred from how many ids the hydrating search could
+      // not resolve; `unavailableCount` is authoritative now.
+      final page = PlaylistRepo.debugDetail({
+        'id': 'p',
+        'title': 'x',
+        'itemCount': 5,
+        'unavailableCount': 4,
+        'items': [item('1')],
+      });
       expect(page.unavailableCount, 4);
       expect(page.itemCount, 5);
+    });
+
+    test('and is inferred only when it does not', () {
+      final page = PlaylistRepo.debugDetail({
+        'id': 'p',
+        'title': 'x',
+        'itemCount': 5,
+        'items': [item('1')],
+      });
+      expect(page.unavailableCount, 4);
     });
   });
 }

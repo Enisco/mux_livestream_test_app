@@ -122,18 +122,16 @@ class _PlaylistFormScreenState extends State<PlaylistFormScreen> {
                       label: AppStrings.playlistPublic,
                       icon: HugeIcons.strokeRoundedView,
                       selected: !_private,
-                      // Not a choice yet: the API refuses `visibility` on
-                      // both create and update, so every playlist is
-                      // private. Offering it would be a switch that silently
-                      // does nothing.
-                      onTap: null,
+                      onTap: () => setState(() => _private = false),
                     ),
                   ),
                 ],
               ),
               SizedBox(height: 8.s),
               Text(
-                AppStrings.playlistPublicUnavailable,
+                _private
+                    ? AppStrings.playlistPrivateNote
+                    : AppStrings.playlistPublicNote,
                 style: AppStyles.body(12, color: AppColors.neutral500),
               ),
               const Spacer(),

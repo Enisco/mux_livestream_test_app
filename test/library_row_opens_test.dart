@@ -91,6 +91,12 @@ class _FakeApi implements ApiService {
         'title': 'Sunday set',
         'orderedMediaIds': playlistIds,
         'itemCount': playlistIds.length,
+        // Hydrated by the server since 2026-10-15 — the client no longer
+        // runs a second search over the ids.
+        'items': [
+          for (final id in playlistIds)
+            ...items.where((h) => h['entityId'] == id),
+        ],
       });
     }
     // History, liked and saved all answer the same enriched-hit envelope.
@@ -144,12 +150,9 @@ Map<String, dynamic> _hit({
   'viewedAt': DateTime.now().toUtc().toIso8601String(),
   'interactionAt': DateTime.now().toUtc().toIso8601String(),
   'completed': false,
-  'creator': {
-    'id': 'c1',
-    'creatorId': 'c1',
-    'displayName': 'Grace Community',
-    'handle': 'grace',
-  },
+  // A search hit keys its creator `id`, not `creatorId` — verified against
+  // staging. Carrying both here hid the fact that nothing read `id`.
+  'creator': {'id': 'c1', 'displayName': 'Grace Community', 'handle': 'grace'},
   'facets': {'mediaType': mediaType, 'analyticsViews': 12},
   'meta': {'durationSeconds': 600.0, 'progressPercent': progressPercent},
 };
@@ -234,6 +237,9 @@ void main() {
       final api = _FakeApi(items: [_hit()], playlistIds: const ['m1']);
       final playlist = await PlaylistRepo(api: api).fetch('p1');
       expect(playlist.items.single.source?.entityId, 'm1');
+      // A search hit keys its creator `id`, not `creatorId`; reading only
+      // the latter left the click beacon with no creator attributed.
+      expect(playlist.items.single.source?.creator?.creatorId, 'c1');
     });
 
     test('an event carries its identity and its type', () async {

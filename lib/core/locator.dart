@@ -8,6 +8,9 @@ import 'package:test_app/features/creator/services/checkout_handoff_service.dart
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/subscriptions/repo/following_repo.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/notifications/data/notification_store.dart';
+import 'package:test_app/features/notifications/repo/notification_repo.dart';
+import 'package:test_app/shared/services/push_service.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/onboarding/repo/onboarding_repo.dart';
 import 'package:test_app/shared/services/analytics_playback_reporter.dart';
@@ -67,6 +70,11 @@ Future<void> setupLocator() async {
   // App-scoped on purpose: a like made on one screen has to be the like every
   // other screen shows, so there is exactly one of these for the whole session.
   getIt.registerLazySingleton<EngagementStore>(() => EngagementStore());
+  getIt.registerLazySingleton<NotificationRepo>(NotificationRepo.new);
+  // Same reason as the engagement store: the member bell and the studio bell
+  // must not disagree about how many things are waiting.
+  getIt.registerLazySingleton<NotificationStore>(() => NotificationStore());
+  getIt.registerLazySingleton<PushService>(PushService.new);
   getIt.registerLazySingleton<AnalyticsService>(
     () => AnalyticsService(
       api: getIt<ApiService>(),

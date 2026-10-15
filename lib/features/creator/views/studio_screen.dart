@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/router.dart';
+import 'package:test_app/core/locator.dart';
+import 'package:test_app/features/notifications/data/notification_store.dart';
+import 'package:test_app/features/notifications/views/notifications_screen.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
 import 'package:test_app/features/creator/views/go_live_setup_screen.dart';
 import 'package:test_app/features/creator/views/new_article_screen.dart';
@@ -51,6 +56,20 @@ class _StudioScreenState extends State<StudioScreen> {
   void initState() {
     super.initState();
     _load();
+    unawaited(_notifications.refresh());
+    _notifications.addListener(_onNotifications);
+  }
+
+  final _notifications = getIt<NotificationStore>();
+
+  void _onNotifications() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _notifications.removeListener(_onNotifications);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -322,7 +341,15 @@ class _StudioScreenState extends State<StudioScreen> {
       GestureDetector(
         key: const ValueKey('studio-notifications'),
         behavior: HitTestBehavior.opaque,
-        onTap: () => _todo('Notifications'),
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => const NotificationsScreen(),
+            ),
+          );
+          if (mounted) setState(() {});
+        },
         child: Container(
           width: 38.s,
           height: 38.s,
@@ -331,10 +358,30 @@ class _StudioScreenState extends State<StudioScreen> {
             shape: BoxShape.circle,
             color: AppColors.fieldBg,
           ),
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedNotification01,
-            color: AppColors.textPrimary,
-            size: 18.s,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedNotification01,
+                color: AppColors.textPrimary,
+                size: 18.s,
+              ),
+              // The same store the member bell reads, so the two cannot
+              // disagree about how many things are waiting.
+              if (_notifications.hasUnread)
+                Positioned(
+                  right: -2.s,
+                  top: -2.s,
+                  child: Container(
+                    width: 8.s,
+                    height: 8.s,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

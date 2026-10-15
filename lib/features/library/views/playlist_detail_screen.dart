@@ -201,10 +201,17 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     );
     if (draft == null || !mounted) return;
     try {
-      await _repo.update(_playlist.id, title: draft.name);
+      await _repo.update(
+        _playlist.id,
+        title: draft.name,
+        isPrivate: draft.isPrivate,
+      );
       if (!mounted) return;
       setState(() {
-        _playlist = _playlist.copyWith(name: draft.name);
+        _playlist = _playlist.copyWith(
+          name: draft.name,
+          isPrivate: draft.isPrivate,
+        );
         _changed = true;
       });
     } catch (e) {

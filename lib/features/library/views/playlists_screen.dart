@@ -96,7 +96,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     );
     if (draft == null || !mounted) return;
     try {
-      await _repo.create(title: draft.name);
+      await _repo.create(title: draft.name, isPrivate: draft.isPrivate);
       await _load();
     } catch (e) {
       logger.w('Playlist create failed', error: e);
@@ -181,12 +181,20 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     );
     if (draft == null || !mounted) return;
     try {
-      await _repo.update(playlist.id, title: draft.name);
+      await _repo.update(
+        playlist.id,
+        title: draft.name,
+        isPrivate: draft.isPrivate,
+      );
       if (!mounted) return;
       setState(() {
         final i = _playlists.indexWhere((p) => p.id == playlist.id);
         if (i < 0) return;
-        _playlists = [..._playlists]..[i] = playlist.copyWith(name: draft.name);
+        _playlists = [..._playlists]
+          ..[i] = playlist.copyWith(
+            name: draft.name,
+            isPrivate: draft.isPrivate,
+          );
       });
     } catch (e) {
       logger.w('Playlist rename failed', error: e);
@@ -373,6 +381,41 @@ class PlaylistRow extends StatelessWidget {
   }
 }
 
+/// One tile of the mosaic.
+///
+/// The covers are **URLs** — `meta.thumbnailUrl`, or a CDN key resolved
+/// through `AssetUrlResolver` — not bundled asset paths. This drew them with
+/// `Image.asset`, left over from when playlists ran on dummy artwork, so
+/// every real playlist with a cover threw "Unable to load asset" and showed
+/// a red plate where the still should be. A bundled path is still accepted
+/// for the placeholders that use one.
+class _CoverTile extends StatelessWidget {
+  const _CoverTile(this.cover);
+
+  final String cover;
+
+  static const _plate = ColoredBox(color: AppColors.base2);
+
+  @override
+  Widget build(BuildContext context) {
+    if (cover.isEmpty) return _plate;
+    if (!cover.startsWith('http')) {
+      return Image.asset(
+        cover,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _plate,
+      );
+    }
+    return Image.network(
+      cover,
+      fit: BoxFit.cover,
+      // A thumbnail the gateway cannot serve — a `mux_auto` still for a
+      // stream with no generated frame — must not take the card with it.
+      errorBuilder: (_, _, _) => _plate,
+    );
+  }
+}
+
 /// A playlist's covers tiled into one block.
 ///
 /// Four stills make a 2×2; fewer fill what they can; none leaves the plain
@@ -427,9 +470,7 @@ class PlaylistMosaic extends StatelessWidget {
                         child: Row(
                           children: [
                             for (final cover in row)
-                              Expanded(
-                                child: Image.asset(cover, fit: BoxFit.cover),
-                              ),
+                              Expanded(child: _CoverTile(cover)),
                           ],
                         ),
                       ),
