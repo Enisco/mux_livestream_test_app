@@ -6,7 +6,109 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 class EngagementRepo {
-  final ApiService _api = GetIt.instance<ApiService>();
+  EngagementRepo({ApiService? api}) : _injected = api;
+
+  final ApiService? _injected;
+
+  ApiService get _api => _injected ?? GetIt.instance<ApiService>();
+
+  /// `POST /v1/engagement/share-links` — a URL to paste.
+  ///
+  /// **Minting a link is not recording a share.** The count still moves only
+  /// on an `interactionType: "share"` interaction, so mint when the sheet
+  /// opens and record the interaction when the viewer actually sends it —
+  /// counting a copied link would inflate every creator's share numbers by
+  /// every abandoned sheet.
+  ///
+  /// Throws when the target cannot be shared. A link is never minted for
+  /// something the viewer cannot already open: a private playlist, an
+  /// unpublished post or a cancelled event answers `404`, and a target that
+  /// exists but is not for this viewer answers `403`. **Treat a refusal as
+  /// final** — it will not change until the creator changes the content's
+  /// visibility.
+  ///
+  /// Share the URL exactly as returned: it carries `?analyticsSource=
+  /// share_link`, and wrapping it in a redirector loses both the Open Graph
+  /// preview and the deep link.
+  Future<String?> mintShareLink({
+    required String targetType,
+    required String targetId,
+  }) async {
+    final response = await _api.post(
+      ApiEndpoints.shareLinks,
+      data: {'targetType': targetType, 'targetId': targetId},
+    );
+    final body = response.data;
+    final data = body is Map<String, dynamic> ? body['data'] : null;
+    final url = data is Map<String, dynamic> ? data['url'] as String? : null;
+    return url == null || url.isEmpty ? null : url;
+  }
+
+  /// `POST /v1/engagement/reports`.
+  ///
+  /// Nothing is stored as a report row and nothing consumes the event yet —
+  /// the audit log is the durable record, and there is no inbox or queue. So
+  /// the screen says "reported" and never promises a review outcome.
+  ///
+  /// **You cannot report your own content**, which the route refuses.
+  Future<void> report({
+    required String targetType,
+    required String targetId,
+    required String reason,
+    String? detail,
+  }) => _api.post(
+    ApiEndpoints.engagementReports,
+    data: {
+      'targetType': targetType,
+      'targetId': targetId,
+      'reason': reason,
+      'details': ?(detail == null || detail.trim().isEmpty
+          ? null
+          : detail.trim()),
+    },
+  );
+
+  /// Mute: keep the follow, stop surfacing them.
+  Future<void> muteCreator(String creatorId) =>
+      _api.post(ApiEndpoints.mutedCreators, data: {'creatorId': creatorId});
+
+  Future<void> unmuteCreator(String creatorId) =>
+      _api.delete(ApiEndpoints.mutedCreator(creatorId));
+
+  /// Block: hide them everywhere and drop the follow.
+  ///
+  /// Returns whether a follow was actually dropped, so the confirmation can
+  /// say "Blocked and unfollowed" or just "Blocked" rather than assuming.
+  Future<bool> blockCreator(String creatorId) async {
+    final response = await _api.post(
+      ApiEndpoints.blockedCreators,
+      data: {'creatorId': creatorId},
+    );
+    final body = response.data;
+    final data = body is Map<String, dynamic> ? body['data'] : null;
+    return data is Map<String, dynamic> && data['unfollowed'] == true;
+  }
+
+  /// **Unblocking does not re-follow.** It makes the creator visible and
+  /// stops there; restoring the follow silently would put them back in the
+  /// viewer's Following feed by surprise.
+  Future<void> unblockCreator(String creatorId) =>
+      _api.delete(ApiEndpoints.blockedCreator(creatorId));
+
+  Future<List<HiddenCreator>> fetchHiddenCreators({
+    required bool blocked,
+  }) async {
+    final response = await _api.get(
+      blocked ? ApiEndpoints.blockedCreators : ApiEndpoints.mutedCreators,
+    );
+    final body = response.data;
+    final data = body is Map<String, dynamic> ? body['data'] : null;
+    final items = data is Map<String, dynamic> ? data['items'] : null;
+    return [
+      for (final row in items as List? ?? const [])
+        if (row is Map<String, dynamic>) HiddenCreator.fromJson(row),
+    ];
+  }
 
   Future<bool> toggleInteraction({
     required String targetType,

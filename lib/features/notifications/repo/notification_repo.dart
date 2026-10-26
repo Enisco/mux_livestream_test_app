@@ -87,10 +87,24 @@ class NotificationRepo {
     bool? email,
     bool? push,
     bool? inApp,
+    bool? eventReminders,
+    int? eventReminderMinutes,
+    bool clearReminderMinutes = false,
   }) async {
     final response = await _api.patch(
       ApiEndpoints.notificationPreferences,
-      data: {'email': ?email, 'push': ?push, 'inApp': ?inApp},
+      data: {
+        'email': ?email,
+        'push': ?push,
+        'inApp': ?inApp,
+        'eventRemindersEnabled': ?eventReminders,
+        // An explicit null is "use the organiser's schedule", which is a
+        // different thing from leaving the key out.
+        if (clearReminderMinutes)
+          'eventReminderMinutes': null
+        else
+          'eventReminderMinutes': ?eventReminderMinutes,
+      },
     );
     return NotificationPrefs.fromJson(_data(response.data));
   }

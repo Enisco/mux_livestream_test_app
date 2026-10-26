@@ -100,6 +100,34 @@ class LivestreamRepo {
     }
   }
 
+  /// `GET /v1/media/live/streams/{id}/prayers` — newest first, keyset.
+  ///
+  /// The sort is fixed; an oldest-first toggle would invalidate every cursor
+  /// mid-run. `limit` defaults to 25 and caps at 100.
+  ///
+  /// **There is no `isAnonymous`.** A prayer request is private between the
+  /// viewer and the ministry, and the reason a broadcaster wants the list is
+  /// to pray for a *named* person — anonymity exists on testimonies, where an
+  /// approved one is published to a public wall. `requester` is best-effort,
+  /// so it can be absent; the card keeps a neutral fallback rather than
+  /// treating that as anonymous.
+  Future<LivePrayerPage> prayers(String mediaId, {String? cursor}) async {
+    final response = await _api.get(
+      ApiEndpoints.livePrayers(mediaId),
+      queryParameters: {'limit': 25, 'cursor': ?cursor},
+    );
+    final data = (response.data as Map<String, dynamic>?)?['data'];
+    final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
+    return LivePrayerPage(
+      items: [
+        for (final row in map['items'] as List? ?? const [])
+          if (row is Map<String, dynamic>) LivePrayer.fromJson(row),
+      ],
+      total: (map['total'] as num?)?.toInt() ?? 0,
+      nextCursor: map['nextCursor'] as String?,
+    );
+  }
+
   /// The snapshot the broadcast screen's counters read.
   Future<LivestreamStudio> studio(String mediaId) async {
     final response = await _api.get(ApiEndpoints.liveStudio(mediaId));

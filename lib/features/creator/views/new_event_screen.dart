@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/models/creator_models/media_upload_models.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/repo/event_repo.dart';
@@ -305,11 +306,22 @@ class _NewEventScreenState extends State<NewEventScreen> {
 
   // ---- filing it ---------------------------------------------------------
 
-  Future<void> _publish() => _commit(publish: true);
+  /// Publish now, or schedule the listing.
+  ///
+  /// The sheet was left out while `scheduledAt` was refused — the publish
+  /// route took no body, so a schedule sent to it was accepted and silently
+  /// dropped. It validates one since 2026-10-26.
+  Future<void> _publish() async {
+    final choice = await GoLiveSheet.show(context);
+    if (!mounted || choice == null) return;
+    await _commit(choice: choice);
+  }
 
-  Future<void> _saveDraft() => _commit(publish: false);
+  Future<void> _saveDraft() => _commit(choice: const PublishChoice.draft());
 
-  Future<void> _commit({required bool publish}) async {
+  Future<void> _commit({required PublishChoice choice}) async {
+    final publish = choice.timing != PublishTiming.draft;
+    final scheduledAt = choice.at;
     final creatorId = _creatorId;
     if (creatorId == null) return _say(AppStrings.newMediaRejected);
 
@@ -325,18 +337,26 @@ class _NewEventScreenState extends State<NewEventScreen> {
           : await _repo.uploadCover(creatorId: creatorId, image: _cover!);
 
       final id = await _repo.create(creatorId: creatorId, draft: _draft);
-      if (publish) await _repo.publish(id);
+      if (publish) await _repo.publish(id, scheduledAt: scheduledAt);
 
       if (!mounted) return;
       setState(() => _working = false);
       await PublishedCard.show(
         context,
-        title: publish
-            ? AppStrings.newEventLiveTitle
-            : AppStrings.newMediaDraftTitle,
-        body: publish
-            ? AppStrings.newEventLiveBody
-            : AppStrings.newEventDraftBody,
+        title: switch (choice.timing) {
+          PublishTiming.now => AppStrings.newEventLiveTitle,
+          PublishTiming.schedule => AppStrings.newEventScheduledTitle,
+          PublishTiming.draft => AppStrings.newMediaDraftTitle,
+        },
+        // A scheduled event is not on the channel yet, so it must not be
+        // told it is: the listing goes up at the moment that was picked.
+        body: switch (choice.timing) {
+          PublishTiming.now => AppStrings.newEventLiveBody,
+          PublishTiming.schedule =>
+            'It goes live on ${formatSheetDate(choice.at!)} '
+                'at ${formatSheetTime(choice.at!)}.',
+          PublishTiming.draft => AppStrings.newEventDraftBody,
+        },
       );
       if (!mounted) return;
       Navigator.pop(context, true);

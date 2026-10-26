@@ -5,9 +5,18 @@ import 'package:test_app/features/library/repo/viewer_library_repo.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/library_models/playlist_models.dart';
+import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/s3_upload.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
+
+/// The cover is bigger than the server will take, or the ticket came back
+/// malformed. Read the ceiling off the ticket's `constraints` rather than
+/// hard-coding it.
+class PlaylistCoverTooLarge implements Exception {
+  const PlaylistCoverTooLarge();
+}
 
 /// The reader's own running orders.
 ///
@@ -36,14 +45,27 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 /// - **Adding is not idempotent.** A duplicate answers 409 "Media is already
 ///   in this playlist" rather than quietly doing nothing, and a playlist
 ///   holds at most 500 items.
-/// - **A playlist holds media only.** `items` takes `mediaId`; a post or an
-///   event is refused.
-/// - There is a `cover` field but nothing uploads to one — see
-///   `docs/MOBILE_API_REQUESTS.md` §2.1.
+/// - **PARKED(1.5) — a playlist holds media only.** `items` takes `mediaId`;
+///   a post, devotional or event is refused. Ruled **not planned** on
+///   2026-10-19 (`docs/mobile-api-gap-responses.md` §1.5): widening it means
+///   answering what a mixed playlist plays and what its cover is when the
+///   first item is a post. **So the card overflow sheet must not offer "Add
+///   to playlist" on the blog, devotional or event variants.** Unpark when
+///   the items route takes a `targetType`/`targetId` pair.
+/// - **A cover can be uploaded** since 2026-10-26: a presigned S3 POST in a
+///   `playlist_cover` category, then `coverFileId` on the PATCH, which is
+///   also where the upload is confirmed. `coverFileId: null` removes it and
+///   falls back to the derived cover.
 class PlaylistRepo {
-  PlaylistRepo({ApiService? api}) : _injected = api;
+  PlaylistRepo({ApiService? api, S3Send? send})
+    : _injected = api,
+      _send = send ?? S3PresignedUpload.send;
 
   final ApiService? _injected;
+
+  /// The S3 leg, injectable for the same reason [AccountRepo] injects it: so
+  /// the three-step cover upload can be exercised without the network.
+  final S3Send _send;
 
   ApiService get _api => _injected ?? GetIt.instance<ApiService>();
 
@@ -121,6 +143,59 @@ class PlaylistRepo {
   }
 
   Future<void> delete(String id) => _api.delete(ApiEndpoints.playlist(id));
+
+  /// Put a cover on a playlist: ticket, S3, then name the `fileId`.
+  ///
+  /// **The result is visible immediately** — no review step, nothing to poll,
+  /// no pending state to draw. An uploaded cover *overrides* the derived one
+  /// rather than replacing the mechanism, so removing it falls back to the
+  /// first public item again.
+  ///
+  /// JPEG, PNG or WebP, **5 MB** — read from the ticket's `constraints`
+  /// rather than hard-coded, since the server may tighten them.
+  Future<void> uploadCover(String playlistId, PickedImage image) async {
+    final ticket = await _api.post(
+      ApiEndpoints.playlistCoverUploadUrl(playlistId),
+      data: {
+        'filename': image.filename,
+        'mimeType': image.mimeType,
+        'size': image.size,
+      },
+    );
+    final data = _data(ticket.data);
+    final maxBytes =
+        (data['constraints'] as Map<String, dynamic>?)?['maxSizeBytes'] as int?;
+    if (maxBytes != null && image.size > maxBytes) {
+      throw const PlaylistCoverTooLarge();
+    }
+
+    final fileId = data['fileId'] as String?;
+    final uploadUrl = data['uploadUrl'] as String?;
+    final fields = (data['fields'] as Map<String, dynamic>?) ?? const {};
+    if (fileId == null || uploadUrl == null || fields.isEmpty) {
+      throw const PlaylistCoverTooLarge();
+    }
+
+    await _send(
+      uploadUrl: uploadUrl,
+      fields: fields,
+      bytes: image.bytes,
+      filename: image.filename,
+    );
+
+    // Naming it on the playlist is what confirms the upload and promotes the
+    // key out of `quarantine/`.
+    await _api.patch(
+      ApiEndpoints.playlist(playlistId),
+      data: {'coverFileId': fileId},
+    );
+  }
+
+  /// Back to the derived cover — the first public, published item.
+  Future<void> removeCover(String playlistId) => _api.patch(
+    ApiEndpoints.playlist(playlistId),
+    data: {'coverFileId': null},
+  );
 
   /// Add one media. Throws on a duplicate — see [PlaylistAddOutcome].
   Future<void> addItem(String playlistId, String mediaId) => _api.post(

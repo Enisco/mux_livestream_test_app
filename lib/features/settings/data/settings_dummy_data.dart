@@ -7,17 +7,14 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 /// name, the email, the phone and the chosen topics all come off the account
 /// the server holds.
 ///
-/// What is left invented is what the profile payload has **no field for**,
-/// confirmed against staging on 2026-10-07 — there is no `passwordChangedAt`,
-/// no reminder lead time and no `twoFactorEnabled`:
+/// Since 2026-10-26 the profile also carries `passwordChangedAt`,
+/// `twoFactorEnabled` and `language`, so the only thing still read out of a
+/// constant here is the Account row's reminder summary — and the reminders
+/// screen behind it reads the real preference.
 ///
-///  * when the password last changed — now shown as nothing rather than a
-///    date that was made up
-///  * the event-reminder lead time
-///  * whether two-factor is on
-///
-/// To retire the rest: a profile payload that carries them, or the routes in
-/// `docs/OPEN_ISSUES.md` #33.
+/// To retire the last of it: have the Account row read
+/// `/v1/notification/preferences` too, or accept one extra request on a menu
+/// that already makes two.
 abstract final class SettingsDummyData {
   /// Real: the cached account carries it.
   static String get email =>
@@ -41,10 +38,40 @@ abstract final class SettingsDummyData {
       .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
       .join(' ');
 
-  /// The profile carries no `passwordChangedAt`, so this says nothing rather
-  /// than naming a date nobody recorded.
-  static const passwordChanged = '';
+  /// Real: `passwordChangedAt` arrived on 2026-10-26. **Null means never
+  /// changed since registration**, not unknown — the row says so.
+  static String get passwordChanged {
+    final at = LocalStorage.cachedPasswordChangedAt;
+    if (at == null) return AppStrings.settingsPasswordNeverChanged;
+    return AppStrings.settingsPasswordChangedOn(_date(at.toLocal()));
+  }
 
+  static String _date(DateTime at) =>
+      '${at.day} ${_months[at.month - 1]} '
+      '${at.year}';
+
+  static const _months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  /// Real: `twoFactorEnabled` is on every `User` now.
+  static String get twoFactorStatus => LocalStorage.cachedTwoFactorEnabled
+      ? AppStrings.twoFactorStatusOn
+      : AppStrings.twoFactorStatusOff;
+
+  /// The last invented value here. The reminder default is real
+  /// (`/v1/notification/preferences`) but lives on the reminders screen,
+  /// which reads it directly.
   static const eventReminder = '1 hour before';
-  static const twoFactorStatus = 'Off · uses an authenticator app';
 }

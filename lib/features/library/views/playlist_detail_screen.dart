@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
@@ -182,6 +183,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           switch (label) {
             case AppStrings.playlistEditDetail:
               _edit();
+            case AppStrings.playlistUpdateCover:
+              unawaited(_editCover());
             case AppStrings.playlistDelete:
               _confirmDelete();
             default:
@@ -191,6 +194,46 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       ),
     );
   }
+
+  /// Pick a cover, upload it, name it on the playlist.
+  ///
+  /// **Visible immediately** — there is no review step and nothing to poll,
+  /// so the playlist is simply re-read once the PATCH lands. An uploaded
+  /// cover overrides the derived one; removing it falls back to the first
+  /// public item again.
+  Future<void> _editCover() async {
+    final picked = await CreatorImagePicker.pick(maxBytes: _coverMaxBytes);
+    if (picked.isCancelled || !mounted) return;
+    if (picked.failure case final why?) {
+      _report(
+        why == PickFailure.tooLarge
+            ? AppStrings.playlistCoverTooLarge
+            : AppStrings.settingsPhotoUnreadable,
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await _repo.uploadCover(_playlist.id, picked.image!);
+      if (!mounted) return;
+      await _load();
+      if (mounted) _report(AppStrings.playlistCoverSaved);
+    } on PlaylistCoverTooLarge {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _report(AppStrings.playlistCoverTooLarge);
+    } catch (e) {
+      logger.w('Playlist cover failed', error: e);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _report(AppStrings.playlistSaveFailed);
+    }
+  }
+
+  /// What staging answered in `constraints.maxSizeBytes`; the ticket's own
+  /// value is still honoured, this only turns a file away before a request.
+  static const _coverMaxBytes = 5 * 1024 * 1024;
 
   Future<void> _edit() async {
     final draft = await Navigator.push<PlaylistDraft>(
@@ -318,10 +361,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   ? null
                   : () => _open(playlist.items.first),
               onMore: _openActions,
-              onEditCover: () => _report(
-                '${AppStrings.playlistEditCover} '
-                'is not built yet',
-              ),
+              onEditCover: () => unawaited(_editCover()),
             ),
             if (_loading)
               Padding(
@@ -431,11 +471,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   /// Open what the row is a picture of.
-  ///
-  /// The library is not one of the surfaces the beacon's `source` enum knows,
-  /// so these clicks are reported as `unknown` rather than invented.
   void _open(HistoryEntry item) {
-    if (!openFeedItem(context, item.source, source: AnalyticsSource.unknown)) {
+    if (!openFeedItem(context, item.source, source: AnalyticsSource.library)) {
       _report(AppStrings.libraryRowGone);
     }
   }

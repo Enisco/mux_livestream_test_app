@@ -19,8 +19,11 @@ const _context = DashboardContext(
   },
 );
 
-Future<StudiosChoice?> _openStudios(WidgetTester tester) async {
-  StudiosChoice? picked;
+Future<StudiosOutcome?> _openStudios(
+  WidgetTester tester, {
+  List<StudioMembership> studios = const [],
+}) async {
+  StudiosOutcome? picked;
   await tester.pumpWidget(
     SizingBuilder(
       baseSize: const Size(390, 844),
@@ -28,6 +31,7 @@ Future<StudiosChoice?> _openStudios(WidgetTester tester) async {
         home: Scaffold(
           body: StudiosSheet(
             current: _context,
+            studios: studios,
             onPick: (choice) => picked = choice,
           ),
         ),
@@ -52,12 +56,12 @@ void main() {
       expect(find.text('Personal · Owner'), findsOneWidget);
     });
 
-    testWidgets('offers switching, settings and the way back out', (
-      tester,
-    ) async {
+    testWidgets('offers settings and the way back out', (tester) async {
+      // "Switch studio" is no longer a row of its own: the studios are
+      // listed, so switching is tapping one.
       await _openStudios(tester);
 
-      expect(find.text(AppStrings.studiosSwitch), findsOneWidget);
+      expect(find.text(AppStrings.studiosSwitch), findsNothing);
       expect(find.text(AppStrings.studiosSettings), findsOneWidget);
       expect(find.text(AppStrings.studiosBackToWatching), findsOneWidget);
     });
@@ -67,14 +71,48 @@ void main() {
     ) async {
       await _openStudios(tester);
 
-      // Nothing returns a membership list yet, so exactly one studio is
-      // named — the real one. A placeholder row here would tell the reader
-      // they belong to a ministry they do not.
+      // Only the current studio, when the reader belongs to no other.
       expect(find.text('CCI International'), findsNothing);
     });
 
-    testWidgets('switching reports back as its own choice', (tester) async {
-      StudiosChoice? picked;
+    testWidgets('lists every studio the reader belongs to', (tester) async {
+      // `GET /v1/creator/me/memberships` answers both the one they own and
+      // the organisations they were added to.
+      await _openStudios(
+        tester,
+        studios: const [
+          StudioMembership(
+            creatorId: 'c2',
+            displayName: 'CCI International',
+            handle: 'cci',
+            role: 'editor',
+          ),
+        ],
+      );
+
+      expect(find.text('CCI International'), findsOneWidget);
+    });
+
+    testWidgets('and the current one is not offered twice', (tester) async {
+      // A reader who both owns a studio and holds a member row in it is one
+      // row, ticked — ownership is the stronger claim.
+      await _openStudios(
+        tester,
+        studios: [
+          StudioMembership(
+            creatorId: _context.creatorId,
+            displayName: _context.displayName,
+            handle: _context.handle,
+            role: 'owner',
+          ),
+        ],
+      );
+
+      expect(find.text(_context.displayName), findsOneWidget);
+    });
+
+    testWidgets('picking another reports its creator id', (tester) async {
+      StudiosOutcome? picked;
       await tester.pumpWidget(
         SizingBuilder(
           baseSize: const Size(390, 844),
@@ -82,6 +120,14 @@ void main() {
             home: Scaffold(
               body: StudiosSheet(
                 current: _context,
+                studios: const [
+                  StudioMembership(
+                    creatorId: 'c2',
+                    displayName: 'CCI International',
+                    handle: 'cci',
+                    role: 'editor',
+                  ),
+                ],
                 onPick: (choice) => picked = choice,
               ),
             ),
@@ -90,9 +136,9 @@ void main() {
       );
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('studio-switch')));
+      await tester.tap(find.byKey(const ValueKey('studio-c2')));
       await tester.pump();
-      expect(picked, StudiosChoice.switchStudio);
+      expect(picked?.switchTo, 'c2');
     });
   });
 

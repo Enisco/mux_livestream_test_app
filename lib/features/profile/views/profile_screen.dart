@@ -285,13 +285,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SizedBox(height: 10.s),
         ContinueWatchingCard(
           progress: progress,
-          // The library is not one of the surfaces the beacon's `source` enum
-          // knows, so the click is reported as `unknown` rather than invented.
           onTap: () {
             if (!openFeedItem(
               context,
               row.source,
-              source: AnalyticsSource.unknown,
+              source: AnalyticsSource.library,
             )) {
               _say(AppStrings.libraryRowGone);
             }

@@ -6,6 +6,26 @@ import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
+/// How a "mine" list is ordered.
+///
+/// `recent` and `oldest` mean **when the viewer acted** on all three lists —
+/// when they RSVP'd, asked or submitted — not when the thing itself happens.
+/// Events add [startSoonest] for "the event itself is next", which is the
+/// only one of the three that has a second axis.
+///
+/// **A cursor belongs to one direction.** The cursor is a row boundary, so
+/// flipping the control mid-list would skip or repeat rows — the two cursor
+/// lists must restart from no cursor when this changes.
+enum RecordsSort {
+  recent('recent'),
+  oldest('oldest'),
+  startSoonest('start_soonest');
+
+  const RecordsSort(this.value);
+
+  final String value;
+}
+
 /// The reader's own records: events they said they would attend, prayers they
 /// asked for, testimonies they submitted, and what they have given.
 ///
@@ -27,10 +47,14 @@ class ViewerRecordsRepo {
   /// The list spans every creator the reader has RSVP'd to and **includes
   /// past events**, so the screen groups them itself rather than asking for
   /// one half at a time.
-  Future<List<MyEvent>> fetchMyEvents({int page = 1, int limit = 50}) async {
+  Future<List<MyEvent>> fetchMyEvents({
+    int page = 1,
+    int limit = 50,
+    RecordsSort sort = RecordsSort.recent,
+  }) async {
     final response = await _api.get(
       ApiEndpoints.myEvents,
-      queryParameters: {'page': page, 'limit': limit},
+      queryParameters: {'page': page, 'limit': limit, 'sort': sort.value},
     );
     final data = _data(response.data);
     return _rows(data['data']).map(_event).toList();
@@ -103,10 +127,13 @@ class ViewerRecordsRepo {
   ///
   /// `assignedToUserId` comes back on these rows and is **internal ministry
   /// routing**: the requester is shown status, never who is handling it.
-  Future<List<PrayerRequest>> fetchMyPrayers({String? cursor}) async {
+  Future<List<PrayerRequest>> fetchMyPrayers({
+    String? cursor,
+    RecordsSort sort = RecordsSort.recent,
+  }) async {
     final response = await _api.get(
       ApiEndpoints.myPrayers,
-      queryParameters: {'limit': 50, 'cursor': ?cursor},
+      queryParameters: {'limit': 50, 'cursor': ?cursor, 'sort': sort.value},
     );
     return _rows(_data(response.data)['items']).map(_prayer).toList();
   }
@@ -168,10 +195,13 @@ class ViewerRecordsRepo {
   /// that looks approved has the reader asking why their story is not on the
   /// wall. Submissions cannot be edited, so a rejected one points at sharing
   /// a new one rather than at an edit that does not exist.
-  Future<List<Testimony>> fetchMyTestimonies({String? cursor}) async {
+  Future<List<Testimony>> fetchMyTestimonies({
+    String? cursor,
+    RecordsSort sort = RecordsSort.recent,
+  }) async {
     final response = await _api.get(
       ApiEndpoints.myTestimonies,
-      queryParameters: {'limit': 50, 'cursor': ?cursor},
+      queryParameters: {'limit': 50, 'cursor': ?cursor, 'sort': sort.value},
     );
     return _rows(_data(response.data)['items']).map(_testimony).toList();
   }

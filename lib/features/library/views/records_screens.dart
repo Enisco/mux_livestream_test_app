@@ -10,6 +10,7 @@ import 'package:test_app/features/creator/views/widgets/creator_profile_parts.da
     show CreatorTab;
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/features/library/views/widgets/records_sort_sheet.dart';
 import 'package:test_app/models/creator_models/impact_models.dart'
     show testimonyImpactTagLabel;
 import 'package:test_app/shared/components/error_state_view.dart';
@@ -62,13 +63,25 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
     unawaited(_load());
   }
 
+  RecordsSort _sort = RecordsSort.recent;
+
+  /// **A cursor belongs to one direction**, so changing the order restarts
+  /// the list from no cursor rather than paging on with a boundary minted
+  /// under the old one.
+  Future<void> _pickSort() async {
+    final picked = await showRecordsSortSheet(context, current: _sort);
+    if (picked == null || picked == _sort || !mounted) return;
+    setState(() => _sort = picked);
+    await _load();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      final rows = await _repo.fetchMyPrayers();
+      final rows = await _repo.fetchMyPrayers(sort: _sort);
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -151,7 +164,7 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
     if (!openFeedItem(
       context,
       request.aboutItem,
-      source: AnalyticsSource.unknown,
+      source: AnalyticsSource.library,
       beacon: false,
     )) {
       _report(context, AppStrings.libraryRowGone);
@@ -169,9 +182,9 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
         children: [
           LibraryHeader(
             title: AppStrings.prayerTitle,
-            actionLabel: AppStrings.myEventsSort,
+            actionLabel: recordsSortLabel(_sort),
             actionIcon: HugeIcons.strokeRoundedSorting05,
-            onAction: () => _report(context, 'Sorting is not built yet'),
+            onAction: () => unawaited(_pickSort()),
             bottom: LibraryFilterChips(
               labels: const [
                 AppStrings.prayerFilterAll,
@@ -292,13 +305,25 @@ class _TestimoniesScreenState extends State<TestimoniesScreen> {
     unawaited(_load());
   }
 
+  RecordsSort _sort = RecordsSort.recent;
+
+  /// **A cursor belongs to one direction**, so changing the order restarts
+  /// the list from no cursor rather than paging on with a boundary minted
+  /// under the old one.
+  Future<void> _pickSort() async {
+    final picked = await showRecordsSortSheet(context, current: _sort);
+    if (picked == null || picked == _sort || !mounted) return;
+    setState(() => _sort = picked);
+    await _load();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      final rows = await _repo.fetchMyTestimonies();
+      final rows = await _repo.fetchMyTestimonies(sort: _sort);
       if (!mounted) return;
       setState(() {
         _rows = rows;
@@ -427,9 +452,9 @@ class _TestimoniesScreenState extends State<TestimoniesScreen> {
         children: [
           LibraryHeader(
             title: AppStrings.testimoniesTitle,
-            actionLabel: AppStrings.myEventsSort,
+            actionLabel: recordsSortLabel(_sort),
             actionIcon: HugeIcons.strokeRoundedSorting05,
-            onAction: () => _report(context, 'Sorting is not built yet'),
+            onAction: () => unawaited(_pickSort()),
           ),
           Expanded(
             child: _loading

@@ -10,7 +10,8 @@ import 'package:test_app/features/settings/repo/account_repo.dart';
 import 'package:test_app/features/settings/views/account_forms.dart';
 import 'package:test_app/features/settings/views/account_sheets.dart';
 import 'package:test_app/features/settings/views/event_reminders_screen.dart';
-import 'package:test_app/features/settings/data/two_factor_dummy_data.dart';
+import 'package:test_app/features/settings/views/hidden_creators_screen.dart';
+import 'package:test_app/features/settings/views/language_screen.dart';
 import 'package:test_app/features/settings/views/two_factor_screens.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
 import 'package:test_app/shared/components/app_icons.dart';
@@ -52,14 +53,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _todo(BuildContext context, String what) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$what is not built yet', style: AppStyles.body(13)),
-        backgroundColor: AppColors.neutral800,
-        behavior: SnackBarBehavior.floating,
-      ),
+  /// Push a settings screen and rebuild from the cache it may have replaced.
+  ///
+  /// Every credential route answers with the updated `User`, which the repo
+  /// caches — so the menu behind only needs to re-read it.
+  Future<void> _open(Widget screen) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<bool>(builder: (_) => screen),
     );
+    if (mounted) setState(() {});
   }
 
   @override
@@ -125,43 +128,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: email,
                         subtitleVerified: SettingsDummyData.emailVerified,
                         action: AppStrings.settingsChange,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChangeEmailScreen(),
-                          ),
-                        ),
+                        onTap: () => _open(const ChangeEmailScreen()),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedCall,
                         title: AppStrings.settingsPhone,
                         subtitle: SettingsDummyData.phone,
                         action: AppStrings.settingsChange,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChangePhoneScreen(),
-                          ),
-                        ),
+                        onTap: () => _open(const ChangePhoneScreen()),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedSquareLock01,
                         title: AppStrings.settingsPassword,
                         subtitle: SettingsDummyData.passwordChanged,
                         action: AppStrings.settingsChange,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChangePasswordScreen(),
-                          ),
-                        ),
+                        onTap: () => _open(const ChangePasswordScreen()),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedFlag01,
                         title: AppStrings.settingsLanguage,
-                        subtitle: AppStrings.settingsLanguageValue,
+                        subtitle: languageLabel(LocalStorage.cachedLanguage),
                         showChevron: true,
-                        onTap: () => _todo(context, 'Choosing a language'),
+                        onTap: () => _open(const LanguageScreen()),
                       ),
                     ],
                   ),
@@ -181,12 +169,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: AppStrings.settingsEventReminders,
                         subtitle: SettingsDummyData.eventReminder,
                         showChevron: true,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const EventRemindersScreen(),
-                          ),
-                        ),
+                        onTap: () => _open(const EventRemindersScreen()),
                       ),
                     ],
                   ),
@@ -199,16 +182,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: AppStrings.settingsTwoFactor,
                         subtitle: SettingsDummyData.twoFactorStatus,
                         showChevron: true,
-                        // Someone already enrolled lands on the manage
-                        // screen; everyone else starts the walkthrough.
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TwoFactorDummyData.enabled
-                                ? const TwoFactorManageScreen()
-                                : const TwoFactorIntroScreen(),
-                          ),
-                        ),
+                        onTap: () => _open(const TwoFactorScreen()),
+                      ),
+                      SettingsRow(
+                        icon: HugeIcons.strokeRoundedVolumeOff,
+                        title: AppStrings.hiddenTitle,
+                        subtitle: AppStrings.hiddenRowSub,
+                        showChevron: true,
+                        onTap: () => _open(const HiddenCreatorsScreen()),
                       ),
                       SettingsRow(
                         icon: HugeIcons.strokeRoundedComputerPhoneSync,

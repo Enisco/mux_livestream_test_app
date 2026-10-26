@@ -259,13 +259,24 @@ void main() {
       expect(api.sent['/v1/content/calendar/events']!['creatorId'], 'c1');
     });
 
-    test('publishing sends nothing, because nothing is read', () async {
+    test('publishing now sends an empty body', () async {
       final api = _FakeApi(body: const {'data': {}});
       await EventRepo(api).publish('e1');
 
-      // The route ignores whatever body it is handed — passing a schedule
-      // would look like it worked.
       expect(api.sent['/v1/content/calendar/events/e1/publish'], isEmpty);
+    });
+
+    test('a schedule goes on the publish call, as UTC', () async {
+      // Until 2026-10-26 the route took no body at all and answered 200 to
+      // anything, so a schedule sent to it was silently dropped.
+      final api = _FakeApi(body: const {'data': {}});
+      final at = DateTime.now().toUtc().add(const Duration(days: 2));
+      await EventRepo(api).publish('e1', scheduledAt: at);
+
+      expect(
+        api.sent['/v1/content/calendar/events/e1/publish']!['scheduledAt'],
+        at.toIso8601String(),
+      );
     });
 
     test('the cover goes through the content asset ticket', () async {
@@ -319,6 +330,54 @@ void main() {
   });
 
   group('the screen', () {
+    /// Fill in the four fields publishing needs, then open the timing sheet.
+    Future<void> readyToPublish(WidgetTester tester) async {
+      await tester.enterText(
+        find.byKey(const ValueKey('event-title')),
+        'Encounter Conference 2026',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('event-description')),
+        'Three evenings of worship.',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('event-address')),
+        '1 Admiralty Way',
+      );
+      await tester.enterText(find.byKey(const ValueKey('event-city')), 'Lagos');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('event-publish')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a scheduled event is not told it is live', (tester) async {
+      // A scheduled event is absent from search, from the public read and
+      // from the ICS feed, and RSVP on it is refused — so "it's now on your
+      // channel for your community to book" would be a straight lie.
+      await _pumpScreen(tester);
+      await readyToPublish(tester);
+
+      await tester.tap(find.byKey(const ValueKey('go-live-later')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('go-live-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.newEventScheduledTitle), findsOneWidget);
+      expect(find.text(AppStrings.newEventLiveTitle), findsNothing);
+      expect(find.text(AppStrings.newEventLiveBody), findsNothing);
+    });
+
+    testWidgets('publishing now does say it is live', (tester) async {
+      await _pumpScreen(tester);
+      await readyToPublish(tester);
+
+      await tester.tap(find.byKey(const ValueKey('go-live-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.newEventLiveTitle), findsOneWidget);
+      expect(find.text(AppStrings.newEventScheduledTitle), findsNothing);
+    });
+
     testWidgets('it asks for an event, not an upload', (tester) async {
       await _pumpScreen(tester);
 

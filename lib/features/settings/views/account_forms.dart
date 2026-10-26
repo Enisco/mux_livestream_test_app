@@ -20,27 +20,54 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
-/// The four screens the account menu's rows lead to.
+/// The four screens the account menu's rows lead to. **All four are wired.**
 ///
-/// **Profile info is wired; the other three are not, and cannot be.** Probed
-/// on 2026-10-07: `PATCH /v1/user/{id}` takes `firstName`, `lastName` and
-/// `phone`, and the avatar pair takes a photo — so a name and a picture save
-/// for real. It **refuses** `email` and `password`, and there is no
-/// `.../email/change` or password-change route of any kind, so those two
-/// forms validate and then say so. See `docs/OPEN_ISSUES.md`.
+/// The email and password routes arrived on 2026-10-26
+/// (`docs/mobile-api-gap-responses.md` §3.1, §3.2); before that these two
+/// forms validated and then said they could not save.
+///
+/// Three things the routes insist on, which shape these screens:
+///
+/// - **The email code goes to the new address**, so the OTP screen names it
+///   and the password is proved here, before any mail is sent.
+/// - **A wrong password or a wrong code is a `401` that must not be retried**
+///   — it is slow by design, and five wrong answers lock the password proof
+///   across all three credential routes for fifteen minutes.
+/// - **The password change spares this session** by sending the refresh
+///   token, and says so in `currentSessionRetained`. That is read, not
+///   assumed: without it the next call 401s and the reader is stranded.
 
-/// Reports that a form is as far as the app can currently take it.
-void _notWired(BuildContext context, String what) {
+void showAccountSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(
-        '$what is not wired to the API yet',
-        style: AppStyles.body(13),
-      ),
+      content: Text(message, style: AppStyles.body(13)),
       backgroundColor: AppColors.neutral800,
       behavior: SnackBarBehavior.floating,
     ),
   );
+}
+
+/// What to put under the field when a credential route refuses.
+///
+/// The backend asks that its own wording for a wrong password or a wrong code
+/// be shown as-is: both are deliberately identical and deliberately vague,
+/// because an authenticated route that takes a password is a password oracle
+/// for anyone holding a stolen access token.
+String accountFailureMessage(AccountException e) => switch (e.failure) {
+  AccountFailure.network => AppStrings.settingsOffline,
+  AccountFailure.expired => AppStrings.settingsExpiredRestart,
+  AccountFailure.locked || AccountFailure.cooldown =>
+    e.retryAt == null
+        ? AppStrings.settingsTryLater
+        : AppStrings.settingsLockedUntil(formatClock(e.retryAt!)),
+  _ => e.message ?? AppStrings.settingsSaveFailed,
+};
+
+String formatClock(DateTime at) {
+  final local = at.toLocal();
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute${local.hour < 12 ? 'am' : 'pm'}';
 }
 
 /// Display name and photo.
@@ -241,30 +268,65 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  final _repo = AccountRepo();
+  bool _busy = false;
+
+  /// Ask for a code, then hand over to the OTP screen.
+  ///
+  /// The password is proved here rather than on the code screen, so a wrong
+  /// one is caught before an email goes anywhere.
+  Future<void> _submit() async {
     final problem = AccountFormRules.email(
       value: _next.text,
       current: _current.text,
     );
     setState(() => _error = problem);
-    if (problem == null) {
-      // The designed flow posts the change and then asks for the code; only
-      // the second half of that exists, so this goes straight to it.
-      Navigator.push(
+    if (problem != null || _busy) return;
+    if (_password.text.isEmpty) {
+      setState(() => _error = AppStrings.settingsPasswordRequired);
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final challenge = await _repo.requestEmailChange(
+        newEmail: _next.text,
+        password: _password.text,
+      );
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final done = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              ConfirmChangeScreen.email(destination: _next.text.trim()),
+          builder: (_) => ConfirmChangeScreen.email(challenge: challenge),
         ),
       );
+      if ((done ?? false) && mounted) {
+        _say(AppStrings.settingsEmailChanged);
+        Navigator.pop(context, true);
+      }
+    } on AccountException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = accountFailureMessage(e);
+      });
+    } catch (e) {
+      logger.w('Email change failed', error: e);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _say(AppStrings.settingsSaveFailed);
     }
   }
+
+  void _say(String message) => showAccountSnack(context, message);
 
   @override
   Widget build(BuildContext context) {
     return SettingsFormScaffold(
       title: AppStrings.settingsChangeEmailTitle,
-      onAction: _submit,
+      onAction: () => unawaited(_submit()),
+      busy: _busy,
       children: [
         const SettingsFormNotice(text: AppStrings.settingsEmailNotice),
         SettingsFormField(
@@ -305,31 +367,44 @@ class ChangePhoneScreen extends StatefulWidget {
 class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
   final _current = TextEditingController(text: SettingsDummyData.phone);
   final _next = TextEditingController();
-  final _password = TextEditingController();
   String? _error;
 
   @override
   void dispose() {
     _current.dispose();
     _next.dispose();
-    _password.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  final _repo = AccountRepo();
+  bool _busy = false;
+
+  /// **A phone number is not verified.** `PATCH /v1/user/{id}` takes `phone`
+  /// and writes it; there is no phone OTP route anywhere, and the gap
+  /// responses did not add one — only email got a challenge flow. So this
+  /// saves directly, and the screen does not pretend a code is coming.
+  ///
+  /// The password field the design draws has nothing to prove against here
+  /// either; it is left out rather than collected and discarded.
+  Future<void> _submit() async {
     final problem = AccountFormRules.phone(
       value: _next.text,
       current: _current.text,
     );
     setState(() => _error = problem);
-    if (problem == null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) =>
-              ConfirmChangeScreen.phone(destination: _next.text.trim()),
-        ),
-      );
+    if (problem != null || _busy) return;
+
+    setState(() => _busy = true);
+    try {
+      await _repo.updateAccount(phone: _next.text.trim());
+      if (!mounted) return;
+      showAccountSnack(context, AppStrings.settingsPhoneChanged);
+      Navigator.pop(context, true);
+    } catch (e) {
+      logger.w('Phone change failed', error: e);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showAccountSnack(context, AppStrings.settingsSaveFailed);
     }
   }
 
@@ -337,7 +412,8 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
   Widget build(BuildContext context) {
     return SettingsFormScaffold(
       title: AppStrings.settingsChangePhoneTitle,
-      onAction: _submit,
+      onAction: () => unawaited(_submit()),
+      busy: _busy,
       children: [
         const SettingsFormNotice(text: AppStrings.settingsPhoneNotice),
         SettingsFormField(
@@ -351,16 +427,8 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
           controller: _next,
           hint: '+234 000 000 0000',
           keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-          error: _error,
-        ),
-        SettingsFormField(
-          label: AppStrings.settingsPassword,
-          controller: _password,
-          hint: '',
-          obscure: true,
-          helper: AppStrings.settingsPasswordRule,
           textInputAction: TextInputAction.done,
+          error: _error,
         ),
       ],
     );
@@ -389,21 +457,60 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  final _repo = AccountRepo();
+  bool _busy = false;
+
+  /// The calling session is spared, which the repo arranges by sending the
+  /// refresh token. If the server says otherwise, the next call will 401 —
+  /// so that is read rather than assumed.
+  Future<void> _submit() async {
     final problem = AccountFormRules.newPassword(
       current: _current.text,
       next: _next.text,
       confirm: _confirm.text,
     );
     setState(() => _error = problem);
-    if (problem == null) _notWired(context, 'Changing your password');
+    if (problem != null || _busy) return;
+
+    setState(() => _busy = true);
+    try {
+      final result = await _repo.changePassword(
+        currentPassword: _current.text,
+        newPassword: _next.text,
+      );
+      if (!mounted) return;
+      showAccountSnack(
+        context,
+        !result.currentSessionRetained
+            ? AppStrings.settingsSignInAgain
+            : result.sessionsRevoked > 0
+            ? AppStrings.settingsSessionsEnded(result.sessionsRevoked)
+            : AppStrings.settingsPasswordChanged,
+      );
+      Navigator.pop(context, true);
+    } on AccountException catch (e) {
+      if (!mounted) return;
+      // Never retry a 401 here: the route is deliberately slow and
+      // uninformative, and five wrong answers lock the password proof for
+      // the email change and the 2FA switch too.
+      setState(() {
+        _busy = false;
+        _error = accountFailureMessage(e);
+      });
+    } catch (e) {
+      logger.w('Password change failed', error: e);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showAccountSnack(context, AppStrings.settingsSaveFailed);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return SettingsFormScaffold(
       title: AppStrings.settingsChangePasswordTitle,
-      onAction: _submit,
+      onAction: () => unawaited(_submit()),
+      busy: _busy,
       children: [
         SettingsFormField(
           label: AppStrings.settingsCurrentPassword,

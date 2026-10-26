@@ -7,6 +7,7 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/creator/views/widgets/live_prayers_sheet.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/shared/services/live_socket_service.dart';
 import 'package:test_app/features/creator/repo/livestream_repo.dart';
@@ -626,6 +627,13 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     ),
   );
 
+  /// The requests themselves, which the socket does not carry.
+  ///
+  /// `livestream.metrics_updated` brings the count in realtime; the bodies
+  /// stay on an authorised request/response rather than a fan-out room.
+  Future<void> _openPrayers() =>
+      showLivePrayersSheet(context, mediaId: widget.mediaId, repo: _repo);
+
   Widget _onAirOverlay() => Column(
     children: [
       Padding(
@@ -634,6 +642,8 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
           likes: _studio.likeCount,
           viewers: _studio.viewerCount,
           giving: givingLabel(_studio),
+          prayers: _studio.prayerCount,
+          onOpenPrayers: () => unawaited(_openPrayers()),
           onFlipCamera: () => _controller.switchCamera(),
         ),
       ),
@@ -704,10 +714,15 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 
 /// The chat the design runs along the foot of the broadcast.
 ///
-/// Comments on a livestream are ordinary media comments, and the app
-/// already reads and writes them — but nothing pushes them, and there is no
-/// live chat channel in the contract at all (OPEN_ISSUES 25). Rather than
-/// invent messages, this says plainly that it is not wired yet.
+/// **PARKED(5.1) — live chat is deferred post-MVP**, confirmed by the backend
+/// on 2026-10-16 (`docs/mobile-api-gap-responses.md` §5.1). There is no chat
+/// channel of any kind: `…/streams/{id}/studio` reports presence and counts
+/// and nothing readable, and `…/streams/{id}/chat` does not exist.
+///
+/// Kept rather than removed, because the design draws it and it is a route
+/// away from working. **Unpark when** a chat route ships: replace this
+/// placeholder with the list and composer, and give it the socket room —
+/// `livestream.metrics_updated` already reaches the studio.
 class _LiveChat extends StatelessWidget {
   const _LiveChat();
 

@@ -198,6 +198,14 @@ class WebFeedItemMeta {
 
   /// Devotional series.
   final String? description;
+
+  /// A creator row's own blurb. Shipped 2026-10-26 — it exists on the creator
+  /// record and was simply not projected onto search hits, which is why the
+  /// channel card drew a blank where the design has two lines.
+  ///
+  /// **Needs a reindex to appear**, so an absent value is normal on rows
+  /// written before the projection landed.
+  final String? bio;
   final int? publishedEntryCount;
 
   /// Devotional entries.
@@ -233,6 +241,7 @@ class WebFeedItemMeta {
     this.creatorType,
     this.locationLabel,
     this.description,
+    this.bio,
     this.publishedEntryCount,
     this.dayNumber,
     this.seriesTitle,
@@ -268,6 +277,7 @@ class WebFeedItemMeta {
         creatorType: json['creatorType'] as String?,
         locationLabel: json['locationLabel'] as String?,
         description: json['description'] as String?,
+        bio: json['bio'] as String?,
         publishedEntryCount: (json['publishedEntryCount'] as num?)?.toInt(),
         dayNumber: (json['dayNumber'] as num?)?.toInt(),
         seriesTitle: json['seriesTitle'] as String?,

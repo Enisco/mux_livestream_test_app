@@ -7,6 +7,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/library/repo/viewer_records_repo.dart';
+import 'package:test_app/features/library/views/widgets/records_sort_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/library_models/library_models.dart';
@@ -46,13 +47,29 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
     unawaited(_load());
   }
 
+  RecordsSort _sort = RecordsSort.recent;
+
+  /// Changing the order restarts the list: this one pages by number, and a
+  /// page minted under the old order describes a different result set.
+  Future<void> _pickSort() async {
+    final picked = await showRecordsSortSheet(
+      context,
+      current: _sort,
+      // Only events have a date of their own worth sorting on.
+      withStartSoonest: true,
+    );
+    if (picked == null || picked == _sort || !mounted) return;
+    setState(() => _sort = picked);
+    await _load();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _failed = false;
     });
     try {
-      final rows = await _repo.fetchMyEvents();
+      final rows = await _repo.fetchMyEvents(sort: _sort);
       if (!mounted) return;
       setState(() {
         _events = rows;
@@ -124,11 +141,8 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
   }
 
   /// Open the event this tile stands for.
-  ///
-  /// The library is not one of the surfaces the beacon's `source` enum knows,
-  /// so the click is reported as `unknown` rather than invented.
   void _open(MyEvent event) {
-    if (!openFeedItem(context, event.source, source: AnalyticsSource.unknown)) {
+    if (!openFeedItem(context, event.source, source: AnalyticsSource.library)) {
       _report(AppStrings.libraryRowGone);
     }
   }
@@ -156,9 +170,9 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
         children: [
           LibraryHeader(
             title: AppStrings.myEventsTitle,
-            actionLabel: AppStrings.myEventsSort,
+            actionLabel: recordsSortLabel(_sort),
             actionIcon: HugeIcons.strokeRoundedSorting05,
-            onAction: () => _report('Sorting is not built yet'),
+            onAction: () => unawaited(_pickSort()),
             controller: _controller,
             onQueryChanged: (v) => setState(() => _query = v),
             searchHint: AppStrings.likedSearchHint,

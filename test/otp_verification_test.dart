@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/settings/repo/account_repo.dart';
+import 'package:test_app/models/auth_models/account_challenge.dart';
 import 'package:test_app/features/settings/views/confirm_change_screen.dart';
 import 'package:test_app/shared/components/otp_code_field.dart';
 import 'package:test_app/shared/components/otp_verification_view.dart';
@@ -181,37 +183,99 @@ void main() {
   });
 
   group('the settings confirmation', () {
-    testWidgets('names the address the code went to', (tester) async {
+    /// A challenge as `POST /v1/user/me/email-change` answers it.
+    AccountChallenge challenge({String masked = 'j•••s@mail.com'}) =>
+        AccountChallenge(
+          challengeId: 'ch1',
+          maskedDestination: masked,
+          resendAvailableAt: DateTime.now().add(const Duration(seconds: 30)),
+        );
+
+    testWidgets('names the masked address the code went to', (tester) async {
+      // The code goes to the **new** address, and the screen names it from
+      // `maskedNewEmail` rather than echoing back a field that has scrolled
+      // away.
       await _pump(
         tester,
-        const ConfirmChangeScreen.email(destination: 'james@mail.com'),
+        ConfirmChangeScreen(
+          challenge: challenge(),
+          title: AppStrings.settingsConfirmEmailTitle,
+          onVerify: (_, _) async => const {},
+          onResend: (_) async => challenge(),
+        ),
       );
 
       expect(
-        find.textContaining('james@mail.com', findRichText: true),
+        find.textContaining('j•••s@mail.com', findRichText: true),
         findsOneWidget,
       );
       expect(find.text(AppStrings.settingsConfirmEmailTitle), findsOneWidget);
     });
 
-    testWidgets('a phone change says messages, not mail', (tester) async {
+    testWidgets('verifying sends the challenge id with the code', (
+      tester,
+    ) async {
+      String? sentId;
+      String? sentCode;
       await _pump(
         tester,
-        const ConfirmChangeScreen.phone(destination: '+234 90 555 1111'),
-      );
-      expect(find.text(AppStrings.settingsConfirmPhoneTitle), findsOneWidget);
-    });
-
-    testWidgets('it admits it cannot confirm anything yet', (tester) async {
-      await _pump(
-        tester,
-        const ConfirmChangeScreen.email(destination: 'james@mail.com'),
+        ConfirmChangeScreen(
+          challenge: challenge(),
+          title: AppStrings.settingsConfirmEmailTitle,
+          onVerify: (id, code) async {
+            sentId = id;
+            sentCode = code;
+            return const {};
+          },
+          onResend: (_) async => challenge(),
+        ),
       );
 
       await _enterCode(tester, '123456');
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(find.text(AppStrings.settingsOtpNotWired), findsOneWidget);
+      expect(sentId, 'ch1');
+      expect(sentCode, '123456');
+    });
+
+    testWidgets("a refusal shows the server's own words", (tester) async {
+      // The backend asks that its wording for a wrong code be used as-is.
+      await _pump(
+        tester,
+        ConfirmChangeScreen(
+          challenge: challenge(),
+          title: AppStrings.settingsConfirmEmailTitle,
+          onVerify: (_, _) async => throw const AccountException(
+            AccountFailure.rejected,
+            message: 'Invalid verification code',
+          ),
+          onResend: (_) async => challenge(),
+        ),
+      );
+
+      await _enterCode(tester, '000000');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Invalid verification code'), findsOneWidget);
+    });
+
+    testWidgets('the resend countdown comes from the server', (tester) async {
+      // `resendAvailableAt`, not a client-side interval — one that disagreed
+      // would offer a button the route answers 409 to.
+      await _pump(
+        tester,
+        ConfirmChangeScreen(
+          challenge: challenge(),
+          title: AppStrings.settingsConfirmEmailTitle,
+          onVerify: (_, _) async => const {},
+          onResend: (_) async => challenge(),
+        ),
+      );
+
+      // 30 or 29 depending on how the pump lands; what matters is that it is
+      // not the view's own 60-second default.
+      final row = tester.widget<OtpResendRow>(find.byType(OtpResendRow));
+      expect(row.secondsLeft, inInclusiveRange(25, 30));
     });
   });
 }

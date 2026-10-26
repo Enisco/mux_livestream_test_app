@@ -129,6 +129,52 @@ class GivingTotal {
   final int grossMinor;
 }
 
+/// A prayer request sent during a broadcast.
+///
+/// **No `isAnonymous`, and there never will be.** There is no way to submit a
+/// prayer request anonymously — not in the model, the route or any client —
+/// and shipping `isAnonymous: false` for ever would be a field promising a
+/// feature the platform does not have. Anonymity exists on *testimonies*,
+/// where it earns its place because an approved one is published publicly.
+///
+/// [requesterName] is best-effort: hydration can fail, so it is **absent**
+/// rather than false, and the card keeps a neutral fallback.
+class LivePrayer {
+  const LivePrayer({
+    required this.id,
+    required this.body,
+    required this.createdAt,
+    this.requesterName = '',
+    this.status = 'open',
+  });
+
+  final String id;
+  final String body;
+  final DateTime? createdAt;
+  final String requesterName;
+  final String status;
+
+  factory LivePrayer.fromJson(Map<String, dynamic> json) {
+    final requester = json['requester'] as Map<String, dynamic>?;
+    return LivePrayer(
+      id: json['id'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+      requesterName: requester?['displayName'] as String? ?? '',
+      status: json['status'] as String? ?? 'open',
+    );
+  }
+}
+
+/// One keyset page of them. `nextCursor` is the last item's `id`.
+class LivePrayerPage {
+  const LivePrayerPage({required this.items, this.total = 0, this.nextCursor});
+
+  final List<LivePrayer> items;
+  final int total;
+  final String? nextCursor;
+}
+
 /// `GET /v1/media/live/streams/{id}/studio` — the authoritative snapshot.
 ///
 /// It is what the broadcast screen's counters read. The contract also

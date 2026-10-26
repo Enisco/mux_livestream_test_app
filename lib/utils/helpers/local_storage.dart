@@ -126,6 +126,53 @@ class LocalStorage {
     }
   }
 
+  /// The account's own second-factor setting.
+  ///
+  /// Defaults to **true** when absent: the second factor used to be
+  /// platform-wide, so an account that has never touched the switch is on,
+  /// and assuming off would draw a switch that disagrees with the server.
+  static bool get cachedTwoFactorEnabled {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return true;
+    try {
+      return (jsonDecode(raw) as Map<String, dynamic>)['twoFactorEnabled']
+              as bool? ??
+          true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// When the password last changed. **Null means "never since registration"**,
+  /// not "unknown" — the row says so rather than going blank.
+  static DateTime? get cachedPasswordChangedAt {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      return DateTime.tryParse(
+        (jsonDecode(raw) as Map<String, dynamic>)['passwordChangedAt']
+                as String? ??
+            '',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// BCP 47, or null when the viewer has not chosen — which is the only
+  /// state a client can honestly fall back to the device language from.
+  static String? get cachedLanguage {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return null;
+    try {
+      final tag =
+          (jsonDecode(raw) as Map<String, dynamic>)['language'] as String?;
+      return tag == null || tag.trim().isEmpty ? null : tag;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Replace the cached account wholesale.
   ///
   /// Every `cached…` getter above reads one blob, so the way to keep them in
@@ -133,6 +180,23 @@ class LocalStorage {
   /// than patching fields in.
   static Future<bool> cacheUser(Map<String, dynamic> user) =>
       setString(cachedUserKey, jsonEncode(user));
+
+  /// Patch a few fields of the cached account.
+  ///
+  /// For the one write that does **not** answer with a `User`: the password
+  /// change answers how the session fared and when the password changed, and
+  /// without folding that in the account menu goes on reporting the old date
+  /// until the next profile read.
+  static Future<bool> mergeCachedUser(Map<String, dynamic> patch) async {
+    final raw = getString(cachedUserKey);
+    if (raw == null) return false;
+    try {
+      final user = jsonDecode(raw) as Map<String, dynamic>;
+      return cacheUser({...user, ...patch});
+    } catch (_) {
+      return false;
+    }
+  }
 
   static String? get cachedEmail {
     final raw = getString(cachedUserKey);

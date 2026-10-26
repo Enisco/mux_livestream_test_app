@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:dio/dio.dart';
+
+import 'package:test_app/features/notifications/repo/notification_repo.dart';
 import 'package:test_app/features/settings/data/preferences_dummy_data.dart';
+import 'package:test_app/models/notification_models/notification_models.dart';
+import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/features/settings/views/account_sheets.dart';
 import 'package:test_app/features/settings/views/event_reminders_screen.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -29,41 +34,103 @@ Future<void> _pump(
   await tester.pump();
 }
 
+/// The preferences route, as it answers since 2026-10-26.
+class _PrefsApi implements ApiService {
+  _PrefsApi({this.minutes});
+
+  /// Reminders are on in every fixture here; the switch test asserts the
+  /// write rather than a starting state.
+  final bool enabled = true;
+  final int? minutes;
+  final List<Object?> patched = [];
+
+  @override
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async => _ok(path);
+
+  @override
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    patched.add(data);
+    return _ok(path);
+  }
+
+  Response<T> _ok<T>(String path) => Response<T>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: 200,
+    data:
+        {
+              'data': {
+                'emailEnabled': true,
+                'pushEnabled': true,
+                'inAppEnabled': true,
+                'eventRemindersEnabled': enabled,
+                'eventReminderMinutes': minutes,
+              },
+            }
+            as T,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+EventRemindersScreen _reminders([_PrefsApi? api]) =>
+    EventRemindersScreen(repo: NotificationRepo(api: api ?? _PrefsApi()));
+
 void main() {
   setUpAll(loadAppFonts);
 
   group('lead times read as English', () {
     test('minutes, an hour, and days', () {
-      expect(leadTimeLabel(15), '15 minutes before');
-      expect(leadTimeLabel(30), '30 minutes before');
-      expect(leadTimeLabel(60), '1 hour before');
-      expect(leadTimeLabel(120), '2 hours before');
-      expect(leadTimeLabel(1440), '1 day before');
-      expect(leadTimeLabel(2880), '2 days before');
+      expect(reminderOffsetLabel(15), '15 minutes before');
+      expect(reminderOffsetLabel(30), '30 minutes before');
+      expect(reminderOffsetLabel(60), '1 hour before');
+      expect(reminderOffsetLabel(120), '2 hours before');
+      expect(reminderOffsetLabel(1440), '1 day before');
+      expect(reminderOffsetLabel(2880), '2 days before');
     });
   });
 
   group('event reminders', () {
-    testWidgets('offers every lead time the design lists', (tester) async {
-      await _pump(tester, const EventRemindersScreen());
+    testWidgets('offers all five offsets, not the design\'s four', (
+      tester,
+    ) async {
+      // 120 is in the set because RSVP rows already held it; dropping it to
+      // match the design would have orphaned reminders people had set.
+      await _pump(tester, _reminders());
+      await tester.pumpAndSettle();
 
-      for (final minutes in PreferencesDummyData.leadTimes) {
+      expect(reminderOffsets, hasLength(5));
+      expect(reminderOffsets, contains(120));
+      for (final minutes in reminderOffsets) {
         expect(
-          find.text(leadTimeLabel(minutes)),
+          find.text(reminderOffsetLabel(minutes)),
           findsOneWidget,
           reason: '$minutes',
         );
       }
-      expect(find.text(AppStrings.remindersDefault), findsOneWidget);
+      // "Whatever the organiser set" is its own row — a different state
+      // from off, and from any offset.
+      expect(find.text(AppStrings.remindersOrganiser), findsOneWidget);
     });
 
     testWidgets('choosing a different lead time moves the selection', (
       tester,
     ) async {
-      await _pump(tester, const EventRemindersScreen());
+      await _pump(tester, _reminders());
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('15 minutes before'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       // The chosen row is the only one filled in.
       final filled = tester.widgetList<Container>(find.byType(Container)).where(
@@ -77,10 +144,11 @@ void main() {
 
     testWidgets('turning reminders off disables the choices', (tester) async {
       // Picking a lead time is meaningless when nothing will be sent.
-      await _pump(tester, const EventRemindersScreen());
+      await _pump(tester, _reminders());
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byType(Switch));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       final gate = tester.widget<IgnorePointer>(
         find
@@ -93,13 +161,41 @@ void main() {
       expect(gate.ignoring, isTrue);
     });
 
-    testWidgets('it says the choice is not saved anywhere yet', (tester) async {
-      await _pump(tester, const EventRemindersScreen());
+    testWidgets('choosing an offset saves it', (tester) async {
+      final api = _PrefsApi();
+      await _pump(tester, _reminders(api));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('1 day before'));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(find.text(AppStrings.remindersNotWired), findsOneWidget);
+      expect(api.patched.single, {'eventReminderMinutes': 1440});
+    });
+
+    testWidgets("and the organiser's schedule saves an explicit null", (
+      tester,
+    ) async {
+      // Null is not "off" — it means follow the event. Omitting the key
+      // would leave whatever was there instead.
+      final api = _PrefsApi(minutes: 60);
+      await _pump(tester, _reminders(api));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(AppStrings.remindersOrganiser));
+      await tester.pumpAndSettle();
+
+      expect(api.patched.single, {'eventReminderMinutes': null});
+    });
+
+    testWidgets('turning reminders off is its own field', (tester) async {
+      final api = _PrefsApi();
+      await _pump(tester, _reminders(api));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(api.patched.single, {'eventRemindersEnabled': false});
     });
   });
 
@@ -228,11 +324,7 @@ void main() {
 
   group('all four survive a small screen', () {
     testWidgets('reminders at 320pt', (tester) async {
-      await _pump(
-        tester,
-        const EventRemindersScreen(),
-        size: const Size(320, 568),
-      );
+      await _pump(tester, _reminders(), size: const Size(320, 568));
       expect(tester.takeException(), isNull);
     });
 

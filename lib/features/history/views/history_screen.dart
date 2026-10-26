@@ -207,12 +207,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// Open what the row is a picture of.
-  ///
-  /// The library is not one of the surfaces the beacon's `source` enum knows,
-  /// so these clicks are reported as `unknown` rather than invented — sending
-  /// a value the route refuses would lose the click altogether.
   void _open(WebFeedItem? item) {
-    if (!openFeedItem(context, item, source: AnalyticsSource.unknown)) {
+    if (!openFeedItem(context, item, source: AnalyticsSource.library)) {
       _say(AppStrings.libraryRowGone);
     }
   }

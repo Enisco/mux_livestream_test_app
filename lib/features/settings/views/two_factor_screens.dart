@@ -1,207 +1,133 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/settings/data/two_factor_dummy_data.dart';
-import 'package:test_app/features/settings/views/widgets/settings_form.dart';
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/settings/repo/account_repo.dart';
+import 'package:test_app/features/settings/views/account_forms.dart'
+    show accountFailureMessage, showAccountSnack;
+import 'package:test_app/features/settings/views/confirm_change_screen.dart';
 import 'package:test_app/shared/components/app_icons.dart';
-import 'package:test_app/shared/components/otp_code_field.dart';
-import 'package:test_app/shared/components/otp_verification_view.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
-/// Turning on a second factor: what it is, the secret to add, the code that
-/// proves it was added, and the state afterwards.
+/// Two-factor authentication: one switch, and a code we email.
 ///
-/// None of it is wired, and the gap is larger than a missing payload — see
-/// [TwoFactorDummyData], which records that the spec's 2FA routes look like a
-/// server-sent OTP rather than the authenticator app this flow describes.
+/// **This replaced four screens** (`11599-107177`, `-107746`, `-107859`,
+/// `-108005`) that described TOTP — a QR code, a secret to type into an
+/// authenticator app, recovery codes. None of that exists. The backend ruled
+/// on 2026-10-19 that the second factor is an emailed code, per account, and
+/// asked for the screens to be redrawn before anything was built against it
+/// (`docs/mobile-api-gap-responses.md` §3.5). The QR tile, the secret chip and
+/// the `qr_flutter` dependency went with them.
+///
+/// The asymmetry is deliberate and worth preserving if this is ever redrawn
+/// again:
+///
+/// - **Turning it on takes no password.** The emailed code is the proof, and
+///   it doubles as a check that codes actually arrive — so nobody can switch
+///   2FA on against a mailbox they cannot read and strand themselves.
+/// - **Turning it off takes the current password.** It is the one direction an
+///   attacker on a stolen session wants, and an emailed code would be the same
+///   factor being removed.
+class TwoFactorScreen extends StatefulWidget {
+  const TwoFactorScreen({super.key, this.repo});
 
-void _report(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message, style: AppStyles.body(13)),
-      backgroundColor: AppColors.neutral800,
-      behavior: SnackBarBehavior.floating,
-    ),
-  );
-}
-
-/// Step one: what a second factor buys, and which apps it works with.
-class TwoFactorIntroScreen extends StatelessWidget {
-  const TwoFactorIntroScreen({super.key});
+  /// Defaults to the real thing; a test supplies its own.
+  final AccountRepo? repo;
 
   @override
-  Widget build(BuildContext context) {
-    return SettingsFormScaffold(
-      title: AppStrings.twoFactorTitle,
-      actionLabel: AppStrings.twoFactorSetup,
-      onAction: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const TwoFactorScanScreen()),
-      ),
-      children: [
-        SizedBox(height: 8.s),
-        const Center(child: _ShieldBadge()),
-        SizedBox(height: 16.s),
-        Text(
-          AppStrings.twoFactorHeading,
-          textAlign: TextAlign.center,
-          style: AppStyles.heading(
-            20,
-            lineHeight: 28 / 20,
-            letterSpacing: -0.4,
-          ),
-        ),
-        SizedBox(height: 10.s),
-        Text(
-          AppStrings.twoFactorBody,
-          textAlign: TextAlign.center,
-          style: AppStyles.label(13, color: AppColors.neutral300),
-        ),
-        SizedBox(height: 24.s),
-        _Card(
-          child: Text(
-            AppStrings.twoFactorApps,
-            style: AppStyles.label(
-              13,
-              color: AppColors.neutral300,
-              lineHeight: 20 / 13,
-            ),
-          ),
-        ),
-      ],
-    );
+  State<TwoFactorScreen> createState() => _TwoFactorScreenState();
+}
+
+class _TwoFactorScreenState extends State<TwoFactorScreen> {
+  late final _repo = widget.repo ?? AccountRepo();
+
+  /// The account's own setting, straight off the cached `User`.
+  ///
+  /// An account that has never touched the switch still reports `true`: the
+  /// second factor used to be platform-wide, so existing accounts default to
+  /// on rather than silently getting weaker on deploy.
+  late bool _on = LocalStorage.cachedTwoFactorEnabled;
+  bool _busy = false;
+
+  Future<void> _toggle(bool wanted) async {
+    if (_busy) return;
+    if (wanted) {
+      await _enable();
+    } else {
+      await _confirmDisable();
+    }
   }
-}
 
-/// Step two: the secret, as a code to scan and as characters to type.
-class TwoFactorScanScreen extends StatelessWidget {
-  const TwoFactorScanScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return SettingsFormScaffold(
-      title: AppStrings.twoFactorScanTitle,
-      actionLabel: AppStrings.twoFactorAdded,
-      onAction: () => Navigator.push(
+  Future<void> _enable() async {
+    setState(() => _busy = true);
+    try {
+      final challenge = await _repo.enableTwoFactor();
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final done = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => const TwoFactorCodeScreen()),
-      ),
-      children: [
-        Text(
-          AppStrings.twoFactorScanBody,
-          style: AppStyles.label(13, color: AppColors.neutral300),
+        MaterialPageRoute(
+          builder: (_) =>
+              ConfirmChangeScreen.twoFactor(challenge: challenge, repo: _repo),
         ),
-        SizedBox(height: 10.s),
-        const Center(child: _QrTile()),
-        SizedBox(height: 10.s),
-        Text(
-          AppStrings.twoFactorHeading,
-          textAlign: TextAlign.center,
-          style: AppStyles.heading(
-            20,
-            lineHeight: 28 / 20,
-            letterSpacing: -0.4,
-          ),
-        ),
-        SizedBox(height: 10.s),
-        Text(
-          AppStrings.twoFactorBody,
-          textAlign: TextAlign.center,
-          style: AppStyles.label(13, color: AppColors.neutral300),
-        ),
-        SizedBox(height: 10.s),
-        const Center(child: _SecretChip()),
-      ],
-    );
-  }
-}
-
-/// Step three: the code the authenticator is showing right now, which is what
-/// proves the secret actually made it across.
-class TwoFactorCodeScreen extends StatefulWidget {
-  const TwoFactorCodeScreen({super.key});
-
-  @override
-  State<TwoFactorCodeScreen> createState() => _TwoFactorCodeScreenState();
-}
-
-class _TwoFactorCodeScreenState extends State<TwoFactorCodeScreen> {
-  final _code = TextEditingController();
-
-  /// A TOTP code is generated on the phone, so there is nothing to resend —
-  /// the design still offers it, which would mean issuing a fresh secret.
-  static const _cooldown = 60;
-  int _secondsLeft = _cooldown;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return timer.cancel();
-      if (_secondsLeft <= 1) {
-        timer.cancel();
-        setState(() => _secondsLeft = 0);
-      } else {
-        setState(() => _secondsLeft--);
+      );
+      if (!mounted) return;
+      if (done ?? false) {
+        setState(() => _on = true);
+        showAccountSnack(context, AppStrings.twoFactorNowOn);
       }
-    });
+    } on AccountException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      // Already on: nothing to do but correct the switch.
+      if (e.failure == AccountFailure.conflict) {
+        setState(() => _on = true);
+        return;
+      }
+      showAccountSnack(context, accountFailureMessage(e));
+    } catch (e) {
+      logger.w('2FA enable failed', error: e);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showAccountSnack(context, AppStrings.settingsSaveFailed);
+    }
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _code.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SettingsFormScaffold(
-      title: AppStrings.twoFactorCodeTitle,
-      actionLabel: AppStrings.twoFactorTurnOn,
-      onAction: () {
-        if (_code.text.length < 6) return;
-        _report(context, AppStrings.twoFactorNotWired);
-      },
-      children: [
-        Text(
-          AppStrings.twoFactorCodeBody,
-          style: AppStyles.label(13, color: AppColors.neutral300),
-        ),
-        SizedBox(height: 24.s),
-        OtpCodeField(controller: _code, onCompleted: (_) => setState(() {})),
-        SizedBox(height: 20.s),
-        Center(
-          child: OtpResendRow(
-            secondsLeft: _secondsLeft,
-            onResend: () =>
-                _report(context, AppStrings.twoFactorResendNotWired),
-          ),
-        ),
-      ],
+  Future<void> _confirmDisable() async {
+    final password = await showDialog<String>(
+      context: context,
+      builder: (_) => const _PasswordPrompt(),
     );
+    if (password == null || password.isEmpty || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await _repo.disableTwoFactor(password);
+      if (!mounted) return;
+      setState(() {
+        _on = false;
+        _busy = false;
+      });
+      showAccountSnack(context, AppStrings.twoFactorNowOff);
+    } on AccountException catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      // Never retry a 401 here — it shares a lockout with the email and
+      // password changes, and five wrong answers lock all three.
+      showAccountSnack(context, accountFailureMessage(e));
+    } catch (e) {
+      logger.w('2FA disable failed', error: e);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showAccountSnack(context, AppStrings.settingsSaveFailed);
+    }
   }
-}
-
-/// The state afterwards: whether it is on, how to re-enrol, and what to do if
-/// the phone with the authenticator is lost.
-class TwoFactorManageScreen extends StatefulWidget {
-  const TwoFactorManageScreen({super.key});
-
-  @override
-  State<TwoFactorManageScreen> createState() => _TwoFactorManageScreenState();
-}
-
-class _TwoFactorManageScreenState extends State<TwoFactorManageScreen> {
-  bool _on = TwoFactorDummyData.enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +162,25 @@ class _TwoFactorManageScreenState extends State<TwoFactorManageScreen> {
               child: ListView(
                 padding: EdgeInsets.symmetric(horizontal: 20.s),
                 children: [
+                  SizedBox(height: 8.s),
+                  const Center(child: _ShieldBadge()),
+                  SizedBox(height: 18.s),
+                  Text(
+                    AppStrings.twoFactorHeading,
+                    textAlign: TextAlign.center,
+                    style: AppStyles.heading(18, lineHeight: 26 / 18),
+                  ),
+                  SizedBox(height: 8.s),
+                  Text(
+                    AppStrings.twoFactorBody,
+                    textAlign: TextAlign.center,
+                    style: AppStyles.body(
+                      13,
+                      color: AppColors.neutral400,
+                      lineHeight: 19 / 13,
+                    ),
+                  ),
+                  SizedBox(height: 24.s),
                   _Card(
                     child: Row(
                       children: [
@@ -255,11 +200,8 @@ class _TwoFactorManageScreenState extends State<TwoFactorManageScreen> {
                               ),
                               SizedBox(height: 4.s),
                               Text(
-                                // "Enabled Jun 9" contradicts a switch that
-                                // is off, so it is only shown when it is on.
                                 _on
-                                    ? '${TwoFactorDummyData.enabledOn} · '
-                                          '${TwoFactorDummyData.method}'
+                                    ? AppStrings.twoFactorOnSub
                                     : AppStrings.twoFactorOffSub,
                                 style: AppStyles.label(
                                   12,
@@ -270,100 +212,116 @@ class _TwoFactorManageScreenState extends State<TwoFactorManageScreen> {
                             ],
                           ),
                         ),
-                        Switch(
-                          value: _on,
-                          activeThumbColor: AppColors.textPrimary,
-                          activeTrackColor: AppColors.brandPrimary,
-                          inactiveThumbColor: AppColors.neutral400,
-                          inactiveTrackColor: AppColors.neutral800,
-                          onChanged: (v) {
-                            setState(() => _on = v);
-                            _report(context, AppStrings.twoFactorNotWired);
-                          },
-                        ),
+                        if (_busy)
+                          SizedBox(
+                            width: 20.s,
+                            height: 20.s,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.brandPrimary,
+                            ),
+                          )
+                        else
+                          Switch(
+                            key: const ValueKey('two-factor-switch'),
+                            value: _on,
+                            activeThumbColor: AppColors.textPrimary,
+                            activeTrackColor: AppColors.brandPrimary,
+                            inactiveThumbColor: AppColors.neutral400,
+                            inactiveTrackColor: AppColors.neutral800,
+                            onChanged: (v) => unawaited(_toggle(v)),
+                          ),
                       ],
                     ),
                   ),
-                  SizedBox(height: 12.s),
-                  _Card(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                AppStrings.twoFactorRescan,
-                                style: AppStyles.label(
-                                  14,
-                                  weight: AppStyles.bold,
-                                ),
-                              ),
-                              SizedBox(height: 4.s),
-                              Text(
-                                AppStrings.twoFactorRescanSub,
-                                style: AppStyles.label(
-                                  12,
-                                  color: AppColors.neutral500,
-                                  lineHeight: 16 / 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: 10.s),
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const TwoFactorScanScreen(),
-                            ),
-                          ),
-                          child: Text(
-                            AppStrings.twoFactorBeginSetup,
-                            style: AppStyles.label(
-                              12,
-                              weight: AppStyles.bold,
-                              color: AppColors.yellow600,
-                            ),
-                          ),
-                        ),
-                      ],
+                  SizedBox(height: 16.s),
+                  Text(
+                    AppStrings.twoFactorLostMailbox,
+                    style: AppStyles.label(
+                      12,
+                      color: AppColors.neutral500,
+                      lineHeight: 17 / 12,
                     ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(20.s, 0, 20.s, 20.s),
-              child: _Card(
-                child: Text.rich(
-                  TextSpan(
-                    style: AppStyles.label(
-                      13,
-                      color: AppColors.neutral300,
-                      lineHeight: 20 / 13,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: AppStrings.twoFactorLostPhoneLead,
-                        style: AppStyles.label(
-                          13,
-                          weight: AppStyles.bold,
-                          color: AppColors.brandPrimary,
-                        ),
-                      ),
-                      const TextSpan(text: AppStrings.twoFactorLostPhoneBody),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Proving the current password before the protection comes off.
+class _PasswordPrompt extends StatefulWidget {
+  const _PasswordPrompt();
+
+  @override
+  State<_PasswordPrompt> createState() => _PasswordPromptState();
+}
+
+class _PasswordPromptState extends State<_PasswordPrompt> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.fieldBg,
+      title: Text(
+        AppStrings.twoFactorTurnOffTitle,
+        style: AppStyles.heading(16),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            AppStrings.twoFactorTurnOffBody,
+            style: AppStyles.body(13, color: AppColors.neutral400),
+          ),
+          SizedBox(height: 16.s),
+          TextField(
+            key: const ValueKey('two-factor-password'),
+            controller: _controller,
+            obscureText: true,
+            autofocus: true,
+            style: AppStyles.body(14),
+            decoration: InputDecoration(
+              hintText: AppStrings.settingsCurrentPassword,
+              hintStyle: AppStyles.body(14, color: AppColors.neutral500),
+              filled: true,
+              fillColor: AppColors.base2,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.s),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            AppStrings.notNow,
+            style: AppStyles.button(13, color: AppColors.neutral400),
+          ),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: Text(
+            AppStrings.twoFactorTurnOff,
+            style: AppStyles.button(13, color: AppColors.brandPrimary),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -391,91 +349,7 @@ class _ShieldBadge extends StatelessWidget {
   }
 }
 
-/// The provisioning code, on a white tile washed with brand colour — the
-/// design bakes that wash into the image as an inset shadow.
-class _QrTile extends StatelessWidget {
-  const _QrTile();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 266.s,
-      height: 266.s,
-      padding: EdgeInsets.all(16.s),
-      decoration: BoxDecoration(
-        color: AppColors.textPrimary,
-        borderRadius: BorderRadius.circular(10.s),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color.alphaBlend(
-              AppColors.brandPrimary.withValues(alpha: 0.16),
-              AppColors.textPrimary,
-            ),
-            AppColors.textPrimary,
-          ],
-        ),
-      ),
-      child: QrImageView(
-        data: TwoFactorDummyData.provisioningUri,
-        version: QrVersions.auto,
-        backgroundColor: Colors.transparent,
-        eyeStyle: const QrEyeStyle(
-          eyeShape: QrEyeShape.square,
-          color: AppColors.base1,
-        ),
-        dataModuleStyle: const QrDataModuleStyle(
-          dataModuleShape: QrDataModuleShape.square,
-          color: AppColors.base1,
-        ),
-      ),
-    );
-  }
-}
-
-/// The same secret in characters, for anyone whose camera will not cooperate.
-class _SecretChip extends StatelessWidget {
-  const _SecretChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () async {
-        await Clipboard.setData(
-          const ClipboardData(text: TwoFactorDummyData.secret),
-        );
-      },
-      child: Builder(
-        builder: (context) => Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.s, vertical: 13.s),
-          decoration: BoxDecoration(
-            color: AppColors.fieldBg,
-            borderRadius: BorderRadius.circular(11.s),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                TwoFactorDummyData.secret,
-                style: AppStyles.label(13, color: AppColors.neutral300),
-              ),
-              SizedBox(width: 10.s),
-              HugeIcon(
-                icon: HugeIcons.strokeRoundedCopy01,
-                color: AppColors.brandPrimary,
-                size: 18.s,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The rounded plate the two-factor screens group things on.
+/// The rounded plate the two-factor screen groups things on.
 class _Card extends StatelessWidget {
   const _Card({required this.child});
 

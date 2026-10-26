@@ -8,6 +8,7 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/features/library/views/my_events_screen.dart';
 import 'package:test_app/features/library/views/records_screens.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 Future<void> _pump(
@@ -48,6 +49,9 @@ class _FakeApi implements ApiService {
   final List<String> posts = [];
   final List<String> deletes = [];
 
+  /// Every read, with its query — the sort control is only observable here.
+  final List<({String path, Map<String, dynamic>? query})> gets = [];
+
   @override
   Future<Response<T>> post<T>(
     String path, {
@@ -76,6 +80,7 @@ class _FakeApi implements ApiService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    gets.add((path: path, query: queryParameters));
     if (fail) throw DioException(requestOptions: RequestOptions(path: path));
     if (path.contains('calendar/events/mine')) {
       return _ok(path, {
@@ -529,6 +534,73 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining("off the ministry's wall"), findsOneWidget);
+    });
+  });
+
+  group('sorting the three "mine" lists', () {
+    // `recent` and `oldest` mean **when the viewer acted** — when they
+    // RSVP'd, asked or submitted. Only an event has a date of its own, so
+    // only events offer the third option; the other two lists answer 400.
+    testWidgets('every read carries a sort, and recent is the default', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        MyEventsScreen(repo: _repo(events: [_eventRow()])),
+        size: _tall,
+      );
+
+      expect(_lastApi!.gets.single.query!['sort'], 'recent');
+    });
+
+    testWidgets('picking an order re-reads the list under it', (tester) async {
+      await _pump(
+        tester,
+        MyEventsScreen(repo: _repo(events: [_eventRow()])),
+        size: _tall,
+      );
+
+      await tester.tap(find.text(AppStrings.sortRecent));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.sortStartSoonest));
+      await tester.pumpAndSettle();
+
+      expect(_lastApi!.gets.last.query!['sort'], 'start_soonest');
+      // And the control says what it is doing now.
+      expect(find.text(AppStrings.sortStartSoonest), findsOneWidget);
+    });
+
+    testWidgets('a cursor list restarts rather than paging on', (tester) async {
+      // A cursor is a row boundary under one direction: carrying one across
+      // a flip would skip or repeat rows.
+      await _pump(
+        tester,
+        PrayerRequestsScreen(repo: _repo(prayers: [_prayerRow()])),
+        size: _tall,
+      );
+
+      await tester.tap(find.text(AppStrings.sortRecent));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.sortOldest));
+      await tester.pumpAndSettle();
+
+      final read = _lastApi!.gets.last.query!;
+      expect(read['sort'], 'oldest');
+      expect(read.containsKey('cursor'), isFalse);
+    });
+
+    testWidgets('only events offer "starting soonest"', (tester) async {
+      await _pump(
+        tester,
+        TestimoniesScreen(repo: _repo(testimonies: [_testimonyRow()])),
+        size: _tall,
+      );
+
+      await tester.tap(find.text(AppStrings.sortRecent));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.sortOldest), findsOneWidget);
+      expect(find.text(AppStrings.sortStartSoonest), findsNothing);
     });
   });
 

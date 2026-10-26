@@ -1,169 +1,224 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizing/sizing.dart';
 
-import 'package:test_app/features/settings/data/two_factor_dummy_data.dart';
+import 'package:test_app/features/settings/repo/account_repo.dart';
 import 'package:test_app/features/settings/views/two_factor_screens.dart';
+import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
-Future<void> _pump(
-  WidgetTester tester,
-  Widget child, {
-  Size size = const Size(390, 844),
+/// Two-factor, as the backend shipped it on 2026-10-26.
+///
+/// **This replaced a TOTP flow.** The four screens it used to test described a
+/// QR code, a secret and recovery codes; none of that exists and none of it
+/// ever will — the second factor is a code emailed to the address on the
+/// account. See `docs/mobile-api-gap-responses.md` §3.5.
+///
+/// The asymmetry is the thing worth pinning: enabling takes **no password**
+/// (the emailed code is the proof, and proves codes arrive), disabling takes
+/// **the current password** (it is the direction an attacker wants).
+class _FakeApi implements ApiService {
+  _FakeApi({this.failDisable = false});
+
+  final bool failDisable;
+  final List<({String path, Object? body})> posted = [];
+
+  @override
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    posted.add((path: path, body: data));
+    if (path.contains('disable') && failDisable) {
+      throw DioException(
+        requestOptions: RequestOptions(path: path),
+        response: Response(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 401,
+          data: const {'error': 'Current password is incorrect'},
+        ),
+      );
+    }
+    if (path.contains('enable') && !path.contains('verify')) {
+      return _ok(path, {
+        'challengeId': 'ch1',
+        'expiresAt': DateTime.now()
+            .add(const Duration(minutes: 10))
+            .toIso8601String(),
+        'delivery': 'email',
+        'resendAvailableAt': DateTime.now()
+            .add(const Duration(seconds: 30))
+            .toIso8601String(),
+        'maskedEmail': 'g•••e@example.com',
+      });
+    }
+    return _ok(path, {
+      'id': 'u1',
+      'email': 'g@example.com',
+      'twoFactorEnabled': !path.contains('disable'),
+    });
+  }
+
+  Response<T> _ok<T>(String path, Object body) => Response<T>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: 200,
+    data: {'data': body} as T,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
+Future<_FakeApi> _pump(
+  WidgetTester tester, {
+  bool enabled = false,
+  bool failDisable = false,
 }) async {
-  tester.view.physicalSize = size * 3;
+  SharedPreferences.setMockInitialValues({});
+  await LocalStorage.init();
+  await LocalStorage.setString(
+    LocalStorage.cachedUserKey,
+    '{"id":"u1","email":"g@example.com","twoFactorEnabled":$enabled}',
+  );
+
+  final api = _FakeApi(failDisable: failDisable);
+  tester.view.physicalSize = const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
+
   await tester.pumpWidget(
     SizingBuilder(
       baseSize: const Size(390, 844),
-      builder: (context) => MaterialApp(
+      builder: (_) => MaterialApp(
         theme: ThemeData(scaffoldBackgroundColor: AppColors.base1),
-        home: child,
+        home: TwoFactorScreen(repo: AccountRepo(api: api)),
       ),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
+  return api;
 }
 
 void main() {
   setUpAll(loadAppFonts);
 
-  group('the walkthrough', () {
-    testWidgets('step one explains what a second factor is', (tester) async {
-      await _pump(tester, const TwoFactorIntroScreen());
+  testWidgets('nothing on it mentions an authenticator app', (tester) async {
+    // The TOTP wording went with the TOTP screens. If any of this comes back,
+    // the screen is describing a feature the platform does not have.
+    await _pump(tester);
 
-      expect(find.text(AppStrings.twoFactorHeading), findsOneWidget);
-      expect(find.textContaining('TOTP app'), findsOneWidget);
-      expect(find.text(AppStrings.twoFactorSetup), findsOneWidget);
-    });
-
-    testWidgets('step two shows the secret both ways', (tester) async {
-      await _pump(tester, const TwoFactorScanScreen());
-
-      // Scannable, and typeable for anyone whose camera will not cooperate.
-      expect(find.byType(QrImageView), findsOneWidget);
-      expect(find.text(TwoFactorDummyData.secret), findsOneWidget);
-    });
-
-    test('the code encodes a real otpauth URI', () {
-      // An authenticator app can only read the standard shape, so the
-      // placeholder has to be the right shape even while the secret is fake.
-      final uri = TwoFactorDummyData.provisioningUri;
-      expect(uri, startsWith('otpauth://totp/'));
-      expect(uri, contains('secret=BSWY3DPEHPK3PXP'));
-      expect(uri, contains('issuer=GospelTube'));
-      expect(uri, contains('digits=6'));
-      // The spaces the design prints are for reading, not for the key.
-      expect(uri, isNot(contains(' ')));
-    });
-
-    testWidgets('tapping the key copies it', (tester) async {
-      final copied = <String>[];
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        (call) async {
-          if (call.method == 'Clipboard.setData') {
-            copied.add((call.arguments as Map)['text'] as String);
-          }
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          SystemChannels.platform,
-          null,
-        ),
-      );
-
-      await _pump(tester, const TwoFactorScanScreen());
-      await tester.tap(find.text(TwoFactorDummyData.secret));
-      await tester.pump();
-
-      expect(copied, [TwoFactorDummyData.secret]);
-    });
-
-    testWidgets('step three asks for the code the app is showing', (
-      tester,
-    ) async {
-      await _pump(tester, const TwoFactorCodeScreen());
-
+    for (final word in ['QR', 'authenticator', 'Authy', 'recovery', 'secret']) {
       expect(
-        find.textContaining('6-digit code your app shows'),
-        findsOneWidget,
+        find.textContaining(word, findRichText: true),
+        findsNothing,
+        reason: word,
       );
-      expect(find.text(AppStrings.twoFactorTurnOn), findsOneWidget);
-    });
-
-    testWidgets('an incomplete code does not turn anything on', (tester) async {
-      await _pump(tester, const TwoFactorCodeScreen());
-
-      await tester.tap(find.text(AppStrings.twoFactorTurnOn));
-      await tester.pump();
-
-      expect(find.text(AppStrings.twoFactorNotWired), findsNothing);
-    });
-  });
-
-  group('the manage screen', () {
-    testWidgets('reports the current state and how to re-enrol', (
-      tester,
-    ) async {
-      await _pump(tester, const TwoFactorManageScreen());
-
-      expect(find.text(AppStrings.twoFactorRescan), findsOneWidget);
-      expect(find.text(AppStrings.twoFactorBeginSetup), findsOneWidget);
-      expect(
-        find.textContaining('Lose your phone?', findRichText: true),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the switch reflects the stored state', (tester) async {
-      await _pump(tester, const TwoFactorManageScreen());
-
-      final sw = tester.widget<Switch>(find.byType(Switch));
-      expect(sw.value, TwoFactorDummyData.enabled);
-      // An "Enabled Jun 9" subtitle under an off switch would contradict it.
-      expect(
-        find.text(AppStrings.twoFactorOffSub),
-        TwoFactorDummyData.enabled ? findsNothing : findsOneWidget,
-      );
-      expect(
-        find.text(
-          TwoFactorDummyData.enabled
-              ? AppStrings.twoFactorOn
-              : AppStrings.twoFactorOff,
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('flipping it says it cannot be saved yet', (tester) async {
-      await _pump(tester, const TwoFactorManageScreen());
-
-      await tester.tap(find.byType(Switch));
-      await tester.pump();
-
-      expect(find.text(AppStrings.twoFactorNotWired), findsOneWidget);
-    });
-  });
-
-  group('every step survives a small screen', () {
-    for (final (name, screen) in <(String, Widget)>[
-      ('intro', TwoFactorIntroScreen()),
-      ('scan', TwoFactorScanScreen()),
-      ('code', TwoFactorCodeScreen()),
-      ('manage', TwoFactorManageScreen()),
-    ]) {
-      testWidgets('$name on a 320pt phone', (tester) async {
-        await _pump(tester, screen, size: const Size(320, 568));
-        expect(tester.takeException(), isNull);
-      });
     }
+  });
+
+  testWidgets('reads the switch off the account, not a constant', (
+    tester,
+  ) async {
+    await _pump(tester, enabled: true);
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const ValueKey('two-factor-switch')))
+          .value,
+      isTrue,
+    );
+  });
+
+  testWidgets('an account that never chose still reads on', (tester) async {
+    // The second factor used to be platform-wide, so existing accounts
+    // default to on rather than silently getting weaker on deploy.
+    SharedPreferences.setMockInitialValues({});
+    await LocalStorage.init();
+    await LocalStorage.setString(
+      LocalStorage.cachedUserKey,
+      '{"id":"u1","email":"g@example.com"}',
+    );
+    expect(LocalStorage.cachedTwoFactorEnabled, isTrue);
+  });
+
+  testWidgets('turning it on asks for no password', (tester) async {
+    final api = await _pump(tester);
+
+    await tester.tap(find.byKey(const ValueKey('two-factor-switch')));
+    await tester.pumpAndSettle();
+
+    final call = api.posted.single;
+    expect(call.path, '/v1/user/me/two-factor/enable');
+    expect(call.body, isEmpty);
+    // It goes straight to the OTP screen, which names the masked address.
+    expect(
+      find.textContaining('g•••e@example.com', findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('turning it off asks for one', (tester) async {
+    final api = await _pump(tester, enabled: true);
+
+    await tester.tap(find.byKey(const ValueKey('two-factor-switch')));
+    await tester.pumpAndSettle();
+    expect(find.text(AppStrings.twoFactorTurnOffTitle), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('two-factor-password')),
+      'hunter2',
+    );
+    await tester.tap(find.text(AppStrings.twoFactorTurnOff));
+    await tester.pumpAndSettle();
+
+    expect(api.posted.single.path, '/v1/user/me/two-factor/disable');
+    expect(api.posted.single.body, {'password': 'hunter2'});
+  });
+
+  testWidgets('a wrong password leaves it on, in the server\'s words', (
+    tester,
+  ) async {
+    await _pump(tester, enabled: true, failDisable: true);
+
+    await tester.tap(find.byKey(const ValueKey('two-factor-switch')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('two-factor-password')),
+      'wrong',
+    );
+    await tester.tap(find.text(AppStrings.twoFactorTurnOff));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current password is incorrect'), findsOneWidget);
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const ValueKey('two-factor-switch')))
+          .value,
+      isTrue,
+    );
+  });
+
+  testWidgets('backing out of the prompt changes nothing', (tester) async {
+    final api = await _pump(tester, enabled: true);
+
+    await tester.tap(find.byKey(const ValueKey('two-factor-switch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(AppStrings.notNow));
+    await tester.pumpAndSettle();
+
+    expect(api.posted, isEmpty);
+    expect(
+      tester
+          .widget<Switch>(find.byKey(const ValueKey('two-factor-switch')))
+          .value,
+      isTrue,
+    );
   });
 }

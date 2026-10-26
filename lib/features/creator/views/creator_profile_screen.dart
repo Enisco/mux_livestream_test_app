@@ -6,6 +6,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:go_router/go_router.dart';
 
+import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
@@ -239,6 +240,34 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     openContentDetail(context, item, source: AnalyticsSource.creatorProfile);
   }
 
+  /// The profile itself as a row, so the header's `…` opens the same sheet
+  /// every card does — share the channel, mute it, block it.
+  WebFeedItem _asRow(CreatorProfile profile) => WebFeedItem(
+    entityType: 'creator',
+    entityId: profile.id,
+    title: profile.displayName,
+    meta: WebFeedItemMeta(
+      handle: profile.handle,
+      isVerified: profile.isVerified,
+    ),
+    isFollowingCreator: _store.isFollowing(
+      profile.id,
+      fallback: profile.isFollowing,
+    ),
+  );
+
+  /// The `…` on a card: share, hide, mute, block and the rest.
+  ///
+  /// Share needs no account; everything else does, which the sheet gates
+  /// through [_requireAccount] rather than refusing the whole sheet.
+  Future<void> _openCardActions(WebFeedItem item, {bool isOwn = false}) =>
+      showCardActionsSheet(
+        context,
+        item,
+        requireAccount: _requireAccount,
+        isOwn: isOwn,
+      );
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -324,7 +353,12 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
               onBack: () => Navigator.of(context).maybePop(),
               onFollow: _toggleFollow,
               onGive: () => _requireAccount('give to this ministry'),
-              onMore: () => _requireAccount('use that'),
+              onMore: () => unawaited(
+                _openCardActions(
+                  _asRow(profile),
+                  isOwn: profile.isOwnedByViewer,
+                ),
+              ),
               onOpenStudio: () => context.go(AppRouter.studio),
             ),
           ),
@@ -402,7 +436,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
           child: CreatorLibraryTab(
             sections: _library,
             onOpen: _openItem,
-            onMore: (_) => _requireAccount('use that'),
+            onMore: (e) => unawaited(_openCardActions(e)),
           ),
         ),
       ];
@@ -441,7 +475,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
             onLike: _actions.like(rows[i]),
             onSave: _actions.save(rows[i]),
             onComment: _actions.comment(context, rows[i]),
-            onMore: () => _requireAccount('use that'),
+            onMore: () => unawaited(_openCardActions(rows[i])),
             playback: _playback,
             engagement: _store,
             source: AnalyticsSource.creatorProfile,

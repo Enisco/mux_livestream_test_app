@@ -31,12 +31,14 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 ///    physical, a meeting link for anything virtual.
 ///  * `schedule.timezone` is required and validated as an IANA name —
 ///    `Mars/Olympus` and an empty string are both "Invalid schedule".
-///  * There is **no scheduled publish**. `publishAt` and `scheduledAt` are
-///    refused on create and on PATCH, and the publish route quietly ignores
-///    any body it is given, so passing one would look like it worked
-///    (OPEN_ISSUES 21).
-///  * `recurrence.mode` accepts only `none`, and there is no series field
-///    of any name (OPEN_ISSUES 20).
+///  * **Scheduled publish arrived 2026-10-26.** `scheduledAt` goes on the
+///    *publish* call, not on create or PATCH, and the route validates it now
+///    — it used to take no body at all, so one sent to it was accepted with a
+///    200 and silently dropped. `CalendarEventStatus` gained `scheduled`, so
+///    anything exhaustive over that union needs the new arm.
+///  * `recurrence.mode` still accepts only `none`. A **series** exists now
+///    (`/v1/content/calendar/series`) but it is a label, not recurrence:
+///    adding an event to one creates no other event.
 class EventRepo {
   EventRepo([ApiService? api]) : _injected = api;
 
@@ -88,12 +90,25 @@ class EventRepo {
     }
   }
 
-  /// Step 3. Takes no body worth sending — anything passed is ignored.
-  Future<void> publish(String eventId) async {
+  /// Step 3. Publish now, or schedule the listing for later.
+  ///
+  /// [scheduledAt] must be in the future **and before the event's own
+  /// `startAt`** — two distinct `400`s. Omitting it, or sending null,
+  /// publishes immediately.
+  ///
+  /// **Every readiness check runs when you schedule**, not when the sweep
+  /// fires, so a missing address is refused at the moment the creator taps
+  /// Schedule rather than silently failing to publish two days later.
+  ///
+  /// A `scheduled` event is **not public**: absent from search, the public
+  /// read, the creator's public list and the ICS feed, and RSVP on it is
+  /// refused. An already-published event **cannot** be scheduled, so the
+  /// control is hidden once it is out.
+  Future<void> publish(String eventId, {DateTime? scheduledAt}) async {
     try {
       await _api.post(
         ApiEndpoints.publishCalendarEvent(eventId),
-        data: const <String, dynamic>{},
+        data: {'scheduledAt': ?scheduledAt?.toUtc().toIso8601String()},
       );
     } on DioException catch (e) {
       throw _translate(e);

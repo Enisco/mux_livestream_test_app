@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
@@ -342,6 +343,13 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
     openContentDetail(context, item, source: AnalyticsSource.homeFeed);
   }
 
+  /// The `…` on a card: share, hide, mute, block and the rest.
+  ///
+  /// Share needs no account; everything else does, which the sheet gates
+  /// through [_requireAccount] rather than refusing the whole sheet.
+  Future<void> _openCardActions(WebFeedItem item) =>
+      showCardActionsSheet(context, item, requireAccount: _requireAccount);
+
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
@@ -418,7 +426,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
             // Straight to the thread rather than the detail page behind it:
             // the tap was on the comment count, not on the content.
             onComment: _actions.comment(context, item),
-            onMore: () => _requireAccount('use that'),
+            onMore: () => unawaited(_openCardActions(item)),
             playback: _playback,
             coordinator: _autoplay,
             videoController: _playback.videoController,
@@ -457,7 +465,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
       onOpenEvent: _openItem,
       onOpenCreator: (e) =>
           openCreatorProfile(context, creatorId: e.profileCreatorId),
-      onMore: (_) => _requireAccount('use that'),
+      onMore: (e) => unawaited(_openCardActions(e)),
     ),
     HomeTab.discover => const _Empty(
       title: AppStrings.feedEmptyTitle,

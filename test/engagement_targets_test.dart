@@ -63,7 +63,34 @@ void main() {
     test('dislike is not an interaction the API knows', () {
       // Why the card's second action is save, not a thumbs-down.
       expect(InteractionTypes.all.contains('dislike'), isFalse);
-      expect(InteractionTypes.all, {'like', 'favorite', 'amen', 'share'});
+      expect(InteractionTypes.all, {
+        'like',
+        'favorite',
+        'amen',
+        'share',
+        'not_interested',
+      });
+    });
+
+    test('not_interested is offered only where ranking chose the row', () {
+      // A testimony is surfaced by the creator who approved it and the verse
+      // of the day is one platform-wide item, so neither is something
+      // ranking put in front of this viewer — both are a 400.
+      expect(InteractionTypes.notInterestedTargets, {
+        'media',
+        'post',
+        'devotional',
+        'devotional_entry',
+        'event',
+      });
+      expect(
+        InteractionTypes.notInterestedTargets.contains('testimony'),
+        isFalse,
+      );
+      expect(
+        InteractionTypes.notInterestedTargets.contains('verse_of_day'),
+        isFalse,
+      );
     });
   });
 

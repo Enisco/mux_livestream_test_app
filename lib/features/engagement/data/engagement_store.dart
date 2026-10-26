@@ -199,6 +199,62 @@ class EngagementStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- Hiding -----------------------------------------------------------
+  //
+  // Three states the card sheet writes and every surface reads. They are held
+  // here for the same reason likes are: a creator muted on one screen has to
+  // be muted on every other without a reload.
+
+  final _notInterested = <String>{};
+  final _muted = <String>{};
+  final _blocked = <String>{};
+
+  /// Whether this viewer has hidden a row. Read from
+  /// `GET /v1/engagement/interactions/{type}/{id}`, whose `types` include
+  /// `not_interested` — it is one viewer's own flag, never a tally.
+  bool isNotInterested(String targetId) => _notInterested.contains(targetId);
+
+  bool isMuted(String creatorId) => _muted.contains(creatorId);
+
+  bool isBlocked(String creatorId) => _blocked.contains(creatorId);
+
+  void setNotInterested(String targetId, bool hidden) =>
+      _flag(_notInterested, targetId, hidden);
+
+  void setMuted(String creatorId, bool muted) =>
+      _flag(_muted, creatorId, muted);
+
+  /// Blocking also drops the follow, which the caller adopts separately from
+  /// the route's own `unfollowed` — it is not assumed here.
+  void setBlocked(String creatorId, bool blocked) =>
+      _flag(_blocked, creatorId, blocked);
+
+  /// Seed from `following-creators`, which carries `isMuted` now.
+  void seedMuted(Iterable<String> creatorIds) => _seed(_muted, creatorIds);
+
+  /// Seed from the blocked list, so every surface agrees after one read.
+  void seedBlocked(Iterable<String> creatorIds) => _seed(_blocked, creatorIds);
+
+  /// Add every id, then notify once.
+  ///
+  /// Written as a loop deliberately: `ids.where(set.add).isNotEmpty` reads
+  /// like it adds them all and does not — `where` is lazy, so it stops at the
+  /// first id that is new and the rest of the list is never seeded.
+  void _seed(Set<String> into, Iterable<String> ids) {
+    var added = false;
+    for (final id in ids) {
+      if (id.isEmpty) continue;
+      if (into.add(id)) added = true;
+    }
+    if (added) notifyListeners();
+  }
+
+  void _flag(Set<String> into, String id, bool on) {
+    if (id.isEmpty) return;
+    final changed = on ? into.add(id) : into.remove(id);
+    if (changed) notifyListeners();
+  }
+
   void seedFollowing(String creatorId, bool following) {
     if (creatorId.isEmpty || _followOwned.contains(creatorId)) return;
     if (_following[creatorId] == following) return;

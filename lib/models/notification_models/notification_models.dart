@@ -86,25 +86,59 @@ class NotificationPage {
   bool get isEmpty => items.isEmpty;
 }
 
-/// The three channel switches `GET /v1/notification/preferences` returns.
+/// The notification preferences, as `GET /v1/notification/preferences`
+/// returns them.
 ///
-/// There is nothing per-type and no reminder lead time — see
-/// `docs/MOBILE_API_REQUESTS.md` §3.4.
+/// Two fields arrived on 2026-10-26 with the event-reminder default
+/// (`docs/mobile-api-gap-responses.md` §3.4), and the second needs reading
+/// carefully:
+///
+/// **`eventReminderMinutes: null` does not mean "no reminder".** It is the
+/// default state and means *follow whatever the organiser set on the event* —
+/// the same thing `reminderOffsetMinutes: null` has always meant on an RSVP
+/// row. Turning reminders off is `eventRemindersEnabled: false`. They are two
+/// controls, not one picker with an "Off" entry.
 class NotificationPrefs {
   const NotificationPrefs({
     this.email = true,
     this.push = true,
     this.inApp = true,
+    this.eventReminders = true,
+    this.eventReminderMinutes,
   });
 
   final bool email;
   final bool push;
   final bool inApp;
 
+  final bool eventReminders;
+
+  /// One of [reminderOffsets], or null for the organiser's own schedule.
+  final int? eventReminderMinutes;
+
   factory NotificationPrefs.fromJson(Map<String, dynamic> json) =>
       NotificationPrefs(
         email: json['emailEnabled'] as bool? ?? true,
         push: json['pushEnabled'] as bool? ?? true,
         inApp: json['inAppEnabled'] as bool? ?? true,
+        eventReminders: json['eventRemindersEnabled'] as bool? ?? true,
+        eventReminderMinutes: (json['eventReminderMinutes'] as num?)?.toInt(),
       );
+}
+
+/// The lead times the platform accepts — **five values, not four**.
+///
+/// One set, shared by the viewer's default and the per-event override, so a
+/// viewer can never set a default their own override cannot express. `120`
+/// is in it because RSVP rows already held it: dropping it to match the
+/// design would have orphaned reminders people had already set.
+const reminderOffsets = <int>[15, 30, 60, 120, 1440];
+
+/// "15 minutes before", "2 hours before", "1 day before".
+String reminderOffsetLabel(int minutes) {
+  if (minutes < 60) return '$minutes minutes before';
+  if (minutes == 60) return '1 hour before';
+  if (minutes < 1440) return '${minutes ~/ 60} hours before';
+  final days = minutes ~/ 1440;
+  return days == 1 ? '1 day before' : '$days days before';
 }

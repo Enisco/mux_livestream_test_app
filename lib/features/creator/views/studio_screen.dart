@@ -33,7 +33,19 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 /// Every section loads separately — a studio with no payment set up makes the
 /// giving figure fail, which must not empty the rest of the screen.
 class StudioScreen extends StatefulWidget {
-  const StudioScreen({super.key, this.onLeaveStudio});
+  const StudioScreen({
+    super.key,
+    this.onLeaveStudio,
+    this.studios = const [],
+    this.onSwitchStudio,
+  });
+
+  /// Every studio the reader can work in. The shell owns the list so all
+  /// four tabs show the same switcher.
+  final List<StudioMembership> studios;
+
+  /// Re-points the shell at another studio.
+  final Future<void> Function(String creatorId)? onSwitchStudio;
 
   /// "Back to watching" — handed in so the shell decides where that goes.
   final VoidCallback? onLeaveStudio;
@@ -72,12 +84,22 @@ class _StudioScreenState extends State<StudioScreen> {
     super.dispose();
   }
 
+  /// What is left of the plan's upload allowance, so the + Create sheet can
+  /// say so before a file is picked rather than after it is uploaded.
+  PlanUsage? _usage;
+
+  Future<void> _loadUsage(String creatorId) async {
+    final usage = await CreatorDashboardRepo().fetchPlanUsage(creatorId);
+    if (mounted) setState(() => _usage = usage);
+  }
+
   Future<void> _load() async {
     final creatorId = LocalStorage.creatorId;
     if (creatorId == null) {
       setState(() => _loading = false);
       return;
     }
+    unawaited(_loadUsage(creatorId));
 
     final context = await _repo.fetchContext(creatorId);
     if (!mounted) return;
@@ -131,21 +153,32 @@ class _StudioScreenState extends State<StudioScreen> {
     );
   }
 
+  /// Every studio the reader can work in, since 2026-10-26.
+  ///
+  /// Switching re-points the cached `creatorId` and reloads: per-studio
+  /// permissions are resolved by `dashboard/context`, which is read again for
+  /// whichever one is picked, so nothing else has to be invalidated by hand.
   Future<void> _openStudios() async {
-    final current = _context;
+    // Not `_context` alone: a studio whose dashboard refuses this reader has
+    // none, and that is the reader who most needs the way out.
+    final current = openStudio(_context, widget.studios);
     if (current == null) return;
-    final choice = await StudiosSheet.show(context, current: current);
+    final choice = await StudiosSheet.show(
+      context,
+      current: current,
+      studios: widget.studios,
+    );
     if (!mounted || choice == null) return;
-    switch (choice) {
-      case StudiosChoice.switchStudio:
-        // No route returns the studios a user belongs to yet; the backend
-        // will publish one. See OPEN_ISSUES 14.
-        _say(AppStrings.studiosNotImplemented);
-      case StudiosChoice.settings:
-        _todo(AppStrings.studiosSettings);
-      case StudiosChoice.backToWatching:
-        widget.onLeaveStudio?.call();
+    if (choice.leave) {
+      widget.onLeaveStudio?.call();
+      return;
     }
+    if (choice.switchTo case final creatorId?) {
+      await widget.onSwitchStudio?.call(creatorId);
+      if (mounted) await _load();
+      return;
+    }
+    _todo(AppStrings.studiosSettings);
   }
 
   /// Where a getting-started step actually leads.
@@ -188,7 +221,11 @@ class _StudioScreenState extends State<StudioScreen> {
       for (final kind in CreateKind.values)
         if (current == null || current.can(kind.capability)) kind,
     ];
-    final picked = await CreateSheet.show(context, kinds: allowed);
+    final picked = await CreateSheet.show(
+      context,
+      kinds: allowed,
+      usage: _usage,
+    );
     if (!mounted || picked == null) return;
     // Video and audio are the same screen; everything else is not built.
     final kind = switch (picked) {
@@ -333,7 +370,9 @@ class _StudioScreenState extends State<StudioScreen> {
       Flexible(
         child: StudioPill(
           key: const ValueKey('studio-pill'),
-          name: _context?.displayName ?? '',
+          // Named off the membership row when the dashboard refused a
+          // context, so the pill is not a blank, dead control.
+          name: openStudio(_context, widget.studios)?.displayName ?? '',
           onTap: _openStudios,
         ),
       ),

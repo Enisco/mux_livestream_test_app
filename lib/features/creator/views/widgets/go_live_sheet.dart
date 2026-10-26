@@ -12,9 +12,15 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// "When should this go live" — publish now, or pick a moment.
 ///
 /// Scheduling is a property of the media row itself: `POST /v1/media` takes
-/// `scheduledAt` and the backend publishes at that time on its own. The
-/// publish route refuses it. So this sheet decides which of the two calls
-/// the screen makes, not an extra one.
+/// `scheduledAt` and the backend publishes at that time on its own. The media
+/// publish route refuses it. So this sheet decides which of the two calls the
+/// screen makes, not an extra one.
+///
+/// **A calendar event is the other way round.** Its create and PATCH refuse
+/// `scheduledAt` and its *publish* route takes it — since 2026-10-26, where
+/// before it took no body at all and dropped one silently. The sheet hands
+/// back the same [PublishChoice] either way; where it goes is the caller's
+/// business.
 class GoLiveSheet extends StatefulWidget {
   const GoLiveSheet({super.key, required this.onChoose, this.initialAt});
 

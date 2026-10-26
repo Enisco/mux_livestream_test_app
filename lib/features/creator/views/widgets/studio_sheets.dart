@@ -8,6 +8,7 @@ import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The two sheets the Studio tab opens.
 
@@ -36,29 +37,65 @@ enum CreateKind {
 
 /// "What are you sharing" — the + Create sheet.
 class CreateSheet extends StatelessWidget {
-  const CreateSheet({super.key, required this.kinds, required this.onPick});
+  const CreateSheet({
+    super.key,
+    required this.kinds,
+    required this.onPick,
+    this.usage,
+  });
 
   final List<CreateKind> kinds;
   final ValueChanged<CreateKind> onPick;
 
+  /// What is left of the plan's upload allowance.
+  ///
+  /// `POST /v1/media` refuses over the limit — *"Monthly upload limit reached
+  /// (5 uploads on current plan)"* — but only after a file has been picked
+  /// and uploaded. Saying it here costs one read and saves that.
+  final PlanUsage? usage;
+
   static Future<CreateKind?> show(
     BuildContext context, {
     required List<CreateKind> kinds,
+    PlanUsage? usage,
   }) => showModalBottomSheet<CreateKind>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (sheetContext) => CreateSheet(
       kinds: kinds,
+      usage: usage,
       onPick: (kind) => Navigator.pop(sheetContext, kind),
     ),
   );
 
   @override
   Widget build(BuildContext context) {
+    final quota = usage;
     return _SheetFrame(
       title: AppStrings.createSheetTitle,
       children: [
+        if (quota != null && quota.hasUploadLimit) ...[
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.s),
+            child: Text(
+              quota.uploadsExhausted
+                  ? AppStrings.uploadsExhaustedBody(quota.windowDays)
+                  : AppStrings.uploadsUsed(
+                      quota.uploadsUsed,
+                      quota.uploadLimit!,
+                      quota.windowDays,
+                    ),
+              style: AppStyles.label(
+                12,
+                color: quota.uploadsExhausted
+                    ? AppColors.statusClosed
+                    : AppColors.neutral500,
+                lineHeight: 17 / 12,
+              ),
+            ),
+          ),
+        ],
         for (final kind in kinds)
           Padding(
             padding: EdgeInsets.only(bottom: 10.s),
@@ -143,112 +180,116 @@ class CreateSheet extends StatelessWidget {
   }
 }
 
-/// What came of the studios sheet.
-enum StudiosChoice { switchStudio, settings, backToWatching }
+/// Which studio the switcher should show as the open one.
+///
+/// The dashboard context is the answer when there is one. There is not
+/// always: `dashboard/context` refuses a `streamer` with **403**, and that
+/// reader still belongs to the studio and still needs the way out of it. So
+/// the membership row stands in rather than the pill going dead.
+DashboardContext? openStudio(
+  DashboardContext? context,
+  List<StudioMembership> studios, {
+  String? creatorId,
+}) {
+  if (context != null) return context;
+  final id = creatorId ?? LocalStorage.creatorId;
+  if (id == null) return null;
+  for (final studio in studios) {
+    if (studio.creatorId == id) return DashboardContext.fromMembership(studio);
+  }
+  return null;
+}
+
+/// What came of the studios sheet: a studio to switch to, or one of the two
+/// other rows.
+class StudiosOutcome {
+  const StudiosOutcome.settings() : switchTo = null, leave = false;
+  const StudiosOutcome.backToWatching() : switchTo = null, leave = true;
+  const StudiosOutcome.switchTo(String this.switchTo) : leave = false;
+
+  /// The creator id to open instead.
+  final String? switchTo;
+  final bool leave;
+}
 
 /// "Your studios" — which studio the reader is in, and the way back out.
 ///
-/// The design lists every studio the reader can work in. Nothing in the spec
-/// returns that list (see OPEN_ISSUES 14), so the owned studio is real and
-/// the rest sits behind one "Switch studio" row that says it is not
-/// implemented. Inventing membership rows was the alternative and would have
-/// told the reader they belong to ministries they do not.
+/// Every studio the reader can work in is listed for real since 2026-10-26:
+/// `GET /v1/creator/me/memberships` answers both the one they own and the
+/// organisations they were added to. Before that there was no route at all
+/// and the sheet carried a single "Switch studio" row that reported it was
+/// not implemented.
+///
+/// Owned studios come first, so the sheet opens on the one the reader most
+/// likely means; the current studio is ticked rather than tappable.
 class StudiosSheet extends StatelessWidget {
-  const StudiosSheet({super.key, required this.current, required this.onPick});
+  const StudiosSheet({
+    super.key,
+    required this.current,
+    required this.onPick,
+    this.studios = const [],
+  });
 
   final DashboardContext current;
-  final ValueChanged<StudiosChoice> onPick;
+  final List<StudioMembership> studios;
+  final ValueChanged<StudiosOutcome> onPick;
 
-  static Future<StudiosChoice?> show(
+  static Future<StudiosOutcome?> show(
     BuildContext context, {
     required DashboardContext current,
-  }) => showModalBottomSheet<StudiosChoice>(
+    List<StudioMembership> studios = const [],
+  }) => showModalBottomSheet<StudiosOutcome>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (sheetContext) => StudiosSheet(
       current: current,
+      studios: studios,
       onPick: (choice) => Navigator.pop(sheetContext, choice),
     ),
   );
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = [
-      AppStrings.studiosPersonal,
-      if (current.role.isNotEmpty) _titleCase(current.role),
-    ].join(' · ');
+    final others = [
+      for (final studio in studios)
+        if (studio.creatorId != current.creatorId) studio,
+    ];
 
     return _SheetFrame(
       title: AppStrings.studiosSheetTitle,
       children: [
-        Container(
-          padding: EdgeInsets.all(12.s),
-          decoration: BoxDecoration(
-            color: AppColors.fieldBg,
-            borderRadius: BorderRadius.circular(10.s),
-          ),
-          child: Row(
-            children: [
-              StudioAvatar(size: 34.s),
-              SizedBox(width: 12.s),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      current.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppStyles.label(14, weight: AppStyles.bold),
-                    ),
-                    SizedBox(height: 3.s),
-                    Text(
-                      subtitle,
-                      style: AppStyles.label(
-                        12,
-                        color: AppColors.neutral400,
-                        lineHeight: 16 / 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 20.s,
-                height: 20.s,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.brandPrimary,
-                ),
-                child: Icon(Icons.check, size: 12.s, color: AppColors.base1),
-              ),
-            ],
-          ),
+        _StudioRow(
+          name: current.displayName,
+          handle: current.handle,
+          role: current.role,
+          selected: true,
+          onTap: null,
         ),
-        SizedBox(height: 12.s),
-        _SheetRow(
-          rowKey: const ValueKey('studio-switch'),
-          icon: HugeIcons.strokeRoundedArrowDataTransferHorizontal,
-          title: AppStrings.studiosSwitch,
-          note: AppStrings.studiosSwitchNote,
-          onTap: () => onPick(StudiosChoice.switchStudio),
-        ),
+        for (final studio in others) ...[
+          SizedBox(height: 10.s),
+          _StudioRow(
+            rowKey: ValueKey('studio-${studio.creatorId}'),
+            name: studio.displayName,
+            handle: studio.handle,
+            role: studio.role,
+            selected: false,
+            onTap: () => onPick(StudiosOutcome.switchTo(studio.creatorId)),
+          ),
+        ],
         SizedBox(height: 18.s),
         _SheetRow(
           rowKey: const ValueKey('studio-settings'),
           icon: HugeIcons.strokeRoundedSettings02,
           title: AppStrings.studiosSettings,
           note: AppStrings.studiosSettingsNote,
-          onTap: () => onPick(StudiosChoice.settings),
+          onTap: () => onPick(const StudiosOutcome.settings()),
         ),
         SizedBox(height: 18.s),
         GestureDetector(
           key: const ValueKey('back-to-watching'),
           behavior: HitTestBehavior.opaque,
-          onTap: () => onPick(StudiosChoice.backToWatching),
+          onTap: () => onPick(const StudiosOutcome.backToWatching()),
           child: Container(
             padding: EdgeInsets.all(14.s),
             decoration: BoxDecoration(
@@ -289,9 +330,101 @@ class StudiosSheet extends StatelessWidget {
       ],
     );
   }
+}
 
-  static String _titleCase(String value) =>
-      value.isEmpty ? value : value[0].toUpperCase() + value.substring(1);
+String _titleCase(String value) =>
+    value.isEmpty ? value : value[0].toUpperCase() + value.substring(1);
+
+/// One studio in the switcher: the current one ticked, the rest tappable.
+class _StudioRow extends StatelessWidget {
+  const _StudioRow({
+    required this.name,
+    required this.handle,
+    required this.role,
+    required this.selected,
+    required this.onTap,
+    this.rowKey,
+  });
+
+  final String name;
+  final String handle;
+  final String role;
+  final bool selected;
+  final VoidCallback? onTap;
+  final Key? rowKey;
+
+  @override
+  Widget build(BuildContext context) {
+    // "Personal" belongs to the studio the reader owns. A ministry they were
+    // added to is identified by its handle, because calling someone else's
+    // organisation personal is simply wrong.
+    final subtitle = [
+      if (role == 'owner')
+        AppStrings.studiosPersonal
+      else if (handle.isNotEmpty)
+        '@${handle.replaceFirst('@', '')}',
+      if (role.isNotEmpty) _titleCase(role),
+    ].join(' · ');
+
+    return GestureDetector(
+      key: rowKey,
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(12.s),
+        decoration: BoxDecoration(
+          color: AppColors.fieldBg,
+          borderRadius: BorderRadius.circular(10.s),
+        ),
+        child: Row(
+          children: [
+            StudioAvatar(size: 34.s),
+            SizedBox(width: 12.s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppStyles.label(14, weight: AppStyles.bold),
+                  ),
+                  SizedBox(height: 3.s),
+                  Text(
+                    subtitle,
+                    style: AppStyles.label(
+                      12,
+                      color: AppColors.neutral400,
+                      lineHeight: 16 / 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              Container(
+                width: 20.s,
+                height: 20.s,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.brandPrimary,
+                ),
+                child: Icon(Icons.check, size: 12.s, color: AppColors.base1),
+              )
+            else
+              Icon(
+                AppIcons.chevronRight,
+                size: 16.s,
+                color: AppColors.neutral400,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// An icon, a title and a line under it — the shape the sheet's actions take.

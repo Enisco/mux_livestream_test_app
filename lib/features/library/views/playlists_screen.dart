@@ -166,6 +166,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               _rename(playlist);
             case AppStrings.playlistDelete:
               _confirmDelete(playlist);
+            case AppStrings.playlistUpdateCover:
+              // Covers are edited on the playlist itself, where the result
+              // is visible — there is nothing to show for one here.
+              unawaited(_open(playlist));
             default:
               _report('$label is not built yet');
           }

@@ -413,7 +413,6 @@ abstract final class AppStrings {
   static const settingsPhone = 'Phone number';
   static const settingsPassword = 'Password';
   static const settingsLanguage = 'Language';
-  static const settingsLanguageValue = 'English';
   static const settingsTopics = 'Your topics';
   static const settingsEventReminders = 'Event reminders';
   static const settingsTwoFactor = 'Two-factor authentication';
@@ -451,15 +450,22 @@ abstract final class AppStrings {
   static const settingsFirstNameHint = 'First name';
   static const settingsLastNameHint = 'Last name';
   static const settingsChangeEmailTitle = 'Change email address';
+
+  /// The code goes to the **new** address — receiving it is the proof. The
+  /// current address gets a no-code notice that someone asked, which is the
+  /// only warning a real owner gets while the account can still be saved.
   static const settingsEmailNotice =
-      "We'll send a verification link to your new address. Your email "
-      'changes once you confirm it.';
+      "We'll email a 6-digit code to your new address, and let your current "
+      'address know. Your email changes once you enter the code.';
   static const settingsCurrentEmail = 'Current email';
   static const settingsNewEmail = 'New email';
   static const settingsChangePhoneTitle = 'Phone number';
+
+  /// No code, and deliberately so: nothing in the platform verifies a phone
+  /// number, so promising a confirmation step would be a lie.
   static const settingsPhoneNotice =
-      "We'll send a verification code to your new number. Your number "
-      'changes once you confirm it.';
+      'Your number is saved to your account. We use it to reach you about '
+      'your account only.';
   static const settingsCurrentPhone = 'Current phone number';
   static const settingsNewPhone = 'New phone number';
   static const settingsChangePasswordTitle = 'Change password';
@@ -470,14 +476,33 @@ abstract final class AppStrings {
       'At least 8 characters, with a number and a letter.';
   static const settingsConfirmEmailTitle = 'Check your mail';
   static const settingsConfirmPhoneTitle = 'Check your messages';
-  static const settingsOtpNotWired =
-      'Confirming this change is not wired to the API yet.';
-  static const settingsOtpResendNotWired =
-      'Sending another code is not wired to the API yet.';
+  static const settingsEmailChanged = 'Your email address is updated';
+  static const settingsPhoneChanged = 'Your phone number is updated';
+  static const settingsPasswordChanged = 'Your password is updated';
+  static String settingsSessionsEnded(int n) => n == 1
+      ? 'Signed out of 1 other device'
+      : 'Signed out of $n other devices';
+  static const settingsSignInAgain =
+      'Your password changed. Sign in again to continue.';
+  static const settingsOtpSent = 'A new code is on its way';
+  static const settingsTryLater = 'Too many tries. Try again later.';
+  static String settingsLockedUntil(String when) =>
+      'Too many attempts. Try again after $when.';
+  static const settingsExpiredRestart = 'That request expired. Start again.';
+  static const settingsOffline = 'No connection. Try again.';
   static const settingsShow = 'Show';
   static const settingsHide = 'Hide';
 
   // Settings forms — what goes wrong.
+  static const settingsPasswordNeverChanged = 'Never changed';
+  static String settingsPasswordChangedOn(String date) => 'Last changed $date';
+  static const twoFactorStatusOn = 'On · we email you a code';
+  static const twoFactorStatusOff = 'Off · password only';
+
+  static const languageDevice = 'Match my device';
+  static const languageDeviceNote =
+      'GospelTube follows whatever language your phone is set to.';
+
   static const settingsNameRequired = 'Enter your first and last name.';
   static const settingsEmailRequired = 'Enter your new email address.';
   static const settingsEmailInvalid =
@@ -493,40 +518,29 @@ abstract final class AppStrings {
   static const settingsPasswordSame =
       'Your new password must differ from the current one.';
 
-  // Two-factor authentication — the enrolment flow.
+  // Two-factor authentication — a switch and an emailed code.
+  //
+  // The TOTP wording is gone with the TOTP screens: there is no authenticator
+  // app, no QR and no recovery codes. See `two_factor_screens.dart`.
   static const twoFactorTitle = 'Two-factor authentication';
   static const twoFactorHeading = 'Add a second lock';
   static const twoFactorBody =
-      "When you sign in, you'll also enter a 6-digit code from an "
-      'authenticator app on your phone.';
-  static const twoFactorApps =
-      'Works with Google Authenticator, Authy, 1Password or any TOTP app. '
-      'No SMS needed.';
-  static const twoFactorSetup = 'Setup';
-  static const twoFactorScanTitle = 'Scan this code';
-  static const twoFactorScanBody =
-      'Open your authenticator app and scan — or add the key by hand.';
-  static const twoFactorAdded = "I've added it";
-  static const twoFactorKeyCopied = 'Key copied';
-  static const twoFactorCodeTitle = 'Enter the code';
-  static const twoFactorCodeBody =
-      'Type the 6-digit code your app shows right now, so we know '
-      "it's connected.";
-  static const twoFactorTurnOn = 'Turn on 2FA';
+      "When you sign in, we'll email you a 6-digit code to enter as well as "
+      'your password.';
   static const twoFactorOn = '2FA is on';
+  static const twoFactorOnSub = "We'll email a code each time you sign in";
   static const twoFactorOff = '2FA is off';
-  static const twoFactorOffSub = 'Not set up on this account yet';
-  static const twoFactorRescan = 'Rescan / new device';
-  static const twoFactorRescanSub = 'Re-enroll with a fresh code';
-  static const twoFactorBeginSetup = 'Begin Setup';
-  static const twoFactorLostPhoneLead = 'Lose your phone?';
-  static const twoFactorLostPhoneBody =
-      ' Reset your password by email to get back in, that signs out every '
-      'device.';
-  static const twoFactorNotWired =
-      'Turning on 2FA is not wired to the API yet.';
-  static const twoFactorResendNotWired =
-      'There is no route to issue a fresh secret yet.';
+  static const twoFactorOffSub = 'Only your password is needed to sign in';
+  static const twoFactorNowOn = 'Two-factor authentication is on';
+  static const twoFactorNowOff = 'Two-factor authentication is off';
+  static const twoFactorTurnOffTitle = 'Turn off 2FA?';
+  static const twoFactorTurnOffBody =
+      'Enter your password to confirm. Your account will be protected by '
+      'your password alone.';
+  static const twoFactorTurnOff = 'Turn off';
+  static const twoFactorLostMailbox =
+      'Codes go to the email address on your account, so keep access to it. '
+      'If you lose that mailbox, change your email address first.';
 
   // Event reminders, topics, and the two destructive account actions.
   static const remindersTitle = 'Event reminders';
@@ -534,11 +548,14 @@ abstract final class AppStrings {
   static const remindersToggleSub = "For events you've said you're going to";
   static const remindersWhen = 'WHEN';
   static const remindersDefault = 'Default';
+  static const remindersOrganiser = 'Whatever the organiser set';
+
+  /// Says "from now on" deliberately: saving a default does **not** move
+  /// reminders on events already RSVP'd to.
   static const remindersNote =
-      'Reminders arrive as push and in-app notifications. Virtual events '
-      'include the meeting link; in-person ones include the venue.';
-  static const remindersNotWired =
-      'Saving your reminder choice is not wired to the API yet.';
+      'Used for events you RSVP to from now on. Reminders you have already '
+      'set stay as they are — change those on the event itself.';
+  static const remindersLoadFailed = 'Your reminder settings could not load';
 
   static const topicsTitle = 'Edit your topics';
   static const topicsSubtitle =
@@ -618,6 +635,76 @@ abstract final class AppStrings {
   // My events, prayer requests and testimonies.
   static const myEventsTitle = 'My events';
   static const myEventsSort = 'Recent';
+
+  /// Rolling window, so "in the last 30 days" rather than "this month" —
+  /// nothing resets, the oldest upload ages out.
+  static String uploadsUsed(int used, int limit, int days) =>
+      '$used of $limit uploads used in the last $days days';
+  static const uploadsExhausted = 'Upload limit reached';
+  static String uploadsExhaustedBody(int days) =>
+      'Your plan allows a set number of uploads every $days days. The oldest '
+      'one ages out — or upgrade for more.';
+
+  // The card overflow sheet (Figma 10779-89546), six variants of one sheet.
+  static const cardShare = 'Share';
+  static const cardAddToPlaylist = 'Add to playlist';
+  static const cardAddToCalendar = 'Add to calendar';
+  static const cardPrayerRequest = 'Prayer request';
+  static const cardGiveNow = 'Give now';
+  static const cardBookmark = 'Bookmark';
+  static const cardBookmarked = 'Remove bookmark';
+  static const cardFollow = 'Follow';
+  static const cardUnfollow = 'Unfollow';
+  static const cardViewEvents = 'View events';
+  static const cardSubmitTestimony = 'Submit testimony';
+  static const cardMute = 'Mute';
+  static const cardUnmute = 'Unmute';
+  static const cardNotInterested = 'Not interested';
+  static const cardUndoNotInterested = 'Undo not interested';
+  static const cardBlock = 'Block this creator';
+  static const cardUnblock = 'Unblock this creator';
+  static const cardReport = 'Report';
+
+  static const cardSharing = 'Getting a link…';
+  static const cardShareUnavailable = "That can't be shared";
+  static String cardMuted(String name) => 'Muted $name';
+  static String cardUnmuted(String name) => 'Unmuted $name';
+  static String cardBlocked(String name) => 'Blocked $name';
+  static String cardBlockedUnfollowed(String name) =>
+      'Blocked and unfollowed $name';
+  static String cardUnblocked(String name) => 'Unblocked $name';
+  static const cardHidden = "You won't see that again";
+  static const cardHiddenUndone = 'That can show up again';
+  static const cardActionFailed = 'That did not work. Try again.';
+
+  // Muted and blocked creators.
+  static const hiddenTitle = 'Muted & blocked';
+  static const hiddenMutedTab = 'Muted';
+  static const hiddenBlockedTab = 'Blocked';
+  static const hiddenMutedEmptyTitle = 'Nobody is muted';
+  static const hiddenMutedEmptyBody =
+      "A muted ministry stays followed and their page still opens — they "
+      'just stop showing up in your feed, Explore and search.';
+  static const hiddenBlockedEmptyTitle = 'Nobody is blocked';
+  static const hiddenBlockedEmptyBody =
+      'Blocking hides a ministry everywhere and unfollows them. This is the '
+      'only place to undo it.';
+  static const hiddenLoadFailed = 'That list could not be loaded';
+  static const hiddenRowSub = 'Ministries you have hidden';
+
+  // Prayer requests during a broadcast.
+  static const livePrayersTitle = 'Prayer requests';
+  static String livePrayersCount(int n) => n == 1 ? '1 request' : '$n requests';
+  static const livePrayersEmpty = 'No prayer requests yet';
+  static const livePrayersEmptyBody =
+      'Requests sent while you are live show up here, newest first.';
+  static const livePrayersFailed = 'Prayer requests could not be loaded';
+  static const livePrayersAnonymous = 'Someone';
+
+  static const sortTitle = 'Sort by';
+  static const sortRecent = 'Most recent';
+  static const sortOldest = 'Oldest first';
+  static const sortStartSoonest = 'Starting soonest';
   static String myEventsCount(int n) => n == 1 ? '1 event' : '$n events';
   static const myEventsUpcoming = 'UPCOMING';
   static const myEventsPast = 'PAST';
@@ -718,6 +805,8 @@ abstract final class AppStrings {
   static const playlistSaveFailed = 'That did not save. Try again.';
   static const playlistPlayAll = 'Play all';
   static const playlistUpdateCover = 'Update cover photo';
+  static const playlistCoverSaved = 'Cover updated';
+  static const playlistCoverTooLarge = 'Pick an image under 5 MB';
   static const playlistEditDetail = 'Edit playlist detail';
   static const playlistDelete = 'Delete this playlist';
 
@@ -936,6 +1025,11 @@ abstract final class AppStrings {
       "It's now on your channel for your community to book.";
   static const newEventDraftBody =
       "It's in your content, ready whenever you are.";
+
+  /// A scheduled event is **not public** — absent from search, from the
+  /// public read and from the ICS feed, and RSVP on it is refused. Saying it
+  /// is live would be a straight lie.
+  static const newEventScheduledTitle = 'Your event is scheduled';
 
   // What can go wrong.
   static const newEventNeedsDescription =
@@ -1181,9 +1275,6 @@ abstract final class AppStrings {
   static const studiosSheetTitle = 'YOUR STUDIOS';
   static const studiosPersonal = 'Personal';
   static const studiosSwitch = 'Switch studio';
-  static const studiosSwitchNote = 'Work in another ministry you belong to';
-  static const studiosNotImplemented =
-      "Switching studios isn't yet implemented";
   static const studiosSettings = 'Studio Settings';
   static const studiosSettingsNote = 'Settings are managed on the web';
   static const studiosBackToWatching = 'Back to watching';

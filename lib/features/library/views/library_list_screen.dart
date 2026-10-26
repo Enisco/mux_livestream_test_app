@@ -150,11 +150,8 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
       days.fold(0, (n, d) => n + d.entries.length);
 
   /// Open what the row is a picture of.
-  ///
-  /// The library is not one of the surfaces the beacon's `source` enum knows,
-  /// so these clicks are reported as `unknown` rather than invented.
   void _open(HistoryEntry entry) {
-    if (!openFeedItem(context, entry.source, source: AnalyticsSource.unknown)) {
+    if (!openFeedItem(context, entry.source, source: AnalyticsSource.library)) {
       _say(AppStrings.libraryRowGone);
     }
   }

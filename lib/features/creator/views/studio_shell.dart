@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
 import 'package:test_app/features/creator/views/impact_screen.dart';
@@ -45,9 +48,39 @@ class _StudioShellState extends State<StudioShell> {
     final context = await repo.fetchContext(creatorId);
     if (mounted) setState(() => _context = context);
 
+    unawaited(_loadStudios());
+
     final attention = await repo.fetchAttention(creatorId);
     if (!mounted) return;
     setState(() => _impactBadge = attention.fold(0, (sum, i) => sum + i.count));
+  }
+
+  /// Every studio the reader can work in, shared by all four tabs so the
+  /// switcher says the same thing wherever it is opened from.
+  List<StudioMembership> _studios = const [];
+
+  Future<void> _loadStudios() async {
+    try {
+      final studios = await CreatorDashboardRepo().fetchMemberships();
+      if (mounted) setState(() => _studios = studios);
+    } catch (e) {
+      logger.w('Studio memberships unavailable', error: e);
+    }
+  }
+
+  /// Open the switcher, and re-point the whole shell if one is picked.
+  ///
+  /// `creatorId` in storage is what every tab reads, so switching is: write
+  /// it, drop the cached context, and load again. Per-studio permissions come
+  /// from `dashboard/context`, which is re-read for the new one.
+  Future<void> switchStudio(String creatorId) async {
+    await LocalStorage.setString(LocalStorage.creatorIdKey, creatorId);
+    if (!mounted) return;
+    setState(() {
+      _context = null;
+      _impactBadge = 0;
+    });
+    await _loadContext();
   }
 
   /// How many things are waiting, for the badge on the Impact tab.
@@ -68,9 +101,19 @@ class _StudioShellState extends State<StudioShell> {
             child: switch (_tab) {
               0 => StudioScreen(
                 onLeaveStudio: () => context.go(AppRouter.home),
+                studios: _studios,
+                onSwitchStudio: switchStudio,
               ),
-              1 => StudioContentScreen(context: _context),
-              2 => ImpactScreen(context: _context),
+              1 => StudioContentScreen(
+                context: _context,
+                studios: _studios,
+                onSwitchStudio: switchStudio,
+              ),
+              2 => ImpactScreen(
+                context: _context,
+                studios: _studios,
+                onSwitchStudio: switchStudio,
+              ),
               _ => const _NotBuilt(AppStrings.studioTabGiving),
             },
           ),

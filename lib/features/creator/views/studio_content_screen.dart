@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
 import 'package:test_app/features/creator/repo/studio_content_repo.dart';
 import 'package:test_app/features/creator/views/go_live_setup_screen.dart';
 import 'package:test_app/features/creator/views/new_article_screen.dart';
@@ -29,7 +32,19 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 ///
 /// Rows are real; see [StudioContentRepo] for the filter dialect.
 class StudioContentScreen extends StatefulWidget {
-  const StudioContentScreen({super.key, this.context});
+  const StudioContentScreen({
+    super.key,
+    this.context,
+    this.studios = const [],
+    this.onSwitchStudio,
+  });
+
+  /// Every studio the reader can work in. The shell owns the list so all
+  /// four tabs show the same switcher.
+  final List<StudioMembership> studios;
+
+  /// Re-points the shell at another studio.
+  final Future<void> Function(String creatorId)? onSwitchStudio;
 
   /// The studio being worked in. Supplied by the shell so the Create sheet
   /// can be gated on the same capabilities the Studio tab uses.
@@ -61,12 +76,22 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
     super.dispose();
   }
 
+  /// What is left of the plan's upload allowance, so the + Create sheet can
+  /// say so before a file is picked rather than after it is uploaded.
+  PlanUsage? _usage;
+
+  Future<void> _loadUsage(String creatorId) async {
+    final usage = await CreatorDashboardRepo().fetchPlanUsage(creatorId);
+    if (mounted) setState(() => _usage = usage);
+  }
+
   Future<void> _load() async {
     final creatorId = LocalStorage.creatorId;
     if (creatorId == null) {
       setState(() => _loading = false);
       return;
     }
+    unawaited(_loadUsage(creatorId));
     setState(() => _loading = true);
     final page = await _repo.fetch(creatorId: creatorId, kind: _kind);
     if (!mounted) return;
@@ -103,7 +128,11 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
       for (final kind in CreateKind.values)
         if (studio == null || studio.can(kind.capability)) kind,
     ];
-    final picked = await CreateSheet.show(context, kinds: allowed);
+    final picked = await CreateSheet.show(
+      context,
+      kinds: allowed,
+      usage: _usage,
+    );
     if (!mounted || picked == null) return;
     // Video and audio are the same screen; everything else is not built.
     final kind = switch (picked) {
@@ -147,6 +176,25 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
     _report('${picked.title} is not built yet');
   }
 
+  /// The same switcher the Studio tab opens, so all three agree.
+  Future<void> _openStudios() async {
+    final current = openStudio(widget.context, widget.studios);
+    if (current == null) return;
+    final choice = await StudiosSheet.show(
+      context,
+      current: current,
+      studios: widget.studios,
+    );
+    if (!mounted || choice == null) return;
+    if (choice.switchTo case final creatorId?) {
+      await widget.onSwitchStudio?.call(creatorId);
+      // The shell re-points `creatorId` and re-reads its own context, but
+      // this list is state of its own — without a reload it keeps showing
+      // the studio the reader just switched away from.
+      if (mounted) await _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _visible;
@@ -169,8 +217,13 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
                     children: [
                       Flexible(
                         child: StudioPill(
-                          name: widget.context?.displayName ?? '',
-                          onTap: () => _report(AppStrings.studiosSwitch),
+                          name:
+                              openStudio(
+                                widget.context,
+                                widget.studios,
+                              )?.displayName ??
+                              '',
+                          onTap: () => unawaited(_openStudios()),
                         ),
                       ),
                       SizedBox(width: 12.s),

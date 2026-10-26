@@ -90,6 +90,37 @@ abstract final class ApiEndpoints {
   static String creatorHandleAvailability(String handle) =>
       '$_creator/handle/$handle/availability';
 
+  /// Every studio the reader can work in — owned and joined. A user with
+  /// none gets `{items: [], total: 0}`, not an error.
+  static const creatorMemberships = '/v1/creator/me/memberships';
+
+  /// Plan and usage together. **Not** on `dashboard/context`, where the
+  /// upload quota was first looked for.
+  static String creatorPlan(String creatorId) =>
+      '/v1/creator/$creatorId/settings/plan';
+
+  // ---- Hiding creators (gap responses §1.3, §1.4) ------------------------
+
+  static const mutedCreators = '/v1/discovery/muted-creators';
+  static String mutedCreator(String creatorId) => '$mutedCreators/$creatorId';
+
+  /// The list is **not optional**: a blocked creator is hidden from every
+  /// surface a viewer could rediscover them on, so without it the delete is
+  /// unreachable and a block can never be undone.
+  static const blockedCreators = '/v1/discovery/blocked-creators';
+  static String blockedCreator(String creatorId) =>
+      '$blockedCreators/$creatorId';
+
+  /// Minting a link to paste. **Not** `/v1/media/live/streams/:id/share-link`,
+  /// which mints an access token for an unlisted livestream.
+  static const shareLinks = '/v1/engagement/share-links';
+
+  /// Eight target types: `media`, `post`, `devotional`, `devotional_entry`,
+  /// `event`, `testimony`, `verse_of_day`, `comment` — plus `user_playlist`,
+  /// which is a **report** target only and not an engagement target.
+  /// A session is required; a signed-out reader must sign in first.
+  static const engagementReports = '/v1/engagement/reports';
+
   static const userCategories = '/v1/user/categories';
   static const userProfile = '/v1/user/profile';
 
@@ -108,6 +139,30 @@ abstract final class ApiEndpoints {
   static const notificationMarkAllRead = '/v1/notification/mark-all-read';
   static const notificationPreferences = '/v1/notification/preferences';
   static const notificationDeviceToken = '/v1/notification/device-token';
+
+  // ---- Account credentials (backend gap responses §3.1, §3.2, §3.5) ------
+
+  /// Signed-in email change. **Not** the signed-out forgot/reset pair: the
+  /// code goes to the *new* address, because receiving it is the proof.
+  static const emailChange = '/v1/user/me/email-change';
+  static String emailChangeResend(String challengeId) =>
+      '$emailChange/$challengeId/resend';
+  static String emailChangeVerify(String challengeId) =>
+      '$emailChange/$challengeId/verify';
+
+  /// Signed-in password change. Takes the native `refreshToken` so the
+  /// calling session survives; omit it and every session goes.
+  static const passwordChange = '/v1/user/me/password';
+
+  /// Per-account email 2FA. Enabling takes no password — the emailed code is
+  /// the proof. Disabling takes one, because it is the direction an attacker
+  /// on a stolen session wants.
+  static const twoFactorEnable = '/v1/user/me/two-factor/enable';
+  static String twoFactorEnableResend(String challengeId) =>
+      '$twoFactorEnable/$challengeId/resend';
+  static String twoFactorEnableVerify(String challengeId) =>
+      '$twoFactorEnable/$challengeId/verify';
+  static const twoFactorDisable = '/v1/user/me/two-factor/disable';
 
   static const userAvatarUploadUrl = '/v1/user/avatar/upload-url';
   static const userAvatarConfirm = '/v1/user/avatar/confirm';
@@ -223,6 +278,16 @@ abstract final class ApiEndpoints {
   static String cancelLiveSession(String mediaId) =>
       '$_media/live/streams/$mediaId/cancel';
 
+  /// The prayer **bodies** for a broadcast, not a count.
+  ///
+  /// On the live namespace rather than a `streamId` filter on the creator
+  /// inbox: the inbox is authorised for `owner | admin | editor`, but the
+  /// studio is also held by a `streamer` — filtering it would have shipped a
+  /// list the person actually broadcasting cannot open. Do **not** fall back
+  /// to the inbox on a refusal; it will refuse too, for another reason.
+  static String livePrayers(String mediaId) =>
+      '$_media/live/streams/$mediaId/prayers';
+
   /// The authoritative snapshot: presence, giving, prayers and the
   /// session's own state.
   static String liveStudio(String mediaId) =>
@@ -295,6 +360,12 @@ abstract final class ApiEndpoints {
   static const playlistSearch = '/v1/media/playlists/search';
   static String playlist(String id) => '/v1/media/playlists/$id';
   static String publicPlaylist(String id) => '/v1/public/media/playlists/$id';
+
+  /// A viewer-supplied playlist cover. Its own `playlist_cover` category, so
+  /// a viewer cannot name their own avatar's `fileId` as a cover and have the
+  /// next replacement delete it out from under their profile.
+  static String playlistCoverUploadUrl(String playlistId) =>
+      '${playlist(playlistId)}/cover/upload-url';
   static String playlistItems(String id) => '/v1/media/playlists/$id/items';
   static String playlistItem(String id, String mediaId) =>
       '/v1/media/playlists/$id/items/$mediaId';

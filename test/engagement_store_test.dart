@@ -272,6 +272,58 @@ void main() {
     });
   });
 
+  group('hiding', () {
+    // The muted and blocked lists are seeded whole, from one read each. An
+    // `ids.where(set.add).isNotEmpty` here seeded only the first id, because
+    // `where` is lazy and stops at the first element that passes — so every
+    // creator after the first still read as unmuted on every card.
+    test('seeding muted takes the whole list, not just the first', () {
+      final store = _store(_Server());
+      store.seedMuted(['c1', 'c2', 'c3']);
+
+      expect(store.isMuted('c1'), isTrue);
+      expect(store.isMuted('c2'), isTrue);
+      expect(store.isMuted('c3'), isTrue);
+    });
+
+    test('seeding blocked takes the whole list', () {
+      final store = _store(_Server());
+      store.seedBlocked(['c1', 'c2', 'c3']);
+
+      expect(store.isBlocked('c2'), isTrue);
+      expect(store.isBlocked('c3'), isTrue);
+    });
+
+    test('an id already held does not stop the ones after it', () {
+      final store = _store(_Server());
+      store.seedMuted(['c1']);
+      store.seedMuted(['c1', 'c2']);
+
+      expect(store.isMuted('c2'), isTrue);
+    });
+
+    test('seeding wakes the surfaces once, and not at all for nothing new', () {
+      final store = _store(_Server());
+      var woke = 0;
+      store.addListener(() => woke++);
+
+      store.seedMuted(['c1', 'c2']);
+      expect(woke, 1);
+
+      store.seedMuted(['c1', 'c2']);
+      expect(woke, 1);
+    });
+
+    test('mute, block and not-interested are three separate flags', () {
+      final store = _store(_Server());
+      store.setMuted('c1', true);
+
+      expect(store.isMuted('c1'), isTrue);
+      expect(store.isBlocked('c1'), isFalse);
+      expect(store.isNotInterested('c1'), isFalse);
+    });
+  });
+
   group('listeners', () {
     test('a change on one target wakes the surfaces showing it', () async {
       final store = _store(_Server());

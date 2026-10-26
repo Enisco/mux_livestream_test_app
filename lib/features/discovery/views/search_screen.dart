@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
@@ -408,6 +409,13 @@ class _SearchScreenState extends State<SearchScreen> {
     openContentDetail(context, item, source: AnalyticsSource.search);
   }
 
+  /// The `…` on a card: share, hide, mute, block and the rest.
+  ///
+  /// Share needs no account; everything else does, which the sheet gates
+  /// through [_requireAccount] rather than refusing the whole sheet.
+  Future<void> _openCardActions(WebFeedItem item) =>
+      showCardActionsSheet(context, item, requireAccount: _requireAccount);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -591,7 +599,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         onTap: () => _open(item),
         onFollow: _actions.follow(item),
-        onMore: () => _requireAccount('use that'),
+        onMore: () => unawaited(_openCardActions(item)),
       ),
     ),
     SearchGroupKind.events => SearchEventRow(
@@ -603,7 +611,7 @@ class _SearchScreenState extends State<SearchScreen> {
       item: item,
       kindLabel: kind.rowLabel,
       onTap: () => _open(item),
-      onMore: () => _requireAccount('use that'),
+      onMore: () => unawaited(_openCardActions(item)),
     ),
   };
 

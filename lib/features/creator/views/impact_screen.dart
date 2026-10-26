@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
 import 'package:test_app/features/creator/repo/impact_repo.dart';
@@ -35,7 +36,21 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 ///
 /// The Comments tab is **not** a comment feed — see [ImpactQueueNote].
 class ImpactScreen extends StatefulWidget {
-  const ImpactScreen({super.key, this.repo, this.dashboard, this.context});
+  const ImpactScreen({
+    super.key,
+    this.repo,
+    this.dashboard,
+    this.context,
+    this.studios = const [],
+    this.onSwitchStudio,
+  });
+
+  /// Every studio the reader can work in. The shell owns the list so all
+  /// four tabs show the same switcher.
+  final List<StudioMembership> studios;
+
+  /// Re-points the shell at another studio.
+  final Future<void> Function(String creatorId)? onSwitchStudio;
 
   /// Defaults to the real thing; a test supplies its own.
   final ImpactRepo? repo;
@@ -569,6 +584,27 @@ class _ImpactScreenState extends State<ImpactScreen> {
     },
   };
 
+  /// The same switcher the Studio tab opens, so all three agree.
+  Future<void> _openStudios() async {
+    final current = openStudio(widget.context, widget.studios);
+    if (current == null) return;
+    final choice = await StudiosSheet.show(
+      context,
+      current: current,
+      studios: widget.studios,
+    );
+    if (!mounted || choice == null) return;
+    if (choice.switchTo case final creatorId?) {
+      await widget.onSwitchStudio?.call(creatorId);
+      if (!mounted) return;
+      // The queues and the assignee list both belong to the studio that was
+      // open, so both are dropped rather than left to describe another
+      // ministry's people.
+      setState(() => _assignees = const []);
+      await _load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -659,8 +695,8 @@ class _ImpactScreenState extends State<ImpactScreen> {
     children: [
       Flexible(
         child: StudioPill(
-          name: widget.context?.displayName ?? '',
-          onTap: () => _say(AppStrings.studiosSwitch),
+          name: openStudio(widget.context, widget.studios)?.displayName ?? '',
+          onTap: () => unawaited(_openStudios()),
         ),
       ),
       SizedBox(width: 12.s),

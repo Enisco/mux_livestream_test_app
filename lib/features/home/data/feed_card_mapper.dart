@@ -106,7 +106,10 @@ abstract final class FeedCardMapper {
   static String? bodyFor(FeedCardKind kind, WebFeedItem item) => switch (kind) {
     // A post's subtitle is the excerpt itself, not a status line.
     FeedCardKind.post || FeedCardKind.blog => excerpt(item.subtitle),
-    FeedCardKind.channel => excerpt(item.meta.description),
+    // `bio` is the creator's own blurb; `description` is the older key some
+    // rows still carry, so both are read rather than one replacing the other.
+    FeedCardKind.channel =>
+      excerpt(item.meta.bio) ?? excerpt(item.meta.description),
     _ => null,
   };
 

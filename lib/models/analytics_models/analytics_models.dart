@@ -36,6 +36,14 @@ abstract final class AnalyticsSource {
   /// "How people find you" breakdown.
   static const explore = 'explore';
   static const following = 'following';
+
+  /// The viewer's own library — History, Liked, Saved and playlists.
+  ///
+  /// Deliberately **one** value rather than four: the distinction that
+  /// matters to a creator is *the viewer went looking for this* versus *a
+  /// rail put it in front of them*. Shipped 2026-10-26; these opens used to
+  /// report `unknown`, which hid them among clicks with no known surface.
+  static const library = 'library';
   static const suggestedContent = 'suggested_content';
   static const search = 'search';
   static const shareLink = 'share_link';
@@ -43,14 +51,15 @@ abstract final class AnalyticsSource {
   static const external = 'external';
   static const unknown = 'unknown';
 
-  /// The set the beacon route validates against, read off its own refusal on
-  /// 2026-10-05 — `explore` and `following` are both accepted, although the
-  /// beacon guide's prose list omits them.
+  /// The set the beacon route validates against. `explore` and `following`
+  /// were read off its own refusal on 2026-10-05, although the beacon guide's
+  /// prose list omits them; `library` was added by the backend on 2026-10-26.
   static const all = {
     creatorChannel,
     homeFeed,
     explore,
     following,
+    library,
     suggestedContent,
     search,
     shareLink,

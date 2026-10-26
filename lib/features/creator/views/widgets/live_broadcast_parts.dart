@@ -124,12 +124,19 @@ class LiveStatBar extends StatelessWidget {
     required this.viewers,
     required this.giving,
     required this.onFlipCamera,
+    this.prayers = 0,
+    this.onOpenPrayers,
   });
 
   final int likes;
   final int viewers;
   final String giving;
   final VoidCallback onFlipCamera;
+
+  /// `metrics.prayers.count`, which arrives by socket. The bodies do not —
+  /// tapping the pill fetches them.
+  final int prayers;
+  final VoidCallback? onOpenPrayers;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -158,6 +165,20 @@ class LiveStatBar extends StatelessWidget {
                 icon: HugeIcons.strokeRoundedGift,
                 value: giving,
               ),
+              // Drawn only once there is something to read: an empty panel
+              // behind a pill is worse than no pill.
+              if (prayers > 0) ...[
+                SizedBox(width: 8.s),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onOpenPrayers,
+                  child: LiveStatPill(
+                    pillKey: const ValueKey('live-prayers'),
+                    icon: HugeIcons.strokeRoundedHandPrayer,
+                    value: '$prayers',
+                  ),
+                ),
+              ],
             ],
           ),
         ),

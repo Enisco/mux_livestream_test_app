@@ -14,6 +14,17 @@ import 'package:dio/dio.dart';
 ///
 /// This is **not** how video and audio are uploaded: those go to Mux as a
 /// PUT with the bytes as the body. See `MediaUploadRepo`.
+/// Sending the bytes to S3. [S3PresignedUpload.send] in production, and a
+/// recorder in a test — the repos that mint a ticket take one so the
+/// ticket → S3 → confirm sequence can be exercised without the network.
+typedef S3Send =
+    Future<void> Function({
+      required String uploadUrl,
+      required Map<String, dynamic> fields,
+      required Uint8List bytes,
+      required String filename,
+    });
+
 abstract final class S3PresignedUpload {
   /// A bare client: the S3 leg must carry neither the app's Authorization
   /// header nor its base URL.

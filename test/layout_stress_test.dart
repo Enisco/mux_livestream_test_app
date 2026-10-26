@@ -13,13 +13,18 @@ import 'package:test_app/features/explore/views/widgets/explore_creator_card.dar
 import 'package:test_app/features/explore/views/widgets/explore_event_row.dart';
 import 'package:test_app/features/explore/views/widgets/explore_hero.dart';
 import 'package:test_app/features/explore/views/widgets/explore_rail.dart';
+import 'package:test_app/features/creator/views/widgets/live_broadcast_parts.dart';
+import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/features/history/views/widgets/history_parts.dart';
 import 'package:test_app/features/profile/views/widgets/profile_header_card.dart';
 import 'package:test_app/features/profile/views/widgets/profile_menu.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
+import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
+import 'package:test_app/shared/components/library_parts.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/models/explore_models/explore_models.dart';
 import 'package:test_app/models/history_models/profile_watch_progress.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
@@ -553,6 +558,111 @@ void main() {
               pill: '2 Upcoming',
             ),
           ],
+        ),
+        size: _small,
+        scroll: true,
+      );
+    });
+  });
+
+  // Everything the 2026-10-26 gap responses added, at the width where a row
+  // that forgot to ellipsize gives way.
+  group('the sheets and bars shipped against the gap responses', () {
+    testWidgets('the broadcast bar with a prayer count and a long total', (
+      tester,
+    ) async {
+      // Four pills and a currency-named total; the row scrolls rather than
+      // competing for room, which is the only reason it fits.
+      await _stress(
+        tester,
+        LiveStatBar(
+          likes: 1289345,
+          viewers: 904211,
+          giving: '₦12,480,000.00 raised',
+          prayers: 1842,
+          onFlipCamera: () {},
+          onOpenPrayers: () {},
+        ),
+        size: _small,
+      );
+    });
+
+    testWidgets('the Create sheet carrying an exhausted quota', (tester) async {
+      await _stress(
+        tester,
+        CreateSheet(
+          kinds: CreateKind.values,
+          onPick: (_) {},
+          usage: const PlanUsage(uploadsUsed: 5, uploadLimit: 5),
+        ),
+        size: _small,
+      );
+    });
+
+    testWidgets('the studio switcher with ministries for names', (
+      tester,
+    ) async {
+      await _stress(
+        tester,
+        StudiosSheet(
+          current: const DashboardContext(
+            creatorId: 'c1',
+            displayName: _longName,
+            handle: 'celebrationcentreinternationalworldwide',
+            role: 'owner',
+            capabilities: {},
+          ),
+          studios: const [
+            StudioMembership(
+              creatorId: 'c2',
+              displayName: _longName,
+              handle: 'anotherextremelylonghandleindeed',
+              role: 'editor',
+            ),
+          ],
+          onPick: (_) {},
+        ),
+        size: _small,
+      );
+    });
+
+    testWidgets('the card overflow sheet, every row at once', (tester) async {
+      await _stress(
+        tester,
+        LibraryActionSheet(
+          actions: const [
+            LibraryAction(
+              label: AppStrings.cardShare,
+              icon: HugeIcons.strokeRoundedShare08,
+            ),
+            LibraryAction(
+              label: AppStrings.cardAddToPlaylist,
+              icon: HugeIcons.strokeRoundedPlayList,
+            ),
+            LibraryAction(
+              label: AppStrings.cardBookmark,
+              icon: HugeIcons.strokeRoundedBookmark02,
+            ),
+            LibraryAction(
+              label: AppStrings.cardMute,
+              icon: HugeIcons.strokeRoundedVolumeOff,
+            ),
+            LibraryAction(
+              label: AppStrings.cardNotInterested,
+              icon: HugeIcons.strokeRoundedCancelCircle,
+            ),
+            LibraryAction(
+              label: AppStrings.cardBlock,
+              icon: HugeIcons.strokeRoundedUserBlock01,
+              destructive: true,
+            ),
+            LibraryAction(
+              label: AppStrings.cardReport,
+              icon: HugeIcons.strokeRoundedFlag02,
+              destructive: true,
+            ),
+          ],
+          onSelected: (_) {},
         ),
         size: _small,
         scroll: true,
