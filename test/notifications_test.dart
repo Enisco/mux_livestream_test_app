@@ -16,6 +16,7 @@ import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
+import 'helpers/fixture_time.dart';
 
 /// The bell, and what is behind it.
 ///
@@ -101,8 +102,6 @@ class _FakeDevice implements DeviceInfoService {
       throw UnimplementedError(invocation.memberName.toString());
 }
 
-String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
-
 Map<String, dynamic> _row({
   required String id,
   String title = 'Upload complete',
@@ -119,7 +118,7 @@ Map<String, dynamic> _row({
   'body': 'Your file is ready.',
   'actionUrl': null,
   'readAt': readAt,
-  'createdAt': _ago(ago),
+  'createdAt': fixtureAgo(ago),
 };
 
 Future<_FakeApi> _pump(
@@ -236,7 +235,11 @@ void main() {
         pages: [
           [
             _row(id: 'n1', title: 'Unread one'),
-            _row(id: 'n2', title: 'Read one', readAt: _ago(Duration.zero)),
+            _row(
+              id: 'n2',
+              title: 'Read one',
+              readAt: fixtureAgo(Duration.zero),
+            ),
           ],
         ],
       );
@@ -272,7 +275,7 @@ void main() {
       await _pump(
         tester,
         pages: [
-          [_row(id: 'n1', readAt: _ago(Duration.zero))],
+          [_row(id: 'n1', readAt: fixtureAgo(Duration.zero))],
         ],
       );
       expect(find.text(AppStrings.notificationsMarkAll), findsNothing);

@@ -8,6 +8,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
+import 'package:test_app/features/creator/views/giving_screen.dart';
 import 'package:test_app/features/creator/views/impact_screen.dart';
 import 'package:test_app/features/creator/views/studio_content_screen.dart';
 import 'package:test_app/features/creator/views/studio_screen.dart';
@@ -18,9 +19,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The creator studio, and the four things it is made of.
-///
-/// Giving is its own Figma section and is not built yet; it says so rather
-/// than showing an empty screen that looks broken.
 class StudioShell extends StatefulWidget {
   const StudioShell({super.key});
 
@@ -114,7 +112,11 @@ class _StudioShellState extends State<StudioShell> {
                 studios: _studios,
                 onSwitchStudio: switchStudio,
               ),
-              _ => const _NotBuilt(AppStrings.studioTabGiving),
+              _ => GivingScreen(
+                context: _context,
+                studios: _studios,
+                onSwitchStudio: switchStudio,
+              ),
             },
           ),
           Positioned(
@@ -261,23 +263,4 @@ class _NavTab extends StatelessWidget {
       ),
     );
   }
-}
-
-/// A tab whose Figma section has not been built yet.
-class _NotBuilt extends StatelessWidget {
-  const _NotBuilt(this.name);
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 40.s),
-      child: Text(
-        '$name is not built yet',
-        textAlign: TextAlign.center,
-        style: AppStyles.body(14, color: AppColors.neutral400),
-      ),
-    ),
-  );
 }

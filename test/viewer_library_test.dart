@@ -10,6 +10,7 @@ import 'package:test_app/features/library/views/liked_saved_screens.dart';
 import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'helpers/load_app_fonts.dart';
+import 'helpers/fixture_time.dart';
 
 /// Liked and Saved, which are one screen reading two routes.
 ///
@@ -60,8 +61,6 @@ class _FakeApi implements ApiService {
       throw UnimplementedError(invocation.memberName.toString());
 }
 
-String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
-
 Map<String, dynamic> _hit({
   String id = 'e1',
   String title = 'Sunday Service',
@@ -77,7 +76,7 @@ Map<String, dynamic> _hit({
   'engagementTargetType': entityType == 'devotional_series'
       ? 'devotional'
       : entityType,
-  'interactionAt': _ago(ago),
+  'interactionAt': fixtureAgo(ago),
   if (creator != null)
     'creator': {
       'id': 'c1',
@@ -256,13 +255,32 @@ void main() {
   });
 
   group('the shared mapper', () {
+    test('a day heading is a local day, not a UTC one', () {
+      // The gateway sends UTC and a calendar day is a local idea, so the
+      // heading has to convert before it buckets. Both instants below are
+      // built from local midnight, which is what makes this meaningful in
+      // any zone: east of Greenwich the first one's UTC date is a day
+      // earlier, and west of it the second one's runs a day ahead.
+      final now = DateTime.now();
+      final midnight = DateTime(now.year, now.month, now.day);
+
+      expect(
+        dayLabel(midnight.add(const Duration(minutes: 1)).toUtc()),
+        'Today',
+      );
+      expect(
+        dayLabel(midnight.subtract(const Duration(minutes: 1)).toUtc()),
+        'Yesterday',
+      );
+    });
+
     test('names each entity type in its own words', () {
       final rows = ViewerLibraryRepo.debugMap([
         {
           'entityType': 'post',
           'entityId': 'p',
           'title': 'An article',
-          'viewedAt': _ago(const Duration(hours: 1)),
+          'viewedAt': fixtureAgo(const Duration(hours: 1)),
           'meta': const <String, dynamic>{},
         },
       ]);
@@ -277,7 +295,7 @@ void main() {
           'entityType': 'media',
           'entityId': 'm',
           'title': 'Seen it',
-          'viewedAt': _ago(const Duration(hours: 1)),
+          'viewedAt': fixtureAgo(const Duration(hours: 1)),
           'completed': true,
           'meta': const {'progressPercent': 100},
         },
@@ -291,7 +309,7 @@ void main() {
           'entityType': 'media',
           'entityId': 'm',
           'title': 'Opened once',
-          'viewedAt': _ago(const Duration(hours: 1)),
+          'viewedAt': fixtureAgo(const Duration(hours: 1)),
           'meta': const {'progressPercent': 0},
         },
       ]);
@@ -304,7 +322,7 @@ void main() {
           'entityType': 'media',
           'entityId': 'm',
           'title': 'Halfway',
-          'viewedAt': _ago(const Duration(hours: 1)),
+          'viewedAt': fixtureAgo(const Duration(hours: 1)),
           'meta': const {'progressPercent': 40},
         },
       ]);

@@ -377,4 +377,83 @@ abstract final class ApiEndpoints {
   static String mediaPlaybackInfo(String id) => '/v1/media/$id/playback-info';
   static String publicMediaPlaybackInfo(String id) =>
       '/v1/public/media/$id/playback-info';
+
+  // ---- Creator Giving ---------------------------------------------------
+  //
+  // Two families under one feature. `/payment/earnings/*` is the creator's
+  // side — the recipient application, its rails, and what they have earned.
+  // `/payment/giving/funds*` is the purposes givers choose between. The
+  // donor's own routes (`checkout`, `quote`, `me/gifts`) are elsewhere in
+  // this file and are a different reader entirely.
+  //
+  // Rail enrolment and every configuration change are step-up gated: a code
+  // is emailed, and the grant it mints is spent on the very next call.
+
+  static const _earnings = '/v1/payment/earnings';
+
+  /// The legal recipient and the rails under it. `GET` takes `?creatorId=`
+  /// and answers `{application: null}` before anything has been applied for.
+  static const givingApplication = '$_earnings/application';
+
+  /// The provider / country / currency combinations policy currently allows,
+  /// plus the `termsVersion` the application must be created against.
+  /// Never cached as permanent capability — re-read before every enrolment.
+  static const givingApplicationOptions = '$givingApplication/options';
+
+  /// Rail-scoped, and each requirement says who owns it: the creator, a
+  /// reviewer at GospelTube, or the provider.
+  static const givingApplicationRequirements =
+      '$givingApplication/requirements';
+
+  static const givingEvidenceUploadUrl =
+      '$givingApplication/evidence/upload-url';
+  static const givingEvidence = '$givingApplication/evidence';
+  static const givingApplicationSubmit = '$givingApplication/submit';
+
+  static const givingRails = '$_earnings/rails';
+  static String givingRail(String railId) => '$givingRails/$railId';
+  static String givingRailHoldingCurrencies(String railId) =>
+      '${givingRail(railId)}/holding-currencies';
+
+  /// A versioned change to a live rail's country, currency, destination or
+  /// legal recipient. The old configuration stays active through review and
+  /// a 48-hour cooling period.
+  static const givingChangeRequests = '$_earnings/change-requests';
+  static String givingChangeRequest(String id) => '$givingChangeRequests/$id';
+  static String givingChangeRequestCancel(String id) =>
+      '${givingChangeRequest(id)}/cancel';
+
+  static const khaimeBanks = '$_earnings/khaime/banks';
+  static const khaimeKyc = '$_earnings/khaime/kyc';
+  static const khaimeKycResubmit = '$khaimeKyc/resubmit';
+
+  static const paystackBanks = '$_earnings/paystack/banks';
+  static const paystackBankAccount = '$_earnings/paystack/bank-account';
+  static const paystackSubaccount = '$_earnings/paystack/subaccount';
+
+  static const stripeOnboardingLink = '$_earnings/stripe/onboarding-link';
+  static const stripeAccountSession = '$_earnings/stripe/account-session';
+
+  /// Provider-reported totals, grouped by settlement currency. Answers
+  /// **"Giving application not found"** until an application exists, which
+  /// is why the Giving tab reads the application first.
+  static const earningsSummary = '$_earnings/summary';
+  static const earningsTransactions = '$_earnings/transactions';
+  static const earningsSettlements = '$_earnings/settlements';
+  static const earningsPayouts = '$_earnings/payouts';
+
+  /// Withdrawing from a provider-held rail's released balance. A direct rail
+  /// has no withdrawal: its PSP settles on its own schedule.
+  static const earningsPayoutRequest = '$earningsPayouts/request';
+
+  /// The purposes a giver can choose between. `GET` creates the reserved
+  /// `general` fund idempotently, so the list is never empty.
+  static const givingFunds = '/v1/payment/giving/funds';
+  static String givingFund(String fundId) => '$givingFunds/$fundId';
+
+  /// The emailed one-time code that gates rail enrolment and every
+  /// configuration change.
+  static const stepUpChallenges = '/v1/auth/step-up/challenges';
+  static String stepUpVerify(String id) => '$stepUpChallenges/$id/verify';
+  static String stepUpResend(String id) => '$stepUpChallenges/$id/resend';
 }

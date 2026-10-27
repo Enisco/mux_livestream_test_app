@@ -1694,5 +1694,389 @@ abstract final class AppStrings {
   static const authWallRecommend = 'Personalised recommendations';
   static const authWallGoLive = 'Go live and stream your content';
 
+  // ---- Creator Giving ---------------------------------------------------
+  //
+  // Wording from the Figma section `12494-149632`, with three places it was
+  // changed deliberately. The design calls the Khaime hold "0 days", which
+  // is the real staging value and is read from the rail rather than written
+  // here. The design labels a provider-held release a "payout"; the
+  // integration guide asks for "release", because the creator asked for it
+  // and it has already happened. And "Estimated proceeds" is never shortened
+  // to "earnings" — the guide forbids showing an estimate as finalized.
+
+  static const givingTitle = 'Giving';
+  static const givingSubtitle =
+      'Gifts your community has entrusted to your ministry.';
+
+  static const givingNotStartedTitle = 'Receive gifts from your community';
+  static const givingNotStartedBody =
+      'Three steps: tell us who gets paid, connect a payment rail, and we '
+      'review it. Most ministries finish setup in under 15 minutes.';
+  static const givingStartApplication = 'Start giving application';
+  static const givingStep1 = '01  Your details';
+  static const givingStep2 = '02  Payment rail';
+  static const givingStep3 = '03  Review';
+
+  static const givingViewEarnings = 'View earnings';
+  static const givingFundsAndPerformance = 'Giving funds & performance';
+  static const givingCopyLink = 'Copy Giving link';
+  static const givingLinkCopied = 'Giving link copied';
+  static const givingNotAccepting = 'No rail is accepting gifts yet.';
+  static const givingAccepting = 'Accepting gifts';
+  static const givingNeutralDonor = 'Giver';
+
+  /// "Individual · Nigeria · terms accepted 19 Oct 2026".
+  static String givingRecipientLine(
+    String classification,
+    String country,
+    String terms,
+  ) => '$classification · $country · terms accepted $terms';
+
+  // Turn on Giving
+
+  static const givingTurnOnTitle = 'Turn on Giving';
+  static const givingTurnOnBody =
+      'Add your recipient details. Connect payment rails next.';
+  static const givingSettleNote =
+      'Stripe & Paystack settle directly to your account.';
+  static const givingRecipientCountry = 'Recipient country';
+  static const givingLegalStructure = 'Legal structure';
+  static const givingLegalName = 'Legal name';
+  static const givingLegalNameHint =
+      'Must match the owner of every settlement account you connect.';
+  static String givingTermsAccept(String version) =>
+      "I'm authorized to act for this recipient and accept the Giving "
+      'recipient terms ($version).';
+  static const givingTermsLink = 'Giving recipient terms';
+  static const givingNotTaxReceipts =
+      'Acknowledgments are not tax receipts unless separately issued under '
+      'applicable law.';
+  static const givingSaveAndChooseRails = 'Save and choose payment rails';
+  static const givingNameRequired = 'Enter the legal recipient name.';
+  static const givingTermsRequired = 'Accept the terms to continue.';
+  static const givingNoOptions =
+      'No payment rail can be enrolled under the current policy. Check back '
+      'shortly.';
+
+  // Payment rails
+
+  static const givingPaymentRails = 'Payment rails';
+  static const givingRailsBody =
+      'Donors pick a currency, never a provider. For each gift, GospelTube '
+      'charges through the enabled rail that leaves you the most after fees.';
+  static const givingCurrencyNotProvider =
+      'Donors choose a currency, not a provider.';
+  static const givingPreferredRail = 'Preferred rail';
+  static const givingTieBreakTitle = 'If two rails would pay you the same';
+  static const givingTieBreakBody =
+      'GospelTube already sends each gift through the rail that leaves you '
+      'the most after fees. Choose which rail to use when two rails would '
+      'leave you exactly the same amount.';
+
+  static String givingSetupProvider(String provider) => 'Setup $provider';
+  static String givingContinueProvider(String provider) =>
+      'Continue Setup $provider';
+  static const givingUpdateAccount = 'Update account';
+  static const givingDetails = 'Details';
+  static const givingViewApplication = 'View application';
+
+  static const providerStripe = 'Stripe';
+  static const providerPaystack = 'Paystack';
+  static const providerKhaime = 'Khaime';
+  static const providerFlutterwave = 'Flutterwave';
+
+  /// "Khaime holds each gift for 0 days before GospelTube releases it to you."
+  static String givingHoldNote(String provider, int days) =>
+      '$provider holds each gift for $days day${days == 1 ? '' : 's'} before '
+      'GospelTube releases it to you.';
+  static String givingDirectNote(String provider) =>
+      'Gifts settle directly to your connected $provider account.';
+  static const givingVerifyHere =
+      'Verify here on GospelTube — gifts held, then released to your bank.';
+  static const givingVerifyOnProvider =
+      'Verify on the provider — direct charges to your connected account.';
+  static const givingKhaimeFormBody =
+      'Complete identity, documents and bank details without leaving your '
+      'studio.';
+  static const givingProviderFormBody =
+      'Connect your account and finish verification securely on the '
+      'provider.';
+
+  static const givingClassIndividual = 'Individual';
+  static const givingClassUnregistered = 'Unregistered organisation';
+  static const givingClassBusiness = 'Registered business';
+  static const givingClassReligious = 'Registered religious organisation';
+  static const givingClassNonprofit = 'Nonprofit (not charity-verified)';
+  static const givingClassCharity = 'Verified charity';
+
+  static const railDraft = 'Not started';
+  static const railCollecting = 'In progress';
+  static const railProviderOnboarding = 'Provider onboarding';
+  static const railPlatformReview = 'Under review';
+  static const railMoreInformation = 'More information needed';
+  static const railActive = 'Active';
+  static const railRestricted = 'Restricted';
+  static const railSuspended = 'Suspended';
+  static const railRejected = 'Rejected';
+  static const railReonboarding = 'Setup again';
+
+  static const requirementOwnerCreator = 'You';
+  static const requirementOwnerGospelTube = 'GospelTube';
+  static const requirementOwnerProvider = 'Payment provider';
+
+  // Rail setup and step-up
+
+  static String givingRailSetupTitle(String provider) =>
+      '$provider payment setup';
+  static const givingRailSetupBody = 'Add your settlement details';
+  static const givingSettlementCountry = 'Settlement country';
+  static const givingSettlementCurrency = 'Settlement currency';
+  static const givingStepUpNote =
+      'Enrolling is protected by a one-time code sent to your GospelTube '
+      'email.';
+  static const givingConnectSecurely = 'Connect securely';
+
+  static String givingStepUpTitle(String provider) =>
+      'Create $provider settlement account';
+  static String givingStepUpUpdateTitle(String provider) =>
+      'Update $provider settlement account';
+  static const givingStepUpBody =
+      'Changes are verified and cooled before replacing this rail’s '
+      'active settlement setup.';
+  static const givingStepUpHint =
+      'Enter the one-time code sent to your GospelTube account email. Valid '
+      'only for this change.';
+  static const givingVerificationCode = 'Verification code';
+  static const givingCodeHint = '6-digit code';
+  static const givingResendCode = 'Resend code';
+  static const givingVerifyAndContinue = 'Verify and continue';
+  static const givingCodeRequired = 'Enter the 6-digit code.';
+  static const givingCodeSent = 'A new code is on its way.';
+  static const givingChangeProviderNote =
+      'To switch providers, add another rail instead. This update changes '
+      'the destination, country, currency, or legal recipient name.';
+  static const givingLegalNameMatchNote =
+      'This must match recipient and settlement account ownership records.';
+
+  // Rail detail
+
+  static String givingRailTitle(String provider) => '$provider payment rail';
+  static const givingVerificationTracks = 'Verification tracks';
+  static const givingVerificationTracksBody =
+      'These checks run independently. Start either one now and return to '
+      'complete the other at any time.';
+  static const givingGospelTubeVerification = 'GospelTube verification';
+  static const givingProviderVerification = 'Provider verification';
+  static const givingRailDetails = 'Rail details';
+  static const givingTrackCompleted = 'Completed';
+  static const givingReviewChecklist = 'Review checklist';
+  static const givingNoChecklist =
+      'Nothing is outstanding on this rail yet. Anything a reviewer asks for '
+      'will appear here.';
+  static const givingLockedNote =
+      'Submitted legal and settlement details are locked during review. If a '
+      'reviewer requests a correction, the relevant document or provider '
+      'step becomes available without restarting this rail.';
+  static const givingRailLegalRecipient = 'Legal recipient';
+  static const givingRailLegalStructure = 'Legal structure';
+  static const givingRailSettlementRoute = 'Settlement route';
+  static const givingRailProvider = 'Payment provider';
+  static const givingRailCustody = 'Custody';
+  static const givingRailSubmitted = 'Submitted';
+  static const givingRailSettlementAccount = 'Settlement account';
+  static const givingRailAccountHolder = 'Account holder';
+  static const givingRailAccountOwnership = 'Account ownership';
+  static String givingCustodyHeld(int days) =>
+      'Held by provider · $days-day hold';
+  static const givingCustodyDirect = 'Settled directly by the provider';
+  static const givingDone = 'Done';
+  static const givingSubmitForReview = 'Submit for review';
+  static const givingSubmitted = 'Sent for review.';
+  static const givingUploadDocument = 'Upload';
+  static const givingReplaceDocument = 'Replace';
+  static const givingDocumentOnFile = 'Document on file';
+  static const givingDocumentOnFileBody =
+      'Uploaded privately. Drop or choose a new file to replace it.';
+  static const givingEvidenceFailed = 'That file could not be uploaded.';
+  static const givingDocumentRequired =
+      'Attach a government-issued identity document.';
+  static const givingBanksUnavailable =
+      'The bank list could not be loaded. Try again shortly.';
+
+  // The Khaime identity form. Khaime is the one provider whose onboarding
+  // the app hosts, so this is the only place GospelTube asks for identity
+  // details at all — which is why each field says where it goes.
+
+  static String givingKycNote(String provider) =>
+      '$provider verifies the recipient and bank account. GospelTube '
+      'forwards these details to $provider and keeps only masked bank '
+      'details; identity numbers are never stored on GospelTube.';
+  static const givingKycOwner = 'Account owner';
+  static const givingKycOwnerBody =
+      'The person who owns the settlement account.';
+  static const givingKycFirstName = 'First name';
+  static const givingKycLastName = 'Last name';
+  static const givingKycDateOfBirth = 'Date of birth';
+  static const givingKycDateOfBirthHint = 'YYYY-MM-DD';
+  static const givingKycPhone = 'Phone number';
+  static const givingKycIdType = 'Identity document type';
+  static const givingKycIdNumber = 'Identity document number';
+  static String givingKycIdNumberHint(String provider) =>
+      'Sent to $provider; not stored by GospelTube.';
+  static const givingKycAddress = 'Residential address';
+  static const givingKycStreet = 'Street address';
+  static const givingKycCity = 'City';
+  static const givingKycState = 'State';
+  static const givingKycPostalCode = 'Postal code';
+  static const givingKycIdDocument = 'Government-issued identity document';
+  static const givingKycSelfie = 'Selfie holding the identity document';
+  static const givingKycOptional = 'Optional';
+  static String givingKycBankSection(String currency) =>
+      'Settlement bank account ($currency)';
+  static const givingKycBankSectionBody =
+      'GospelTube releases this rail\u2019s held gifts to this account.';
+  static const givingKycOwnership = 'Who owns the settlement account?';
+  static const givingKycBank = 'Bank';
+  static const givingKycAccountNumber = 'Account number';
+  static const givingKycAccountName = 'Account name';
+  static const givingKycAccountNameHint = 'Must match the legal recipient.';
+  static const givingKycNameRequired = 'Enter the account owner\u2019s name.';
+  static const givingKycIdNumberRequired =
+      'Enter the number on the identity document.';
+  static const givingKycAddressRequired =
+      'Enter the street, city and state of the residential address.';
+  static const givingKycBankRequired =
+      'Enter the settlement account number and the name on it.';
+
+  /// `legal_recipient` reads as "Legal recipient".
+  ///
+  /// The ownership values are policy's, not a fixed list, so one the app has
+  /// not seen is humanised rather than shown as a wire value.
+  static String givingOwnershipLabel(String wire) => wire.isEmpty
+      ? wire
+      : wire.replaceAll('_', ' ').substring(0, 1).toUpperCase() +
+            wire.replaceAll('_', ' ').substring(1);
+
+  // Funds and performance
+
+  static const givingFundsTitle = 'Giving funds & performance';
+  static const givingThisMonth = 'THIS MONTH';
+  static const givingGrossGifts = 'Gross gifts';
+  static const givingEstimatedProceeds = 'Estimated proceeds';
+  static const givingHeldByProvider = 'Held by provider';
+  static const givingGivers = 'Givers';
+  // The four hints behind the information icons on the metric cards. Each
+  // card draws one, and tapping it says what the figure is not.
+  static const givingGrossHint = 'What givers sent, before any fees are taken.';
+  static const givingProceedsHint =
+      'What you should receive. Final provider adjustments may still apply.';
+  static const givingHeldHint =
+      'Settled, but still inside the provider’s hold window.';
+  static const givingGiversHint = 'How many different people gave.';
+  static const givingProceedsNote =
+      'Final provider adjustments may still apply';
+  static String givingGiftsInPeriod(int n) =>
+      '$n gift${n == 1 ? '' : 's'} in this period';
+  static String givingHeldBy(String provider) =>
+      'Held by $provider until release';
+  static String givingPlatformFees(String amount) => '$amount platform fees';
+  static String givingGiftsAcross(int gifts, int givers) =>
+      '$gifts Gift${gifts == 1 ? '' : 's'} · Across $givers '
+      'giver${givers == 1 ? '' : 's'}';
+
+  static const givingFundsHeading = 'Giving funds';
+  static const givingFundsBody =
+      'Help supporters direct their gift to a specific purpose.';
+  static const givingNewFund = 'New fund';
+  static const givingNewFundTitle = 'New giving fund';
+  static const givingEditFundTitle = 'Edit giving fund';
+  static const givingFundPurpose = 'A purpose people can give towards.';
+  static const givingFundName = 'Name';
+  static const givingFundNameHint = 'Building Fund';
+  static const givingFundWhatFor = 'What it’s for';
+  static const givingFundWhatForHint =
+      'Raising towards the new sanctuary — roofing and seating.';
+  static const givingFundSeenBy = 'Givers see this when choosing a fund.';
+  static const givingCreateFund = 'Create fund';
+  static const givingSaveFund = 'Save changes';
+  static const givingFundNameRequired = 'Give the fund a name.';
+  static const givingFundLimitReached =
+      'Your plan’s fund limit is reached. Deactivate one to free a slot.';
+  static String givingFundStats(int gifts, int givers, String gross) =>
+      '$gifts gift${gifts == 1 ? '' : 's'} · $givers '
+      'giver${givers == 1 ? '' : 's'} · $gross gross';
+  static const givingFundGeneralLocked =
+      'The general fund is always available and cannot be turned off.';
+  static const givingFundDeactivate = 'Deactivate';
+  static const givingNoFunds = 'No funds yet.';
+
+  static const givingRecentGifts = 'Recent gifts';
+  static const givingNoGifts = 'No gifts yet.';
+  static const givingNoGiftsBody =
+      'Gifts appear here as soon as the first one is paid.';
+
+  static const givingStatusFinalized = 'Settlement finalized';
+  static const givingStatusUnderReview = 'Settlement under review';
+  static const givingStatusNeedsReview = 'Needs review';
+  static const givingStatusRefunded = 'Refunded';
+  static const givingStatusPending = 'Pending';
+
+  // Earnings and payouts
+
+  static const earningsTitle = 'Earnings & Payouts';
+  static String earningsHeldFunds(String provider, String currency) =>
+      '$provider — $currency · held funds';
+  static const earningsAvailable = 'Available';
+  static const earningsHolding = 'Holding';
+  static String earningsNextRelease(String date) => 'Next release $date';
+  static const earningsRequestPayout = 'Request payout';
+  static const earningsPayoutInFlight = 'Payout requested';
+  static String earningsPayoutPending(String amount) =>
+      '$amount is already on its way. You can request again once it lands.';
+  static const earningsNoRail =
+      'No payment rail is connected yet, so there is nothing to report.';
+  static const earningsBalanceUnavailable =
+      'The provider could not report this balance just now.';
+  static const earningsNoWithdrawal =
+      'This provider settles to your bank on its own schedule, so there is '
+      'nothing to withdraw here.';
+  static const earningsProviderNote =
+      'Balances, gifts, settlements, payouts and releases are shown from '
+      'provider records, per payment rail. Protected account changes remain '
+      'with each connected provider.';
+  static const earningsOverview = 'Earnings overview';
+  static const earningsGivingFunds = 'Giving funds';
+  static const earningsAllFunds = 'All funds';
+  static const earningsPeriod = 'Period';
+  static const earningsReleasedToYou = 'Released to you';
+  static String earningsReleasedBy(String provider) =>
+      'Released by GospelTube from $provider';
+  static const earningsCapturedFromQuotes = 'Captured from settlement quotes';
+  static const earningsTabGifts = 'Gifts';
+  static const earningsTabSettlements = 'Settlements';
+  static const earningsTabPayouts = 'Payouts & releases';
+  static const earningsTabRefunds = 'Refunds';
+  static const earningsRelease = 'Release';
+  static const earningsNoRows = 'Nothing here yet.';
+
+  static const earningsLast7 = 'Last 7 days';
+  static const earningsLast30 = 'Last 30 days';
+  static const earningsLast90 = 'Last 90 days';
+  static const earningsAllTime = 'All time';
+
+  static const earningsPayoutAmount = 'Amount';
+  static const earningsPayoutTitle = 'Request a payout';
+  static String earningsPayoutBody(String available) =>
+      'Up to $available is available to withdraw. GospelTube releases it '
+      'through your provider in the same request.';
+  static const earningsPayoutConfirm = 'Request payout';
+  static const earningsPayoutRequested = 'Payout requested.';
+  static const earningsPayoutAmountRequired = 'Enter an amount to withdraw.';
+  static String earningsPayoutTooMuch(String available) =>
+      'That is more than the $available available.';
+
+  static const givingFailed = 'Giving could not be loaded.';
+  static const givingWriteFailed = 'That did not go through. Try again.';
+
   static String filesCount(int n) => '$n file${n == 1 ? '' : 's'}';
 }

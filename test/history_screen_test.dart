@@ -11,6 +11,7 @@ import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'helpers/load_app_fonts.dart';
+import 'helpers/fixture_time.dart';
 
 Future<void> _pump(
   WidgetTester tester,
@@ -75,8 +76,6 @@ class _FakeApi implements ApiService {
       throw UnimplementedError(invocation.memberName.toString());
 }
 
-String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
-
 Map<String, dynamic> _row({
   required String id,
   required String title,
@@ -94,7 +93,7 @@ Map<String, dynamic> _row({
   'entityId': id,
   'title': title,
   'historyTargetType': entityType,
-  'viewedAt': _ago(ago),
+  'viewedAt': fixtureAgo(ago),
   'completed': completed,
   'creator': {
     'id': 'c1',

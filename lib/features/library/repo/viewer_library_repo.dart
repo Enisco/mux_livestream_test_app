@@ -270,16 +270,23 @@ List<HistoryDay> mergeDays(List<HistoryDay> a, List<HistoryDay> b) {
 }
 
 /// "Today", "Yesterday", "12 June" — the headings the design groups under.
+///
+/// The gateway sends UTC, and a calendar day is a local idea. Reading
+/// `.year/.month/.day` straight off the parsed value compares a UTC date
+/// against a local one, so west of Greenwich an evening row headed itself
+/// "Today" a day early, and east of it everything watched between midnight
+/// and the UTC offset was headed "Yesterday". Convert first, then bucket.
 String dayLabel(DateTime? at) {
   if (at == null) return 'Earlier';
+  final local = at.toLocal();
   final now = DateTime.now();
-  final day = DateTime(at.year, at.month, at.day);
+  final day = DateTime(local.year, local.month, local.day);
   final today = DateTime(now.year, now.month, now.day);
   final gap = today.difference(day).inDays;
   if (gap <= 0) return 'Today';
   if (gap == 1) return 'Yesterday';
-  final date = '${at.day} ${_months[at.month - 1]}';
-  return at.year == now.year ? date : '$date ${at.year}';
+  final date = '${local.day} ${_months[local.month - 1]}';
+  return local.year == now.year ? date : '$date ${local.year}';
 }
 
 /// "6d", "3w" — the compact age on a library row.
