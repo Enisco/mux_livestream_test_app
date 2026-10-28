@@ -213,15 +213,105 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  void _todo(String what) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$what is not built yet', style: AppStyles.body(13)),
-        backgroundColor: AppColors.neutral800,
-        behavior: SnackBarBehavior.floating,
+  /// The per-row overflow: one action, because the route offers one.
+  ///
+  /// This used to answer "History actions is not built yet" while
+  /// `ViewerLibraryRepo.hideFromHistory` sat unused — the DELETE has been
+  /// there since the library work.
+  Future<void> _rowMenu(HistoryEntry entry) async {
+    if (entry.targetType.isEmpty || entry.id.isEmpty) return;
+    final remove = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.base2,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20.s)),
+          ),
+          padding: EdgeInsets.fromLTRB(20.s, 10.s, 20.s, 10.s),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36.s,
+                  height: 4.s,
+                  margin: EdgeInsets.only(bottom: 14.s),
+                  decoration: BoxDecoration(
+                    color: AppColors.neutral700,
+                    borderRadius: BorderRadius.circular(999.s),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                key: const ValueKey('history-remove'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.pop(sheet, true),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14.s),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline_rounded,
+                        size: 19.s,
+                        color: AppColors.textPrimary,
+                      ),
+                      SizedBox(width: 14.s),
+                      Text(
+                        AppStrings.historyRemoveOne,
+                        style: AppStyles.label(
+                          14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+    if (remove != true || !mounted) return;
+    await _remove(entry);
   }
+
+  /// Take one row out, optimistically.
+  ///
+  /// The row goes immediately because the list is the only feedback a reader
+  /// gets, and comes back if the write refuses — leaving it gone while the
+  /// server still holds it would make the next refresh look like a bug.
+  Future<void> _remove(HistoryEntry entry) async {
+    final before = _loaded;
+    setState(() => _loaded = _without(_loaded, entry.id));
+    try {
+      await _repo.hideFromHistory(entry.targetType, entry.id);
+      if (mounted) _say(AppStrings.historyRemovedOne);
+    } catch (e) {
+      logger.w('History remove failed', error: e);
+      if (!mounted) return;
+      setState(() => _loaded = before);
+      _say(AppStrings.historyRemoveFailed);
+    }
+  }
+
+  /// The days again without one row, dropping any day left empty.
+  ///
+  /// A heading with nothing under it reads as a rendering fault, which is
+  /// what taking the last row of a day out would otherwise leave behind.
+  static List<HistoryDay> _without(List<HistoryDay> days, String id) => [
+    for (final day in days)
+      if ([
+            for (final e in day.entries)
+              if (e.id != id) e,
+          ]
+          case final kept when kept.isNotEmpty)
+        HistoryDay(label: day.label, entries: kept),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +482,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           eventVenue: entry.eventVenue,
           eventTime: entry.eventTime,
           onTap: () => _open(entry.source),
-          onMore: () => _todo('History actions'),
+          moreKey: ValueKey('history-more-${entry.id}'),
+          onMore: () => unawaited(_rowMenu(entry)),
         ),
       ),
     SizedBox(height: 22.s),

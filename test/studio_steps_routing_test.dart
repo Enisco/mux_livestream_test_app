@@ -24,9 +24,10 @@ import 'helpers/load_app_fonts.dart';
 /// Step keys are `GET /v1/creator/{id}/dashboard/getting-started` on staging,
 /// 2026-09-26.
 class _FakeApi implements ApiService {
-  _FakeApi({required this.steps});
+  _FakeApi({required this.steps, this.attention = const []});
 
   final List<Map<String, dynamic>> steps;
+  final List<Map<String, dynamic>> attention;
 
   @override
   Future<Response<T>> get<T>(
@@ -39,7 +40,7 @@ class _FakeApi implements ApiService {
         'data': {'steps': steps},
       },
       _ when path.contains('attention') => {
-        'data': {'items': <dynamic>[]},
+        'data': {'items': attention},
       },
       // The Create sheet is gated on these, so a context without them
       // would offer nothing to create and the test would prove nothing.
@@ -78,16 +79,27 @@ class _FakeApi implements ApiService {
       throw UnimplementedError(invocation.memberName.toString());
 }
 
+/// Where the screen asked the shell to send the reader, if it did.
+class _TabJump {
+  int? tab;
+  int? impactTab;
+  bool? openSearch;
+}
+
 Future<GoRouter> _pumpStudio(
   WidgetTester tester,
-  List<Map<String, dynamic>> steps,
-) async {
+  List<Map<String, dynamic>> steps, {
+  List<Map<String, dynamic>> attention = const [],
+  _TabJump? jump,
+}) async {
   SharedPreferences.setMockInitialValues({});
   await LocalStorage.init();
   await LocalStorage.setString(LocalStorage.creatorIdKey, 'c1');
 
   await GetIt.instance.reset();
-  GetIt.instance.registerSingleton<ApiService>(_FakeApi(steps: steps));
+  GetIt.instance.registerSingleton<ApiService>(
+    _FakeApi(steps: steps, attention: attention),
+  );
   // Both bells read one store; the screens listen to it from `initState`.
   // Its first read fails without an ApiService and is swallowed, which is the
   // behaviour under test here — a bell that cannot be counted draws no dot.
@@ -103,7 +115,17 @@ Future<GoRouter> _pumpStudio(
   final router = GoRouter(
     initialLocation: '/',
     routes: [
-      GoRoute(path: '/', builder: (_, _) => const StudioScreen()),
+      GoRoute(
+        path: '/',
+        builder: (_, _) => StudioScreen(
+          onOpenTab: (tab, {int impactTab = 0, bool openSearch = false}) {
+            jump
+              ?..tab = tab
+              ..impactTab = impactTab
+              ..openSearch = openSearch;
+          },
+        ),
+      ),
       GoRoute(
         path: AppRouter.creatorPhoto,
         builder: (_, _) => const Text('POLISH FLOW'),
@@ -186,6 +208,136 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(AppStrings.studioStepOnWeb), findsOneWidget);
+    expect(find.textContaining('not built'), findsNothing);
+  });
+
+  testWidgets('"Set up giving" opens the Giving tab, not the web studio', (
+    tester,
+  ) async {
+    // It was sent to the web along with team roles, which was true before
+    // the Giving tab existed and has been wrong since.
+    final jump = _TabJump();
+    await _pumpStudio(tester, [
+      _step('setup_giving'),
+      _step('publish_first_content'),
+    ], jump: jump);
+
+    await tester.tap(find.byKey(const ValueKey('step-setup_giving')));
+    await tester.pumpAndSettle();
+
+    expect(jump.tab, 3);
+    expect(find.text(AppStrings.studioStepOnWeb), findsNothing);
+  });
+
+  group('the attention feed', () {
+    Map<String, dynamic> row(String key, int count) => {
+      'key': key,
+      'count': count,
+    };
+
+    testWidgets('a prayer row opens the prayers inbox', (tester) async {
+      final jump = _TabJump();
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('open_prayers', 3)],
+        jump: jump,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('attention-open_prayers')));
+      await tester.pumpAndSettle();
+
+      expect(jump.tab, 2);
+      expect(jump.impactTab, 0);
+    });
+
+    testWidgets('a testimony row opens the testimonies inbox', (tester) async {
+      final jump = _TabJump();
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('pending_testimonies', 2)],
+        jump: jump,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('attention-pending_testimonies')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(jump.impactTab, 1);
+    });
+
+    testWidgets('a flagged-comment row opens the moderation queue', (
+      tester,
+    ) async {
+      final jump = _TabJump();
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('flagged_comments', 1)],
+        jump: jump,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('attention-flagged_comments')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(jump.impactTab, 2);
+    });
+
+    testWidgets('a key this release does not know still opens Impact', (
+      tester,
+    ) async {
+      // Landing on the first inbox beats doing nothing, which is what a row
+      // whose key the client has not seen used to do.
+      final jump = _TabJump();
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('something_new', 4)],
+        jump: jump,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('attention-something_new')));
+      await tester.pumpAndSettle();
+
+      expect(jump.tab, 2);
+      expect(jump.impactTab, 0);
+    });
+  });
+
+  testWidgets('the search icon opens Content with its field up', (
+    tester,
+  ) async {
+    // What it searches is the Content tab's list, so it goes there rather
+    // than owning a second search of its own.
+    final jump = _TabJump();
+    await _pumpStudio(tester, [
+      _step('publish_first_content', complete: true),
+      _step('complete_profile', complete: true),
+    ], jump: jump);
+
+    await tester.tap(find.byKey(const ValueKey('studio-search')));
+    await tester.pumpAndSettle();
+
+    expect(jump.tab, 1);
+    expect(jump.openSearch, isTrue);
+  });
+
+  testWidgets('"Full analytics" names the web studio, not "not built yet"', (
+    tester,
+  ) async {
+    await _pumpStudio(tester, [
+      _step('publish_first_content', complete: true),
+      _step('complete_profile', complete: true),
+    ]);
+
+    await tester.tap(find.text(AppStrings.studioFullAnalytics));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.studioWebAnalyticsNote), findsOneWidget);
     expect(find.textContaining('not built'), findsNothing);
   });
 

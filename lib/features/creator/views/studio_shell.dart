@@ -26,8 +26,32 @@ class StudioShell extends StatefulWidget {
   State<StudioShell> createState() => _StudioShellState();
 }
 
+/// Sends the reader to another tab of the studio shell.
+///
+/// The Studio tab is a set of pointers — a checklist, an attention feed, a
+/// search icon — and almost everything it points at is another tab of this
+/// same shell rather than a screen to push on top of it. Pushing would leave
+/// the reader on a Giving screen with a back arrow and no nav bar, which is
+/// not where that tab lives.
+typedef OpenStudioTab =
+    void Function(int tab, {int impactTab, bool openSearch});
+
 class _StudioShellState extends State<StudioShell> {
   int _tab = 0;
+
+  /// Which Impact tab to land on, and whether Content should open with its
+  /// search field up. Both are set by whatever sent the reader there and
+  /// read once, on the next build of that tab.
+  int _impactTab = 0;
+  bool _contentSearch = false;
+
+  void _openTab(int tab, {int impactTab = 0, bool openSearch = false}) {
+    setState(() {
+      _tab = tab;
+      _impactTab = impactTab;
+      _contentSearch = openSearch;
+    });
+  }
 
   /// Fetched once for the shell so every tab shares one answer rather than
   /// each asking again on every switch.
@@ -101,16 +125,24 @@ class _StudioShellState extends State<StudioShell> {
                 onLeaveStudio: () => context.go(AppRouter.home),
                 studios: _studios,
                 onSwitchStudio: switchStudio,
+                onOpenTab: _openTab,
               ),
               1 => StudioContentScreen(
+                // Keyed on the flag so arriving from the Studio tab's search
+                // icon rebuilds the screen with its field already up, rather
+                // than reusing a state that was built without it.
+                key: ValueKey('studio-content-$_contentSearch'),
                 context: _context,
                 studios: _studios,
                 onSwitchStudio: switchStudio,
+                openSearch: _contentSearch,
               ),
               2 => ImpactScreen(
+                key: ValueKey('studio-impact-$_impactTab'),
                 context: _context,
                 studios: _studios,
                 onSwitchStudio: switchStudio,
+                initialTab: _impactTab,
               ),
               _ => GivingScreen(
                 context: _context,
@@ -130,7 +162,7 @@ class _StudioShellState extends State<StudioShell> {
                 child: _StudioNavBar(
                   index: _tab,
                   impactBadge: _impactBadge,
-                  onChanged: (i) => setState(() => _tab = i),
+                  onChanged: (i) => _openTab(i),
                 ),
               ),
             ),

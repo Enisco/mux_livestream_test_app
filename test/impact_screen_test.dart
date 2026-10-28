@@ -11,6 +11,9 @@ import 'package:test_app/features/creator/views/widgets/impact_parts.dart';
 import 'package:test_app/features/creator/views/widgets/impact_sheets.dart';
 import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/models/creator_models/impact_models.dart';
+import 'package:test_app/features/notifications/data/notification_store.dart';
+import 'package:test_app/features/notifications/views/notifications_screen.dart';
+import 'package:test_app/features/notifications/repo/notification_repo.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -204,6 +207,12 @@ Future<_FakeApi> _pump(
 
   await GetIt.instance.reset();
   GetIt.instance.registerSingleton<ApiService>(api);
+  // The bell in this screen's header reads the one store every bell in the
+  // app reads, from `initState`. It is registered lazily on the fake API
+  // above, so the count it draws is this test's own.
+  GetIt.instance.registerLazySingleton<NotificationStore>(
+    () => NotificationStore(repo: NotificationRepo(api: api)),
+  );
   addTearDown(GetIt.instance.reset);
 
   tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
@@ -253,6 +262,33 @@ void main() {
         expect(find.textContaining(label), findsWidgets, reason: label);
       }
       expect(find.text('Grace Chapel'), findsOneWidget);
+    });
+
+    testWidgets('the bell opens notifications, not an apology', (tester) async {
+      // It used to answer "Not available yet — waiting on the API", which
+      // stopped being true when the notification routes landed; the Studio
+      // and Content bells had opened the real screen all along.
+      await _pump(tester, _FakeApi());
+
+      await tester.tap(find.byKey(const ValueKey('impact-notifications')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.impactAwaitingApi), findsNothing);
+      expect(find.byType(NotificationsScreen), findsOneWidget);
+    });
+
+    testWidgets('and the screen it opens is the one every other bell opens', (
+      tester,
+    ) async {
+      // One store behind all three, so they cannot disagree about how many
+      // things are waiting.
+      await _pump(tester, _FakeApi());
+      expect(GetIt.instance.isRegistered<NotificationStore>(), isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('impact-notifications')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.notificationsTitle), findsOneWidget);
     });
 
     testWidgets('a count that could not be read shows no number at all', (

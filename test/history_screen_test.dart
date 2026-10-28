@@ -43,6 +43,7 @@ class _FakeApi implements ApiService {
   final List<Map<String, dynamic>> items;
   final bool fail;
   final List<String> deletes = [];
+  bool deleteFails = false;
 
   @override
   Future<Response<T>> get<T>(
@@ -61,6 +62,9 @@ class _FakeApi implements ApiService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
+    if (deleteFails) {
+      throw DioException(requestOptions: RequestOptions(path: path));
+    }
     deletes.add(path);
     return _ok(path, const <String, dynamic>{});
   }
@@ -111,6 +115,10 @@ Map<String, dynamic> _row({
     'thumbnailUrl': null,
   },
 };
+
+/// The rows [_history] puts under "Yesterday" — one, so removing it empties
+/// the day and the heading has to go with it.
+const _yesterdayIds = ['h3'];
 
 /// A day's worth of plausible history, spanning three day groups.
 List<Map<String, dynamic>> _history() => [
@@ -261,6 +269,58 @@ void main() {
 
       expect(api.deletes, ['/v1/discovery/viewer/history']);
       expect(find.text('Nothing here yet'), findsOneWidget);
+    });
+
+    testWidgets('one row can be taken out on its own', (tester) async {
+      // The per-row overflow answered "History actions is not built yet"
+      // while `hideFromHistory` sat unused in the repo.
+      final api = await _pumpScreen(tester, size: const Size(390, 844));
+
+      await tester.tap(find.byKey(const ValueKey('history-more-h2')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('history-remove')));
+      await tester.pumpAndSettle();
+
+      // The row's own target type and id, not the whole-history route.
+      expect(api.deletes, ['/v1/discovery/viewer/history/media/h2']);
+      expect(find.text('Sunday Worship'), findsNothing);
+      // Everything else stays where it was.
+      expect(find.text('Romans, chapter'), findsWidgets);
+    });
+
+    testWidgets('taking the last row of a day out takes its heading too', (
+      tester,
+    ) async {
+      // A heading with nothing under it reads as a rendering fault.
+      final api = await _pumpScreen(tester, size: const Size(390, 844));
+      expect(find.text('Yesterday'), findsOneWidget);
+
+      for (final id in _yesterdayIds) {
+        final more = find.byKey(ValueKey('history-more-$id'));
+        if (more.evaluate().isEmpty) continue;
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('history-remove')));
+        await tester.pumpAndSettle();
+      }
+
+      expect(api.deletes, isNotEmpty);
+      expect(find.text('Yesterday'), findsNothing);
+    });
+
+    testWidgets('a refused removal puts the row back', (tester) async {
+      // Leaving it gone while the server still holds it would make the next
+      // refresh look like a bug.
+      final api = await _pumpScreen(tester, size: const Size(390, 844));
+      api.deleteFails = true;
+
+      await tester.tap(find.byKey(const ValueKey('history-more-h2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('history-remove')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sunday Worship'), findsOneWidget);
     });
 
     testWidgets('and says it hides rather than deleting for ever', (

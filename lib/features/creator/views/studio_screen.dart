@@ -13,6 +13,8 @@ import 'package:test_app/features/creator/views/go_live_setup_screen.dart';
 import 'package:test_app/features/creator/views/new_article_screen.dart';
 import 'package:test_app/features/creator/views/new_event_screen.dart';
 import 'package:test_app/features/creator/views/new_media_screen.dart';
+import 'package:test_app/features/creator/views/studio_shell.dart'
+    show OpenStudioTab;
 import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
@@ -38,7 +40,15 @@ class StudioScreen extends StatefulWidget {
     this.onLeaveStudio,
     this.studios = const [],
     this.onSwitchStudio,
+    this.onOpenTab,
   });
+
+  /// Sends the reader to another tab of the shell.
+  ///
+  /// Most of what this screen points at — the attention feed, the giving
+  /// step, the search icon — already exists as a sibling tab, so it asks the
+  /// shell to switch rather than pushing a second copy over itself.
+  final OpenStudioTab? onOpenTab;
 
   /// Every studio the reader can work in. The shell owns the list so all
   /// four tabs show the same switcher.
@@ -143,15 +153,25 @@ class _StudioScreenState extends State<StudioScreen> {
     );
   }
 
-  void _todo(String what) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$what is not built yet', style: AppStyles.body(13)),
-        backgroundColor: AppColors.neutral800,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+  /// The shell's tab order, named so the call sites read as destinations
+  /// rather than as magic numbers.
+  static const _contentTab = 1;
+  static const _impactTab = 2;
+  static const _givingTab = 3;
+
+  /// Open the Impact inbox a "needs you" row belongs to.
+  ///
+  /// The three keys the dashboard actually sends are `open_prayers`,
+  /// `pending_testimonies` and `flagged_comments`; anything else lands on
+  /// Impact's first tab rather than nowhere.
+  void _openAttention(String key) => widget.onOpenTab?.call(
+    _impactTab,
+    impactTab: switch (key) {
+      'pending_testimonies' => 1,
+      'flagged_comments' => 2,
+      _ => 0,
+    },
+  );
 
   /// Every studio the reader can work in, since 2026-10-26.
   ///
@@ -178,7 +198,9 @@ class _StudioScreenState extends State<StudioScreen> {
       if (mounted) await _load();
       return;
     }
-    _todo(AppStrings.studiosSettings);
+    // Not "not built yet": studio settings are a web-studio screen and say
+    // so on the row that offers them, so the answer names the reason.
+    _say(AppStrings.studiosSettingsNote);
   }
 
   /// Where a getting-started step actually leads.
@@ -204,14 +226,19 @@ class _StudioScreenState extends State<StudioScreen> {
           MaterialPageRoute(builder: (_) => const GoLiveSetupScreen()),
         );
         if ((went ?? false) && mounted) await _load();
-      case 'invite_team':
       case 'setup_giving':
-        // Team roles and bank verification are web-studio work, like events
-        // and promotions — which the card at the bottom of this screen
-        // already says.
+        // Giving is a tab of this shell now. It used to be sent to the web
+        // with team roles, which was true before the Giving tab existed and
+        // has been wrong since.
+        widget.onOpenTab?.call(_givingTab);
+      case 'invite_team':
+        // Team roles really are web-studio work, like events and promotions
+        // — which the card at the bottom of this screen already says.
         _say(AppStrings.studioStepOnWeb);
       default:
-        _todo(AppStrings.studioStepTitles[step.key] ?? step.key);
+        // A step the backend has added that this release has no destination
+        // for. Naming it is better than a key, and better than silence.
+        _say(AppStrings.studioStepOnWeb);
     }
   }
 
@@ -268,7 +295,9 @@ class _StudioScreenState extends State<StudioScreen> {
       if ((made ?? false) && mounted) await _load();
       return;
     }
-    _todo(picked.title);
+    // Unreachable today — every CreateKind above returns — but a kind added
+    // later would otherwise fall out of this sheet silently.
+    _say(AppStrings.studioStepOnWeb);
   }
 
   @override
@@ -308,7 +337,10 @@ class _StudioScreenState extends State<StudioScreen> {
                     alignment: Alignment.centerRight,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => _todo(AppStrings.studioFullAnalytics),
+                      // Per-item analytics live on the web studio: the
+                      // mobile dashboard has today's four figures and no
+                      // breakdown behind them (OPEN_ISSUES 18).
+                      onTap: () => _say(AppStrings.studioWebAnalyticsNote),
                       child: Text(
                         AppStrings.studioFullAnalytics,
                         style: AppStyles.label(
@@ -334,16 +366,12 @@ class _StudioScreenState extends State<StudioScreen> {
                           AttentionRow(
                             item: item,
                             last: i == _attention.length - 1,
-                            // Named, not keyed: this said
-                            // "prayer_requests is not built yet". There is
-                            // no creator-side inbox to open — the screen of
-                            // that name is the *reader's* own requests, on
-                            // placeholder data, so opening it would show a
-                            // creator somebody else's list.
-                            onTap: () => _todo(
-                              AppStrings.studioAttentionTitles[item.key] ??
-                                  item.key,
-                            ),
+                            // Each key names one of the three Impact
+                            // inboxes, so the row opens that tab. The note
+                            // this replaces said there was no creator-side
+                            // inbox to open; there is, and has been since
+                            // Impact shipped.
+                            onTap: () => _openAttention(item.key),
                           ),
                       ],
                     ),
@@ -469,7 +497,7 @@ class _StudioScreenState extends State<StudioScreen> {
           GestureDetector(
             key: const ValueKey('studio-search'),
             behavior: HitTestBehavior.opaque,
-            onTap: () => _todo('Studio search'),
+            onTap: () => widget.onOpenTab?.call(_contentTab, openSearch: true),
             child: Padding(
               padding: EdgeInsets.all(4.s),
               child: HugeIcon(

@@ -37,7 +37,15 @@ class StudioContentScreen extends StatefulWidget {
     this.context,
     this.studios = const [],
     this.onSwitchStudio,
+    this.openSearch = false,
   });
+
+  /// Open with the search field already up.
+  ///
+  /// The Studio tab carries a search icon of its own, and what it searches is
+  /// this screen's list — so it sends the reader here rather than owning a
+  /// second search of its own.
+  final bool openSearch;
 
   /// Every studio the reader can work in. The shell owns the list so all
   /// four tabs show the same switcher.
@@ -61,7 +69,7 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
   StudioContentKind? _kind;
   StudioContentPage _page = StudioContentPage.empty;
   bool _loading = true;
-  bool _searching = false;
+  late bool _searching = widget.openSearch;
   String _query = '';
 
   @override

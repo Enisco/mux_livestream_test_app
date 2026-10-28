@@ -92,14 +92,22 @@ class _Actions extends StatelessWidget {
           SocialAuthButton(
             icon: AppAssets.iconGoogle,
             label: AppStrings.continueWithGoogle,
-            // TODO(auth): wire to the browser handoff OAuth flow
+            // No social sign-in exists to wire: the gateway publishes no OAuth,
+            // Google or Apple route anywhere in its 299 paths, and
+            // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
+            // already-signed-in user, not a sign-in. Disabled until a provider
+            // flow is agreed — see MISSING_FEATURES.md.
             onPressed: null,
           ),
           const SizedBox(height: 10),
           SocialAuthButton(
             icon: AppAssets.iconApple,
             label: AppStrings.continueWithApple,
-            // TODO(auth): wire to Sign in with Apple.
+            // No social sign-in exists to wire: the gateway publishes no OAuth,
+            // Google or Apple route anywhere in its 299 paths, and
+            // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
+            // already-signed-in user, not a sign-in. Disabled until a provider
+            // flow is agreed — see MISSING_FEATURES.md.
             onPressed: null,
           ),
           const SizedBox(height: 10),

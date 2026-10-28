@@ -7,7 +7,10 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/repo/creator_dashboard_repo.dart';
+import 'package:test_app/core/locator.dart';
 import 'package:test_app/features/creator/repo/impact_repo.dart';
+import 'package:test_app/features/notifications/data/notification_store.dart';
+import 'package:test_app/features/notifications/views/notifications_screen.dart';
 import 'package:test_app/features/creator/views/widgets/impact_parts.dart';
 import 'package:test_app/features/creator/views/widgets/impact_sheets.dart';
 import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
@@ -43,7 +46,14 @@ class ImpactScreen extends StatefulWidget {
     this.context,
     this.studios = const [],
     this.onSwitchStudio,
+    this.initialTab = 0,
   });
+
+  /// Which inbox to open on: prayers, testimonies or the comment queue.
+  ///
+  /// The Studio tab's "needs you" rows name one of the three, so sending the
+  /// reader to Impact without saying which would make them find it again.
+  final int initialTab;
 
   /// Every studio the reader can work in. The shell owns the list so all
   /// four tabs show the same switcher.
@@ -66,7 +76,7 @@ class ImpactScreen extends StatefulWidget {
 class _ImpactScreenState extends State<ImpactScreen> {
   late final _repo = widget.repo ?? ImpactRepo();
 
-  int _tab = 0;
+  late int _tab = widget.initialTab.clamp(0, 2);
   bool _loading = true;
   bool _failed = false;
   bool _loadingMore = false;
@@ -95,10 +105,26 @@ class _ImpactScreenState extends State<ImpactScreen> {
 
   String? get _creatorId => widget.context?.creatorId ?? LocalStorage.creatorId;
 
+  /// The one notification store the whole app shares, so this bell and the
+  /// Studio tab's cannot disagree about how many things are waiting.
+  final _notifications = getIt<NotificationStore>();
+
+  void _onNotifications() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     unawaited(_load());
+    unawaited(_notifications.refresh());
+    _notifications.addListener(_onNotifications);
+  }
+
+  @override
+  void dispose() {
+    _notifications.removeListener(_onNotifications);
+    super.dispose();
   }
 
   /// Load the tab in view. Only the one on screen is fetched — the other two
@@ -703,7 +729,18 @@ class _ImpactScreenState extends State<ImpactScreen> {
       GestureDetector(
         key: const ValueKey('impact-notifications'),
         behavior: HitTestBehavior.opaque,
-        onTap: () => _say(AppStrings.impactAwaitingApi),
+        // The same destination the Studio and Content bells open. This said
+        // it was waiting on the API, which stopped being true when the
+        // notification routes landed.
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => const NotificationsScreen(),
+            ),
+          );
+          if (mounted) setState(() {});
+        },
         child: Container(
           width: 38.s,
           height: 38.s,
@@ -712,10 +749,30 @@ class _ImpactScreenState extends State<ImpactScreen> {
             shape: BoxShape.circle,
             color: AppColors.fieldBg,
           ),
-          child: HugeIcon(
-            icon: HugeIcons.strokeRoundedNotification01,
-            color: AppColors.textPrimary,
-            size: 18.s,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              HugeIcon(
+                icon: HugeIcons.strokeRoundedNotification01,
+                color: AppColors.textPrimary,
+                size: 18.s,
+              ),
+              // One store behind every bell in the app, so the three cannot
+              // disagree about how many things are waiting.
+              if (_notifications.hasUnread)
+                Positioned(
+                  right: -2.s,
+                  top: -2.s,
+                  child: Container(
+                    width: 8.s,
+                    height: 8.s,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

@@ -215,10 +215,18 @@ class _SocialRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // TODO(auth): wire to Sign in with Apple.
+            // No social sign-in exists to wire: the gateway publishes no OAuth,
+            // Google or Apple route anywhere in its 299 paths, and
+            // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
+            // already-signed-in user, not a sign-in. Disabled until a provider
+            // flow is agreed — see MISSING_FEATURES.md.
             const _SocialIconButton(icon: AppAssets.iconApple),
             const SizedBox(width: 11),
-            // TODO(auth): wire to the browser handoff OAuth flow.
+            // No social sign-in exists to wire: the gateway publishes no OAuth,
+            // Google or Apple route anywhere in its 299 paths, and
+            // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
+            // already-signed-in user, not a sign-in. Disabled until a provider
+            // flow is agreed — see MISSING_FEATURES.md.
             const _SocialIconButton(icon: AppAssets.iconGoogle),
           ],
         ),
@@ -267,7 +275,11 @@ class _SocialIconButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        // TODO(auth): enable once the provider flow is agreed.
+        // No social sign-in exists to wire: the gateway publishes no OAuth,
+        // Google or Apple route anywhere in its 299 paths, and
+        // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
+        // already-signed-in user, not a sign-in. Disabled until a provider
+        // flow is agreed — see MISSING_FEATURES.md.
         onTap: null,
         child: Padding(
           padding: const EdgeInsets.all(8),

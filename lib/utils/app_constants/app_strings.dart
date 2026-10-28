@@ -1221,6 +1221,13 @@ abstract final class AppStrings {
   static const studioCreateCaption = 'CREATE';
   static const studioQuickUpload = 'Quick upload';
   static const studioFullAnalytics = 'Full analytics';
+
+  /// Why "Full analytics" does not open anything on the phone.
+  ///
+  /// The mobile dashboard carries today's four figures and nothing behind
+  /// them: per-item breakdowns are a web-studio screen (OPEN_ISSUES 18).
+  static const studioWebAnalyticsNote = 'Full analytics are on the web studio.';
+
   static const studioWebNote =
       'Events, devotionals, promotions and your team are managed on the web '
       'studio.';
@@ -1317,6 +1324,15 @@ abstract final class AppStrings {
       'This hides everything you have watched and read so far. Anything you '
       'open again will reappear.';
   static const historyClearConfirm = 'Clear all';
+
+  /// The per-row overflow.
+  ///
+  /// "Remove from" rather than "Delete": the route suppresses the row through
+  /// an instant rather than deleting it, so watching the same thing again
+  /// brings it back — and a reader told "deleted" would report that as a bug.
+  static const historyRemoveOne = 'Remove from history';
+  static const historyRemovedOne = 'Removed from your history.';
+  static const historyRemoveFailed = 'That did not save. Try again.';
 
   // You — the reader's own profile and its menu.
   static const profileAccountInfo = 'Account info';

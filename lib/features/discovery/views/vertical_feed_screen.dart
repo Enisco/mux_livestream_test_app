@@ -11,8 +11,14 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
+import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/share_link_action.dart';
+import 'package:test_app/features/engagement/data/vertical_feed_actions.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
+import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
@@ -87,6 +93,8 @@ class VerticalFeedScreen extends StatefulWidget {
 
 class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   final _repo = GetIt.instance<DiscoveryRepo>();
+  final _engagement = GetIt.instance<EngagementRepo>();
+  final _store = GetIt.instance<EngagementStore>();
   final _cache = GetIt.instance<PlaybackInfoCache>();
   final _pageController = PageController();
 
@@ -103,7 +111,42 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
 
   Future<void> _checkAuth() async {
     final has = await GetIt.instance<TokenStorageService>().hasSession;
-    if (mounted) setState(() => _isLoggedIn = has);
+    if (!mounted) return;
+    setState(() => _isLoggedIn = has);
+    // This resolves after the first page is already on screen, so whatever
+    // loaded while it was in flight still needs its own state fetched —
+    // otherwise the video the reader opened on is the one page whose heart
+    // never fills in.
+    if (has && _items.isNotEmpty) unawaited(_seedInteractions(_items));
+  }
+
+  /// Teach the shared store what a page of rows says, then what the viewer
+  /// has already done to them.
+  ///
+  /// Two steps because they come from different places: the counts ride along
+  /// on the feed row, but whether *this* viewer liked it is one batched call
+  /// the feed route does not answer. Without the first step every heart shows
+  /// zero until it is tapped; without the second, a video the reader liked
+  /// last week opens unliked and a second tap takes the like away.
+  void _seedEngagement(List<VerticalFeedItem> rows) {
+    VerticalFeedActions.seedRows(_store, rows);
+    if (_isLoggedIn) unawaited(_seedInteractions(rows));
+  }
+
+  Future<void> _seedInteractions(List<VerticalFeedItem> rows) async {
+    final ids = [
+      for (final row in rows)
+        if (row.mediaId.isNotEmpty) row.mediaId,
+    ];
+    if (ids.isEmpty) return;
+    // `fetchMyInteractions` swallows its own failures: engagement state is
+    // decoration here and must never blank a feed that is playing fine.
+    final mine = await _engagement.fetchMyInteractions(
+      targetType: InteractionTargets.media,
+      targetIds: ids,
+    );
+    if (!mounted || mine.isEmpty) return;
+    _store.seedInteractions(InteractionTargets.media, mine);
   }
 
   @override
@@ -133,6 +176,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
     _items.addAll(preloader.items);
     _nextCursor = preloader.nextCursor;
     _loading = false;
+    _seedEngagement(preloader.items);
     _prefetch(3);
     _prefetch(4);
   }
@@ -149,6 +193,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
         _nextCursor = preloader.nextCursor;
         _loading = false;
       });
+      _seedEngagement(preloader.items);
       _prefetch(3);
       _prefetch(4);
     } else if (_items.isEmpty) {
@@ -184,6 +229,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
         _nextCursor = result.nextCursor;
         _loading = false;
       });
+      _seedEngagement(result.items);
       _prefetch(0);
       _prefetch(1);
       _prefetch(2);
@@ -224,6 +270,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
         _nextCursor = result.nextCursor;
         _loadingMore = false;
       });
+      _seedEngagement(result.items);
     } catch (e) {
       logger.e('VerticalFeed: loadMore failed', error: e);
       if (mounted) setState(() => _loadingMore = false);
@@ -451,6 +498,19 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   String? _creatorHandle;
   String? _creatorDisplayName;
 
+  final _repo = GetIt.instance<DiscoveryRepo>();
+  final _engagement = GetIt.instance<EngagementRepo>();
+  final _store = GetIt.instance<EngagementStore>();
+
+  late final _actions = VerticalFeedActions(
+    store: _store,
+    requireAccount: _requireAccount,
+  );
+
+  EngagementState get _engagementState => _actions.stateOf(widget.item);
+
+  bool get _isFollowing => _actions.isFollowing(widget.item);
+
   bool get _isPlaying => _player?.state.playing ?? false;
   bool get _isBuffering => _player?.state.buffering ?? false;
 
@@ -467,6 +527,11 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     super.initState();
     _creatorHandle = widget.item.creatorHandle;
     _creatorDisplayName = widget.item.creatorDisplayName;
+    // A like made here has to be the like the detail screen and the home card
+    // show, so the counts are read from the shared store rather than kept
+    // locally — which means this page repaints when anything moves them.
+    _store.addListener(_onEngagementChanged);
+    if (widget.isActive) _seedFollowing();
     if (widget.isActive) {
       _activate();
     } else if (widget.preload) {
@@ -479,6 +544,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     super.didUpdateWidget(old);
     if (widget.isActive && !old.isActive) {
       _activate();
+      _seedFollowing();
     } else if (!widget.isActive && old.isActive) {
       _deactivate();
     } else if (widget.preload && !old.preload && !widget.isActive) {
@@ -487,11 +553,18 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     if (!widget.isActive && !widget.preload && (old.isActive || old.preload)) {
       _disposePlayer();
     }
+    // The session check resolves a beat after the first page is built, so the
+    // page the reader opened on is still showing `isLoggedIn: false` when it
+    // first asks. Ask again the moment that flips.
+    if (widget.isLoggedIn && !old.isLoggedIn && widget.isActive) {
+      _seedFollowing();
+    }
   }
 
   @override
   void dispose() {
     _trackViewEndedAnalytics();
+    _store.removeListener(_onEngagementChanged);
     for (final s in _subs) {
       s.cancel();
     }
@@ -964,8 +1037,78 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     handle: _creatorHandle,
   );
 
+  void _onEngagementChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Whether the viewer may act, showing the sign-in sheet if not.
+  bool _requireAccount(String feature) {
+    if (widget.isLoggedIn) return true;
+    showAuthSheet(context, feature);
+    return false;
+  }
+
+  /// Find out whether this viewer already follows the ministry on screen.
+  ///
+  /// The feed route does not say, and guessing "not following" draws a +
+  /// on a ministry the reader subscribed to last month — then the tap
+  /// unfollows them, because the toggle flips whatever it was told. One read
+  /// per ministry, only while its video is the one playing, and the shared
+  /// store keeps the answer for the rest of the session: swiping back through
+  /// a run of the same ministry's videos costs nothing.
+  Future<void> _seedFollowing() async {
+    final creatorId = widget.item.creatorId;
+    if (!widget.isLoggedIn ||
+        creatorId.isEmpty ||
+        _store.knowsFollowing(creatorId)) {
+      return;
+    }
+    try {
+      final profile = await _repo.fetchCreatorById(creatorId);
+      if (!mounted) return;
+      _store.seedFollowing(profile.id, profile.isFollowing);
+    } catch (e) {
+      // Not knowing is the state we were already in; the + stays and the
+      // tap still follows. Nothing on screen depends on this succeeding.
+      logger.w('VerticalFeed: follow state unknown for $creatorId', error: e);
+    }
+  }
+
+  void _toggleFollow() => _actions.follow(widget.item);
+
+  void _toggleLike() => _actions.like(widget.item);
+
+  /// Reading a thread needs no account — the sheet gates its own composer.
+  void _openComments() => unawaited(
+    openComments(
+      context,
+      targetType: InteractionTargets.media,
+      targetId: widget.item.mediaId,
+      initialCount: _engagementState.comments,
+    ),
+  );
+
+  Future<void> _share() async {
+    final url = await copyShareLink(
+      engagement: _engagement,
+      targetType: InteractionTargets.media,
+      targetId: widget.item.mediaId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          url ?? AppStrings.cardShareUnavailable,
+          style: const TextStyle(fontSize: 13, color: Colors.white),
+        ),
+        backgroundColor: AppColors.neutral800,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Widget _buildRightActions() {
-    final item = widget.item;
+    final state = _engagementState;
     return Positioned(
       right: 8,
       bottom: 0,
@@ -978,45 +1121,33 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
             children: [
               _AvatarButton(
                 displayName: _creatorDisplayName ?? _creatorHandle ?? '',
+                following: _isFollowing,
                 onTap: _openCreator,
-                onFollow: () {
-                  if (!widget.isLoggedIn) {
-                    showAuthSheet(context, 'follow this creator');
-                    return;
-                  }
-                  // TODO: implement follow
-                },
+                onFollow: _toggleFollow,
               ),
               const SizedBox(height: 24),
               _FeedActionButton(
-                icon: IconsaxPlusLinear.heart,
-                label: _formatCount(item.likeCount),
-                color: Colors.white,
-                onTap: () {
-                  if (!widget.isLoggedIn) {
-                    showAuthSheet(context, 'like this video');
-                    return;
-                  }
-                  // TODO: implement like
-                },
+                // Filled and brand-coloured once it is the viewer's own like,
+                // which is the only thing that tells them the tap landed —
+                // the count moves by one and one is easy to miss.
+                icon: state.liked
+                    ? IconsaxPlusBold.heart
+                    : IconsaxPlusLinear.heart,
+                label: _formatCount(state.likes),
+                color: state.liked ? AppColors.brandPrimary : Colors.white,
+                onTap: _toggleLike,
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
                 icon: IconsaxPlusLinear.message,
-                label: _formatCount(item.commentCount),
-                onTap: () {
-                  if (!widget.isLoggedIn) {
-                    showAuthSheet(context, 'comment on this video');
-                    return;
-                  }
-                  // TODO: open comment sheet
-                },
+                label: _formatCount(state.comments),
+                onTap: _openComments,
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
                 icon: IconsaxPlusLinear.send_2,
-                label: 'Share',
-                onTap: () {},
+                label: AppStrings.cardShare,
+                onTap: () => unawaited(_share()),
               ),
               const SizedBox(height: 20),
               _FeedActionButton(
@@ -1145,12 +1276,16 @@ class _AvatarButton extends StatelessWidget {
   final String displayName;
   final VoidCallback onFollow;
 
-  /// The avatar itself opens the channel; the plus on it follows.
+  /// Whether the viewer already follows this ministry.
+  final bool following;
+
+  /// The avatar itself opens the channel; the badge on it follows.
   final VoidCallback onTap;
   const _AvatarButton({
     required this.displayName,
     required this.onFollow,
     required this.onTap,
+    this.following = false,
   });
 
   @override
@@ -1195,12 +1330,17 @@ class _AvatarButton extends StatelessWidget {
                 child: Container(
                   width: 20,
                   height: 20,
-                  decoration: const BoxDecoration(
-                    color: AppColors.brandPrimary,
+                  decoration: BoxDecoration(
+                    // Following turns the badge grey with a tick. It stays on
+                    // screen rather than disappearing, because a badge that
+                    // vanishes leaves no way to unfollow from here.
+                    color: following
+                        ? AppColors.neutral700
+                        : AppColors.brandPrimary,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.add_rounded,
+                  child: Icon(
+                    following ? Icons.check_rounded : Icons.add_rounded,
                     color: Colors.white,
                     size: 14,
                   ),

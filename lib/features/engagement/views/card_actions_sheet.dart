@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 import 'package:test_app/core/locator.dart';
@@ -12,6 +11,7 @@ import 'package:test_app/features/library/views/playlists_screen.dart';
 import 'package:test_app/features/creator/views/widgets/impact_sheets.dart'
     show showReportSheet;
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
+import 'package:test_app/features/engagement/data/share_link_action.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
@@ -168,27 +168,18 @@ Future<void> showCardActionsSheet(
 
   switch (picked) {
     case AppStrings.cardShare:
-      try {
-        final url = await engagement.mintShareLink(
-          targetType: item.isCreatorRow ? 'creator' : item.entityType,
-          // For a creator, send the **creator id** — the handle is resolved
-          // server-side, so a rename needs no client release.
-          targetId: creatorId != null && item.isCreatorRow
-              ? creatorId
-              : item.entityId,
-        );
-        if (url == null) {
-          say(AppStrings.cardShareUnavailable);
-          return;
-        }
-        await Clipboard.setData(ClipboardData(text: url));
-        say(url);
-      } catch (e) {
-        // A refusal is final: the target is not shareable until its creator
-        // changes its visibility.
-        logger.w('Share link refused', error: e);
-        say(AppStrings.cardShareUnavailable);
-      }
+      final url = await copyShareLink(
+        engagement: engagement,
+        targetType: item.isCreatorRow ? 'creator' : item.entityType,
+        // For a creator, send the **creator id** — the handle is resolved
+        // server-side, so a rename needs no client release.
+        targetId: creatorId != null && item.isCreatorRow
+            ? creatorId
+            : item.entityId,
+      );
+      // A refusal is final: the target is not shareable until its creator
+      // changes its visibility, so this reports rather than retrying.
+      say(url ?? AppStrings.cardShareUnavailable);
 
     case AppStrings.cardNotInterested:
     case AppStrings.cardUndoNotInterested:

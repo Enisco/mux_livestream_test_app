@@ -139,6 +139,14 @@ class EngagementStore extends ChangeNotifier {
     return _entries[keyFor(targetType, targetId)] ?? fallback;
   }
 
+  /// Whether the store has been told anything about this creator at all.
+  ///
+  /// [isFollowing] cannot answer this: it returns `fallback` both for a
+  /// creator the viewer does not follow and for one nobody has asked about,
+  /// and a surface that has to fetch the real state needs to tell those two
+  /// apart or it refetches the same creator on every rebuild.
+  bool knowsFollowing(String creatorId) => _following.containsKey(creatorId);
+
   bool isFollowing(String creatorId, {bool fallback = false}) =>
       _following[creatorId] ?? fallback;
 
