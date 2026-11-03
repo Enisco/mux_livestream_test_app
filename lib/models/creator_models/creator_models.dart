@@ -212,22 +212,40 @@ enum MobileCheckoutStatus {
 class CheckoutCapabilities {
   const CheckoutCapabilities({
     required this.subscriptionAvailable,
+    required this.givingAvailable,
     this.subscriptionReason,
+    this.givingReason,
   });
 
   final bool subscriptionAvailable;
   final String? subscriptionReason;
 
+  /// Whether this storefront may take gifts. **Gated separately** from
+  /// subscriptions, and the guide says why: store rules for optional gifts,
+  /// fundraising, nonprofit status and platform fees are not the rules for a
+  /// SaaS plan, so one being open says nothing about the other.
+  final bool givingAvailable;
+  final String? givingReason;
+
   factory CheckoutCapabilities.fromJson(Map<String, dynamic> json) {
     final data = json['data'];
     final map = data is Map<String, dynamic> ? data : const <String, dynamic>{};
-    final sub = map['platformSubscription'];
-    final subMap = sub is Map<String, dynamic>
-        ? sub
-        : const <String, dynamic>{};
+    ({bool available, String? reason}) product(String key) {
+      final raw = map[key];
+      final m = raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
+      return (
+        available: m['available'] as bool? ?? false,
+        reason: m['reason'] as String?,
+      );
+    }
+
+    final sub = product('platformSubscription');
+    final giving = product('giving');
     return CheckoutCapabilities(
-      subscriptionAvailable: subMap['available'] as bool? ?? false,
-      subscriptionReason: subMap['reason'] as String?,
+      subscriptionAvailable: sub.available,
+      subscriptionReason: sub.reason,
+      givingAvailable: giving.available,
+      givingReason: giving.reason,
     );
   }
 }
@@ -280,30 +298,100 @@ class CheckoutEntitlement {
 
 /// Canonical state of a mobile→web checkout attempt. The only thing the app
 /// trusts; return-link query parameters are navigation, not proof.
+/// The giving half of a checkout session.
+///
+/// Present only on a `purpose: giving` session, and **entirely null until the
+/// donor actually pays** — a freshly created session carries the keys with no
+/// values, which is normal rather than a failure. Probed on staging
+/// 2026-10-29.
+///
+/// `creatorNet` stays null until settlement actuals are finalized, so it is
+/// never shown as what the ministry received.
+class GivingSessionState {
+  const GivingSessionState({
+    this.givingPaymentId,
+    this.paymentStatus,
+    this.reconciliationStatus,
+    this.settlementStatus,
+    this.charge,
+    this.creatorNet,
+  });
+
+  final String? givingPaymentId;
+  final String? paymentStatus;
+  final String? reconciliationStatus;
+  final String? settlementStatus;
+
+  /// What the donor was charged, `{currency, amountMinor, amount}`. Print
+  /// `amount`; never rebuild it from `amountMinor`.
+  final Map<String, dynamic>? charge;
+  final Map<String, dynamic>? creatorNet;
+
+  /// The donor-facing amount, already formatted by the server.
+  String? get chargeLabel {
+    final value = charge?['amount'];
+    return value == null ? null : '$value';
+  }
+
+  factory GivingSessionState.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic>? money(Object? raw) =>
+        raw is Map<String, dynamic> ? raw : null;
+    return GivingSessionState(
+      givingPaymentId: json['givingPaymentId'] as String?,
+      paymentStatus: json['paymentStatus'] as String?,
+      reconciliationStatus: json['reconciliationStatus'] as String?,
+      settlementStatus: json['settlementStatus'] as String?,
+      charge: money(json['charge']),
+      creatorNet: money(json['creatorNet']),
+    );
+  }
+}
+
 class MobileCheckoutSession {
   const MobileCheckoutSession({
     required this.id,
     required this.status,
+    this.purpose,
+    this.creatorId,
     this.paymentProvider,
     this.mobileReturnUrl,
     this.targetPlanTier,
     this.entitlementsReady = false,
     this.scheduled = false,
     this.entitlement,
+    this.giving,
   });
 
   final String id;
   final MobileCheckoutStatus status;
+
+  /// `platform_subscription` or `giving`. Fixed when the session is created
+  /// and never chosen by the client afterwards.
+  final String? purpose;
+  final String? creatorId;
   final String? paymentProvider;
   final String? mobileReturnUrl;
   final String? targetPlanTier;
   final bool entitlementsReady;
   final bool scheduled;
   final CheckoutEntitlement? entitlement;
+  final GivingSessionState? giving;
 
-  /// Provider confirmation alone is not completion — entitlements must agree.
+  static const givingPurpose = 'giving';
+
+  bool get isGiving => purpose == givingPurpose;
+
+  /// Completion, which means a different thing per purpose.
+  ///
+  /// A subscription is not done when the provider says so — entitlements have
+  /// to agree, or the creator is told they are on Pro before they are. A gift
+  /// grants nothing, so there is no second view to wait for: `succeeded` is
+  /// the end of it, and settlement to the ministry carries on afterwards
+  /// without the donor. Reading the subscription rule on a gift would leave
+  /// every completed gift reported as still processing, forever.
   bool get isSettled =>
-      status == MobileCheckoutStatus.succeeded && entitlementsReady;
+      status == MobileCheckoutStatus.succeeded &&
+      (isGiving || entitlementsReady);
 
   bool get isTerminal => status.isTerminal;
 
@@ -313,9 +401,12 @@ class MobileCheckoutSession {
         ? sub
         : const <String, dynamic>{};
     final ent = subMap['entitlement'];
+    final give = map['giving'];
     return MobileCheckoutSession(
       id: map['id'] as String? ?? '',
       status: MobileCheckoutStatus.fromApi(map['status'] as String?),
+      purpose: map['purpose'] as String?,
+      creatorId: map['creatorId'] as String?,
       paymentProvider: map['paymentProvider'] as String?,
       mobileReturnUrl: map['mobileReturnUrl'] as String?,
       targetPlanTier: subMap['targetPlanTier'] as String?,
@@ -323,6 +414,9 @@ class MobileCheckoutSession {
       scheduled: subMap['scheduled'] as bool? ?? false,
       entitlement: ent is Map<String, dynamic>
           ? CheckoutEntitlement.fromJson(ent)
+          : null,
+      giving: give is Map<String, dynamic>
+          ? GivingSessionState.fromJson(give)
           : null,
     );
   }

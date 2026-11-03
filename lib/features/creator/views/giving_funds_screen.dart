@@ -9,6 +9,7 @@ import 'package:test_app/features/creator/views/giving_earnings_screen.dart';
 import 'package:test_app/features/creator/views/widgets/giving_parts.dart';
 import 'package:test_app/features/creator/views/widgets/giving_sheets.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
+import 'package:test_app/shared/components/busy_barrier.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -136,19 +137,23 @@ class _GivingFundsScreenState extends State<GivingFundsScreen> {
     if (draft == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      if (fund == null) {
-        await _repo.createFund(
-          creatorId: widget.creatorId,
-          name: draft.name,
-          description: draft.description.isEmpty ? null : draft.description,
-        );
-      } else {
-        await _repo.updateFund(
-          fund.id,
-          name: draft.name,
-          description: draft.description,
-        );
-      }
+      await runBusy(
+        context,
+        () => fund == null
+            ? _repo.createFund(
+                creatorId: widget.creatorId,
+                name: draft.name,
+                description: draft.description.isEmpty
+                    ? null
+                    : draft.description,
+              )
+            : _repo.updateFund(
+                fund.id,
+                name: draft.name,
+                description: draft.description,
+              ),
+        message: AppStrings.givingWorking,
+      );
       if (mounted) await _load();
     } catch (e) {
       logger.w('Fund write failed', error: e);

@@ -19,8 +19,41 @@ class CheckoutAlreadyActive implements Exception {
   String toString() => 'CheckoutAlreadyActive($sessionId)';
 }
 
-/// The mobile→web subscription handoff. This repo never sees PSP credentials:
-/// plan, provider and payment all happen on the web surface.
+/// Raised when the ministry cannot take a gift right now.
+///
+/// Shares a **409** with [CheckoutAlreadyActive], which is why the two are
+/// told apart by the session id the body carries rather than by status. The
+/// public capability projection normally keeps the app from getting here, but
+/// it is cached and a rail can be paused between the check and the tap.
+class GivingUnavailable implements Exception {
+  const GivingUnavailable();
+
+  @override
+  String toString() => 'GivingUnavailable()';
+}
+
+/// Raised when the server will not attribute the gift to the content it was
+/// offered from.
+///
+/// `sourceMediaId` is validated when the session is created, and the
+/// permitted set is **narrower than "media the giver can watch"**: probing on
+/// 2026-10-29 found a live session accepted while an ordinary video, a music
+/// row and even the replay of that same livestream were all refused with
+/// `403 "Giving source media is not accessible."`. Attribution is a nicety;
+/// the gift is not, so the caller drops the source and offers it anyway.
+class GivingSourceRejected implements Exception {
+  const GivingSourceRejected();
+
+  @override
+  String toString() => 'GivingSourceRejected()';
+}
+
+/// The mobile→web checkout handoff, for both products that use it:
+/// a creator's platform subscription and a reader's gift to a ministry.
+///
+/// This repo never sees PSP credentials. Plan, amount, currency, provider and
+/// payment all happen on the web surface; the app's share is a durable session
+/// and a short-lived ticket into a browser.
 class MobileCheckoutRepo {
   MobileCheckoutRepo({ApiService? api}) : _injected = api;
 
@@ -28,6 +61,9 @@ class MobileCheckoutRepo {
 
   /// Resolved on use, not on construction — see [CreatorRepo].
   ApiService get _api => _injected ?? GetIt.instance<ApiService>();
+
+  static const subscriptionPurpose = 'platform_subscription';
+  static const givingPurpose = 'giving';
 
   static String get platform => Platform.isIOS ? 'ios' : 'android';
 
@@ -46,32 +82,56 @@ class MobileCheckoutRepo {
 
   /// Creates the durable attempt. Replaying [idempotencyKey] returns the same
   /// session with a fresh launch ticket, which is how a resumed attempt works.
+  ///
+  /// [purpose] is fixed for the life of the session and is the only thing that
+  /// distinguishes the two products on the wire. The three optional fields
+  /// belong to giving alone: [preferredFundSlug] preselects a purpose on the
+  /// web surface, and [sourceMediaId] attributes the gift to the content it
+  /// was offered from.
   Future<MobileCheckoutHandoff> createSession({
     required String creatorId,
     required String storefrontCountry,
     required String idempotencyKey,
+    String purpose = subscriptionPurpose,
+    String? preferredFundSlug,
+    String? sourceMediaId,
   }) async {
     try {
       final response = await _api.post(
         ApiEndpoints.mobileCheckouts,
         data: {
-          'purpose': 'platform_subscription',
+          'purpose': purpose,
           'creatorId': creatorId,
           'platform': platform,
           'storefrontCountry': storefrontCountry,
           'idempotencyKey': idempotencyKey,
+          'preferredFundSlug': ?preferredFundSlug,
+          'sourceMediaId': ?sourceMediaId,
         },
       );
       return MobileCheckoutHandoff.fromJson(
         response.data as Map<String, dynamic>,
       );
     } on DioException catch (e) {
-      if (e.response?.statusCode != 409) rethrow;
+      final status = e.response?.statusCode;
       final body = e.response?.data;
       final details = body is Map ? body['details'] : null;
-      throw CheckoutAlreadyActive(
-        details is Map ? details['sessionId'] as String? : null,
-      );
+      final sessionId = details is Map ? details['sessionId'] as String? : null;
+
+      // Source media the server will not attribute to. Only giving sends one.
+      if (status == 403 && sourceMediaId != null) {
+        throw const GivingSourceRejected();
+      }
+      if (status != 409) rethrow;
+      // Both products refuse with 409, meaning different things: a
+      // subscription already has a live attempt (and names it), while a
+      // ministry simply cannot be given to. Reading the giving refusal as a
+      // live attempt would send the giver to resume a session that does not
+      // exist.
+      if (sessionId == null && purpose == givingPurpose) {
+        throw const GivingUnavailable();
+      }
+      throw CheckoutAlreadyActive(sessionId);
     }
   }
 

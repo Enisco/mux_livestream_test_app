@@ -88,6 +88,7 @@ class CreatorProfileHeader extends StatelessWidget {
     super.key,
     required this.profile,
     required this.busy,
+    this.canGive = false,
     this.onBack,
     this.onFollow,
     this.onGive,
@@ -97,6 +98,14 @@ class CreatorProfileHeader extends StatelessWidget {
 
   final CreatorProfile profile;
   final bool busy;
+
+  /// Whether this ministry can actually receive a gift.
+  ///
+  /// The guide is explicit that the action is **withheld**, not disabled, when
+  /// it is false: a greyed Give Now invites a tap that can only ever be
+  /// refused, and the refusal carries no reason the giver could act on. Follow
+  /// takes the whole width in its place.
+  final bool canGive;
   final VoidCallback? onBack;
   final VoidCallback? onFollow;
   final VoidCallback? onGive;
@@ -226,6 +235,7 @@ class CreatorProfileHeader extends StatelessWidget {
                   owned: profile.isOwnedByViewer,
                   busy: busy,
                   onFollow: onFollow,
+                  canGive: canGive,
                   onGive: onGive,
                   onMore: onMore,
                   onOpenStudio: onOpenStudio,
@@ -244,6 +254,7 @@ class _Actions extends StatelessWidget {
     required this.following,
     required this.busy,
     this.owned = false,
+    this.canGive = false,
     this.onFollow,
     this.onGive,
     this.onMore,
@@ -253,6 +264,7 @@ class _Actions extends StatelessWidget {
   final bool following;
   final bool busy;
   final bool owned;
+  final bool canGive;
   final VoidCallback? onFollow;
   final VoidCallback? onGive;
   final VoidCallback? onMore;
@@ -288,16 +300,18 @@ class _Actions extends StatelessWidget {
               onTap: onFollow,
             ),
           ),
-          SizedBox(width: 10.s),
-          Expanded(
-            child: _OutlineButton(
-              key: const ValueKey('profile-give'),
-              label: AppStrings.giveNow,
-              colour: AppColors.textPrimary,
-              borderColour: AppColors.neutral700,
-              onTap: onGive,
+          if (canGive) ...[
+            SizedBox(width: 10.s),
+            Expanded(
+              child: _OutlineButton(
+                key: const ValueKey('profile-give'),
+                label: AppStrings.giveNow,
+                colour: AppColors.textPrimary,
+                borderColour: AppColors.neutral700,
+                onTap: onGive,
+              ),
             ),
-          ),
+          ],
         ],
         SizedBox(width: 10.s),
         _CircleButton(

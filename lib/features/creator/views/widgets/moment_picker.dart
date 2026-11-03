@@ -16,8 +16,10 @@ Future<DateTime?> pickMoment(
   required DateTime initial,
   required bool dateOnly,
   DateTime? minimum,
+  DateTime? maximum,
 }) {
   var draft = minimum != null && initial.isBefore(minimum) ? minimum : initial;
+  if (maximum != null && draft.isAfter(maximum)) draft = maximum;
 
   return showModalBottomSheet<DateTime>(
     context: context,
@@ -39,6 +41,9 @@ Future<DateTime?> pickMoment(
                       : CupertinoDatePickerMode.time,
                   initialDateTime: draft,
                   minimumDate: dateOnly ? minimum : null,
+                  // A date of birth is the first caller with a ceiling:
+                  // tomorrow is not one.
+                  maximumDate: dateOnly ? maximum : null,
                   onDateTimeChanged: (value) => draft = value,
                 ),
               ),

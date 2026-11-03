@@ -45,6 +45,10 @@ class _StudioShellState extends State<StudioShell> {
   int _impactTab = 0;
   bool _contentSearch = false;
 
+  /// Out of the studio and back to the feed. One place, because all four
+  /// tabs offer it through the same switcher.
+  void _leaveStudio() => context.go(AppRouter.home);
+
   void _openTab(int tab, {int impactTab = 0, bool openSearch = false}) {
     setState(() {
       _tab = tab;
@@ -74,7 +78,7 @@ class _StudioShellState extends State<StudioShell> {
 
     final attention = await repo.fetchAttention(creatorId);
     if (!mounted) return;
-    setState(() => _impactBadge = attention.fold(0, (sum, i) => sum + i.count));
+    setState(() => _impactBadge = impactBadgeFrom(attention));
   }
 
   /// Every studio the reader can work in, shared by all four tabs so the
@@ -122,7 +126,7 @@ class _StudioShellState extends State<StudioShell> {
           Positioned.fill(
             child: switch (_tab) {
               0 => StudioScreen(
-                onLeaveStudio: () => context.go(AppRouter.home),
+                onLeaveStudio: _leaveStudio,
                 studios: _studios,
                 onSwitchStudio: switchStudio,
                 onOpenTab: _openTab,
@@ -135,6 +139,7 @@ class _StudioShellState extends State<StudioShell> {
                 context: _context,
                 studios: _studios,
                 onSwitchStudio: switchStudio,
+                onLeaveStudio: _leaveStudio,
                 openSearch: _contentSearch,
               ),
               2 => ImpactScreen(
@@ -142,12 +147,14 @@ class _StudioShellState extends State<StudioShell> {
                 context: _context,
                 studios: _studios,
                 onSwitchStudio: switchStudio,
+                onLeaveStudio: _leaveStudio,
                 initialTab: _impactTab,
               ),
               _ => GivingScreen(
                 context: _context,
                 studios: _studios,
                 onSwitchStudio: switchStudio,
+                onLeaveStudio: _leaveStudio,
               ),
             },
           ),
@@ -159,7 +166,7 @@ class _StudioShellState extends State<StudioShell> {
               top: false,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(16.s, 0, 16.s, 12.s),
-                child: _StudioNavBar(
+                child: StudioNavBar(
                   index: _tab,
                   impactBadge: _impactBadge,
                   onChanged: (i) => _openTab(i),
@@ -174,8 +181,18 @@ class _StudioShellState extends State<StudioShell> {
 }
 
 /// The floating four-tab bar.
-class _StudioNavBar extends StatelessWidget {
-  const _StudioNavBar({
+/// How much room the floating nav bar needs at the bottom of a shell tab.
+///
+/// A tab's own SnackBar is drawn by that tab's Scaffold, which sits *under*
+/// this bar in the shell's Stack, so a floating one shown without this
+/// clearance is painted behind the bar and never seen. Pinned by a test
+/// against the bar's real height.
+const studioNavClearance = 96.0;
+
+@visibleForTesting
+class StudioNavBar extends StatelessWidget {
+  const StudioNavBar({
+    super.key,
     required this.index,
     required this.impactBadge,
     required this.onChanged,

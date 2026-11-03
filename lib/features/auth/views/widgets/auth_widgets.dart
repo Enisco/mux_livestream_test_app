@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/utils/app_constants/app_styles.dart';
 
 class AuthField extends StatelessWidget {
   const AuthField({
@@ -87,6 +88,39 @@ class AuthField extends StatelessWidget {
           validator: validator,
         ),
       ],
+    );
+  }
+}
+
+/// The quieter sibling of `PrimaryButton`: a second way off a screen that
+/// should not compete with its main action. Same radius and metrics, so it
+/// lines up under the button it sits below.
+class AuthSecondaryButton extends StatelessWidget {
+  const AuthSecondaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  static const _radius = 22.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.buttonSecondaryActive,
+      borderRadius: BorderRadius.circular(_radius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
+          alignment: Alignment.center,
+          child: Text(label, style: AppStyles.button(13, lineHeight: 28 / 13)),
+        ),
+      ),
     );
   }
 }

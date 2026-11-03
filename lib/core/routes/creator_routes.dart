@@ -8,8 +8,10 @@ import 'package:test_app/features/creator/views/creator_live_screen.dart';
 import 'package:test_app/features/creator/views/creator_polish_screens.dart';
 import 'package:test_app/features/creator/views/creator_profile_setup_screen.dart';
 import 'package:test_app/features/creator/views/checkout_status_screen.dart';
+import 'package:test_app/features/giving/views/giving_status_screen.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/creator/views/creator_type_screen.dart';
+import 'package:test_app/features/creator/views/studio_profile_screen.dart';
 import 'package:test_app/features/creator/views/studio_shell.dart';
 import 'package:test_app/features/creator/views/organization_profile_setup_screen.dart';
 import 'package:test_app/features/creator/views/plan_selection_screen.dart';
@@ -77,10 +79,22 @@ final List<RouteBase> creatorRoutes = [
         slideTransition(state, const StudioShell()),
   ),
   GoRoute(
+    path: AppRouter.studioProfile,
+    pageBuilder: (context, state) =>
+        slideTransition(state, const StudioProfileScreen()),
+  ),
+  GoRoute(
     path: AppRouter.checkoutStatus,
     pageBuilder: (context, state) => slideTransition(
       state,
       CheckoutStatusScreen(sessionId: state.extra as String?),
+    ),
+  ),
+  GoRoute(
+    path: AppRouter.givingStatus,
+    pageBuilder: (context, state) => slideTransition(
+      state,
+      GivingStatusScreen(sessionId: state.extra as String?),
     ),
   ),
 ];

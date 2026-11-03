@@ -5,6 +5,8 @@ import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
+import 'package:test_app/features/giving/repo/donor_giving_repo.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -99,6 +101,7 @@ Future<_FakeApi> _open(
   WidgetTester tester,
   WebFeedItem item, {
   EngagementStore? store,
+  GivingCapabilityStore? giving,
   bool unfollowed = true,
   bool shareFails = false,
   bool isOwn = false,
@@ -118,7 +121,13 @@ Future<_FakeApi> _open(
   GetIt.instance
     ..allowReassignment = true
     ..registerSingleton<ApiService>(api)
-    ..registerSingleton<EngagementStore>(used);
+    ..registerSingleton<EngagementStore>(used)
+    // The sheet asks whether this ministry can take a gift before it draws
+    // its rows. Left empty here, so "Give now" is absent — which is what
+    // every case below expects.
+    ..registerSingleton<GivingCapabilityStore>(
+      giving ?? GivingCapabilityStore(repo: DonorGivingRepo(api: api)),
+    );
   addTearDown(GetIt.instance.reset);
 
   tester.view.physicalSize = const Size(390 * 3, 1200 * 3);
@@ -322,6 +331,49 @@ void main() {
       expect(find.text(AppStrings.cardMute), findsOneWidget);
       expect(find.text(AppStrings.cardBlock), findsOneWidget);
       expect(find.text(AppStrings.cardReport), findsOneWidget);
+    });
+  });
+
+  group('giving', () {
+    GivingCapabilityStore storeSaying(bool? available) {
+      final store = GivingCapabilityStore(
+        repo: DonorGivingRepo(api: _FakeApi()),
+      );
+      if (available != null) store.seed('c1', available);
+      return store;
+    }
+
+    testWidgets('a ministry that can receive is offered Give now', (
+      tester,
+    ) async {
+      await _open(tester, _item(), giving: storeSaying(true));
+      expect(find.text(AppStrings.cardGiveNow), findsOneWidget);
+    });
+
+    testWidgets('one that cannot is not', (tester) async {
+      // Withheld rather than disabled: the refusal carries no reason the
+      // giver could act on, so a greyed row would only invite a dead tap.
+      await _open(tester, _item(), giving: storeSaying(false));
+      expect(find.text(AppStrings.cardGiveNow), findsNothing);
+    });
+
+    testWidgets('nor is one nobody has asked about', (tester) async {
+      // Unknown is not yes. The sheet is built in one pass, so a row cannot
+      // appear later — drawing it on a guess is what must not happen.
+      await _open(tester, _item(), giving: storeSaying(null));
+      expect(find.text(AppStrings.cardGiveNow), findsNothing);
+    });
+
+    testWidgets('your own channel is never offered Give now', (tester) async {
+      // `isOwn` drops the creator id, and giving to yourself is refused by
+      // the server anyway.
+      await _open(
+        tester,
+        _item(entityType: 'creator'),
+        isOwn: true,
+        giving: storeSaying(true),
+      );
+      expect(find.text(AppStrings.cardGiveNow), findsNothing);
     });
   });
 }

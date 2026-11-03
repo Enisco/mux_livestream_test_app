@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,12 +9,18 @@ import 'package:test_app/features/creator/repo/giving_repo.dart';
 import 'package:test_app/features/creator/views/giving_earnings_screen.dart';
 import 'package:test_app/features/creator/views/giving_funds_screen.dart';
 import 'package:test_app/features/creator/views/giving_kyc_screen.dart';
+import 'package:test_app/features/creator/views/giving_paystack_screen.dart';
 import 'package:test_app/features/creator/views/giving_rail_screen.dart';
 import 'package:test_app/features/creator/views/giving_screen.dart';
+import 'package:test_app/features/creator/views/giving_stripe_screen.dart';
+import 'package:test_app/features/creator/views/studio_shell.dart';
+import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/features/creator/views/widgets/giving_sheets.dart';
 import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
+import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/api_service.dart';
+import 'package:test_app/shared/services/web_app_origin.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
@@ -46,7 +54,56 @@ class _FakeApi implements ApiService {
     this.optionItems,
     this.failReads = false,
     this.reportingRefuses = false,
+    this.verifyRefuses = false,
+    this.verifyExhausted = false,
+    this.resendTooSoon = false,
+    this.challengeExpired = false,
+    this.hold,
+    this.holdWrite,
+    this.holdBanks,
+    this.submitRefusal,
+    this.resolvedAccountName = 'FOOD FOR THOUGHT',
+    this.onboardingUrl = 'https://connect.stripe.com/setup/s/ONE_TIME',
   });
+
+  /// What `application/submit` refuses with. Captured from a device on
+  /// 2026-11-02: a 400 whose `error` is a **list**, one line per document
+  /// the review is still waiting on.
+  final List<String>? submitRefusal;
+
+  /// The step-up code is refused, as a mistyped or stale one is.
+  final bool verifyRefuses;
+
+  /// The challenge has no tries left. Captured from a device on 2026-11-02:
+  /// a bare 401 whose only distinguishing mark is the message.
+  final bool verifyExhausted;
+
+  /// Another code asked for inside the cooldown. Probed on 2026-11-02: the
+  /// route answers a refusal carrying `details.resendAvailableAt`.
+  final bool resendTooSoon;
+
+  /// Completed by a test to release the verify call, so the wait between
+  /// tapping Verify and the answer can be looked at.
+  final Completer<void>? hold;
+
+  /// A challenge whose code has already run out.
+  final bool challengeExpired;
+
+  /// Completed by a test to release a write, so the gap between a sheet
+  /// closing and the page changing can be looked at.
+  final Completer<void>? holdWrite;
+
+  /// Holds the bank list, which the Khaime form fetches in the background
+  /// while the creator fills everything above it in.
+  final Completer<void>? holdBanks;
+
+  /// What the bank gives back for a resolved number, or null for one it
+  /// does not know.
+  final String? resolvedAccountName;
+
+  /// Stripe's one-time hosted onboarding URL, or null for the refusal that
+  /// comes back without one.
+  final String? onboardingUrl;
 
   /// Null models `{application: null}` — nothing applied for.
   final Map<String, dynamic>? application;
@@ -76,6 +133,9 @@ class _FakeApi implements ApiService {
     Options? options,
   }) async {
     got.add(path);
+    if (path.endsWith('/khaime/banks') && holdBanks != null) {
+      await holdBanks!.future;
+    }
     if (failReads) throw _boom(path);
     if (path == '/v1/payment/earnings/application') {
       return _ok(path, {'application': application});
@@ -88,6 +148,17 @@ class _FakeApi implements ApiService {
     }
     if (path == '/v1/payment/giving/funds') {
       return _ok(path, funds ?? _defaultFunds);
+    }
+    if (path == '/v1/payment/earnings/paystack/banks') {
+      return _ok(path, {
+        'banks': [
+          {'id': 'b-1', 'name': 'Guaranty Trust Bank', 'code': '058'},
+          {'id': 'b-2', 'name': 'Access Bank', 'code': '044'},
+        ],
+      });
+    }
+    if (path == '/v1/payment/earnings/paystack/bank-account') {
+      return _ok(path, {'accountName': resolvedAccountName});
     }
     if (reportingRefuses) throw _boom(path, status: 404);
     if (path == '/v1/payment/earnings/summary') {
@@ -112,14 +183,65 @@ class _FakeApi implements ApiService {
     Map<String, dynamic>? queryParameters,
   }) async {
     posted.add((path, data));
+    if (path.endsWith('/application/submit') && submitRefusal != null) {
+      throw DioException(
+        requestOptions: RequestOptions(path: path),
+        response: Response(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 400,
+          data: {'success': false, 'data': null, 'error': submitRefusal},
+        ),
+      );
+    }
+    if (path.endsWith('/verify') && hold != null) await hold!.future;
+    if (holdWrite != null &&
+        (path == '/v1/payment/earnings/application' ||
+            path == '/v1/payment/giving/funds')) {
+      await holdWrite!.future;
+    }
+    if (path.endsWith('/resend') && resendTooSoon) {
+      throw DioException(
+        requestOptions: RequestOptions(path: path),
+        response: Response(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 400,
+          data: {
+            'success': false,
+            'error': 'Please wait before requesting another verification code.',
+            'details': {'resendAvailableAt': '2026-11-02T06:45:30.202Z'},
+          },
+        ),
+      );
+    }
+    if (path.endsWith('/verify') && verifyExhausted) {
+      throw DioException(
+        requestOptions: RequestOptions(path: path),
+        response: Response(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 401,
+          data: {'success': false, 'error': 'Maximum OTP attempts exceeded'},
+        ),
+      );
+    }
+    if (path.endsWith('/verify') && verifyRefuses) {
+      throw _boom(path, status: 400);
+    }
     if (path == '/v1/auth/step-up/challenges') {
       return _ok(path, {
         'challengeId': 'ch-1',
-        'expiresAt': '2026-10-26T22:00:00.000Z',
+        'expiresAt': challengeExpired
+            ? '2020-01-01T00:00:00.000Z'
+            : DateTime.now()
+                  .toUtc()
+                  .add(const Duration(minutes: 10))
+                  .toIso8601String(),
         'delivery': 'email',
       });
     }
     if (path.endsWith('/verify')) return _ok(path, {'grantToken': 'grant-1'});
+    if (path == '/v1/payment/earnings/stripe/onboarding-link') {
+      return _ok(path, {'onboardingUrl': ?onboardingUrl});
+    }
     if (path == '/v1/payment/earnings/application') {
       return _ok(path, {'application': _draftApplication});
     }
@@ -225,6 +347,52 @@ const _activeKhaimeRail = {
   'priority': 10,
 };
 
+const _onboardingPaystackRail = {
+  'id': 'rail-paystack',
+  'paymentProvider': 'paystack',
+  'custodyMode': 'direct',
+  'countryCode': 'NG',
+  'settlementCurrency': 'NGN',
+  'status': 'provider_onboarding',
+  'enabled': true,
+  'priority': 10,
+  'provider': {
+    'management': {'mode': 'paystack_bank'},
+  },
+};
+
+/// A Stripe rail partway through hosted onboarding: an account exists but
+/// Stripe is still asking for things, which is exactly when section 7 says
+/// to keep offering "Continue Stripe setup".
+const _onboardingStripeRail = {
+  'id': 'rail-stripe',
+  'paymentProvider': 'stripe',
+  'custodyMode': 'direct',
+  'countryCode': 'US',
+  'settlementCurrency': 'USD',
+  'status': 'provider_onboarding',
+  'enabled': true,
+  'priority': 5,
+  'provider': {
+    'detailsSubmitted': false,
+    'requirementsCurrentlyDue': ['identity_document'],
+    'management': {'mode': 'stripe_embedded'},
+  },
+};
+
+const _providerOwnedRequirements = {
+  'applicationId': 'app-1',
+  'railId': 'rail-paystack',
+  'requirements': [
+    {
+      'code': 'identity_and_bank',
+      'label': 'Identity and bank verification',
+      'owner': 'provider',
+      'status': 'pending',
+    },
+  ],
+};
+
 const _reviewingPaystackRail = {
   'id': 'rail-paystack',
   'paymentProvider': 'paystack',
@@ -299,12 +467,25 @@ Future<_FakeApi> _pumpGiving(
   Map<String, dynamic>? application,
   List<Map<String, dynamic>>? optionItems,
   bool failReads = false,
+  bool verifyRefuses = false,
+  bool verifyExhausted = false,
+  bool resendTooSoon = false,
+  bool challengeExpired = false,
+  Completer<void>? hold,
+  Completer<void>? holdWrite,
+  VoidCallback? onLeaveStudio,
   Size size = const Size(390, 844),
 }) async {
   final api = _FakeApi(
     application: application,
     optionItems: optionItems,
     failReads: failReads,
+    verifyRefuses: verifyRefuses,
+    verifyExhausted: verifyExhausted,
+    resendTooSoon: resendTooSoon,
+    challengeExpired: challengeExpired,
+    hold: hold,
+    holdWrite: holdWrite,
   );
   tester.view.physicalSize = size * 3;
   tester.view.devicePixelRatio = 3;
@@ -318,6 +499,7 @@ Future<_FakeApi> _pumpGiving(
         home: GivingScreen(
           repo: GivingRepo(api: api),
           context: _dashboard,
+          onLeaveStudio: onLeaveStudio,
         ),
       ),
     ),
@@ -363,11 +545,13 @@ Future<_FakeApi> _pumpFunds(
   WidgetTester tester, {
   Map<String, dynamic>? funds,
   bool reportingRefuses = false,
+  Completer<void>? holdWrite,
 }) async {
   final api = _FakeApi(
     summary: _emptySummary,
     funds: funds,
     reportingRefuses: reportingRefuses,
+    holdWrite: holdWrite,
   );
   tester.view.physicalSize = const Size(390, 844) * 3;
   tester.view.devicePixelRatio = 3;
@@ -402,15 +586,20 @@ Future<void> _scrollTo(WidgetTester tester, Finder target) async {
   await tester.pumpAndSettle();
 }
 
-Future<void> _pumpRail(
+Future<_FakeApi> _pumpRail(
   WidgetTester tester, {
   Map<String, dynamic> rail = _activeKhaimeRail,
   Map<String, dynamic> requirements = _noRequirements,
+  List<String>? submitRefusal,
 }) async {
   tester.view.physicalSize = const Size(390, 844) * 3;
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
-  final api = _RequirementsApi(requirements, rail);
+  final api = _RequirementsApi(
+    requirements,
+    rail,
+    submitRefusal: submitRefusal,
+  );
   await tester.pumpWidget(
     SizingBuilder(
       baseSize: const Size(390, 844),
@@ -421,17 +610,60 @@ Future<void> _pumpRail(
           rail: GivingRail.fromJson(rail),
           application: GivingApplication.fromJson(_applicationWith([rail])),
           repo: GivingRepo(api: api),
+          api: api,
         ),
       ),
     ),
   );
   await tester.pumpAndSettle();
+  return api;
+}
+
+/// The Stripe handoff on its own, with the browser and the web origin
+/// injected so no test reaches a plugin or a `.env`.
+Future<_FakeApi> _pumpStripe(
+  WidgetTester tester, {
+  String? onboardingUrl = 'https://connect.stripe.com/setup/s/ONE_TIME',
+  List<Uri>? opened,
+  bool opens = true,
+  Map<String, dynamic>? requirements,
+}) async {
+  tester.view.physicalSize = const Size(390, 844) * 3;
+  tester.view.devicePixelRatio = 3;
+  addTearDown(tester.view.reset);
+  final api = _FakeApi(onboardingUrl: onboardingUrl);
+  await tester.pumpWidget(
+    SizingBuilder(
+      baseSize: const Size(390, 844),
+      builder: (_) => MaterialApp(
+        theme: ThemeData(scaffoldBackgroundColor: AppColors.base1),
+        home: GivingStripeScreen(
+          creatorId: 'c-1',
+          rail: GivingRail.fromJson(_onboardingStripeRail),
+          requirements: requirements == null
+              ? null
+              : RailRequirements.fromJson(requirements),
+          repo: GivingRepo(api: api),
+          origin: 'https://app.staging.gospeltube.tv',
+          launcher: (uri) async {
+            opened?.add(uri);
+            return opens;
+          },
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return api;
 }
 
 /// Answers the rail screen's two reads and nothing else.
 class _RequirementsApi extends _FakeApi {
-  _RequirementsApi(this.requirements, Map<String, dynamic> rail)
-    : super(application: _applicationWith([rail]));
+  _RequirementsApi(
+    this.requirements,
+    Map<String, dynamic> rail, {
+    super.submitRefusal,
+  }) : super(application: _applicationWith([rail]));
 
   final Map<String, dynamic> requirements;
 
@@ -737,6 +969,172 @@ void main() {
       );
     });
 
+    testWidgets('a refused code keeps the sheet open and says so', (
+      tester,
+    ) async {
+      // Reported from the device on 2026-11-02: verifying closed the sheet
+      // and left the page exactly as it was, with no message anywhere. The
+      // screen used to own this call, so a refusal arrived after the sheet
+      // it belonged to had gone.
+      final api = await _pumpGiving(
+        tester,
+        application: _draftApplication,
+        verifyRefuses: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('setup-khaime')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-connect-securely')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('giving-code')),
+        '123456',
+      );
+      await tester.tap(find.byKey(const ValueKey('giving-verify')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('giving-code')), findsOneWidget);
+      expect(find.text(AppStrings.givingCodeWrong), findsOneWidget);
+      // And nothing was enrolled on the strength of a code the server
+      // would not take.
+      expect(
+        api.posted.map((p) => p.$1),
+        isNot(contains('/v1/payment/earnings/rails')),
+      );
+    });
+
+    testWidgets('a write says it is working once its sheet has gone', (
+      tester,
+    ) async {
+      // Reported from the device on 2026-11-02: the sheet closed on the CTA
+      // and the page simply sat there until it changed. Every write here is
+      // reached from a sheet, so by the time one runs there is no button
+      // left under the finger to carry a spinner.
+      final hold = Completer<void>();
+      await _pumpGiving(tester, holdWrite: hold);
+
+      await tester.tap(find.byKey(const ValueKey('giving-start')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-accept-terms')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-save-recipient')));
+      await tester.pump();
+
+      expect(find.text(AppStrings.givingWorking), findsOneWidget);
+
+      hold.complete();
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.givingWorking), findsNothing);
+    });
+
+    testWidgets('a spent challenge stops asking for the same code', (
+      tester,
+    ) async {
+      // Once the tries are used up no code will ever work on that
+      // challenge, so offering Verify again is offering a dead end.
+      await _pumpGiving(
+        tester,
+        application: _draftApplication,
+        verifyExhausted: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('setup-khaime')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-connect-securely')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('giving-code')),
+        '123456',
+      );
+      await tester.tap(find.byKey(const ValueKey('giving-verify')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.givingCodeAttemptsUsed), findsOneWidget);
+      final button = tester.widget<PrimaryButton>(
+        find.byKey(const ValueKey('giving-verify')),
+      );
+      expect(button.enabled, isFalse, reason: 'Resend is the only way on');
+    });
+
+    testWidgets('an expired code is not called a typo', (tester) async {
+      // The guide warns against reporting a step-up refusal as a wrong code
+      // without ruling expiry out: a creator who copied it correctly from an
+      // email they opened late would be told they cannot read.
+      await _pumpGiving(
+        tester,
+        application: _draftApplication,
+        verifyRefuses: true,
+        challengeExpired: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('setup-khaime')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-connect-securely')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('giving-code')),
+        '123456',
+      );
+      await tester.tap(find.byKey(const ValueKey('giving-verify')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.givingCodeExpired), findsOneWidget);
+      expect(find.text(AppStrings.givingCodeWrong), findsNothing);
+    });
+
+    testWidgets('verifying shows the wait on the button that was tapped', (
+      tester,
+    ) async {
+      final hold = Completer<void>();
+      await _pumpGiving(tester, application: _draftApplication, hold: hold);
+
+      await tester.tap(find.byKey(const ValueKey('setup-khaime')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-connect-securely')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('giving-code')),
+        '123456',
+      );
+      await tester.tap(find.byKey(const ValueKey('giving-verify')));
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('giving-verify')),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+
+      hold.complete();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('asking again too soon is not reported as a breakage', (
+      tester,
+    ) async {
+      // Probed on 2026-11-02: the resend route refuses inside its cooldown
+      // with `details.resendAvailableAt`. Read as a generic write failure it
+      // says "that did not go through", which sends a creator round again
+      // instead of waiting half a minute.
+      await _pumpGiving(
+        tester,
+        application: _draftApplication,
+        resendTooSoon: true,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('setup-khaime')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-connect-securely')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('giving-resend')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.givingCodeResendTooSoon), findsOneWidget);
+      expect(find.text(AppStrings.givingWriteFailed), findsNothing);
+    });
+
     testWidgets('a failed read offers a retry rather than an empty tab', (
       tester,
     ) async {
@@ -782,6 +1180,29 @@ void main() {
       );
 
       expect(find.text(AppStrings.givingTieBreakTitle), findsNothing);
+    });
+  });
+
+  group('the switcher, from a tab that is not Studio', () {
+    testWidgets('back to watching leaves from the Giving tab too', (
+      tester,
+    ) async {
+      // Found on a device on 2026-11-03. Three of the four tabs that open
+      // this sheet handled only `switchTo`, so the row worked from the
+      // Studio tab and nowhere else.
+      var left = false;
+      await _pumpGiving(
+        tester,
+        application: _draftApplication,
+        onLeaveStudio: () => left = true,
+      );
+
+      await tester.tap(find.byType(StudioPill));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('back-to-watching')));
+      await tester.pumpAndSettle();
+
+      expect(left, isTrue);
     });
   });
 
@@ -1130,6 +1551,37 @@ void main() {
       expect(body.containsKey('description'), isFalse);
     });
 
+    testWidgets('creating one says it is working while it does', (
+      tester,
+    ) async {
+      // The same gap as the Giving tab's: the dialog closes on Save and the
+      // list cannot change until the round trip lands.
+      final hold = Completer<void>();
+      await _pumpFunds(
+        tester,
+        holdWrite: hold,
+        funds: {
+          ..._defaultFunds,
+          'limits': {'maxFunds': 5, 'currentFunds': 1, 'canCreate': true},
+        },
+      );
+
+      await tester.tap(find.byKey(const ValueKey('new-fund')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('fund-name')),
+        'Building Fund',
+      );
+      await tester.tap(find.byKey(const ValueKey('giving-save-fund')));
+      await tester.pump();
+
+      expect(find.text(AppStrings.givingWorking), findsOneWidget);
+
+      hold.complete();
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.givingWorking), findsNothing);
+    });
+
     testWidgets('a refused reporting read offers a retry', (tester) async {
       // Every reporting route answers "Giving application not found" until
       // an application exists, so the screen must not render as an empty
@@ -1209,6 +1661,1143 @@ void main() {
       await _scrollTo(tester, find.text(AppStrings.givingRailSettlementRoute));
       expect(find.text('Nigeria · NGN'), findsOneWidget);
     });
+
+    /// A case waiting on the two documents the creator has to supply.
+    ///
+    /// This is the shape that produced the bug: both are `creator`-owned, so
+    /// the GospelTube track lists them, and neither could be attached from
+    /// anywhere on this screen.
+    const owedByCreator = {
+      'applicationId': 'app-1',
+      'railId': 'rail-khaime',
+      'requirements': [
+        {
+          'code': 'identity',
+          'label': 'Government-issued identity document',
+          'owner': 'creator',
+          'status': 'pending',
+          'evidenceType': 'identity_document',
+        },
+        {
+          'code': 'selfie',
+          'label': 'Selfie holding the identity document',
+          'owner': 'creator',
+          'status': 'pending',
+          'evidenceType': 'selfie',
+        },
+        {
+          'code': 'khaime_review',
+          'label': 'Khaime identity and bank review',
+          'owner': 'provider',
+          'status': 'pending',
+        },
+      ],
+    };
+
+    testWidgets('a document the creator still owes takes the submit\'s place', (
+      tester,
+    ) async {
+      // The whole bug in one assertion. The track listed two documents the
+      // creator had to supply and offered only "Submit for review", whose
+      // one possible outcome was a 400 naming those same two documents —
+      // the upload lived behind the *other* track's button.
+      await _pumpRail(
+        tester,
+        rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
+        requirements: owedByCreator,
+      );
+
+      expect(find.text(AppStrings.givingUploadDocuments), findsOneWidget);
+      expect(find.text(AppStrings.givingSubmitForReview), findsNothing);
+    });
+
+    testWidgets('submit comes back once the documents are uploaded', (
+      tester,
+    ) async {
+      // `submitted` with a file on it is what an attach leaves behind, and
+      // it is the state the creator sits in waiting for the review. It is
+      // still *uploadable* — a file may be replaced right up until it is
+      // accepted — so reading "the creator can act on this" as "this is
+      // missing" would hold the submit back forever.
+      await _pumpRail(
+        tester,
+        rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
+        requirements: {
+          ...owedByCreator,
+          'requirements': [
+            for (final requirement
+                in owedByCreator['requirements']! as List<Map<String, dynamic>>)
+              requirement['owner'] == 'creator'
+                  ? {...requirement, 'status': 'submitted', 'fileId': 'file-1'}
+                  : requirement,
+          ],
+        },
+      );
+
+      expect(find.text(AppStrings.givingSubmitForReview), findsOneWidget);
+      expect(find.text(AppStrings.givingUploadDocuments), findsNothing);
+    });
+
+    testWidgets('a rejected document blocks the submit again', (tester) async {
+      // A rejection reopens the requirement: there is a file on it, and it
+      // is not one the review will take.
+      await _pumpRail(
+        tester,
+        rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
+        requirements: {
+          ...owedByCreator,
+          'requirements': [
+            {
+              'code': 'identity',
+              'label': 'Government-issued identity document',
+              'owner': 'creator',
+              'status': 'rejected',
+              'evidenceType': 'identity_document',
+              'fileId': 'file-1',
+              'rejectionReason': 'The photograph is too dark to read.',
+            },
+          ],
+        },
+      );
+
+      expect(find.text(AppStrings.givingUploadDocuments), findsOneWidget);
+      expect(find.text(AppStrings.givingSubmitForReview), findsNothing);
+    });
+
+    testWidgets('the checklist offers an upload only on the creator\'s rows', (
+      tester,
+    ) async {
+      await _pumpRail(
+        tester,
+        rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
+        requirements: owedByCreator,
+      );
+
+      await _scrollTo(tester, find.text(AppStrings.givingReviewChecklist));
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
+      await tester.pumpAndSettle();
+
+      // One per creator-owned row, and none against the provider's own
+      // review — nothing the creator uploads can satisfy that one.
+      expect(find.text(AppStrings.givingUploadDocument), findsNWidgets(2));
+    });
+
+    testWidgets('a finished track stops offering its own setup', (
+      tester,
+    ) async {
+      // Found on a device on 2026-11-02: "Provider verification ·
+      // Completed" with a live "Continue Setup Khaime" under it. The
+      // action was gated on the *rail* being active, and the rail was not
+      // — GospelTube's half was still outstanding — so a track that had
+      // nothing left to do kept offering to reopen the identity form the
+      // provider had already approved.
+      await _pumpRail(
+        tester,
+        rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
+        requirements: {
+          'applicationId': 'app-1',
+          'railId': 'rail-khaime',
+          'requirements': [
+            {
+              'code': 'identity',
+              'label': 'Government-issued identity document',
+              'owner': 'creator',
+              'status': 'pending',
+              'evidenceType': 'identity_document',
+            },
+            {
+              'code': 'khaime_review',
+              'label': 'Khaime identity and bank review',
+              'owner': 'provider',
+              'status': 'accepted',
+            },
+          ],
+        },
+      );
+
+      expect(find.text(AppStrings.givingTrackCompleted), findsOneWidget);
+      expect(
+        find.text(AppStrings.givingContinueProvider('Khaime')),
+        findsNothing,
+      );
+      // The other track is not finished, so its own action stays.
+      expect(find.text(AppStrings.givingUploadDocuments), findsOneWidget);
+    });
+
+    testWidgets('a provider still working is still offered its setup', (
+      tester,
+    ) async {
+      // `kycStatus` comes down with the fixture as `verified`, which is
+      // the opposite of what this case is about: section 2's machine runs
+      // `not_started -> in_progress -> submitted`, and a rail whose form
+      // is half-filled is `in_progress`.
+      await _pumpRail(
+        tester,
+        rail: {
+          ..._activeKhaimeRail,
+          'status': 'collecting_information',
+          'kycStatus': 'in_progress',
+        },
+        requirements: owedByCreator,
+      );
+
+      expect(
+        find.text(AppStrings.givingContinueProvider('Khaime')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('continue setup opens the Paystack form, not a snackbar', (
+      tester,
+    ) async {
+      // Found on a device on 2026-11-02: the button answered with
+      // "finish verification securely on the provider" and went nowhere.
+      // Paystack has no hosted page — section 8 is three ordinary routes —
+      // so that copy was both a dead end and untrue for this provider.
+      await _pumpRail(
+        tester,
+        rail: _onboardingPaystackRail,
+        requirements: {
+          'applicationId': 'app-1',
+          'railId': 'rail-paystack',
+          'requirements': [
+            {
+              'code': 'identity_and_bank',
+              'label': 'Identity and bank verification',
+              'owner': 'provider',
+              'status': 'pending',
+            },
+          ],
+        },
+      );
+
+      await tester.tap(
+        find.text(AppStrings.givingContinueProvider('Paystack')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GivingPaystackScreen), findsOneWidget);
+      expect(find.text(AppStrings.givingProviderFormBody), findsNothing);
+    });
+
+    testWidgets('a provider already holding the details stops offering it', (
+      tester,
+    ) async {
+      // Found on a device on 2026-11-03. The subaccount had been created —
+      // the rail read "Under review" — and the provider card still offered
+      // "Continue Setup Paystack", which reopens the settlement-account
+      // form. Changing the destination once it is recorded is a versioned
+      // recipient change, not a resubmission.
+      await _pumpRail(
+        tester,
+        rail: {
+          ..._onboardingPaystackRail,
+          'status': 'platform_review',
+          'settlementAccount': {
+            'accountName': 'Guaranty Trust Bank',
+            'accountNumberLast4': '6789',
+          },
+        },
+        requirements: _providerOwnedRequirements,
+      );
+
+      expect(
+        find.text(AppStrings.givingContinueProvider('Paystack')),
+        findsNothing,
+      );
+      // And says why, rather than leaving an outstanding row above a card
+      // with no way on.
+      expect(
+        find.text(AppStrings.givingProviderWaiting('Paystack')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the tab card agrees with the screen behind it', (
+      tester,
+    ) async {
+      // Two places name the same move, and a tab offering "Continue Setup
+      // Paystack" over a screen asking for a correction is the kind of
+      // disagreement a creator reads as the app being broken.
+      await _pumpGiving(
+        tester,
+        application: _applicationWith([
+          {..._onboardingPaystackRail, 'status': 'more_information_required'},
+        ]),
+      );
+
+      expect(find.text(AppStrings.givingProviderUpdate), findsOneWidget);
+      expect(
+        find.text(AppStrings.givingContinueProvider('Paystack')),
+        findsNothing,
+      );
+    });
+
+    /// What the provider track says, for each of the four places the
+    /// provider half can be.
+    ///
+    /// Reported from a device on 2026-11-03 against Stripe: the hosted
+    /// onboarding had been completed and the card still offered "Continue
+    /// Setup Stripe". The deeper fault was that the card only ever asked
+    /// one yes/no question, so *waiting on a decision* and *the decision
+    /// came back and said no* were the same answer — and the second one
+    /// left a creator no way to put anything right.
+    group('the provider track, state by state', () {
+      Map<String, dynamic> stripeRail({
+        bool detailsSubmitted = true,
+        List<String> due = const [],
+        bool? approved,
+        String status = 'provider_onboarding',
+      }) => {
+        ..._onboardingStripeRail,
+        'status': status,
+        'provider': {
+          'detailsSubmitted': detailsSubmitted,
+          'requirementsCurrentlyDue': due,
+          'management': {'mode': 'stripe_embedded'},
+          if (approved != null) 'stripeAccountControls': {'approved': approved},
+        },
+      };
+
+      testWidgets('Stripe stops offering setup once the form is done', (
+        tester,
+      ) async {
+        // The report itself: `detailsSubmitted` with nothing currently
+        // due is Stripe verifying, not Stripe waiting on the creator.
+        await _pumpRail(
+          tester,
+          rail: stripeRail(approved: false),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(
+          find.text(AppStrings.givingContinueProvider('Stripe')),
+          findsNothing,
+        );
+        expect(find.text(AppStrings.givingProviderUpdate), findsNothing);
+      });
+
+      testWidgets('and says who is being waited on, in Stripe\'s words', (
+        tester,
+      ) async {
+        // Section 7 allows exactly this one neutral state while
+        // `approved=false`, and nothing stronger.
+        await _pumpRail(
+          tester,
+          rail: stripeRail(approved: false),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(
+          find.text(AppStrings.givingProviderVerifying('Stripe')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('an approved Stripe account finishes the track', (
+        tester,
+      ) async {
+        // `stripeAccountControls.approved` is Stripe's own verdict and was
+        // not read at all before.
+        await _pumpRail(
+          tester,
+          rail: stripeRail(approved: true),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(find.text(AppStrings.givingTrackCompleted), findsNWidgets(1));
+        expect(
+          find.text(AppStrings.givingContinueProvider('Stripe')),
+          findsNothing,
+        );
+      });
+
+      testWidgets('an unfinished Stripe form still gets its setup', (
+        tester,
+      ) async {
+        await _pumpRail(
+          tester,
+          rail: stripeRail(detailsSubmitted: false),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(
+          find.text(AppStrings.givingContinueProvider('Stripe')),
+          findsOneWidget,
+        );
+      });
+
+      for (final (provider, rail, screen)
+          in <(String, Map<String, dynamic>, Type)>[
+            ('Stripe', _onboardingStripeRail, GivingStripeScreen),
+            ('Paystack', _onboardingPaystackRail, GivingPaystackScreen),
+            ('Khaime', _activeKhaimeRail, GivingKycScreen),
+          ]) {
+        testWidgets('$provider offers a way to put a refusal right', (
+          tester,
+        ) async {
+          // The state with no UI at all before this: the rail came back
+          // needing something changed and the card said nothing to do.
+          await _pumpRail(
+            tester,
+            rail: {...rail, 'status': 'more_information_required'},
+            requirements: _providerOwnedRequirements,
+          );
+
+          expect(find.text(AppStrings.givingProviderUpdate), findsOneWidget);
+          expect(
+            find.text(AppStrings.givingContinueProvider(provider)),
+            findsNothing,
+          );
+
+          await tester.tap(find.text(AppStrings.givingProviderUpdate));
+          await tester.pumpAndSettle();
+
+          expect(find.byType(screen), findsOneWidget);
+        });
+      }
+
+      testWidgets('a rejected rail does too', (tester) async {
+        await _pumpRail(
+          tester,
+          rail: {..._onboardingPaystackRail, 'status': 'rejected'},
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(find.text(AppStrings.givingProviderUpdate), findsOneWidget);
+      });
+
+      testWidgets('and so does a rejected provider KYC', (tester) async {
+        // Khaime has `kyc/resubmit` for precisely this.
+        await _pumpRail(
+          tester,
+          rail: {
+            ..._activeKhaimeRail,
+            'status': 'provider_onboarding',
+            'kycStatus': 'rejected',
+          },
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(find.text(AppStrings.givingProviderUpdate), findsOneWidget);
+      });
+
+      testWidgets('the provider\'s own reason stands in for the stock line', (
+        tester,
+      ) async {
+        await _pumpRail(
+          tester,
+          rail: {..._onboardingPaystackRail, 'status': 'rejected'},
+          requirements: {
+            'applicationId': 'app-1',
+            'railId': 'rail-paystack',
+            'requirements': [
+              {
+                'code': 'bank_account_name_review',
+                'label': 'Bank account name review',
+                'owner': 'provider',
+                'status': 'rejected',
+                'rejectionReason':
+                    'The account name does not match the legal recipient.',
+              },
+            ],
+          },
+        );
+
+        expect(
+          find.text('The account name does not match the legal recipient.'),
+          findsOneWidget,
+        );
+        expect(
+          find.text(AppStrings.givingProviderUpdateNote('Paystack')),
+          findsNothing,
+        );
+      });
+
+      /// The payload from the device on 2026-11-03, trimmed to the
+      /// fields that decide anything: `status: provider_onboarding`,
+      /// `kycStatus: submitted`, a submitted `review`, and a provider
+      /// block whose Stripe mirror had not caught up.
+      Map<String, dynamic> reportedRail({
+        String kycStatus = 'submitted',
+        bool detailsSubmitted = false,
+        List<String> due = const [],
+      }) => {
+        ..._onboardingStripeRail,
+        'kycStatus': kycStatus,
+        'review': {
+          'status': 'submitted',
+          'submittedAt': '2026-11-03T07:00:38.075Z',
+          'reviewedAt': null,
+          'reason': null,
+        },
+        'provider': {
+          'detailsSubmitted': detailsSubmitted,
+          'requirementsCurrentlyDue': due,
+          'management': {'mode': 'stripe_embedded'},
+        },
+      };
+
+      Finder inProvider(String text) => find.descendant(
+        of: find.byKey(const ValueKey('track-provider')),
+        matching: find.text(text),
+      );
+
+      testWidgets('a rail waiting on a decision offers nothing to change', (
+        tester,
+      ) async {
+        await _pumpRail(
+          tester,
+          rail: {
+            ..._onboardingPaystackRail,
+            'status': 'platform_review',
+            'settlementAccount': {'accountNumberLast4': '6789'},
+          },
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(find.text(AppStrings.givingProviderUpdate), findsNothing);
+        expect(
+          find.text(AppStrings.givingProviderWaiting('Paystack')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('a submitted KYC is never called "Not started"', (
+        tester,
+      ) async {
+        // The report: "the screen says that I've not started Stripe
+        // provider verification even though I have submitted it and the
+        // data also says so". `kycStatus: submitted` is the data saying
+        // so, and it outranks the provider's asynchronous mirror of it.
+        await _pumpRail(
+          tester,
+          rail: reportedRail(),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inProvider(AppStrings.givingTrackNotStarted), findsNothing);
+        expect(
+          find.text(AppStrings.givingContinueProvider('Stripe')),
+          findsNothing,
+        );
+        expect(inProvider(AppStrings.givingTrackWaiting), findsOneWidget);
+      });
+
+      testWidgets('but a rail Stripe is still asking of keeps its setup', (
+        tester,
+      ) async {
+        // `currently_due` is the one thing that outranks the KYC state:
+        // Stripe is asking today, whatever was handed over yesterday.
+        await _pumpRail(
+          tester,
+          rail: reportedRail(due: ['individual.verification.document']),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(
+          find.text(AppStrings.givingContinueProvider('Stripe')),
+          findsOneWidget,
+        );
+        expect(
+          find.text(AppStrings.givingProviderWants('Stripe')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('and says so differently from a half-finished form', (
+        tester,
+      ) async {
+        // Same button, two different reasons. Reopening the flow helps
+        // with one of them and cannot help with the other.
+        await _pumpRail(
+          tester,
+          rail: {
+            ...reportedRail(kycStatus: 'in_progress'),
+            'status': 'collecting_information',
+          },
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(
+          find.text(AppStrings.givingProviderUnfinished('Stripe')),
+          findsOneWidget,
+        );
+        expect(inProvider(AppStrings.givingTrackActionNeeded), findsOneWidget);
+      });
+
+      testWidgets('a rail nobody has touched still says so', (tester) async {
+        await _pumpRail(
+          tester,
+          rail: {
+            ...reportedRail(kycStatus: 'not_started'),
+            'status': 'collecting_information',
+            'review': <String, dynamic>{},
+          },
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inProvider(AppStrings.givingTrackNotStarted), findsOneWidget);
+      });
+
+      testWidgets('a verified KYC finishes the provider track', (tester) async {
+        await _pumpRail(
+          tester,
+          rail: reportedRail(kycStatus: 'verified'),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inProvider(AppStrings.givingTrackCompleted), findsOneWidget);
+      });
+
+      testWidgets('a reopened case is the creator\'s move again', (
+        tester,
+      ) async {
+        // A rail sent back keeps the KYC it had, so `verified` survives
+        // alongside a status that says otherwise. The status is newer.
+        await _pumpRail(
+          tester,
+          rail: {
+            ...reportedRail(kycStatus: 'verified'),
+            'status': 'more_information_required',
+          },
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(find.text(AppStrings.givingProviderUpdate), findsOneWidget);
+      });
+    });
+
+    /// GospelTube's own half, which could only ever say "Under review"
+    /// because it read the requirement list instead of the decision the
+    /// rail carries in `review`.
+    group('the GospelTube track reads its own verdict', () {
+      Finder inTrack(String text) => find.descendant(
+        of: find.byKey(const ValueKey('track-gospeltube')),
+        matching: find.text(text),
+      );
+
+      Map<String, dynamic> reviewed(Map<String, dynamic> review) => {
+        ..._onboardingStripeRail,
+        'kycStatus': 'submitted',
+        'review': review,
+      };
+
+      testWidgets('a refusal says so, in the reviewer\'s own words', (
+        tester,
+      ) async {
+        await _pumpRail(
+          tester,
+          rail: reviewed({
+            'status': 'rejected',
+            'reason': 'The registration does not name the legal recipient.',
+          }),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inTrack(AppStrings.givingTrackActionNeeded), findsOneWidget);
+        expect(
+          find.text('The registration does not name the legal recipient.'),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('an information request does too', (tester) async {
+        await _pumpRail(
+          tester,
+          rail: reviewed({'status': 'information_requested', 'reason': null}),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inTrack(AppStrings.givingTrackActionNeeded), findsOneWidget);
+        expect(find.text(AppStrings.givingReviewNeedsMore), findsOneWidget);
+      });
+
+      testWidgets('an approval finishes the track', (tester) async {
+        await _pumpRail(
+          tester,
+          rail: reviewed({
+            'status': 'approved',
+            'reviewedAt': '2026-11-03T09:00:00.000Z',
+          }),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inTrack(AppStrings.givingTrackCompleted), findsOneWidget);
+      });
+
+      testWidgets('and a submitted one is still under review', (tester) async {
+        await _pumpRail(
+          tester,
+          rail: reviewed({'status': 'submitted'}),
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inTrack(AppStrings.givingTrackUnderReview), findsOneWidget);
+      });
+
+      testWidgets('a rail with no decision keeps the old reading', (
+        tester,
+      ) async {
+        // An absent block says nothing, and nothing is not a verdict.
+        await _pumpRail(
+          tester,
+          rail: {..._onboardingStripeRail, 'review': <String, dynamic>{}},
+          requirements: _providerOwnedRequirements,
+        );
+
+        expect(inTrack(AppStrings.givingTrackActionNeeded), findsNothing);
+      });
+    });
+
+    testWidgets('details already at the provider count on their own', (
+      tester,
+    ) async {
+      // `detailsSubmitted` is the provider's own word for "the creator's
+      // details reached us", and it is the half of the answer that does
+      // not depend on GospelTube having recorded a destination yet.
+      await _pumpRail(
+        tester,
+        rail: {
+          ..._onboardingPaystackRail,
+          'provider': {
+            'detailsSubmitted': true,
+            'management': {'mode': 'paystack_bank'},
+          },
+        },
+        requirements: _providerOwnedRequirements,
+      );
+
+      expect(
+        find.text(AppStrings.givingContinueProvider('Paystack')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Stripe keeps its setup while requirements remain', (
+      tester,
+    ) async {
+      // Section 7: "While initial onboarding requirements remain, render
+      // Continue Stripe setup." Its hosted flow can be abandoned halfway,
+      // so the way back has to stay.
+      await _pumpRail(
+        tester,
+        rail: _onboardingStripeRail,
+        requirements: _providerOwnedRequirements,
+      );
+
+      await tester.tap(find.text(AppStrings.givingContinueProvider('Stripe')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GivingStripeScreen), findsOneWidget);
+      // The snackbar it used to answer with belongs to a provider none of
+      // the three forms match.
+      expect(find.text(AppStrings.givingProviderFormBody), findsNothing);
+    });
+
+    testWidgets('Stripe keeps it even once its account exists', (tester) async {
+      // The clause that separates Stripe from the other two. Stripe can
+      // ask for more after `detailsSubmitted` — a document, an owner —
+      // and those are the creator's to answer on Stripe's own pages. The
+      // Paystack rule, "the provider has the details, so there is nothing
+      // left to send", would close the only door.
+      await _pumpRail(
+        tester,
+        rail: {
+          ..._onboardingStripeRail,
+          'provider': {
+            'detailsSubmitted': true,
+            'requirementsCurrentlyDue': ['individual.verification.document'],
+            'management': {'mode': 'stripe_embedded'},
+          },
+          'settlementAccount': {'accountNumberLast4': '4242'},
+        },
+        requirements: _providerOwnedRequirements,
+      );
+
+      expect(
+        find.text(AppStrings.givingContinueProvider('Stripe')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a refused submit says which documents are missing', (
+      tester,
+    ) async {
+      // Verbatim from the device on 2026-11-02. Reported as "that did not
+      // go through", it told a creator nothing about what to do next.
+      const refusal = [
+        'Missing required information: Government-issued identity document, '
+            'Selfie holding the identity document',
+      ];
+      await _pumpRail(
+        tester,
+        rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
+        submitRefusal: refusal,
+      );
+
+      await tester.tap(find.text(AppStrings.givingSubmitForReview));
+      await tester.pumpAndSettle();
+
+      expect(find.text(refusal.single), findsOneWidget);
+      expect(find.text(AppStrings.givingWriteFailed), findsNothing);
+    });
+  });
+
+  group('the Paystack form', () {
+    Future<_FakeApi> pumpPaystack(
+      WidgetTester tester, {
+      String? resolvedAccountName = 'FOOD FOR THOUGHT',
+    }) async {
+      tester.view.physicalSize = const Size(390, 1200) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final api = _FakeApi(resolvedAccountName: resolvedAccountName);
+      await tester.pumpWidget(
+        SizingBuilder(
+          baseSize: const Size(390, 844),
+          builder: (_) => MaterialApp(
+            theme: ThemeData(scaffoldBackgroundColor: AppColors.base1),
+            home: GivingPaystackScreen(
+              creatorId: 'c-1',
+              rail: GivingRail.fromJson(_onboardingPaystackRail),
+              application: GivingApplication.fromJson(_draftApplication),
+              requirements: RailRequirements.fromJson(const {
+                'applicationId': 'app-1',
+                'railId': 'rail-paystack',
+                'requirements': <Map<String, dynamic>>[],
+                'policy': {
+                  'id': 'p-1',
+                  'code': 'ng-individual',
+                  'version': 3,
+                  'allowedAccountOwnership': ['legal_recipient'],
+                },
+              }),
+              repo: GivingRepo(api: api),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return api;
+    }
+
+    Future<void> chooseBank(WidgetTester tester) async {
+      await tester.tap(find.byKey(const ValueKey('paystack-bank')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guaranty Trust Bank').last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('the number is resolved and the name shown before anything '
+        'is created', (tester) async {
+      // "Show the returned account name for explicit confirmation." The
+      // subaccount is the thing that cannot be taken back, so it does not
+      // happen until the creator has seen whose account this is.
+      final api = await pumpPaystack(tester);
+      await chooseBank(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('paystack-account-number')),
+        '0123456789',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('paystack-check')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('FOOD FOR THOUGHT'), findsOneWidget);
+      expect(
+        api.posted.where(
+          (call) => call.$1 == '/v1/payment/earnings/paystack/subaccount',
+        ),
+        isEmpty,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('paystack-connect')));
+      await tester.pumpAndSettle();
+
+      final sent = api.posted.firstWhere(
+        (call) => call.$1 == '/v1/payment/earnings/paystack/subaccount',
+      );
+      final body = sent.$2! as Map;
+      expect(body['settlementBankCode'], '058');
+      expect(body['accountNumber'], '0123456789');
+      expect(body['accountOwnership'], 'legal_recipient');
+      expect(body['railId'], 'rail-paystack');
+    });
+
+    testWidgets('an unchecked account cannot be connected', (tester) async {
+      // Resolution is the confirmation step the guide asks for, not a
+      // convenience, so there is no path past it.
+      final api = await pumpPaystack(tester);
+      await chooseBank(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('paystack-account-number')),
+        '0123456789',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('paystack-connect')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.givingPaystackUnresolved), findsOneWidget);
+      expect(
+        api.posted.where(
+          (call) => call.$1 == '/v1/payment/earnings/paystack/subaccount',
+        ),
+        isEmpty,
+      );
+    });
+
+    testWidgets('editing the number forgets the name it resolved to', (
+      tester,
+    ) async {
+      // Otherwise the old name sits under a number it does not belong to,
+      // and connecting it would send gifts to a different account than the
+      // one confirmed.
+      await pumpPaystack(tester);
+      await chooseBank(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('paystack-account-number')),
+        '0123456789',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('paystack-check')));
+      await tester.pumpAndSettle();
+      expect(find.text('FOOD FOR THOUGHT'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('paystack-account-number')),
+        '0123456788',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('FOOD FOR THOUGHT'), findsNothing);
+    });
+
+    testWidgets('changing the bank forgets it too', (tester) async {
+      await pumpPaystack(tester);
+      await chooseBank(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('paystack-account-number')),
+        '0123456789',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('paystack-check')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('paystack-bank')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Access Bank').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('FOOD FOR THOUGHT'), findsNothing);
+    });
+
+    testWidgets('a number the bank does not know says so', (tester) async {
+      await pumpPaystack(tester, resolvedAccountName: null);
+      await chooseBank(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('paystack-account-number')),
+        '0000000000',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('paystack-check')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.givingPaystackResolveFailed), findsOneWidget);
+    });
+
+    testWidgets('it says the provider step is not the review', (tester) async {
+      // `detailsSubmitted=true` means the bank details reached Paystack,
+      // not that the owner was verified — and Paystack recipient review is
+      // mandatory for everyone.
+      await pumpPaystack(tester);
+      expect(find.text(AppStrings.givingPaystackReviewNote), findsOneWidget);
+    });
+  });
+
+  group('the Stripe handoff', () {
+    testWidgets('the browser is handed Stripe\'s own link', (tester) async {
+      final opened = <Uri>[];
+      final api = await _pumpStripe(tester, opened: opened);
+
+      await tester.tap(find.byKey(const ValueKey('stripe-open')));
+      await tester.pumpAndSettle();
+
+      // Stripe's URL, untouched: it is one-time and already authenticated.
+      expect(opened, [
+        Uri.parse('https://connect.stripe.com/setup/s/ONE_TIME'),
+      ]);
+      final body =
+          api.posted
+                  .firstWhere(
+                    (call) => call.$1.endsWith('/stripe/onboarding-link'),
+                  )
+                  .$2
+              as Map<String, dynamic>;
+      // Both callbacks are web pages on the app domain. The native app is
+      // not in this loop and never takes a Stripe callback as proof.
+      expect(
+        body['returnUrl'],
+        'https://app.staging.gospeltube.tv/earnings/onboarding/return',
+      );
+      expect(
+        body['refreshUrl'],
+        'https://app.staging.gospeltube.tv/earnings/onboarding/refresh',
+      );
+    });
+
+    testWidgets('a link that never arrived is said, not opened', (
+      tester,
+    ) async {
+      final opened = <Uri>[];
+      await _pumpStripe(tester, onboardingUrl: null, opened: opened);
+
+      await tester.tap(find.byKey(const ValueKey('stripe-open')));
+      await tester.pumpAndSettle();
+
+      expect(opened, isEmpty);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('stripe-problem'))).data,
+        AppStrings.givingStripeLinkFailed,
+      );
+    });
+
+    testWidgets('once the browser is open, a fresh link and a way back', (
+      tester,
+    ) async {
+      // Stripe's onboarding links are single-use and expire, which is what
+      // its own refreshUrl is for — so a creator who comes back to a dead
+      // page needs another one rather than a dead end.
+      await _pumpStripe(tester);
+
+      await tester.tap(find.byKey(const ValueKey('stripe-open')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('stripe-open')), findsNothing);
+      expect(find.byKey(const ValueKey('stripe-reopen')), findsOneWidget);
+      expect(find.byKey(const ValueKey('stripe-done')), findsOneWidget);
+    });
+
+    testWidgets('a browser that would not open is not treated as open', (
+      tester,
+    ) async {
+      await _pumpStripe(tester, opens: false);
+
+      await tester.tap(find.byKey(const ValueKey('stripe-open')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('stripe-open')), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('stripe-problem'))).data,
+        AppStrings.givingStripeOpenFailed,
+      );
+    });
+
+    testWidgets('the ownership comes from the policy', (tester) async {
+      // "accountOwnership must be one of the current case policy's
+      // allowedAccountOwnership values" — never inferred from the
+      // classification.
+      final api = await _pumpStripe(
+        tester,
+        requirements: {
+          'applicationId': 'app-1',
+          'railId': 'rail-stripe',
+          'requirements': const [],
+          'policy': {
+            'id': 'pol-1',
+            'code': 'US_INDIVIDUAL',
+            'version': 3,
+            'allowedAccountOwnership': ['legal_entity', 'legal_recipient'],
+          },
+        },
+      );
+
+      await tester.tap(find.byKey(const ValueKey('stripe-open')));
+      await tester.pumpAndSettle();
+
+      final body =
+          api.posted
+                  .firstWhere(
+                    (call) => call.$1.endsWith('/stripe/onboarding-link'),
+                  )
+                  .$2
+              as Map<String, dynamic>;
+      expect(body['accountOwnership'], 'legal_entity');
+    });
+
+    test('the web origin is the API host with its first label swapped', () {
+      // One setting, not two: `.env` names the API and nothing else, and
+      // the app-link entries in AndroidManifest.xml and
+      // Runner.entitlements verify exactly this host.
+      expect(
+        webAppOrigin(apiBase: 'https://api.staging.gospeltube.tv'),
+        'https://app.staging.gospeltube.tv',
+      );
+      expect(
+        webAppOrigin(apiBase: 'https://api.gospeltube.tv'),
+        'https://app.gospeltube.tv',
+      );
+    });
+
+    test('a host that is not api.* is left as it is', () {
+      // A wrong origin is worse than the one we were handed.
+      expect(
+        webAppOrigin(apiBase: 'http://localhost:4000'),
+        'http://localhost:4000',
+      );
+      expect(webAppOrigin(apiBase: '  '), isNull);
+    });
+  });
+
+  group('a refusal', () {
+    DioException refusing(Object? error) => DioException(
+      requestOptions: RequestOptions(path: '/x'),
+      response: Response(
+        requestOptions: RequestOptions(path: '/x'),
+        statusCode: 400,
+        data: {'success': false, 'data': null, 'error': error},
+      ),
+    );
+
+    test('a list of missing documents comes back a line each', () {
+      expect(
+        givingProblem(refusing(['Missing A', 'Missing B'])),
+        'Missing A\nMissing B',
+      );
+    });
+
+    test('a single sentence comes back as itself', () {
+      expect(
+        givingProblem(refusing('Bank not supported')),
+        'Bank not supported',
+      );
+    });
+
+    test('nothing usable is nothing, so the caller keeps its own wording', () {
+      expect(givingProblem(refusing('   ')), isNull);
+      expect(givingProblem(refusing(const <String>[])), isNull);
+      expect(givingProblem(refusing(null)), isNull);
+      expect(givingProblem(StateError('not from the wire')), isNull);
+    });
+
+    test('a gateway page that is not a map does not throw', () {
+      expect(
+        givingProblem(
+          DioException(
+            requestOptions: RequestOptions(path: '/x'),
+            response: Response(
+              requestOptions: RequestOptions(path: '/x'),
+              statusCode: 502,
+              data: '<html>Bad Gateway</html>',
+            ),
+          ),
+        ),
+        isNull,
+      );
+    });
   });
 
   group('the Khaime form', () {
@@ -1283,6 +2872,60 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('the bank list says it is loading, not that there is none', (
+      tester,
+    ) async {
+      // An empty list before the fetch lands is "not here yet", and the tap
+      // handler used to answer it with "no banks available" — a creator
+      // hunting a problem that was about to solve itself.
+      final hold = Completer<void>();
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      final api = _FakeApi(holdBanks: hold);
+      await tester.pumpWidget(
+        SizingBuilder(
+          baseSize: const Size(390, 844),
+          builder: (_) => MaterialApp(
+            theme: ThemeData(scaffoldBackgroundColor: AppColors.base1),
+            home: GivingKycScreen(
+              creatorId: 'c-1',
+              rail: GivingRail.fromJson(_activeKhaimeRail),
+              application: GivingApplication.fromJson(_draftApplication),
+              requirements: RailRequirements.fromJson(
+                caseWithOwnership(const []),
+              ),
+              repo: GivingRepo(api: api),
+              api: api,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Not _scrollTo: that settles, and a held spinner never settles.
+      final field = find.byKey(const ValueKey('kyc-bank'));
+      final sheet = find.byType(Scrollable).first;
+      for (var i = 0; i < 20 && field.evaluate().isEmpty; i++) {
+        await tester.drag(sheet, const Offset(0, -240));
+        await tester.pump();
+      }
+      expect(
+        find.descendant(
+          of: field,
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(field);
+      await tester.pump();
+      expect(find.text(AppStrings.givingBanksUnavailable), findsNothing);
+
+      hold.complete();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('a policy that allows no ownership can still submit', (
       tester,
     ) async {
@@ -1334,6 +2977,180 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.givingKycAddressRequired), findsOneWidget);
+    });
+
+    testWidgets('the date of birth is chosen, not typed', (tester) async {
+      // A free text field had to carry "YYYY-MM-DD" underneath it and still
+      // accepted anything at all. The wheel can only produce the one shape
+      // the route documents.
+      final api = await pumpForm(
+        tester,
+        caseWithOwnership(const ['legal_recipient']),
+      );
+      await fill(tester);
+
+      await tester.tap(find.byKey(const ValueKey('kyc-dob')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.newMediaDone));
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.byKey(const ValueKey('kyc-submit')));
+      await tester.tap(find.byKey(const ValueKey('kyc-submit')));
+      await tester.pumpAndSettle();
+
+      final sent = api.posted.firstWhere(
+        (call) => call.$1 == '/v1/payment/earnings/khaime/kyc',
+      );
+      final owner =
+          ((sent.$2 as Map)['owner'] as Map)['dateOfBirth'] as String?;
+      // The wheel opens thirty years back, and Done takes what it shows.
+      final expected = DateTime(DateTime.now().year - 30);
+      expect(owner, isNotNull);
+      expect(owner, matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+      expect(owner!.startsWith('${expected.year}-'), isTrue);
+    });
+
+    testWidgets('a date of birth nobody set is left out, not sent empty', (
+      tester,
+    ) async {
+      final api = await pumpForm(
+        tester,
+        caseWithOwnership(const ['legal_recipient']),
+      );
+      await fill(tester);
+
+      await _scrollTo(tester, find.byKey(const ValueKey('kyc-submit')));
+      await tester.tap(find.byKey(const ValueKey('kyc-submit')));
+      await tester.pumpAndSettle();
+
+      final sent = api.posted.firstWhere(
+        (call) => call.$1 == '/v1/payment/earnings/khaime/kyc',
+      );
+      expect(
+        ((sent.$2 as Map)['owner'] as Map).containsKey('dateOfBirth'),
+        isFalse,
+      );
+    });
+
+    testWidgets('the phone number goes out with its country on it', (
+      tester,
+    ) async {
+      // "09032242379" tells a provider nothing about which country it is
+      // in. The rail settles to NG, so that is the dial code the field
+      // opens on, and the number leaves in E.164.
+      final api = await pumpForm(
+        tester,
+        caseWithOwnership(const ['legal_recipient']),
+      );
+      await fill(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('kyc-phone')),
+        '09032242379',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('+234'), findsOneWidget);
+
+      await _scrollTo(tester, find.byKey(const ValueKey('kyc-submit')));
+      await tester.tap(find.byKey(const ValueKey('kyc-submit')));
+      await tester.pumpAndSettle();
+
+      final sent = api.posted.firstWhere(
+        (call) => call.$1 == '/v1/payment/earnings/khaime/kyc',
+      );
+      expect(
+        ((sent.$2 as Map)['owner'] as Map)['phoneNumber'],
+        '+2349032242379',
+      );
+    });
+
+    testWidgets('a number too short to dial is caught here', (tester) async {
+      await pumpForm(tester, caseWithOwnership(const ['legal_recipient']));
+      await fill(tester);
+      await tester.enterText(find.byKey(const ValueKey('kyc-phone')), '12');
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.byKey(const ValueKey('kyc-submit')));
+      await tester.tap(find.byKey(const ValueKey('kyc-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.givingKycPhoneInvalid), findsOneWidget);
+    });
+
+    testWidgets('the dial code and the number fit a 320pt phone', (
+      tester,
+    ) async {
+      // A fixed-width box beside an Expanded field is the exact shape that
+      // put a red stripe across the settlement dialogs, and the dial button
+      // is one: flag, "+234" and a chevron that do not shrink.
+      tester.view.physicalSize = const Size(320, 1600) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        SizingBuilder(
+          baseSize: const Size(390, 844),
+          builder: (_) => MaterialApp(
+            theme: ThemeData(scaffoldBackgroundColor: AppColors.base1),
+            home: GivingKycScreen(
+              creatorId: 'c-1',
+              rail: GivingRail.fromJson(_activeKhaimeRail),
+              application: GivingApplication.fromJson(_draftApplication),
+              requirements: RailRequirements.fromJson(
+                caseWithOwnership(const ['legal_recipient']),
+              ),
+              repo: GivingRepo(api: _FakeApi()),
+              api: _FakeApi(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('the studio nav bar', () {
+    testWidgets('a tab\'s snackbar clears it', (tester) async {
+      // The Giving tab's Scaffold sits *under* the shell's floating nav bar
+      // in a Stack, so a snackbar at the default offset is painted behind
+      // it — shown, and never seen. That is how a step-up refusal used to
+      // disappear. This pins the clearance to the bar's real height.
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        SizingBuilder(
+          baseSize: const Size(390, 844),
+          builder: (_) => MaterialApp(
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.bottomCenter,
+                child: StudioNavBar(
+                  index: 3,
+                  impactBadge: 0,
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Plus the padding the shell puts under it.
+      final bar = tester.getSize(find.byType(StudioNavBar)).height + 12;
+      expect(
+        studioNavClearance,
+        greaterThanOrEqualTo(bar),
+        reason:
+            'a snackbar at $studioNavClearance would sit behind a '
+            '${bar}pt bar',
+      );
     });
   });
 

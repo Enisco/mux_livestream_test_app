@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/notifications/data/notification_store.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/views/studio_screen.dart';
+import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
@@ -50,6 +52,7 @@ class _FakeApi implements ApiService {
             'id': 'c1',
             'displayName': 'Food for Thought',
             'handle': 'food',
+            'avatarKey': 'public/avatar/c1/logo.jpg',
           },
           'membership': {'role': 'owner', 'isPrincipalOwner': true},
           'capabilities': {'canCreateMedia': true, 'canCreateLivestream': true},
@@ -170,6 +173,26 @@ void main() {
     expect(find.text(AppStrings.createVideo), findsOneWidget);
   });
 
+  testWidgets('the studio pill wears the logo the context named', (
+    tester,
+  ) async {
+    // `dashboard/context` has carried the creator's `avatarKey` all along;
+    // the pill drew a grey person icon regardless of it.
+    dotenv.testLoad(fileInput: 'CDN_BASE_URL=https://cdn.example.test');
+    addTearDown(() => dotenv.testLoad(fileInput: ''));
+
+    await _pumpStudio(tester, [_step('complete_profile', complete: true)]);
+
+    final urls = [
+      for (final image in tester.widgetList<Image>(find.byType(Image)))
+        if (image.image case final NetworkImage source) source.url,
+    ];
+    expect(
+      urls,
+      contains('https://cdn.example.test/public/avatar/c1/logo.jpg'),
+    );
+  });
+
   testWidgets('"Complete your profile" opens the polish flow', (tester) async {
     await _pumpStudio(tester, [
       _step('complete_profile'),
@@ -287,11 +310,14 @@ void main() {
       expect(jump.impactTab, 2);
     });
 
-    testWidgets('a key this release does not know still opens Impact', (
+    testWidgets('a key this release does not know guesses no inbox', (
       tester,
     ) async {
-      // Landing on the first inbox beats doing nothing, which is what a row
-      // whose key the client has not seen used to do.
+      // This used to land on prayers, on the reasoning that the first
+      // inbox beats doing nothing. `failed_content` proved the premise
+      // wrong: the feed is not only Impact's inboxes, and sending a
+      // creator to the prayer queue over a failed transcode is worse than
+      // telling them where it is handled.
       final jump = _TabJump();
       await _pumpStudio(
         tester,
@@ -303,8 +329,94 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('attention-something_new')));
       await tester.pumpAndSettle();
 
-      expect(jump.tab, 2);
-      expect(jump.impactTab, 0);
+      expect(jump.tab, isNull);
+      expect(find.text(AppStrings.studioAttentionOnWeb), findsOneWidget);
+    });
+
+    testWidgets('failed content opens Content, not the prayer inbox', (
+      tester,
+    ) async {
+      // Found on a device on 2026-11-03: the dashboard answered with
+      // `failed_content`, and tapping it opened the prayer queue.
+      final jump = _TabJump();
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('failed_content', 2)],
+        jump: jump,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('attention-failed_content')));
+      await tester.pumpAndSettle();
+
+      expect(jump.tab, 1);
+    });
+
+    testWidgets('failed content is named, not printed as its key', (
+      tester,
+    ) async {
+      // The row read `failed_content · 2 waiting` on the dashboard.
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('failed_content', 2)],
+      );
+
+      expect(find.text('failed_content'), findsNothing);
+      expect(
+        find.text(AppStrings.studioAttentionTitles['failed_content']!),
+        findsOneWidget,
+      );
+      // And nobody is waiting on it: the creator is.
+      expect(find.text(AppStrings.studioAttentionToFix(2)), findsOneWidget);
+      expect(find.text(AppStrings.studioAttentionWaiting(2)), findsNothing);
+    });
+
+    testWidgets('a key with no wording of its own is still readable', (
+      tester,
+    ) async {
+      await _pumpStudio(
+        tester,
+        [_step('publish_first_content', complete: true)],
+        attention: [row('some_new_queue', 1)],
+      );
+
+      expect(find.text('Some new queue'), findsOneWidget);
+      expect(find.text('some_new_queue'), findsNothing);
+    });
+
+    test('the Impact badge counts its own inboxes only', () {
+      // The dashboard's feed is wider than Impact: two failed uploads were
+      // being counted as two people waiting on a reply.
+      expect(
+        impactBadgeFrom(const [
+          AttentionItem(key: 'open_prayers', count: 3),
+          AttentionItem(key: 'pending_testimonies', count: 1),
+          AttentionItem(key: 'failed_content', count: 2),
+          AttentionItem(key: 'something_new', count: 7),
+        ]),
+        4,
+      );
+    });
+
+    test('an inbox is Impact\'s; a failed upload is not', () {
+      // What the Impact tab's badge counts. Summing the whole feed put two
+      // failed uploads on it.
+      expect(
+        const AttentionItem(key: 'open_prayers', count: 1).destination.isImpact,
+        isTrue,
+      );
+      expect(
+        const AttentionItem(
+          key: 'failed_content',
+          count: 2,
+        ).destination.isImpact,
+        isFalse,
+      );
+      expect(
+        const AttentionItem(key: 'whatever', count: 1).destination,
+        AttentionDestination.elsewhere,
+      );
     });
   });
 

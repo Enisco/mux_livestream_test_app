@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -12,10 +13,20 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The studio the reader is currently in, and the way to switch.
 class StudioPill extends StatelessWidget {
-  const StudioPill({super.key, required this.name, required this.onTap});
+  const StudioPill({
+    super.key,
+    required this.name,
+    required this.onTap,
+    this.avatarKey,
+  });
 
   final String name;
   final VoidCallback onTap;
+
+  /// The studio's logo, as `dashboard/context` and the membership rows carry
+  /// it. Null while the context is still loading, or for a studio that has
+  /// never uploaded one.
+  final String? avatarKey;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +42,7 @@ class StudioPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            StudioAvatar(size: 26.s),
+            StudioAvatar(size: 26.s, avatarKey: avatarKey),
             SizedBox(width: 8.s),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: 150.s),
@@ -51,24 +62,43 @@ class StudioPill extends StatelessWidget {
   }
 }
 
-/// A placeholder ring; creator avatars are not resolved from `avatarKey`
-/// anywhere in the app yet.
+/// The studio's logo in a ring, the way the rest of the app draws a creator.
+///
+/// `avatarKey` is a storage key on the public CDN rather than a URL — the
+/// same shape the discovery feed sends — so it goes through
+/// [AssetUrlResolver.resolve]. A build with no `CDN_BASE_URL`, a studio with
+/// no logo, and a key that fails to load all land on the same placeholder
+/// ring, because artwork is never worth a broken-image box for.
 class StudioAvatar extends StatelessWidget {
-  const StudioAvatar({super.key, required this.size});
+  const StudioAvatar({super.key, required this.size, this.avatarKey});
 
   final double size;
+  final String? avatarKey;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: AppColors.buttonSecondaryActive,
-      border: Border.all(color: AppColors.purple400, width: size / 20),
-    ),
-    child: Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400),
-  );
+  Widget build(BuildContext context) {
+    final url = AssetUrlResolver.resolve(avatarKey);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.buttonSecondaryActive,
+        border: Border.all(color: AppColors.purple400, width: size / 20),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: url == null
+          ? _placeholder()
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _placeholder(),
+            ),
+    );
+  }
+
+  Widget _placeholder() =>
+      Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400);
 }
 
 /// One of the three figures on the TODAY card.
@@ -289,13 +319,16 @@ class AttentionRow extends StatelessWidget {
 
   /// Prayer requests read as "12 New"; anything being reviewed reads as
   /// "2 waiting".
-  bool get _isNew => item.key.contains('prayer');
+  bool get _isNew => item.destination == AttentionDestination.prayers;
 
   @override
   Widget build(BuildContext context) {
+    // A key with no wording of its own used to be printed raw, which is how
+    // `failed_content` ended up on the dashboard.
     final title = item.label.isNotEmpty
         ? item.label
-        : AppStrings.studioAttentionTitles[item.key] ?? item.key;
+        : AppStrings.studioAttentionTitles[item.key] ??
+              AppStrings.studioAttentionFallback(item.key);
 
     return GestureDetector(
       key: ValueKey('attention-${item.key}'),
@@ -311,9 +344,16 @@ class AttentionRow extends StatelessWidget {
         child: Row(
           children: [
             HugeIcon(
-              icon: _isNew
-                  ? HugeIcons.strokeRoundedHandPrayer
-                  : HugeIcons.strokeRoundedFavourite,
+              icon: switch (item.destination) {
+                AttentionDestination.prayers =>
+                  HugeIcons.strokeRoundedHandPrayer,
+                // Not a heart: nothing about a failed transcode is
+                // somebody reaching out.
+                AttentionDestination.content ||
+                AttentionDestination.elsewhere =>
+                  HugeIcons.strokeRoundedAlert02,
+                _ => HugeIcons.strokeRoundedFavourite,
+              },
               color: AppColors.textPrimary,
               size: 18.s,
             ),
@@ -346,7 +386,9 @@ class AttentionRow extends StatelessWidget {
               )
             else
               Text(
-                AppStrings.studioAttentionWaiting(item.count),
+                item.destination == AttentionDestination.content
+                    ? AppStrings.studioAttentionToFix(item.count)
+                    : AppStrings.studioAttentionWaiting(item.count),
                 style: AppStyles.label(
                   12,
                   color: AppColors.neutral400,

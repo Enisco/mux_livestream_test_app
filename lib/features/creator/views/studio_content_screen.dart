@@ -37,6 +37,7 @@ class StudioContentScreen extends StatefulWidget {
     this.context,
     this.studios = const [],
     this.onSwitchStudio,
+    this.onLeaveStudio,
     this.openSearch = false,
   });
 
@@ -53,6 +54,10 @@ class StudioContentScreen extends StatefulWidget {
 
   /// Re-points the shell at another studio.
   final Future<void> Function(String creatorId)? onSwitchStudio;
+
+  /// The way out of the studio entirely. Every tab opens the same
+  /// switcher, so every tab has to answer its Back to watching row.
+  final VoidCallback? onLeaveStudio;
 
   /// The studio being worked in. Supplied by the shell so the Create sheet
   /// can be gated on the same capabilities the Studio tab uses.
@@ -194,13 +199,17 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
       studios: widget.studios,
     );
     if (!mounted || choice == null) return;
-    if (choice.switchTo case final creatorId?) {
-      await widget.onSwitchStudio?.call(creatorId);
-      // The shell re-points `creatorId` and re-reads its own context, but
-      // this list is state of its own — without a reload it keeps showing
-      // the studio the reader just switched away from.
-      if (mounted) await _load();
-    }
+    final creatorId = applyStudiosOutcome(
+      context,
+      choice,
+      onLeave: widget.onLeaveStudio,
+    );
+    if (creatorId == null) return;
+    await widget.onSwitchStudio?.call(creatorId);
+    // The shell re-points `creatorId` and re-reads its own context, but
+    // this list is state of its own — without a reload it keeps showing
+    // the studio the reader just switched away from.
+    if (mounted) await _load();
   }
 
   @override
@@ -231,6 +240,10 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
                                 widget.studios,
                               )?.displayName ??
                               '',
+                          avatarKey: openStudio(
+                            widget.context,
+                            widget.studios,
+                          )?.avatarKey,
                           onTap: () => unawaited(_openStudios()),
                         ),
                       ),

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/router.dart';
+import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -142,6 +146,96 @@ void main() {
     });
   });
 
+  group('what every tab does with the answer', () {
+    // Found on a device on 2026-11-03: "Back to watching" worked from the
+    // Studio tab and nowhere else, and "Studio Settings" worked nowhere at
+    // all. Three of the four tabs handled only `switchTo` and dropped the
+    // other two answers on the floor, so the handling lives in one place
+    // now and these are its tests.
+    Future<BuildContext> pump(WidgetTester tester) async {
+      late BuildContext captured;
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, _) {
+              captured = context;
+              return const Text('A TAB');
+            },
+          ),
+          GoRoute(
+            path: AppRouter.studioProfile,
+            builder: (_, _) => const Text('STUDIO SETTINGS'),
+          ),
+        ],
+      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      return captured;
+    }
+
+    testWidgets('back to watching leaves, from whichever tab asked', (
+      tester,
+    ) async {
+      final context = await pump(tester);
+      var left = false;
+
+      final next = applyStudiosOutcome(
+        context,
+        const StudiosOutcome.backToWatching(),
+        onLeave: () => left = true,
+      );
+
+      expect(left, isTrue);
+      expect(next, isNull);
+    });
+
+    testWidgets('settings opens the studio\'s own settings screen', (
+      tester,
+    ) async {
+      // Not a snackbar repeating the sentence already under the row, and
+      // not the onboarding chain, which starts every field empty.
+      final context = await pump(tester);
+
+      applyStudiosOutcome(context, const StudiosOutcome.settings());
+      await tester.pumpAndSettle();
+
+      expect(find.text('STUDIO SETTINGS'), findsOneWidget);
+    });
+
+    testWidgets('a studio is handed back for the tab to switch to', (
+      tester,
+    ) async {
+      final context = await pump(tester);
+      var left = false;
+
+      final next = applyStudiosOutcome(
+        context,
+        const StudiosOutcome.switchTo('c2'),
+        onLeave: () => left = true,
+      );
+
+      // The caller switches: what each tab has to throw away first differs.
+      expect(next, 'c2');
+      expect(left, isFalse);
+    });
+
+    testWidgets('a dismissed sheet does nothing at all', (tester) async {
+      final context = await pump(tester);
+      var left = false;
+
+      expect(
+        applyStudiosOutcome(context, null, onLeave: () => left = true),
+        isNull,
+      );
+      await tester.pumpAndSettle();
+
+      expect(left, isFalse);
+      expect(find.text('STUDIO SETTINGS'), findsNothing);
+    });
+  });
+
   group('the create sheet', () {
     testWidgets('offers every kind a full owner may make', (tester) async {
       await tester.pumpWidget(
@@ -180,6 +274,126 @@ void main() {
 
       expect(find.text(AppStrings.createVideo), findsOneWidget);
       expect(find.text(AppStrings.createLivestream), findsNothing);
+    });
+  });
+
+  /// The studio's own logo, which the switcher and the pill both drew as a
+  /// grey person icon however long the channel had had one.
+  group('whose logo is on the row', () {
+    const cdn = 'https://cdn.example.test';
+
+    setUp(() => dotenv.testLoad(fileInput: 'CDN_BASE_URL=$cdn'));
+
+    List<String> urls(WidgetTester tester) => [
+      for (final image in tester.widgetList<Image>(find.byType(Image)))
+        if (image.image case final NetworkImage source) source.url,
+    ];
+
+    testWidgets('the open studio wears its own', (tester) async {
+      await _openStudios(tester);
+      expect(urls(tester), isEmpty, reason: 'no logo, no request');
+
+      await tester.pumpWidget(
+        SizingBuilder(
+          baseSize: const Size(390, 844),
+          builder: (context) => MaterialApp(
+            home: Scaffold(
+              body: StudiosSheet(
+                current: const DashboardContext(
+                  creatorId: 'c1',
+                  displayName: 'Pastor James',
+                  handle: 'pjames',
+                  role: 'owner',
+                  avatarKey: 'public/avatar/c1/logo.jpg',
+                  capabilities: {},
+                ),
+                onPick: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(urls(tester), ['$cdn/public/avatar/c1/logo.jpg']);
+    });
+
+    testWidgets('and so does every other studio listed', (tester) async {
+      // The membership rows carry their own `avatarKey`; a switcher that
+      // drew one logo four times would be worse than drawing none.
+      await _openStudios(
+        tester,
+        studios: const [
+          StudioMembership(
+            creatorId: 'c2',
+            displayName: 'CCI International',
+            handle: 'cci',
+            role: 'editor',
+            avatarKey: 'public/avatar/c2/logo.jpg',
+          ),
+        ],
+      );
+
+      expect(urls(tester), ['$cdn/public/avatar/c2/logo.jpg']);
+    });
+
+    testWidgets('a studio with no logo keeps the ring', (tester) async {
+      await _openStudios(
+        tester,
+        studios: const [
+          StudioMembership(
+            creatorId: 'c2',
+            displayName: 'CCI International',
+            handle: 'cci',
+            role: 'editor',
+          ),
+        ],
+      );
+
+      expect(urls(tester), isEmpty);
+      expect(find.byIcon(Icons.person), findsNWidgets(2));
+    });
+
+    testWidgets('the pill in the tab header wears it too', (tester) async {
+      await tester.pumpWidget(
+        SizingBuilder(
+          baseSize: const Size(390, 844),
+          builder: (context) => MaterialApp(
+            home: Scaffold(
+              body: StudioPill(
+                name: 'Pastor James',
+                avatarKey: 'public/avatar/c1/logo.jpg',
+                onTap: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(urls(tester), ['$cdn/public/avatar/c1/logo.jpg']);
+    });
+
+    testWidgets('a build with no CDN configured shows the ring', (
+      tester,
+    ) async {
+      // `resolve` answers null without `CDN_BASE_URL`, and a null URL is
+      // not something to hand `Image.network`.
+      dotenv.testLoad(fileInput: '');
+      await _openStudios(
+        tester,
+        studios: const [
+          StudioMembership(
+            creatorId: 'c2',
+            displayName: 'CCI International',
+            handle: 'cci',
+            role: 'editor',
+            avatarKey: 'public/avatar/c2/logo.jpg',
+          ),
+        ],
+      );
+
+      expect(urls(tester), isEmpty);
     });
   });
 

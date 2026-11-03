@@ -9,6 +9,7 @@ import 'package:test_app/features/creator/views/giving_funds_screen.dart';
 import 'package:test_app/features/creator/views/widgets/giving_parts.dart';
 import 'package:test_app/features/creator/views/widgets/giving_sheets.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
+import 'package:test_app/shared/components/busy_barrier.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/components/library_parts.dart';
 import 'package:test_app/shared/components/primary_button.dart';
@@ -199,11 +200,15 @@ class _GivingEarningsScreenState extends State<GivingEarningsScreen> {
     if (amountMinor == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await _repo.requestPayout(
-        creatorId: widget.creatorId,
-        amountMinor: amountMinor,
-        railId: rail.railId,
-        currency: rail.settlementCurrency,
+      await runBusy(
+        context,
+        () => _repo.requestPayout(
+          creatorId: widget.creatorId,
+          amountMinor: amountMinor,
+          railId: rail.railId,
+          currency: rail.settlementCurrency,
+        ),
+        message: AppStrings.givingWorking,
       );
       if (!mounted) return;
       _say(AppStrings.earningsPayoutRequested);

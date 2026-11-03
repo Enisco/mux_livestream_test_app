@@ -166,7 +166,10 @@ class CreatorRepo {
       if (handle != null && handle.isNotEmpty) 'handle': handle.toLowerCase(),
       if (displayName != null && displayName.isNotEmpty)
         'displayName': displayName,
-      if (bio != null && bio.isNotEmpty) 'bio': bio,
+      // Sent whenever it is given, empty included: `null` is "leave it
+      // alone" and `''` is "clear it". Dropping the empty one meant a
+      // creator could never take their about text back down.
+      'bio': ?bio,
       if (categorySlugs != null && categorySlugs.isNotEmpty)
         'categorySlugs': categorySlugs,
       // Saving the id is what promotes the object out of `quarantine/`; there

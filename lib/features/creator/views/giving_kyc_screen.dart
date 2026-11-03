@@ -5,19 +5,22 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/repo/giving_repo.dart';
-import 'package:test_app/features/creator/services/creator_image_picker.dart';
+import 'package:test_app/features/creator/services/giving_evidence_upload.dart';
 import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
 import 'package:test_app/features/creator/views/widgets/giving_parts.dart';
 import 'package:test_app/features/creator/views/widgets/giving_sheets.dart';
+import 'package:test_app/features/creator/views/widgets/moment_picker.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
+import 'package:test_app/shared/components/country_flag_icon.dart';
+import 'package:test_app/shared/components/country_picker_sheet.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/data/countries.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/s3_upload.dart';
-import 'package:test_app/utils/app_constants/api_endpoints.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
-import 'package:get_it/get_it.dart';
+import 'package:test_app/utils/helpers/phone_number.dart';
 
 /// Khaime's identity and bank form — the one provider whose onboarding the
 /// app hosts itself.
@@ -79,12 +82,9 @@ enum IdType {
 
 class _GivingKycScreenState extends State<GivingKycScreen> {
   late final _repo = widget.repo ?? GivingRepo();
-  late final _api = widget.api ?? GetIt.instance<ApiService>();
-  late final _send = widget.send ?? S3PresignedUpload.send;
 
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
-  final _dateOfBirth = TextEditingController();
   final _phone = TextEditingController();
   final _idNumber = TextEditingController();
   final _street = TextEditingController();
@@ -98,6 +98,17 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   PayoutBank? _bank;
   List<PayoutBank> _banks = const [];
 
+  /// Chosen from a wheel rather than typed. A free text field had to say
+  /// "YYYY-MM-DD" underneath it and still took anything at all, and the one
+  /// shape the route accepts is not the one most people write a date in.
+  DateTime? _dateOfBirth;
+
+  /// The settlement country is the right first guess for the account
+  /// owner's number — never the device locale, which is wrong for anyone
+  /// travelling or on a phone bought abroad.
+  late Country _phoneCountry =
+      Countries.byIsoCode(widget.rail.countryCode) ?? Countries.fallback;
+
   /// Evidence already accepted on this rail, by evidence type.
   late final Map<String, String> _files = {
     for (final requirement in widget.requirements?.requirements ?? const [])
@@ -105,7 +116,17 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   };
 
   bool _busy = false;
-  bool _uploading = false;
+
+  /// Which evidence type is uploading, so only that card spins — and so
+  /// the other one is still refused while it does, since two presigned
+  /// uploads at once is a race nobody asked for.
+  String? _uploadingType;
+
+  /// The bank list is fetched while the rest of the form is being filled in.
+  /// Until it lands, an empty list means "not here yet", not "none" — and
+  /// saying the latter sends a creator looking for a problem that is about
+  /// to solve itself.
+  bool _loadingBanks = true;
   String? _problem;
 
   static const _identityEvidence = 'identity_document';
@@ -149,7 +170,6 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
     for (final controller in [
       _firstName,
       _lastName,
-      _dateOfBirth,
       _phone,
       _idNumber,
       _street,
@@ -166,6 +186,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
 
   Future<void> _loadBanks() async {
     try {
+      if (mounted) setState(() => _loadingBanks = true);
       final banks = await _repo.fetchKhaimeBanks(
         creatorId: widget.creatorId,
         railId: widget.rail.id,
@@ -176,72 +197,34 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
       // A missing bank list is not fatal to the form: everything above it
       // still fills in, and the field says it has nothing to offer.
       logger.w('Khaime banks unavailable', error: e);
+    } finally {
+      if (mounted) setState(() => _loadingBanks = false);
     }
   }
 
   /// Pick a document, ticket it, send it to S3, attach it to the case.
   ///
-  /// The attach is what makes it evidence; an uploaded file nothing has
-  /// attached is invisible to the verification case and would fail the KYC
-  /// submit with a validation error.
+  /// The same sequence the rail screen runs, and deliberately the same code:
+  /// both verification tracks read the one set of evidence, so a document
+  /// attached from either place satisfies both.
   Future<void> _upload(String evidenceType) async {
-    final result = await CreatorImagePicker.pick(maxBytes: 10 * 1024 * 1024);
-    if (result.isCancelled || !mounted) return;
-    if (result.failure case final failure?) {
-      _say(
-        failure == PickFailure.tooLarge
-            ? AppStrings.givingEvidenceFailed
-            : AppStrings.settingsPhotoUnreadable,
-      );
-      return;
-    }
-    final image = result.image!;
-    setState(() => _uploading = true);
-    try {
-      final ticket = await _api.post(
-        ApiEndpoints.givingEvidenceUploadUrl,
-        data: {
-          'creatorId': widget.creatorId,
-          'railId': widget.rail.id,
-          'evidenceType': evidenceType,
-          'filename': image.filename,
-          'mimeType': image.mimeType,
-          // Exactly the bytes being sent: the presigned policy carries a
-          // content-length-range of N,N and S3 refuses anything else.
-          'size': image.size,
-        },
-      );
-      final data =
-          (ticket.data as Map<String, dynamic>?)?['data']
-              as Map<String, dynamic>? ??
-          const {};
-      final fileId = data['fileId'] as String?;
-      final uploadUrl = data['uploadUrl'] as String?;
-      if (fileId == null || uploadUrl == null) {
-        throw StateError('malformed evidence ticket');
-      }
-      await _send(
-        uploadUrl: uploadUrl,
-        fields: (data['fields'] as Map<String, dynamic>?) ?? const {},
-        bytes: image.bytes,
-        filename: image.filename,
-      );
-      await _api.post(
-        ApiEndpoints.givingEvidence,
-        data: {
-          'creatorId': widget.creatorId,
-          'railId': widget.rail.id,
-          'evidenceType': evidenceType,
-          'fileId': fileId,
-        },
-      );
-      if (mounted) setState(() => _files[evidenceType] = fileId);
-    } catch (e) {
-      logger.w('Evidence upload failed', error: e);
-      if (mounted) _say(AppStrings.givingEvidenceFailed);
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
+    if (_uploadingType != null) return;
+    final result = await pickAndAttachEvidence(
+      creatorId: widget.creatorId,
+      railId: widget.rail.id,
+      evidenceType: evidenceType,
+      api: widget.api,
+      send: widget.send,
+      onPicked: () {
+        if (mounted) setState(() => _uploadingType = evidenceType);
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _uploadingType = null;
+      if (result.fileId case final fileId?) _files[evidenceType] = fileId;
+    });
+    if (result.problem case final problem?) _say(problem);
   }
 
   Future<void> _submit() async {
@@ -263,8 +246,10 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
         owner: {
           'firstName': _firstName.text.trim(),
           'lastName': _lastName.text.trim(),
-          'dateOfBirth': ?_textOrNull(_dateOfBirth),
-          'phoneNumber': ?_textOrNull(_phone),
+          'dateOfBirth': ?_isoDateOfBirth,
+          // E.164, because the number is forwarded to a provider that has no
+          // way to know which country a bare "090…" belongs to.
+          'phoneNumber': ?_e164Phone,
           'idType': _idType.wire,
           'idNumber': _idNumber.text.trim(),
           'idDocumentFileId': _files[_identityEvidence],
@@ -291,7 +276,14 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       logger.w('Khaime KYC failed', error: e);
-      if (mounted) setState(() => _problem = AppStrings.givingWriteFailed);
+      // The route names what it would not take — a document that is not
+      // evidence on this case, a bank it does not know — and that is the
+      // creator's next move.
+      if (mounted) {
+        setState(
+          () => _problem = givingProblem(e) ?? AppStrings.givingWriteFailed,
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -300,6 +292,45 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   String? _textOrNull(TextEditingController controller) {
     final value = controller.text.trim();
     return value.isEmpty ? null : value;
+  }
+
+  /// The one shape the route documents: `1990-01-31`.
+  String? get _isoDateOfBirth {
+    final date = _dateOfBirth;
+    if (date == null) return null;
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year.toString().padLeft(4, '0')}-$month-$day';
+  }
+
+  String? get _e164Phone {
+    final number = PhoneNumber.e164(_phone.text, _phoneCountry.dialCode);
+    return number.isEmpty ? null : number;
+  }
+
+  Future<void> _pickDateOfBirth() async {
+    final today = DateTime.now();
+    final picked = await pickMoment(
+      context,
+      initial:
+          _dateOfBirth ?? DateTime(today.year - 30, today.month, today.day),
+      dateOnly: true,
+      maximum: today,
+    );
+    if (picked == null || !mounted) return;
+    setState(
+      () => _dateOfBirth = DateTime(picked.year, picked.month, picked.day),
+    );
+  }
+
+  Future<void> _pickPhoneCountry() async {
+    FocusScope.of(context).unfocus();
+    final picked = await CountryPickerSheet.show(
+      context,
+      selected: _phoneCountry,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _phoneCountry = picked);
   }
 
   /// What the route requires, checked here so a creator is told on the field
@@ -324,6 +355,12 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
     if (_accountNumber.text.trim().isEmpty ||
         _accountName.text.trim().isEmpty) {
       return AppStrings.givingKycBankRequired;
+    }
+    // The number is optional, but a half-typed one reaches the provider as
+    // an unreachable contact rather than as an error anybody sees.
+    if (_phone.text.trim().isNotEmpty &&
+        PhoneNumber.validate(_phone.text, _phoneCountry) != null) {
+      return AppStrings.givingKycPhoneInvalid;
     }
     return null;
   }
@@ -374,7 +411,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
           Row(
             children: [
               Expanded(
-                child: _Field(
+                child: GivingField(
                   label: AppStrings.givingKycFirstName,
                   controller: _firstName,
                   fieldKey: const ValueKey('kyc-first-name'),
@@ -382,7 +419,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
               ),
               SizedBox(width: 12.s),
               Expanded(
-                child: _Field(
+                child: GivingField(
                   label: AppStrings.givingKycLastName,
                   controller: _lastName,
                   fieldKey: const ValueKey('kyc-last-name'),
@@ -390,28 +427,23 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
               ),
             ],
           ),
-          Row(
-            children: [
-              Expanded(
-                child: _Field(
-                  label: AppStrings.givingKycDateOfBirth,
-                  controller: _dateOfBirth,
-                  hint: AppStrings.givingKycDateOfBirthHint,
-                  fieldKey: const ValueKey('kyc-dob'),
-                ),
-              ),
-              SizedBox(width: 12.s),
-              Expanded(
-                child: _Field(
-                  label: AppStrings.givingKycPhone,
-                  controller: _phone,
-                  keyboardType: TextInputType.phone,
-                  fieldKey: const ValueKey('kyc-phone'),
-                ),
-              ),
-            ],
+          // A row each. Sharing one left the date under a format hint it no
+          // longer needs and the number with no room for a dial code.
+          GivingSelect(
+            key: const ValueKey('kyc-dob'),
+            label: AppStrings.givingKycDateOfBirth,
+            value: _isoDateOfBirth ?? '',
+            hint: AppStrings.givingKycDateOfBirthHint,
+            onTap: _pickDateOfBirth,
           ),
-          _Select(
+          _PhoneField(
+            label: AppStrings.givingKycPhone,
+            controller: _phone,
+            country: _phoneCountry,
+            fieldKey: const ValueKey('kyc-phone'),
+            onPickCountry: _pickPhoneCountry,
+          ),
+          GivingSelect(
             label: AppStrings.givingKycIdType,
             value: _idType.label,
             onTap: () async {
@@ -426,7 +458,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
               setState(() => _idType = picked);
             },
           ),
-          _Field(
+          GivingField(
             label: AppStrings.givingKycIdNumber,
             controller: _idNumber,
             fieldKey: const ValueKey('kyc-id-number'),
@@ -434,7 +466,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
           ),
           SizedBox(height: 8.s),
           const GivingSectionTitle(AppStrings.givingKycAddress),
-          _Field(
+          GivingField(
             label: AppStrings.givingKycStreet,
             controller: _street,
             fieldKey: const ValueKey('kyc-street'),
@@ -442,7 +474,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
           Row(
             children: [
               Expanded(
-                child: _Field(
+                child: GivingField(
                   label: AppStrings.givingKycCity,
                   controller: _city,
                   fieldKey: const ValueKey('kyc-city'),
@@ -450,7 +482,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
               ),
               SizedBox(width: 10.s),
               Expanded(
-                child: _Field(
+                child: GivingField(
                   label: AppStrings.givingKycState,
                   controller: _state,
                   fieldKey: const ValueKey('kyc-state'),
@@ -458,7 +490,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
               ),
               SizedBox(width: 10.s),
               Expanded(
-                child: _Field(
+                child: GivingField(
                   label: AppStrings.givingKycPostalCode,
                   controller: _postalCode,
                   fieldKey: const ValueKey('kyc-postal'),
@@ -471,7 +503,8 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
             key: const ValueKey('kyc-identity-document'),
             title: AppStrings.givingKycIdDocument,
             fileId: _files[_identityEvidence],
-            busy: _uploading,
+            busy: _uploadingType != null,
+            loading: _uploadingType == _identityEvidence,
             onPick: () => unawaited(_upload(_identityEvidence)),
           ),
           SizedBox(height: 12.s),
@@ -480,7 +513,8 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
             title: AppStrings.givingKycSelfie,
             optional: true,
             fileId: _files[_selfieEvidence],
-            busy: _uploading,
+            busy: _uploadingType != null,
+            loading: _uploadingType == _selfieEvidence,
             onPick: () => unawaited(_upload(_selfieEvidence)),
           ),
           SizedBox(height: 22.s),
@@ -489,7 +523,7 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
             body: AppStrings.givingKycBankSectionBody,
           ),
           if (_ownerships.length > 1)
-            _Select(
+            GivingSelect(
               label: AppStrings.givingKycOwnership,
               // Policy's own wire values, humanised rather than printed raw:
               // "legal_recipient" is not a thing to ask a creator to read.
@@ -506,10 +540,13 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
                 setState(() => _ownership = picked);
               },
             ),
-          _Select(
+          GivingSelect(
+            key: const ValueKey('kyc-bank'),
             label: AppStrings.givingKycBank,
             value: _bank?.name ?? '',
+            loading: _loadingBanks,
             onTap: () async {
+              if (_loadingBanks) return;
               if (_banks.isEmpty) {
                 _say(AppStrings.givingBanksUnavailable);
                 return;
@@ -525,13 +562,13 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
               setState(() => _bank = picked);
             },
           ),
-          _Field(
+          GivingField(
             label: AppStrings.givingKycAccountNumber,
             controller: _accountNumber,
             keyboardType: TextInputType.number,
             fieldKey: const ValueKey('kyc-account-number'),
           ),
-          _Field(
+          GivingField(
             label: AppStrings.givingKycAccountName,
             controller: _accountName,
             fieldKey: const ValueKey('kyc-account-name'),
@@ -558,20 +595,27 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   }
 }
 
-class _Field extends StatelessWidget {
-  const _Field({
+/// A dial code beside the number, in the setup form's own field styling.
+///
+/// [GTubePhoneField] exists and does the same job, but it is built out of
+/// the auth screens' field shell — a different border, radius and focus
+/// shadow — so dropping it into this form would put one field from another
+/// screen in the middle of it. The picker sheet and the dial-code formatting
+/// are shared; only the shell is local.
+class _PhoneField extends StatelessWidget {
+  const _PhoneField({
     required this.label,
     required this.controller,
+    required this.country,
     required this.fieldKey,
-    this.hint,
-    this.keyboardType,
+    required this.onPickCountry,
   });
 
   final String label;
   final TextEditingController controller;
+  final Country country;
   final Key fieldKey;
-  final String? hint;
-  final TextInputType? keyboardType;
+  final Future<void> Function() onPickCountry;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -582,47 +626,57 @@ class _Field extends StatelessWidget {
       children: [
         CreatorFieldLabel(label),
         SizedBox(height: 6.s),
-        CreatorTextField(
-          key: fieldKey,
-          controller: controller,
-          hint: label,
-          keyboardType: keyboardType,
-          contentPadding: EdgeInsets.all(12.s),
-        ),
-        if (hint case final note?) ...[
-          SizedBox(height: 6.s),
-          Text(note, style: AppStyles.label(10, color: AppColors.neutral500)),
-        ],
-      ],
-    ),
-  );
-}
-
-class _Select extends StatelessWidget {
-  const _Select({
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final Future<void> Function() onTap;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: 14.s),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CreatorFieldLabel(label),
-        SizedBox(height: 6.s),
-        CreatorSelectField(
-          hint: label,
-          value: value,
-          contentPadding: EdgeInsets.all(12.s),
-          onTap: () => unawaited(onTap()),
+        Row(
+          children: [
+            Material(
+              color: AppColors.brandAltDark,
+              borderRadius: BorderRadius.circular(8.s),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: const ValueKey('kyc-phone-country'),
+                onTap: () => unawaited(onPickCountry()),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.s,
+                    vertical: 13.s,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8.s),
+                    border: Border.all(color: AppColors.neutral700),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // An SVG flag, not the emoji: no emoji glyph renders
+                      // on the iOS simulator or on many Android builds.
+                      CountryFlagIcon(isoCode: country.isoCode, height: 12.s),
+                      SizedBox(width: 6.s),
+                      Text(
+                        country.display,
+                        style: AppStyles.body(13, color: AppColors.neutral50),
+                      ),
+                      SizedBox(width: 4.s),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 16.s,
+                        color: AppColors.neutral400,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 10.s),
+            Expanded(
+              child: CreatorTextField(
+                key: fieldKey,
+                controller: controller,
+                hint: label,
+                keyboardType: TextInputType.phone,
+                contentPadding: EdgeInsets.all(12.s),
+              ),
+            ),
+          ],
         ),
       ],
     ),
@@ -638,6 +692,7 @@ class _DocumentCard extends StatelessWidget {
     this.fileId,
     this.optional = false,
     this.busy = false,
+    this.loading = false,
   });
 
   final String title;
@@ -647,6 +702,10 @@ class _DocumentCard extends StatelessWidget {
 
   final bool optional;
   final bool busy;
+
+  /// This card's own upload is in flight. [busy] is the whole group's, which
+  /// is what stops a second pick while this one runs.
+  final bool loading;
   final VoidCallback onPick;
 
   @override
@@ -707,12 +766,22 @@ class _DocumentCard extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 8.s),
-              Text(
-                onFile
-                    ? AppStrings.givingReplaceDocument
-                    : AppStrings.givingUploadDocument,
-                style: AppStyles.button(11, color: AppColors.brandPrimary),
-              ),
+              if (loading)
+                SizedBox(
+                  width: 14.s,
+                  height: 14.s,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.s,
+                    color: AppColors.brandPrimary,
+                  ),
+                )
+              else
+                Text(
+                  onFile
+                      ? AppStrings.givingReplaceDocument
+                      : AppStrings.givingUploadDocument,
+                  style: AppStyles.button(11, color: AppColors.brandPrimary),
+                ),
             ],
           ),
         ),

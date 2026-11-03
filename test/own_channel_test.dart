@@ -44,6 +44,7 @@ Future<void> _pumpHeader(
   WidgetTester tester,
   CreatorProfile profile, {
   VoidCallback? onOpenStudio,
+  bool canGive = true,
 }) async {
   tester.view.physicalSize = const Size(390 * 3, 1200 * 3);
   tester.view.devicePixelRatio = 3;
@@ -56,6 +57,7 @@ Future<void> _pumpHeader(
         home: Scaffold(
           body: SingleChildScrollView(
             child: CreatorProfileHeader(
+              canGive: canGive,
               profile: profile,
               busy: false,
               onFollow: () {},
@@ -114,6 +116,17 @@ void main() {
         find.byKey(const ValueKey('profile-open-own-studio')),
         findsNothing,
       );
+    });
+
+    testWidgets('but Give Now needs the ministry to be able to receive', (
+      tester,
+    ) async {
+      // Being someone else's channel is necessary, not sufficient — a
+      // ministry that has not enrolled cannot take a gift, and the action is
+      // withheld rather than drawn and refused.
+      await _pumpHeader(tester, _profile(_theirs), canGive: false);
+      expect(find.text(AppStrings.follow), findsOneWidget);
+      expect(find.text(AppStrings.giveNow), findsNothing);
     });
 
     testWidgets('my own channel is offered neither', (tester) async {

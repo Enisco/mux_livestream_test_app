@@ -1,8 +1,68 @@
+import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 
 import 'package:test_app/models/creator_models/giving_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
+
+/// What the server said went wrong, when it said anything a creator can use.
+///
+/// The giving routes answer a refusal with `error`, which is sometimes one
+/// sentence and sometimes a list of them: `application/submit` returns one
+/// entry per missing document — *"Missing required information:
+/// Government-issued identity document, Selfie holding the identity
+/// document"*. Those are written for the creator, so they are shown.
+/// Flattening them into "that did not go through" is what left a creator
+/// tapping Submit for review with no idea which document was missing.
+String? givingProblem(Object error) {
+  if (error is! DioException) return null;
+  final message = switch (error.response?.data) {
+    final Map body => body['error'],
+    _ => null,
+  };
+  if (message is String) {
+    final text = message.trim();
+    return text.isEmpty ? null : text;
+  }
+  if (message is List) {
+    final lines = [
+      for (final line in message)
+        if ('$line'.trim().isNotEmpty) '$line'.trim(),
+    ];
+    if (lines.isNotEmpty) return lines.join('\n');
+  }
+  return null;
+}
+
+/// Raised when another code is asked for inside the resend cooldown.
+///
+/// Probed against staging on 2026-11-02: the route answers a refusal whose
+/// `details.resendAvailableAt` says when the next one may be asked for.
+/// Reported as a plain write failure it reads as "something broke", which
+/// sends a creator round the loop again instead of waiting half a minute.
+class StepUpResendTooSoon implements Exception {
+  const StepUpResendTooSoon(this.availableAt);
+
+  final DateTime? availableAt;
+
+  @override
+  String toString() => 'StepUpResendTooSoon($availableAt)';
+}
+
+/// Raised when the server will not take a step-up code.
+///
+/// Verify answers **401** for this, which is not a session problem — see the
+/// note on `ApiService._isAuthRoute`. [attemptsExhausted] marks the terminal
+/// case: the challenge is spent and no code will ever work on it again, so
+/// the only way forward is a new one.
+class StepUpRefused implements Exception {
+  const StepUpRefused({this.attemptsExhausted = false});
+
+  final bool attemptsExhausted;
+
+  @override
+  String toString() => 'StepUpRefused($attemptsExhausted)';
+}
 
 /// The creator's side of Giving: who gets paid, through what, and what came
 /// in.
@@ -197,15 +257,43 @@ class GivingRepo {
     required String challengeId,
     required String code,
   }) async {
-    final response = await _api.post(
-      ApiEndpoints.stepUpVerify(challengeId),
-      data: {'code': code},
-    );
-    return _data(response.data)['grantToken'] as String? ?? '';
+    try {
+      final response = await _api.post(
+        ApiEndpoints.stepUpVerify(challengeId),
+        data: {'code': code},
+      );
+      return _data(response.data)['grantToken'] as String? ?? '';
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status != 400 && status != 401) rethrow;
+      final body = e.response?.data;
+      final reason = body is Map ? '${body['error']}' : '';
+      // Matched on the server's own words because the refusal carries no
+      // code of its own: both cases are a bare 401. Seen on 2026-11-02 as
+      // "Maximum OTP attempts exceeded". A miss here costs the sharper
+      // message, not correctness — the generic refusal still shows.
+      throw StepUpRefused(
+        attemptsExhausted: reason.toLowerCase().contains('attempts'),
+      );
+    }
   }
 
-  Future<void> resendStepUp(String challengeId) async {
-    await _api.post(ApiEndpoints.stepUpResend(challengeId));
+  /// Rotates the code and sends it again, returning the refreshed challenge.
+  ///
+  /// The new `expiresAt` matters to the caller: a sheet that still holds the
+  /// first challenge's expiry would start calling a perfectly good code
+  /// expired a few minutes later.
+  Future<StepUpChallenge> resendStepUp(String challengeId) async {
+    try {
+      final response = await _api.post(ApiEndpoints.stepUpResend(challengeId));
+      return StepUpChallenge.fromJson(_data(response.data));
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      final details = body is Map ? body['details'] : null;
+      final at = details is Map ? details['resendAvailableAt'] : null;
+      if (at == null) rethrow;
+      throw StepUpResendTooSoon(DateTime.tryParse(at.toString())?.toLocal());
+    }
   }
 
   /// `POST .../change-requests` — a versioned change to a live rail.

@@ -17,6 +17,8 @@ import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
+import 'package:test_app/features/giving/data/give_action.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -84,6 +86,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   final _playback = getIt<PlaybackController>();
   final _engagement = getIt<EngagementRepo>();
   final _store = getIt<EngagementStore>();
+  final _giving = getIt<GivingCapabilityStore>();
   late final _actions = FeedCardActions(
     store: _store,
     requireAccount: _requireAccount,
@@ -94,6 +97,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   bool _failed = false;
   bool _authed = false;
   bool _followBusy = false;
+  bool _canGive = false;
 
   late CreatorTab _tab = widget.initialTab ?? CreatorTab.latest;
 
@@ -130,6 +134,10 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
         _profile = profile;
         _loading = false;
       });
+      // Asked once the ministry is known, not on every build. Nothing waits
+      // on it: the channel renders, and Give Now appears beside Follow if the
+      // answer comes back yes.
+      unawaited(_askCanGive(profile.id, profile.isOwnedByViewer));
       await _loadTab(_tab);
     } catch (e) {
       logger.e('Creator profile load failed', error: e);
@@ -139,6 +147,29 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
         _failed = true;
       });
     }
+  }
+
+  /// Whether to draw Give Now at all.
+  ///
+  /// Skipped for the reader's own channel: giving to yourself is refused by
+  /// the server, and the header offers the studio there instead.
+  Future<void> _askCanGive(String creatorId, bool owned) async {
+    if (owned) return;
+    final can = await _giving.ensure(creatorId);
+    if (mounted && can) setState(() => _canGive = true);
+  }
+
+  /// Hands off to the web surface. The gift is not attributed to a piece of
+  /// content — the giver is on the channel, not on anything in particular.
+  Future<void> _give() async {
+    final profile = _profile;
+    if (profile == null) return;
+    await startGive(
+      context,
+      creatorId: profile.id,
+      ministryName: profile.displayName,
+      requireAccount: _requireAccount,
+    );
   }
 
   Future<void> _loadTab(CreatorTab tab) async {
@@ -352,7 +383,8 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
               busy: _followBusy,
               onBack: () => Navigator.of(context).maybePop(),
               onFollow: _toggleFollow,
-              onGive: () => _requireAccount('give to this ministry'),
+              canGive: _canGive,
+              onGive: () => unawaited(_give()),
               onMore: () => unawaited(
                 _openCardActions(
                   _asRow(profile),

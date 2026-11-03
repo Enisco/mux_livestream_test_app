@@ -9,6 +9,7 @@ import 'package:test_app/features/creator/views/creator_type_screen.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/creator/views/widgets/creator_topics_sheet.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
+import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
@@ -185,6 +186,36 @@ void main() {
       expect(find.text('at /creator-banner'), findsOneWidget);
     });
 
+    testWidgets('back from the first step leaves the chain', (tester) async {
+      // Found on a device on 2026-11-03: the arrow did nothing. Every step
+      // is reached with `go`, so there has never been anything to pop.
+      await _pump(tester, const CreatorPhotoScreen());
+
+      await tester.tap(find.byType(GTubeBackButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('at /studio'), findsOneWidget);
+    });
+
+    testWidgets('back from a later step goes to the one before it', (
+      tester,
+    ) async {
+      await _pump(tester, const CreatorBannerScreen());
+      await tester.tap(find.byType(GTubeBackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('at /creator-photo'), findsOneWidget);
+
+      await _pump(tester, const CreatorBioScreen());
+      await tester.tap(find.byType(GTubeBackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('at /creator-banner'), findsOneWidget);
+
+      await _pump(tester, const CreatorLinksScreen());
+      await tester.tap(find.byType(GTubeBackButton));
+      await tester.pumpAndSettle();
+      expect(find.text('at /creator-bio'), findsOneWidget);
+    });
+
     testWidgets('the photo target opens the picker, not a fake toggle', (
       tester,
     ) async {
@@ -292,6 +323,74 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(result, {'praise'});
+    });
+
+    testWidgets('a ninth topic reads as unavailable once eight are on', (
+      tester,
+    ) async {
+      // Reported from a device: the rows past the eighth looked as live as
+      // the rest and only said otherwise after a tap.
+      await _pump(
+        tester,
+        CreatorTopicsSheet(
+          categories: [
+            for (final (slug, name) in CreatorTopicsSheet.fallback)
+              ContentCategory(slug: slug, name: name),
+          ],
+          selected: {
+            for (final (slug, _) in CreatorTopicsSheet.fallback.take(
+              AppStrings.creatorCategoryMax,
+            ))
+              slug,
+          },
+        ),
+        size: const Size(390, 1400),
+      );
+
+      double dim(String topic) => tester
+          .widget<Opacity>(
+            find.descendant(
+              of: find.byKey(ValueKey('topic-$topic')),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .opacity;
+
+      expect(dim('Family'), lessThan(1), reason: 'the ninth is spent');
+      expect(dim('Devotionals'), lessThan(1));
+      expect(dim('Worship'), 1, reason: 'a chosen one stays live to turn off');
+    });
+
+    testWidgets('and goes live again when one is turned off', (tester) async {
+      await _pump(
+        tester,
+        CreatorTopicsSheet(
+          categories: [
+            for (final (slug, name) in CreatorTopicsSheet.fallback)
+              ContentCategory(slug: slug, name: name),
+          ],
+          selected: {
+            for (final (slug, _) in CreatorTopicsSheet.fallback.take(
+              AppStrings.creatorCategoryMax,
+            ))
+              slug,
+          },
+        ),
+        size: const Size(390, 1400),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('topic-Worship')));
+      await tester.pump();
+
+      final opacity = tester
+          .widget<Opacity>(
+            find.descendant(
+              of: find.byKey(const ValueKey('topic-Family')),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .opacity;
+      expect(opacity, 1);
     });
   });
 

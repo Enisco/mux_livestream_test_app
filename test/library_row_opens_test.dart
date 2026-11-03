@@ -11,6 +11,8 @@ import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/media_series_screen.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
+import 'package:test_app/features/giving/repo/donor_giving_repo.dart';
 import 'package:test_app/features/history/views/history_screen.dart';
 import 'package:test_app/features/library/repo/playlist_repo.dart';
 import 'package:test_app/features/library/repo/viewer_library_repo.dart';
@@ -203,7 +205,12 @@ Future<void> _pump(
     ..registerSingleton<EngagementRepo>(EngagementRepo())
     ..registerSingleton<EngagementStore>(EngagementStore())
     ..registerSingleton<TokenStorageService>(_SignedIn())
-    ..registerSingleton<AnalyticsService>(_NoopAnalytics());
+    ..registerSingleton<AnalyticsService>(_NoopAnalytics())
+    // A detail screen asks whether its ministry can take a gift. Left empty,
+    // so Give is absent — these cases are about opening rows, not giving.
+    ..registerSingleton<GivingCapabilityStore>(
+      GivingCapabilityStore(repo: DonorGivingRepo(api: api)),
+    );
   addTearDown(GetIt.instance.reset);
 
   tester.view.physicalSize = size * 3;

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -496,7 +499,7 @@ class GivingRailCard extends StatelessWidget {
             children: [
               if (onDetails case final open?) ...[
                 Expanded(
-                  child: _RailButton(
+                  child: GivingOutlineButton(
                     key: const ValueKey('rail-details'),
                     label: AppStrings.givingDetails,
                     onTap: open,
@@ -505,7 +508,7 @@ class GivingRailCard extends StatelessWidget {
                 SizedBox(width: 10.s),
               ],
               Expanded(
-                child: _RailButton(
+                child: GivingOutlineButton(
                   key: ValueKey('rail-action-${rail.id}'),
                   label: actionLabel,
                   onTap: busy ? null : onAction,
@@ -538,17 +541,28 @@ class GivingRailCard extends StatelessWidget {
   }
 }
 
-class _RailButton extends StatelessWidget {
-  const _RailButton({
+/// A bordered, full-width action that sits inside a card or a form.
+///
+/// Three screens wanted the same one — the rail card's track action, the
+/// checklist row's upload, and the Paystack form's "check account" — so it
+/// is one widget rather than three that drift apart.
+class GivingOutlineButton extends StatelessWidget {
+  const GivingOutlineButton({
     super.key,
     required this.label,
     required this.onTap,
     this.outlined = false,
+    this.loading = false,
   });
 
   final String label;
   final VoidCallback? onTap;
   final bool outlined;
+
+  /// This button's own work is in flight. The label is replaced rather than
+  /// joined by a spinner: an upload is reached from a row that stays on
+  /// screen, so there is nowhere else for the wait to show.
+  final bool loading;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -563,15 +577,26 @@ class _RailButton extends StatelessWidget {
           color: outlined ? AppColors.brandPrimary : AppColors.neutral700,
         ),
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppStyles.button(
-          12,
-          color: outlined ? AppColors.brandPrimary : AppColors.textPrimary,
-        ),
-      ),
+      child: loading
+          ? SizedBox(
+              width: 14.s,
+              height: 14.s,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.s,
+                color: AppColors.brandPrimary,
+              ),
+            )
+          : Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppStyles.button(
+                12,
+                color: outlined
+                    ? AppColors.brandPrimary
+                    : AppColors.textPrimary,
+              ),
+            ),
     ),
   );
 }
@@ -634,6 +659,7 @@ class GivingChecklistRow extends StatelessWidget {
     required this.requirement,
     this.onUpload,
     this.busy = false,
+    this.loading = false,
   });
 
   final RailRequirement requirement;
@@ -641,7 +667,12 @@ class GivingChecklistRow extends StatelessWidget {
   /// Present only when this is the creator's to supply.
   final VoidCallback? onUpload;
 
+  /// Something else on the screen is mid-write, so this row does not start
+  /// a second one.
   final bool busy;
+
+  /// This row's own document is uploading.
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -691,10 +722,11 @@ class GivingChecklistRow extends StatelessWidget {
           ],
           if (onUpload case final upload?) ...[
             SizedBox(height: 10.s),
-            _RailButton(
+            GivingOutlineButton(
               label: requirement.fileId == null
                   ? AppStrings.givingUploadDocument
                   : AppStrings.givingReplaceDocument,
+              loading: loading,
               onTap: busy ? null : upload,
             ),
           ],
@@ -944,4 +976,111 @@ String givingDate(DateTime? at) {
     'Dec',
   ];
   return '${at.day} ${months[at.month - 1]} ${at.year}';
+}
+
+// ---------------------------------------------------------------------------
+// Provider form fields
+//
+// Shared by the Khaime identity form and the Paystack bank form. Both are
+// hosted by the app rather than by the provider, so they have to look like
+// the rest of the setup rather than like two different screens.
+
+class GivingField extends StatelessWidget {
+  const GivingField({
+    super.key,
+    required this.label,
+    required this.controller,
+    required this.fieldKey,
+    this.hint,
+    this.keyboardType,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final Key fieldKey;
+  final String? hint;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: 14.s),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CreatorFieldLabel(label),
+        SizedBox(height: 6.s),
+        CreatorTextField(
+          key: fieldKey,
+          controller: controller,
+          hint: label,
+          keyboardType: keyboardType,
+          contentPadding: EdgeInsets.all(12.s),
+        ),
+        if (hint case final note?) ...[
+          SizedBox(height: 6.s),
+          Text(note, style: AppStyles.label(10, color: AppColors.neutral500)),
+        ],
+      ],
+    ),
+  );
+}
+
+class GivingSelect extends StatelessWidget {
+  const GivingSelect({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.hint,
+    this.loading = false,
+  });
+
+  final String label;
+  final String value;
+  final Future<void> Function() onTap;
+
+  /// What an empty field says. Defaults to the label, which reads fine for
+  /// a list of options and not at all for a date.
+  final String? hint;
+
+  /// The options are still being fetched, so the field says so rather than
+  /// opening on an empty list.
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: 14.s),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CreatorFieldLabel(label),
+        SizedBox(height: 6.s),
+        Stack(
+          alignment: Alignment.centerRight,
+          children: [
+            CreatorSelectField(
+              hint: hint ?? label,
+              value: value,
+              contentPadding: EdgeInsets.all(12.s),
+              onTap: () => unawaited(onTap()),
+            ),
+            if (loading)
+              Padding(
+                padding: EdgeInsets.only(right: 12.s),
+                child: SizedBox(
+                  width: 14.s,
+                  height: 14.s,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.s,
+                    color: AppColors.brandPrimary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
 }

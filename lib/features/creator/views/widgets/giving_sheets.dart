@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/logger.dart';
+import 'package:test_app/features/creator/repo/giving_repo.dart';
 import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
 import 'package:test_app/features/creator/views/widgets/giving_parts.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
@@ -709,6 +713,8 @@ class StepUpCodeSheet extends StatefulWidget {
     super.key,
     required this.title,
     required this.onResend,
+    required this.onVerify,
+    this.expiresAt,
     this.body,
   });
 
@@ -717,18 +723,44 @@ class StepUpCodeSheet extends StatefulWidget {
 
   /// Asking for another code. The dialog stays open — a creator who waited
   /// for a second email should not have to find their way back here.
-  final Future<void> Function() onResend;
+  ///
+  /// Returns the refreshed challenge, whose new expiry replaces the one this
+  /// sheet was opened with.
+  final Future<StepUpChallenge> Function() onResend;
+
+  /// Exchanges a code for a grant, or throws.
+  ///
+  /// **The sheet owns this call, not its caller.** It used to pop on the tap
+  /// and leave the screen behind it to verify, which meant a refused code
+  /// closed the sheet and said nothing — the creator was returned to an
+  /// unchanged page with no idea whether anything had happened. A refusal
+  /// belongs where the field is.
+  final Future<String> Function(String code) onVerify;
+
+  /// When the code stops working, so a refusal after that moment is not
+  /// reported as a typo.
+  final DateTime? expiresAt;
 
   static Future<String?> show(
     BuildContext context, {
     required String title,
-    required Future<void> Function() onResend,
+    required Future<StepUpChallenge> Function() onResend,
+    required Future<String> Function(String code) onVerify,
+    DateTime? expiresAt,
     String? body,
   }) => showDialog<String>(
     context: context,
     barrierColor: AppColors.overlayDark,
-    builder: (_) =>
-        StepUpCodeSheet(title: title, onResend: onResend, body: body),
+    // Closing it mid-verify would leave a grant minted and nothing holding
+    // it, so the only ways out are a refusal, a grant, or the X.
+    barrierDismissible: false,
+    builder: (_) => StepUpCodeSheet(
+      title: title,
+      onResend: onResend,
+      onVerify: onVerify,
+      expiresAt: expiresAt,
+      body: body,
+    ),
   );
 
   @override
@@ -740,6 +772,22 @@ class _StepUpCodeSheetState extends State<StepUpCodeSheet> {
   String? _problem;
   String? _note;
   bool _resending = false;
+  bool _verifying = false;
+  late DateTime? _expiresAt = widget.expiresAt;
+
+  /// The challenge is spent. Nothing typed into the field can work on it
+  /// again, so Verify is withheld until a new code has been sent.
+  bool _spent = false;
+
+  /// Whether the code this sheet was given has run out.
+  ///
+  /// Checked on the client because the refusal does not say which it was,
+  /// and the guide is explicit that a step-up failure must not be reported
+  /// as a wrong code without ruling expiry out first.
+  bool get _expired {
+    final at = _expiresAt;
+    return at != null && DateTime.now().isAfter(at);
+  }
 
   @override
   void dispose() {
@@ -747,26 +795,57 @@ class _StepUpCodeSheetState extends State<StepUpCodeSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final code = _code.text.trim();
     if (code.length != 6) {
       setState(() => _problem = AppStrings.givingCodeRequired);
       return;
     }
-    Navigator.pop(context, code);
+    setState(() {
+      _verifying = true;
+      _problem = null;
+      _note = null;
+    });
+    try {
+      final grant = await widget.onVerify(code);
+      if (grant.isEmpty) throw StateError('no grant');
+      if (mounted) Navigator.pop(context, grant);
+    } catch (e) {
+      logger.w('Step-up verify refused', error: e);
+      if (!mounted) return;
+      final exhausted = e is StepUpRefused && e.attemptsExhausted;
+      setState(() {
+        _problem = exhausted
+            ? AppStrings.givingCodeAttemptsUsed
+            : _expired
+            ? AppStrings.givingCodeExpired
+            : AppStrings.givingCodeWrong;
+        _spent = exhausted;
+        _verifying = false;
+      });
+    }
   }
 
   Future<void> _resend() async {
     setState(() => _resending = true);
     try {
-      await widget.onResend();
+      final refreshed = await widget.onResend();
       if (mounted) {
         setState(() {
           _note = AppStrings.givingCodeSent;
           _problem = null;
+          // A fresh code comes with a fresh allowance of tries.
+          _spent = false;
+          _expiresAt = refreshed.expiresAt ?? _expiresAt;
         });
       }
-    } catch (_) {
+    } on StepUpResendTooSoon {
+      // Not a failure: a code is already on its way.
+      if (mounted) {
+        setState(() => _problem = AppStrings.givingCodeResendTooSoon);
+      }
+    } catch (e) {
+      logger.w('Step-up resend failed', error: e);
       if (mounted) setState(() => _problem = AppStrings.givingWriteFailed);
     } finally {
       if (mounted) setState(() => _resending = false);
@@ -783,18 +862,27 @@ class _StepUpCodeSheetState extends State<StepUpCodeSheet> {
           GestureDetector(
             key: const ValueKey('giving-resend'),
             behavior: HitTestBehavior.opaque,
-            onTap: _resending ? null : _resend,
+            onTap: _resending || _verifying ? null : () => unawaited(_resend()),
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 8.s, horizontal: 4.s),
-              child: Text(
-                AppStrings.givingResendCode,
-                style: AppStyles.button(
-                  13,
-                  color: _resending
-                      ? AppColors.neutral500
-                      : AppColors.brandPrimary,
-                ),
-              ),
+              child: _resending
+                  ? SizedBox(
+                      width: 16.s,
+                      height: 16.s,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.s,
+                        color: AppColors.brandPrimary,
+                      ),
+                    )
+                  : Text(
+                      AppStrings.givingResendCode,
+                      style: AppStyles.button(
+                        13,
+                        color: _verifying
+                            ? AppColors.neutral500
+                            : AppColors.brandPrimary,
+                      ),
+                    ),
             ),
           ),
           SizedBox(width: 12.s),
@@ -802,7 +890,9 @@ class _StepUpCodeSheetState extends State<StepUpCodeSheet> {
             child: PrimaryButton(
               key: const ValueKey('giving-verify'),
               label: AppStrings.givingVerifyAndContinue,
-              onPressed: _submit,
+              loading: _verifying,
+              enabled: !_spent,
+              onPressed: () => unawaited(_submit()),
             ),
           ),
         ],

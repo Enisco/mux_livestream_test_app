@@ -16,6 +16,7 @@ import 'package:test_app/features/notifications/views/notifications_screen.dart'
 import 'package:test_app/features/notifications/repo/notification_repo.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
+import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
@@ -200,6 +201,7 @@ Future<_FakeApi> _pump(
   WidgetTester tester,
   _FakeApi api, {
   bool withContext = true,
+  VoidCallback? onLeaveStudio,
 }) async {
   SharedPreferences.setMockInitialValues({});
   await LocalStorage.init();
@@ -227,6 +229,7 @@ Future<_FakeApi> _pump(
         home: ImpactScreen(
           repo: ImpactRepo(api: api),
           context: withContext ? _context() : null,
+          onLeaveStudio: onLeaveStudio,
         ),
       ),
     ),
@@ -252,6 +255,23 @@ void main() {
   setUpAll(loadAppFonts);
 
   group('the shell', () {
+    testWidgets('back to watching leaves from the Impact tab too', (
+      tester,
+    ) async {
+      // Found on a device on 2026-11-03: the switcher's Back to watching
+      // row worked from the Studio tab and nowhere else, because the other
+      // three tabs handled only `switchTo` and dropped the rest.
+      var left = false;
+      await _pump(tester, _FakeApi(), onLeaveStudio: () => left = true);
+
+      await tester.tap(find.byType(StudioPill));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('back-to-watching')));
+      await tester.pumpAndSettle();
+
+      expect(left, isTrue);
+    });
+
     testWidgets('leads with the three things a congregation sends', (
       tester,
     ) async {

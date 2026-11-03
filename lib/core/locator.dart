@@ -5,6 +5,8 @@ import 'package:test_app/features/creator/repo/creator_asset_repo.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/repo/mobile_checkout_repo.dart';
 import 'package:test_app/features/creator/services/checkout_handoff_service.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
+import 'package:test_app/features/giving/repo/donor_giving_repo.dart';
 import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/subscriptions/repo/following_repo.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
@@ -59,6 +61,13 @@ Future<void> setupLocator() async {
   getIt.registerLazySingleton<MobileCheckoutRepo>(() => MobileCheckoutRepo());
   getIt.registerLazySingleton<CheckoutHandoffService>(
     () => CheckoutHandoffService(repo: getIt<MobileCheckoutRepo>()),
+  );
+  getIt.registerLazySingleton<DonorGivingRepo>(() => DonorGivingRepo());
+  // App-scoped: whether a ministry can receive a gift is the same answer on
+  // every surface, and the guide asks for it to be cached only briefly rather
+  // than fetched per card.
+  getIt.registerLazySingleton<GivingCapabilityStore>(
+    () => GivingCapabilityStore(repo: getIt<DonorGivingRepo>()),
   );
   getIt.registerLazySingleton<DiscoveryRepo>(() => DiscoveryRepo());
   getIt.registerLazySingleton<FollowingRepo>(FollowingRepo.new);

@@ -451,6 +451,39 @@ abstract final class ApiEndpoints {
   static const givingFunds = '/v1/payment/giving/funds';
   static String givingFund(String fundId) => '$givingFunds/$fundId';
 
+  // ---- Donor Giving ------------------------------------------------------
+  //
+  // The giving half of the feature: what a *reader* calls to offer a gift.
+  // Flutter's share of the flow is small by contract — capability, funds,
+  // then a browser handoff — because amount, fee breakdown and payment all
+  // live on the first-party web surface. See
+  // `creator-giving-and-recipient-integration-guide.md` section 9.
+
+  /// Whether this ministry can accept gifts at all. Public on purpose: the
+  /// Give action has to be drawn or withheld before anyone signs in.
+  ///
+  /// Answers `200 {available: false}` rather than an error for an ineligible
+  /// creator, and deliberately says nothing about *why* — the guide forbids
+  /// inferring or showing a reason.
+  static String givingCapability(String creatorId) =>
+      '/v1/public/payment/giving/creators/$creatorId/capability';
+
+  /// The same question for 1-50 creators at once, answered in input order.
+  static const givingCapabilities =
+      '/v1/public/payment/giving/creators/capabilities';
+
+  /// The purposes a giver may choose between, as a *giver* sees them.
+  ///
+  /// Not in the integration guide — found by probing on 2026-10-29. The
+  /// documented `/v1/payment/giving/funds?creatorId=` is the creator's own
+  /// management list and answers **403 "Not allowed to manage this
+  /// creator's giving funds"** to anyone else. This route is the donor-side
+  /// projection: active funds only, no counts, no plan limits. It needs a
+  /// session (401 without one) and, like the management list, creates the
+  /// reserved `general` fund as a side effect, so it is never empty.
+  static String givingCreatorFunds(String creatorId) =>
+      '/v1/payment/giving/creators/$creatorId/funds';
+
   /// The emailed one-time code that gates rail enrolment and every
   /// configuration change.
   static const stepUpChallenges = '/v1/auth/step-up/challenges';

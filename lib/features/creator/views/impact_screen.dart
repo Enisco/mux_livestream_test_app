@@ -46,6 +46,7 @@ class ImpactScreen extends StatefulWidget {
     this.context,
     this.studios = const [],
     this.onSwitchStudio,
+    this.onLeaveStudio,
     this.initialTab = 0,
   });
 
@@ -61,6 +62,10 @@ class ImpactScreen extends StatefulWidget {
 
   /// Re-points the shell at another studio.
   final Future<void> Function(String creatorId)? onSwitchStudio;
+
+  /// The way out of the studio entirely. Every tab opens the same
+  /// switcher, so every tab has to answer its Back to watching row.
+  final VoidCallback? onLeaveStudio;
 
   /// Defaults to the real thing; a test supplies its own.
   final ImpactRepo? repo;
@@ -620,15 +625,19 @@ class _ImpactScreenState extends State<ImpactScreen> {
       studios: widget.studios,
     );
     if (!mounted || choice == null) return;
-    if (choice.switchTo case final creatorId?) {
-      await widget.onSwitchStudio?.call(creatorId);
-      if (!mounted) return;
-      // The queues and the assignee list both belong to the studio that was
-      // open, so both are dropped rather than left to describe another
-      // ministry's people.
-      setState(() => _assignees = const []);
-      await _load();
-    }
+    final creatorId = applyStudiosOutcome(
+      context,
+      choice,
+      onLeave: widget.onLeaveStudio,
+    );
+    if (creatorId == null) return;
+    await widget.onSwitchStudio?.call(creatorId);
+    if (!mounted) return;
+    // The queues and the assignee list both belong to the studio that was
+    // open, so both are dropped rather than left to describe another
+    // ministry's people.
+    setState(() => _assignees = const []);
+    await _load();
   }
 
   @override
@@ -722,6 +731,7 @@ class _ImpactScreenState extends State<ImpactScreen> {
       Flexible(
         child: StudioPill(
           name: openStudio(widget.context, widget.studios)?.displayName ?? '',
+          avatarKey: openStudio(widget.context, widget.studios)?.avatarKey,
           onTap: () => unawaited(_openStudios()),
         ),
       ),

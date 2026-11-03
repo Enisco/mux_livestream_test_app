@@ -34,6 +34,11 @@ class AppRouter {
   static const String planSelection = '/plan-selection';
   static const String checkoutStatus = '/checkout-status';
 
+  /// Where a gift's return link lands. Separate from [checkoutStatus] because
+  /// the two read different halves of the same session and mean different
+  /// things by "done".
+  static const String givingStatus = '/giving-status';
+
   /// Everything after the plan is settled: the channel is live, then four
   /// optional steps that make it look like a channel.
   static const String creatorLive = '/creator-live';
@@ -44,6 +49,13 @@ class AppRouter {
 
   /// The creator studio: dashboard, content, impact and giving.
   static const String studio = '/studio';
+
+  /// The studio's own settings — logo, cover and about, on one screen.
+  ///
+  /// Not the onboarding chain at [creatorPhoto]: that asks for the four in
+  /// turn and starts every field empty, which is right the first time and
+  /// wrong every time after it.
+  static const String studioProfile = '/studio-profile';
   static const String creatorProfile = '/creator';
 
   /// Profile by id — the form every in-app creator affordance uses.

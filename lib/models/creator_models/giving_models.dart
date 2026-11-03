@@ -168,6 +168,19 @@ enum RailStatus {
       this == RailStatus.moreInformationRequired ||
       this == RailStatus.collectingInformation ||
       this == RailStatus.draft;
+
+  /// The provider's own stage is still open.
+  ///
+  /// Wider than [needsCreator] by the two states that *are* the provider
+  /// stage: a rail sits in `provider_onboarding` both before its form has
+  /// been filled and while the provider decides, so this says only that
+  /// nobody has moved past it — `platform_review` and the terminal states
+  /// have. What was actually handed over is a separate question, which
+  /// [GivingRail.providerHasDetails] answers.
+  bool get providerStageOpen =>
+      needsCreator ||
+      this == RailStatus.providerOnboarding ||
+      this == RailStatus.reonboardingRequired;
 }
 
 /// Who holds a gift between the giver paying and the creator being paid.
@@ -381,6 +394,130 @@ class RailRequirements {
       );
 }
 
+/// A rail's KYC, as section 2's own state machine names it.
+///
+/// ```text
+/// not_started -> in_progress -> submitted -> provider_review
+/// provider_review -> platform_review -> verified
+/// any review state -> rejected
+/// verified -> expired -> in_progress
+/// ```
+///
+/// This is the fact the provider track most needed and never read. A rail
+/// reading `submitted` has had the creator's answers taken off it — which
+/// is why a card calling that "Not started" was not merely unhelpful, it
+/// contradicted the payload it was drawn from.
+enum KycState {
+  notStarted('not_started'),
+  inProgress('in_progress'),
+  submitted('submitted'),
+  providerReview('provider_review'),
+  platformReview('platform_review'),
+  verified('verified'),
+  rejected('rejected'),
+  expired('expired'),
+
+  /// Absent, or a state added server-side. Says nothing either way, so it
+  /// never decides anything on its own.
+  unknown('');
+
+  const KycState(this.wire);
+
+  final String wire;
+
+  static KycState from(String? wire) {
+    for (final value in values) {
+      if (value.wire == wire && value != unknown) return value;
+    }
+    return unknown;
+  }
+
+  /// The creator's answers are in and somebody is looking at them.
+  bool get isHandedOver =>
+      this == submitted || this == providerReview || this == platformReview;
+
+  /// Anything at all has happened.
+  bool get isStarted => this != notStarted && this != unknown;
+}
+
+/// GospelTube's own verdict on the rail's verification case.
+///
+/// Straight off the wire — `review: {status, submittedAt, reviewedAt,
+/// reason, expiresAt}` — and previously dropped on the floor, which is why
+/// the GospelTube track could only ever say "Under review": it was reading
+/// the requirement list, not the decision.
+class RailReview {
+  const RailReview({
+    this.status = '',
+    this.submittedAt,
+    this.reviewedAt,
+    this.reason,
+  });
+
+  final String status;
+  final DateTime? submittedAt;
+  final DateTime? reviewedAt;
+
+  /// Why it was turned down or sent back. Shown verbatim: a reviewer
+  /// writing "the name on the registration does not match" has said the
+  /// whole thing, and a stock sentence in its place sends the creator back
+  /// into the form blind.
+  final String? reason;
+
+  bool get isApproved => status == 'approved' || status == 'accepted';
+  bool get isRejected => status == 'rejected';
+
+  /// A reviewer asked for something rather than refusing outright.
+  bool get needsMore =>
+      status == 'information_requested' ||
+      status == 'more_information_required';
+
+  /// Handed over and nobody has decided yet.
+  bool get isUnderReview =>
+      status == 'submitted' ||
+      status == 'in_review' ||
+      status == 'provider_review' ||
+      status == 'platform_review';
+
+  /// Whether this says anything at all. An absent block decides nothing.
+  bool get isKnown => status.isNotEmpty;
+
+  factory RailReview.fromJson(Map<String, dynamic> json) => RailReview(
+    status: json['status'] as String? ?? '',
+    submittedAt: _date(json['submittedAt']),
+    reviewedAt: _date(json['reviewedAt']),
+    reason: json['reason'] as String?,
+  );
+}
+
+/// Where the provider's half of a rail's verification actually stands.
+///
+/// The screen used to ask one yes/no question — "is there still something
+/// for the creator to do at the provider?" — which cannot tell *waiting on
+/// a decision* apart from *the decision came back and said no*. Both
+/// answered "nothing to do", so a rejected rail offered no way to fix
+/// itself, and a rail the provider was still verifying offered to start
+/// setup again.
+enum ProviderStage {
+  /// Nothing has reached the provider yet, or its initial onboarding was
+  /// never finished.
+  setup,
+
+  /// It came back wanting something changed: a refusal, an information
+  /// request, or a re-onboarding.
+  update,
+
+  /// Everything the creator can give is with the provider, and the
+  /// provider is deciding.
+  waiting,
+
+  /// The provider's half is done.
+  ready;
+
+  /// Whether the card should offer a button at all.
+  bool get needsCreator => this == setup || this == update;
+}
+
 /// One enrolled provider: where it settles, how far along it is, and what it
 /// is still waiting for.
 class GivingRail {
@@ -393,11 +530,14 @@ class GivingRail {
     this.custodyMode = CustodyMode.direct,
     this.holdDays,
     this.kycStatus = '',
+    this.review = const RailReview(),
     this.enabled = true,
     this.priority = 0,
     this.requirements = const [],
     this.managementMode = RailManagementMode.unknown,
     this.providerRequirementsDue = const [],
+    this.detailsSubmitted = false,
+    this.providerApproved,
     this.releaseBlockedReason,
     this.releasesFrozen = false,
     this.changeRequestId,
@@ -423,6 +563,12 @@ class GivingRail {
 
   final String kycStatus;
 
+  /// [kycStatus] in the vocabulary the guide actually documents.
+  KycState get kyc => KycState.from(kycStatus);
+
+  /// GospelTube's decision on this rail, when it has made one.
+  final RailReview review;
+
   /// A creator can take an active rail out of donor routing without
   /// unpicking its verification.
   final bool enabled;
@@ -431,6 +577,25 @@ class GivingRail {
   final List<RailRequirement> requirements;
   final RailManagementMode managementMode;
   final List<String> providerRequirementsDue;
+
+  /// Whether the creator's own details have reached the provider.
+  ///
+  /// The guide is careful about what this does and does not mean:
+  /// *"`detailsSubmitted=true` means the bank details reached GospelTube and
+  /// Paystack; it does not mean the representative or account owner was
+  /// verified."* So it answers "is there anything left for the creator to
+  /// hand over" and nothing about the decision that follows.
+  final bool detailsSubmitted;
+
+  /// Stripe's own verdict on the connected account, from
+  /// `provider.stripeAccountControls.approved`.
+  ///
+  /// Nullable on purpose: only Stripe reports it, so **null is "this
+  /// provider does not say"** and must not be read as a refusal. The guide
+  /// allows exactly one use — *"Clients may show a neutral 'Waiting for
+  /// Stripe account verification' state when `approved=false`; they must
+  /// not override the backend or expose donor checkout."*
+  final bool? providerApproved;
 
   /// Why a provider-held rail is not releasing, when it is not.
   final String? releaseBlockedReason;
@@ -459,6 +624,107 @@ class GivingRail {
   /// Only a provider-held rail is ever withdrawn from.
   bool get offersWithdrawal => custodyMode.isProviderHeld;
 
+  /// Whether the provider still has something for the creator to do.
+  ///
+  /// Not "the rail is not active yet", which is what the rail screen used
+  /// to ask. That left a Paystack rail sitting in `platform_review` — its
+  /// subaccount created, its bank details already at the provider — still
+  /// offering to open the settlement-account form, and reopening that form
+  /// after the destination is recorded is a versioned recipient change
+  /// rather than a resubmission.
+  ///
+  /// Each clause is something the guide says outright:
+  ///
+  /// - A refusal or an information request reopens the form whatever the
+  ///   provider already holds. Khaime has a `kyc/resubmit` route for
+  ///   precisely that, and only the creator can answer it.
+  /// - Stripe keeps its action *"while initial onboarding requirements
+  ///   remain"*: its hosted flow can be abandoned halfway and resumed, and
+  ///   Stripe can ask for more after an account already exists.
+  /// - Paystack and Khaime collect everything in one form, hosted here.
+  ///   Once the provider has it, what is left is underwriting — a decision
+  ///   nobody can hurry from this screen. Until then the form stays
+  ///   reachable for as long as the provider stage is open, because a rail
+  ///   whose bank details were never filled in is in `provider_onboarding`
+  ///   too and hiding it there would strand the creator.
+  bool get providerNeedsCreator => providerStage.needsCreator;
+
+  /// The same question in four answers rather than two.
+  ///
+  /// Read in order, because the earlier clauses are the stronger facts:
+  ///
+  /// - **Done.** The rail is active, or Stripe said so itself through
+  ///   `approved`. Note what is *not* here: `platform_review`. Reaching it
+  ///   does mean the provider half finished — *"When Stripe is ready, a
+  ///   policy with `platformReviewRequired=true` moves the application and
+  ///   verification case to `platform_review`"* — but the provider's own
+  ///   requirement can still be open at that moment, and a card reading
+  ///   "Completed" above its own outstanding row is the contradiction this
+  ///   screen already had once. The requirement list settles that
+  ///   question, and only the screen holds it.
+  /// - **A correction is wanted.** A refusal or an information request
+  ///   reopens the form whatever the provider already holds — Khaime has
+  ///   `kyc/resubmit` for exactly that, Paystack takes a corrected account
+  ///   through the subaccount route, and Stripe mints a fresh link. This
+  ///   is the case that had no UI at all: it read as "nothing to do".
+  /// - **Setup.** Nothing handed over yet. Stripe is its own clause
+  ///   because its hosted flow can be abandoned halfway and because it can
+  ///   ask for more after an account exists: *"While initial onboarding
+  ///   requirements remain, render Continue Stripe setup."*
+  /// - **Waiting**, which is everything else: the details are with the
+  ///   provider and nobody has asked for anything more. `kycStatus` is the
+  ///   first authority on that, because it is the rail's own word rather
+  ///   than a mirror of the PSP's.
+  ProviderStage get providerStage {
+    if (status.isActive) return ProviderStage.ready;
+    // Ahead of every "it is done" clause below: a rail sent back keeps the
+    // KYC it had, so a case that was verified once and then reopened still
+    // reads `verified` while its status says otherwise. The status is the
+    // newer fact.
+    if (status == RailStatus.moreInformationRequired ||
+        status == RailStatus.rejected ||
+        status == RailStatus.reonboardingRequired ||
+        kyc == KycState.rejected ||
+        kyc == KycState.expired) {
+      return ProviderStage.update;
+    }
+    if (kyc == KycState.verified) return ProviderStage.ready;
+    if (providerApproved == true && providerRequirementsDue.isEmpty) {
+      return ProviderStage.ready;
+    }
+    // `currently_due` is Stripe's word for what it wants *now*, from the
+    // account owner; what it is merely verifying is not in it. So a
+    // non-empty list outranks everything below — Stripe is asking today,
+    // whatever was handed over yesterday.
+    if (provider == PaymentProvider.stripe &&
+        providerRequirementsDue.isNotEmpty) {
+      return ProviderStage.setup;
+    }
+    // The rail's own KYC outranks the provider's mirror of it. They can
+    // disagree: `provider.detailsSubmitted` is reconciled from the PSP
+    // asynchronously — *"Provider readiness is asynchronous"* — so a rail
+    // reading `submitted` while Stripe's flag has not caught up is a lag,
+    // not an unstarted form, and sending that creator back through
+    // onboarding is the one thing that cannot help them.
+    if (kyc.isHandedOver) return ProviderStage.waiting;
+    if (provider == PaymentProvider.stripe) {
+      return detailsSubmitted ? ProviderStage.waiting : ProviderStage.setup;
+    }
+    if (!providerHasDetails && status.providerStageOpen) {
+      return ProviderStage.setup;
+    }
+    return ProviderStage.waiting;
+  }
+
+  /// Whether the provider already holds the creator's side of its form.
+  ///
+  /// Two independent signals, because only Stripe's `detailsSubmitted` is
+  /// documented for certain: a recorded settlement destination is the other
+  /// half of the same fact, and Paystack's subaccount route is defined as
+  /// storing one.
+  bool get providerHasDetails =>
+      detailsSubmitted || settlementAccountLast4 != null;
+
   factory GivingRail.fromJson(Map<String, dynamic> json) {
     final provider = (json['provider'] as Map<String, dynamic>?) ?? const {};
     final management =
@@ -476,6 +742,9 @@ class GivingRail {
       custodyMode: CustodyMode.from(json['custodyMode'] as String?),
       holdDays: (json['holdDays'] as num?)?.toInt(),
       kycStatus: json['kycStatus'] as String? ?? '',
+      review: RailReview.fromJson(
+        (json['review'] as Map<String, dynamic>?) ?? const {},
+      ),
       enabled: json['enabled'] as bool? ?? true,
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       requirements: _objects(
@@ -483,6 +752,11 @@ class GivingRail {
       ).map(RailRequirement.fromJson).toList(),
       managementMode: RailManagementMode.from(management['mode'] as String?),
       providerRequirementsDue: _strings(provider['requirementsCurrentlyDue']),
+      detailsSubmitted: provider['detailsSubmitted'] as bool? ?? false,
+      providerApproved:
+          ((provider['stripeAccountControls'] as Map<String, dynamic>?) ??
+                  const {})['approved']
+              as bool?,
       releaseBlockedReason: json['releaseBlockedReason'] as String?,
       releasesFrozen: json['releasesFrozen'] as bool? ?? false,
       changeRequestId: change['id'] as String?,

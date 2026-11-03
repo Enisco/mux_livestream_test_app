@@ -9,12 +9,14 @@ import 'package:test_app/features/creator/repo/giving_repo.dart';
 import 'package:test_app/features/creator/views/giving_earnings_screen.dart';
 import 'package:test_app/features/creator/views/giving_funds_screen.dart';
 import 'package:test_app/features/creator/views/giving_rail_screen.dart';
+import 'package:test_app/features/creator/views/studio_shell.dart';
 import 'package:test_app/features/creator/views/widgets/giving_parts.dart';
 import 'package:test_app/features/creator/views/widgets/giving_sheets.dart';
 import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/features/creator/views/widgets/studio_sheets.dart';
 import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/models/creator_models/giving_models.dart';
+import 'package:test_app/shared/components/busy_barrier.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -48,6 +50,7 @@ class GivingScreen extends StatefulWidget {
     this.context,
     this.studios = const [],
     this.onSwitchStudio,
+    this.onLeaveStudio,
   });
 
   final GivingRepo? repo;
@@ -57,6 +60,10 @@ class GivingScreen extends StatefulWidget {
 
   final List<StudioMembership> studios;
   final Future<void> Function(String creatorId)? onSwitchStudio;
+
+  /// The way out of the studio entirely. Every tab opens the same
+  /// switcher, so every tab has to answer its Back to watching row.
+  final VoidCallback? onLeaveStudio;
 
   @override
   State<GivingScreen> createState() => _GivingScreenState();
@@ -280,9 +287,10 @@ class _GivingScreenState extends State<GivingScreen> {
     setState(() => _busy = true);
     StepUpChallenge challenge;
     try {
-      challenge = await _repo.createStepUp(
-        creatorId: creatorId,
-        operation: operation,
+      challenge = await runBusy(
+        context,
+        () => _repo.createStepUp(creatorId: creatorId, operation: operation),
+        message: AppStrings.givingWorking,
       );
     } catch (e) {
       logger.w('Step-up challenge failed', error: e);
@@ -295,28 +303,17 @@ class _GivingScreenState extends State<GivingScreen> {
     if (mounted) setState(() => _busy = false);
     if (!mounted) return null;
 
-    final code = await StepUpCodeSheet.show(
+    // The sheet verifies. It stays open on a refusal and says so beside the
+    // field, so backing out is a decision rather than something that just
+    // happens to a creator who mistyped a digit.
+    return StepUpCodeSheet.show(
       context,
       title: title,
+      expiresAt: challenge.expiresAt,
       onResend: () => _repo.resendStepUp(challenge.challengeId),
+      onVerify: (code) =>
+          _repo.verifyStepUp(challengeId: challenge.challengeId, code: code),
     );
-    if (code == null || !mounted) return null;
-
-    setState(() => _busy = true);
-    try {
-      final grant = await _repo.verifyStepUp(
-        challengeId: challenge.challengeId,
-        code: code,
-      );
-      if (grant.isEmpty) throw StateError('no grant');
-      return grant;
-    } catch (e) {
-      logger.w('Step-up verify failed', error: e);
-      if (mounted) _say(AppStrings.givingWriteFailed);
-      return null;
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   /// Run one write, then re-read.
@@ -327,7 +324,11 @@ class _GivingScreenState extends State<GivingScreen> {
   Future<void> _write(Future<Object?> Function() call) async {
     setState(() => _busy = true);
     try {
-      await call();
+      // Behind a barrier: every caller here was reached from a sheet that
+      // has already closed, so there is no button left on screen to carry a
+      // spinner. The re-read that follows is covered by the page's own
+      // loading state.
+      await runBusy(context, call, message: AppStrings.givingWorking);
       if (!mounted) return;
       await _load();
     } catch (e) {
@@ -344,6 +345,10 @@ class _GivingScreenState extends State<GivingScreen> {
         content: Text(message, style: AppStyles.body(13)),
         backgroundColor: AppColors.neutral800,
         behavior: SnackBarBehavior.floating,
+        // This tab's Scaffold sits beneath the shell's floating nav bar, so
+        // a snackbar at the default offset is painted behind it: the
+        // message is shown, and nobody sees it.
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, studioNavClearance),
       ),
     );
   }
@@ -357,17 +362,21 @@ class _GivingScreenState extends State<GivingScreen> {
       studios: widget.studios,
     );
     if (!mounted || choice == null) return;
-    if (choice.switchTo case final creatorId?) {
-      await widget.onSwitchStudio?.call(creatorId);
-      if (!mounted) return;
-      // The application, the rails and the policy options all belong to the
-      // studio that was open, so none of them survives the switch.
-      setState(() {
-        _application = null;
-        _options = const GivingOptions();
-      });
-      await _load();
-    }
+    final creatorId = applyStudiosOutcome(
+      context,
+      choice,
+      onLeave: widget.onLeaveStudio,
+    );
+    if (creatorId == null) return;
+    await widget.onSwitchStudio?.call(creatorId);
+    if (!mounted) return;
+    // The application, the rails and the policy options all belong to the
+    // studio that was open, so none of them survives the switch.
+    setState(() {
+      _application = null;
+      _options = const GivingOptions();
+    });
+    await _load();
   }
 
   Future<void> _openRail(GivingRail rail) async {
@@ -444,6 +453,7 @@ class _GivingScreenState extends State<GivingScreen> {
       Flexible(
         child: StudioPill(
           name: openStudio(widget.context, widget.studios)?.displayName ?? '',
+          avatarKey: openStudio(widget.context, widget.studios)?.avatarKey,
           onTap: () => unawaited(_openStudios()),
         ),
       ),
@@ -746,11 +756,19 @@ class _GivingScreenState extends State<GivingScreen> {
           padding: EdgeInsets.only(bottom: 12.s),
           child: GivingRailCard(
             rail: rail,
+            // The same four answers the rail screen gives, so the tab
+            // and the screen behind it never disagree about whose move
+            // it is. "View application" is for a rail nobody is waiting
+            // on the creator for.
             actionLabel: rail.status.isActive
                 ? AppStrings.givingUpdateAccount
-                : rail.status.needsCreator
-                ? AppStrings.givingContinueProvider(rail.provider?.label ?? '')
-                : AppStrings.givingViewApplication,
+                : switch (rail.providerStage) {
+                    ProviderStage.setup => AppStrings.givingContinueProvider(
+                      rail.provider?.label ?? '',
+                    ),
+                    ProviderStage.update => AppStrings.givingProviderUpdate,
+                    _ => AppStrings.givingViewApplication,
+                  },
             busy: _busy,
             onAction: () => unawaited(
               rail.status.isActive ? _updateRail(rail) : _openRail(rail),

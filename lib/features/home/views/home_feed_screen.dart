@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
@@ -51,6 +52,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   final _playback = getIt<PlaybackController>();
   final _engagement = getIt<EngagementRepo>();
   final _store = getIt<EngagementStore>();
+  final _giving = getIt<GivingCapabilityStore>();
   final _scroll = ScrollController();
   late final _actions = FeedCardActions(
     store: _store,
@@ -206,6 +208,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
         _loading = false;
       });
       FeedCardActions.seedRows(_store, result.items);
+      unawaited(_primeGiving(result.items));
       if (result.items.isEmpty) await _loadEmptyCompanions();
       unawaited(_hydrateInteractions(result.items));
     } catch (e) {
@@ -252,6 +255,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
         _cursor = result.nextCursor;
       });
       FeedCardActions.seedRows(_store, result.items);
+      unawaited(_primeGiving(result.items));
       unawaited(_hydrateInteractions(result.items));
     } catch (e) {
       logger.w('Home feed page failed', error: e);
@@ -347,6 +351,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   ///
   /// Share needs no account; everything else does, which the sheet gates
   /// through [_requireAccount] rather than refusing the whole sheet.
+  /// Looks up, in one request, which of these ministries can take a gift.
+  ///
+  /// **Live rows only.** The guide offers Give from a feed on eligible
+  /// livestream menus and nowhere else in a feed, and asking about every
+  /// ministry on every page would be a request a scroll does not need. The
+  /// answers land in the session-wide store, so a card's overflow sheet can
+  /// read them without a wait of its own.
+  Future<void> _primeGiving(List<WebFeedItem> rows) => _giving.prime([
+    for (final row in rows)
+      if (row.isLiveNow) row.profileCreatorId ?? '',
+  ]);
+
   Future<void> _openCardActions(WebFeedItem item) =>
       showCardActionsSheet(context, item, requireAccount: _requireAccount);
 

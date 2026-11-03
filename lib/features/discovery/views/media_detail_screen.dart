@@ -19,6 +19,9 @@ import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
+import 'package:test_app/features/engagement/data/share_link_action.dart';
+import 'package:test_app/features/giving/data/give_action.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
@@ -64,6 +67,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   final _repo = GetIt.instance<DiscoveryRepo>();
   final _engagementRepo = GetIt.instance<EngagementRepo>();
   final _store = getIt<EngagementStore>();
+  final _giving = getIt<GivingCapabilityStore>();
   late final _actions = FeedCardActions(
     store: _store,
     requireAccount: _requireAccount,
@@ -76,6 +80,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   /// What the payload said, before the store has anything newer.
   EngagementState _baseline = const EngagementState();
   bool _followBusy = false;
+  bool _canGive = false;
 
   final List<MediaComment> _comments = [];
   bool _commentsLoading = false;
@@ -162,6 +167,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         );
       }
       FeedCardActions.seedRows(_store, detail.suggestions);
+      unawaited(_askCanGive(creatorId, detail.creator?.isOwnedByViewer));
       _trackOrganicImpression();
       if (!_commentsLoaded) _fetchComments();
     } catch (e) {
@@ -267,6 +273,56 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     artworkUrl:
         _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
   );
+
+  /// Mints a share link and puts it on the clipboard.
+  ///
+  /// The row's Share had no handler at all until Give was added beside it —
+  /// a dead button next to a live one reads as the live one being broken too.
+  Future<void> _share() async {
+    final url = await copyShareLink(
+      engagement: _engagementRepo,
+      targetType: InteractionTargets.media,
+      targetId: _mediaId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          url ?? AppStrings.cardShareUnavailable,
+          style: AppStyles.body(13),
+        ),
+        backgroundColor: AppColors.base2,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Whether to draw Give on the impact row.
+  Future<void> _askCanGive(String? creatorId, bool? owned) async {
+    if (creatorId == null || creatorId.isEmpty || (owned ?? false)) return;
+    final can = await _giving.ensure(creatorId);
+    if (mounted && can) setState(() => _canGive = true);
+  }
+
+  /// Hands off to the web surface, naming this content as the source.
+  ///
+  /// Only a livestream is named. The server validates source media when the
+  /// session is created and accepts a narrower set than "media the giver can
+  /// watch" — a plain video, an audio row and even a livestream's own replay
+  /// are all refused — so sending one anywhere else would buy a round-trip
+  /// and a retry for nothing. The retry still exists as a safety net; this
+  /// just keeps the common case to one request.
+  Future<void> _give() async {
+    final creator = _detail?.creator;
+    if (creator == null) return;
+    await startGive(
+      context,
+      creatorId: creator.creatorId,
+      ministryName: creator.displayName,
+      sourceMediaId: _mediaType == MediaTypes.livestream ? _mediaId : null,
+      requireAccount: _requireAccount,
+    );
+  }
 
   String? get _mediaType =>
       _detail?.playback?.mediaType ??
@@ -435,8 +491,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 saves: formatCount(_engagement.saves),
                 liked: _engagement.liked,
                 saved: _engagement.saved,
+                canGive: _canGive,
                 onLike: _toggleLike,
                 onSave: _toggleSave,
+                onShare: () => unawaited(_share()),
+                onGive: () => unawaited(_give()),
               ),
               const DetailDivider(),
               if (description != null && description.isNotEmpty) ...[

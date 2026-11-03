@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/shared/components/app_icons.dart';
@@ -313,18 +314,29 @@ class DetailImpactActions extends StatelessWidget {
     required this.saves,
     this.liked = false,
     this.saved = false,
+    this.canGive = false,
     this.onLike,
     this.onSave,
     this.onShare,
+    this.onGive,
   });
 
   final String likes;
   final String saves;
   final bool liked;
   final bool saved;
+
+  /// Whether this content's ministry can receive a gift.
+  ///
+  /// The design draws a fourth slot in this row and leaves it hidden (it was
+  /// drafted as a download). Give takes it when the ministry is eligible, and
+  /// the row goes back to three when it is not — rather than carrying a
+  /// permanently greyed action that can only refuse.
+  final bool canGive;
   final VoidCallback? onLike;
   final VoidCallback? onSave;
   final VoidCallback? onShare;
+  final VoidCallback? onGive;
 
   @override
   Widget build(BuildContext context) {
@@ -354,6 +366,19 @@ class DetailImpactActions extends StatelessWidget {
             labelColor: AppColors.neutral50,
             onTap: onShare,
           ),
+          if (canGive)
+            _Action(
+              key: const ValueKey('detail-give'),
+              // The design never drew this slot, so there is no exported
+              // glyph for it. The gift mark the "My giving" menu row already
+              // uses stands in, which at least keeps one symbol for the idea
+              // across the app.
+              hugeIcon: HugeIcons.strokeRoundedGift,
+              size: 18,
+              label: AppStrings.give,
+              labelColor: AppColors.neutral50,
+              onTap: onGive,
+            ),
         ],
       ),
     );
@@ -362,16 +387,26 @@ class DetailImpactActions extends StatelessWidget {
 
 class _Action extends StatelessWidget {
   const _Action({
-    required this.icon,
+    super.key,
+    this.icon,
+    this.hugeIcon,
     required this.size,
     required this.label,
     this.activeIcon,
     this.active = false,
     this.labelColor,
     this.onTap,
-  });
+  }) : assert(
+         icon != null || hugeIcon != null,
+         'an action needs a glyph to draw',
+       );
 
-  final String icon;
+  /// A Figma-exported SVG, which is what every action drawn in the design
+  /// uses.
+  final String? icon;
+
+  /// A packaged glyph, for an action the design never exported one for.
+  final List<List<dynamic>>? hugeIcon;
 
   /// Drawn instead of [icon] while [active]. Null leaves the same glyph, only
   /// recoloured — which is all the actions without a solid variant can do.
@@ -391,12 +426,19 @@ class _Action extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            DesignIcon(
-              active ? (activeIcon ?? icon) : icon,
-              width: size.s,
-              height: size.s,
-              color: active ? AppColors.brandPrimary : null,
-            ),
+            if (icon case final svg?)
+              DesignIcon(
+                active ? (activeIcon ?? svg) : svg,
+                width: size.s,
+                height: size.s,
+                color: active ? AppColors.brandPrimary : null,
+              )
+            else
+              HugeIcon(
+                icon: hugeIcon!,
+                size: size.s,
+                color: active ? AppColors.brandPrimary : AppColors.neutral400,
+              ),
             SizedBox(width: 4.s),
             Text(
               label,

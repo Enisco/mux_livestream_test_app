@@ -212,6 +212,39 @@ class GettingStartedStep {
   final bool blocking;
 }
 
+/// Which of the studio's inboxes an attention row leads to.
+///
+/// Worked out from the key rather than matched against a closed list, which
+/// is what let `failed_content` through: it fell down a `default` arm that
+/// sent the reader to the prayer inbox, and its two failed uploads were
+/// counted on the Impact tab's badge as if somebody were waiting on a
+/// reply.
+enum AttentionDestination {
+  prayers,
+  testimonies,
+  comments,
+
+  /// Media whose processing failed. The creator's content, not their post.
+  content,
+
+  /// Nothing this release knows where to open.
+  elsewhere;
+
+  /// Whether this is one of Impact's three inboxes — which is all the
+  /// Impact badge should ever count.
+  bool get isImpact => this != content && this != elsewhere;
+}
+
+/// What the Impact tab's badge counts.
+///
+/// Its own three inboxes, and nothing else. Summing the whole attention
+/// feed put two failed uploads on the Impact badge, which reads as two
+/// people waiting on a reply nobody owes them.
+int impactBadgeFrom(Iterable<AttentionItem> attention) => attention.fold(
+  0,
+  (sum, item) => item.destination.isImpact ? sum + item.count : sum,
+);
+
 /// Something waiting on the reader: prayer requests, testimonies to review.
 class AttentionItem {
   const AttentionItem({
@@ -232,6 +265,21 @@ class AttentionItem {
   /// Only some responses carry their own wording; otherwise the client names
   /// the row from [key].
   final String label;
+
+  /// Matched on substrings so a key the dashboard renames — `open_prayers`
+  /// to `prayer_requests`, say — keeps leading where it means to.
+  AttentionDestination get destination {
+    final code = key.toLowerCase();
+    if (code.contains('prayer')) return AttentionDestination.prayers;
+    if (code.contains('testimon')) return AttentionDestination.testimonies;
+    if (code.contains('comment')) return AttentionDestination.comments;
+    if (code.contains('content') ||
+        code.contains('media') ||
+        code.contains('upload')) {
+      return AttentionDestination.content;
+    }
+    return AttentionDestination.elsewhere;
+  }
 }
 
 /// One number on the TODAY card, with how it moved.

@@ -140,6 +140,32 @@ class _PolishScaffold extends StatelessWidget {
   final Widget child;
   final bool centerContent;
 
+  /// Back one step, or out of the chain entirely from the first.
+  ///
+  /// The four steps are reached with `go`, not `push` — they are one chain
+  /// rather than a stack — so there was never anything for the header's
+  /// `context.pop()` to pop and the back arrow did nothing on any of them.
+  /// A real stack underneath is still honoured where there is one.
+  static void _back(BuildContext context, int step) {
+    switch (step) {
+      case 1:
+        context.go(AppRouter.creatorPhoto);
+      case 2:
+        context.go(AppRouter.creatorBanner);
+      case 3:
+        context.go(AppRouter.creatorBio);
+      default:
+        if (context.canPop()) {
+          context.pop();
+          return;
+        }
+        // Out of the first step is out of the chain. The studio is where
+        // it ends, where skipping lands, and where both of the ways in
+        // from an existing channel live.
+        context.go(AppRouter.studio);
+    }
+  }
+
   /// Skipping and continuing land in the same place — the difference is only
   /// whether this step wrote anything first.
   static void _advance(BuildContext context, int step) {
@@ -165,7 +191,7 @@ class _PolishScaffold extends StatelessWidget {
       topBar: CreatorFlowHeader(
         title: title,
         subtitle: subtitle,
-        onBack: () => context.pop(),
+        onBack: () => _back(context, step),
       ),
       footer: Column(
         mainAxisSize: MainAxisSize.min,

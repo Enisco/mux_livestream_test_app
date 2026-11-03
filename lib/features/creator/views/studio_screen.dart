@@ -164,14 +164,29 @@ class _StudioScreenState extends State<StudioScreen> {
   /// The three keys the dashboard actually sends are `open_prayers`,
   /// `pending_testimonies` and `flagged_comments`; anything else lands on
   /// Impact's first tab rather than nowhere.
-  void _openAttention(String key) => widget.onOpenTab?.call(
-    _impactTab,
-    impactTab: switch (key) {
-      'pending_testimonies' => 1,
-      'flagged_comments' => 2,
-      _ => 0,
-    },
-  );
+  /// Where an attention row leads.
+  ///
+  /// Every key used to be assumed to name one of Impact's three inboxes,
+  /// with anything unrecognised falling through to prayers — so
+  /// `failed_content`, which is media whose processing failed, opened the
+  /// prayer inbox and read as somebody waiting on a reply.
+  void _openAttention(AttentionItem item) {
+    switch (item.destination) {
+      case AttentionDestination.prayers:
+        widget.onOpenTab?.call(_impactTab);
+      case AttentionDestination.testimonies:
+        widget.onOpenTab?.call(_impactTab, impactTab: 1);
+      case AttentionDestination.comments:
+        widget.onOpenTab?.call(_impactTab, impactTab: 2);
+      case AttentionDestination.content:
+        widget.onOpenTab?.call(_contentTab);
+      case AttentionDestination.elsewhere:
+        // A key added server-side that this release has no screen for.
+        // Saying so beats opening the wrong inbox — which is what landing
+        // everything unrecognised on prayers amounted to.
+        _say(AppStrings.studioAttentionOnWeb);
+    }
+  }
 
   /// Every studio the reader can work in, since 2026-10-26.
   ///
@@ -189,18 +204,14 @@ class _StudioScreenState extends State<StudioScreen> {
       studios: widget.studios,
     );
     if (!mounted || choice == null) return;
-    if (choice.leave) {
-      widget.onLeaveStudio?.call();
-      return;
-    }
-    if (choice.switchTo case final creatorId?) {
-      await widget.onSwitchStudio?.call(creatorId);
-      if (mounted) await _load();
-      return;
-    }
-    // Not "not built yet": studio settings are a web-studio screen and say
-    // so on the row that offers them, so the answer names the reason.
-    _say(AppStrings.studiosSettingsNote);
+    final creatorId = applyStudiosOutcome(
+      context,
+      choice,
+      onLeave: widget.onLeaveStudio,
+    );
+    if (creatorId == null) return;
+    await widget.onSwitchStudio?.call(creatorId);
+    if (mounted) await _load();
   }
 
   /// Where a getting-started step actually leads.
@@ -371,7 +382,7 @@ class _StudioScreenState extends State<StudioScreen> {
                             // this replaces said there was no creator-side
                             // inbox to open; there is, and has been since
                             // Impact shipped.
-                            onTap: () => _openAttention(item.key),
+                            onTap: () => _openAttention(item),
                           ),
                       ],
                     ),
@@ -401,6 +412,7 @@ class _StudioScreenState extends State<StudioScreen> {
           // Named off the membership row when the dashboard refused a
           // context, so the pill is not a blank, dead control.
           name: openStudio(_context, widget.studios)?.displayName ?? '',
+          avatarKey: openStudio(_context, widget.studios)?.avatarKey,
           onTap: _openStudios,
         ),
       ),

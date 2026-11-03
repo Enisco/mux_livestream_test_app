@@ -225,6 +225,7 @@ abstract final class AppStrings {
   static const orDivider = 'Or';
   static const logIn = 'Log in';
   static const forgotPasswordLink = 'Forgot password?';
+  static const newHereSignUp = 'New here? Create an account';
 
   static const forgotPasswordTitle = 'Forgot Password';
   static const forgotPasswordSubtitle =
@@ -354,6 +355,63 @@ abstract final class AppStrings {
   static const checkoutStillProcessing =
       "Your previous attempt is still processing. We'll update your plan as "
       'soon as it settles.';
+  // ---- Giving (the reader's side) ---------------------------------------
+  //
+  // The app never names an amount, a currency or a fee: the giver chooses all
+  // three on the web surface, and copy that previewed them here would be
+  // guessing at numbers only the server can compute.
+
+  /// The action itself, on a content page's impact row.
+  static const give = 'Give';
+
+  /// The fund picker (Figma `11117-116520`).
+  static const giveFundsTitle = 'Give funds';
+  static String giveToMinistry(String ministry) => 'Give to $ministry';
+
+  /// A fund row's caption when it has no description of its own. The design
+  /// writes it "To CCI International" — shorter than the header above it, so
+  /// the two do not read as the same line printed twice.
+  static String giveFundFor(String ministry) => 'To $ministry';
+  static const giveFundPurpose = 'The purpose of the fund';
+  static const giveContinue = 'Continue';
+
+  /// Shown while the handoff is being prepared, before the browser opens.
+  static const giveOpening = 'Opening secure giving…';
+
+  /// Said when this ministry cannot receive a gift. The reason is deliberately
+  /// absent — the capability route omits it, and the guide forbids inferring
+  /// one.
+  static const giveUnavailable =
+      'This ministry cannot receive gifts right now.';
+
+  /// Said when the store itself does not allow giving in this country.
+  static const giveUnavailableHere =
+      'Giving is not available in your region yet.';
+  static const giveFailed = 'Giving could not be started. Please try again.';
+
+  // The gift-status family is `gift*`, not `giving*`: the creator side of the
+  // feature already owns `giving*` and the two are about different people.
+  static const giftStatusTitle = 'Your gift';
+  static const giftInBrowser =
+      'Finish your gift in the browser, then come back here.';
+  static const giftConfirming = 'Confirming your gift…';
+
+  /// Deliberately thanks rather than reporting a transfer. A gift can be
+  /// complete for the giver while the ministry's settlement is still pending,
+  /// so nothing here says the money has arrived.
+  static const giftConfirmed = 'Thank you. Your gift has gone through.';
+  static String giftConfirmedAmount(String amount) =>
+      'Thank you. Your gift of $amount has gone through.';
+  static const giftPending =
+      "Your gift was received. We're still confirming it with the payment "
+      'provider.';
+  static const giftDeclined = 'That gift did not go through.';
+  static const giftCanceled = 'That gift was cancelled.';
+  static const giftExpired =
+      'That giving session expired. Start a new one when you are ready.';
+  static const giftDone = 'Done';
+  static const giftResume = 'Continue in browser';
+
   static const checkAgain = 'Check again';
   static const tryAgain = 'Try again';
   static const notNow = 'Not now';
@@ -1274,16 +1332,68 @@ abstract final class AppStrings {
     'prayers': 'Prayer requests',
     'testimonies': 'Testimonies to review',
     'comments': 'Comments to review',
+    // Media whose processing failed. The dashboard sends the raw key and
+    // no label, and it used to be rendered as `failed_content`.
+    'failed_content': 'Uploads that failed',
+    'failed_media': 'Uploads that failed',
   };
+
+  /// A key this release has no wording for, made readable rather than left
+  /// as `some_new_key`.
+  static String studioAttentionFallback(String key) {
+    final words = key.replaceAll('_', ' ').trim();
+    if (words.isEmpty) return key;
+    return words[0].toUpperCase() + words.substring(1);
+  }
+
   static String studioAttentionNew(int n) => '$n New';
   static String studioAttentionWaiting(int n) => '$n waiting';
+
+  /// Nothing is waiting on a failed upload; it is waiting on the creator.
+  static String studioAttentionToFix(int n) => '$n to fix';
+
+  /// An attention key this release has no screen for. Opening the wrong
+  /// inbox is worse than saying where it is handled.
+  static const studioAttentionOnWeb = 'This one is handled on the web studio.';
 
   // The studio switcher.
   static const studiosSheetTitle = 'YOUR STUDIOS';
   static const studiosPersonal = 'Personal';
   static const studiosSwitch = 'Switch studio';
   static const studiosSettings = 'Studio Settings';
-  static const studiosSettingsNote = 'Settings are managed on the web';
+  // What the app itself owns of a studio's settings. The row used to say
+  // settings were managed on the web and answer a tap by repeating that
+  // sentence as a snackbar — a chevron that led nowhere, when the photo,
+  // banner, bio and links screens have been in the app all along.
+  static const studiosSettingsNote = 'Logo, cover and about';
+
+  // The studio's own settings. One screen showing what the channel already
+  // has, because the onboarding chain starts every field empty and asked a
+  // creator who had filled all three to fill them again.
+  static const studioProfileTitle = 'Studio settings';
+  static const studioProfileSubtitle =
+      'What your channel already shows. Change anything that needs it.';
+  static const studioProfileCover = 'Cover';
+  static const studioProfileLogo = 'Logo';
+  static const studioProfileAbout = 'About';
+  static const studioProfileAboutHint =
+      'One or two sentences for your channel page.';
+  static const studioProfileChange = 'Change';
+  static const studioProfileAdd = 'Add';
+  static const studioProfileNoCover = 'No cover yet';
+  static const studioProfileNoLogo = 'No logo yet';
+  static const studioProfileSave = 'Save changes';
+  static const studioProfileSaved = 'Saved.';
+  static const studioProfileNothingToSave = 'Nothing has changed yet.';
+  static const studioProfileFailed =
+      'Your channel could not be loaded. Pull to try again.';
+  static const studioProfileSaveFailed =
+      'That could not be saved. Try again shortly.';
+
+  /// Said once, under the About field: the rest is not the app's to change.
+  static const studioProfileWebNote =
+      'Your channel name, page address and categories are changed on the '
+      'web studio.';
   static const studiosBackToWatching = 'Back to watching';
   static const studiosBackToWatchingNote = 'Return to your feed';
 
@@ -1814,9 +1924,112 @@ abstract final class AppStrings {
   static const givingKhaimeFormBody =
       'Complete identity, documents and bank details without leaving your '
       'studio.';
+  // Stripe's, and only Stripe's: it is the one provider whose onboarding is
+  // a hosted page. Paystack's is three routes the app hosts itself and
+  // Khaime's is the identity form, so saying this of either would send a
+  // creator looking for a website that does not exist.
   static const givingProviderFormBody =
       'Connect your account and finish verification securely on the '
       'provider.';
+
+  // The Paystack bank form. Paystack v1 is Nigeria and NGN only, and the
+  // provider's own step is a settlement account rather than an identity
+  // check — which is why the note below says review still follows.
+  static String givingPaystackNote(String provider) =>
+      '$provider settles each gift straight to this account. GospelTube '
+      'keeps the bank code and the last four digits only.';
+  static const givingPaystackSection = 'Settlement account';
+  static const givingPaystackSectionBody =
+      'The bank account that should receive gifts.';
+  static const givingPaystackBank = 'Bank';
+  static const givingPaystackAccountNumber = 'Account number';
+  static const givingPaystackCheck = 'Check account';
+  static const givingPaystackAccountName = 'Account name';
+  static const givingPaystackConfirmBody =
+      'Resolved by the bank. Check it is the right account before '
+      'connecting.';
+  static const givingPaystackBankRequired = 'Choose the bank.';
+  static const givingPaystackNumberRequired = 'Enter the account number.';
+  static const givingPaystackResolveFailed =
+      'That number could not be found at this bank.';
+  static const givingPaystackUnresolved =
+      'Check the account before connecting it.';
+  static const givingPaystackConnect = 'Connect account';
+  // Said plainly because the opposite is easy to assume: the subaccount
+  // verifies the settlement rail, not the person behind it.
+  static const givingPaystackReviewNote =
+      'Connecting the account finishes the provider step. GospelTube still '
+      'reviews the recipient afterwards.';
+  static const givingPaystackConnected = 'Account connected.';
+
+  /// Shown on the provider track once the provider has everything the
+  /// creator can give it, in place of an action that would only reopen a
+  /// form whose answers are already with them.
+  static String givingProviderWaiting(String provider) =>
+      '$provider has your details. Nothing else is needed from you here.';
+
+  /// The provider asked for something to be changed. Deliberately not
+  /// "Continue setup": there is nothing to continue, something has to be
+  /// put right.
+  static const givingProviderUpdate = 'Update your details';
+
+  /// The neutral wording the guide allows while a provider decides —
+  /// *"Clients may show a neutral 'Waiting for Stripe account
+  /// verification' state when `approved=false`."*
+  static String givingProviderVerifying(String provider) =>
+      'Waiting for $provider account verification.';
+
+  /// Said once, above the button, when the provider or the review came
+  /// back wanting a change and gave no reason of its own.
+  static String givingProviderUpdateNote(String provider) =>
+      '$provider needs something changed before this rail can go live.';
+
+  /// The provider track's own pill, which says where that half stands
+  /// rather than what the rail as a whole is doing.
+  static const givingTrackActionNeeded = 'Action needed';
+  static const givingTrackWaiting = 'With the provider';
+  static const givingTrackNotStarted = 'Not started';
+  static const givingTrackUnderReview = 'Under review';
+
+  /// Stripe's hosted flow was never finished — distinct from Stripe
+  /// asking for something new, which is the line below it.
+  static String givingProviderUnfinished(String provider) =>
+      '$provider has not confirmed your details reached it. Opening the '
+      'setup again picks up where you left off.';
+  static String givingProviderWants(String provider) =>
+      '$provider is asking for more before it can verify this account.';
+
+  /// GospelTube's own half, once a reviewer has decided.
+  static const givingReviewApproved = 'GospelTube has verified this rail.';
+  static const givingReviewRejected =
+      'GospelTube could not verify this rail with what was sent.';
+  static const givingReviewNeedsMore =
+      'GospelTube needs something more before it can verify this rail.';
+
+  // Stripe's hosted onboarding. The one provider whose setup really does
+  // happen somewhere else: GospelTube collects none of the identity or
+  // bank details itself, so this screen only mints the link and opens it.
+  static String givingStripeNote(String provider) =>
+      '$provider asks for identity and bank details on its own secure '
+      'pages. GospelTube never sees them.';
+  static const givingStripeSection = 'Finish at the provider';
+  static const givingStripeSectionBody =
+      'Your browser opens on the provider\'s onboarding. Come back here '
+      'when it is done.';
+  static const givingStripeOpen = 'Continue to Stripe';
+  static const givingStripeReopen = 'Reopen Stripe';
+  static const givingStripeDone = 'I have finished at Stripe';
+  static const givingStripeOpened =
+      'Stripe is open in your browser. Finish there, then come back.';
+  static const givingStripeLinkFailed =
+      'Stripe did not return a setup link. Try again shortly.';
+  static const givingStripeOpenFailed =
+      'That link could not be opened. Try again shortly.';
+  // The guide's words, because a creator who assumes otherwise stops
+  // checking: "Returning to the app is not proof of completion."
+  static const givingStripeReviewNote =
+      'Coming back does not finish anything by itself. GospelTube reads '
+      'your status from Stripe and shows it on this rail.';
 
   static const givingClassIndividual = 'Individual';
   static const givingClassUnregistered = 'Unregistered organisation';
@@ -1868,6 +2081,25 @@ abstract final class AppStrings {
   static const givingVerifyAndContinue = 'Verify and continue';
   static const givingCodeRequired = 'Enter the 6-digit code.';
   static const givingCodeSent = 'A new code is on its way.';
+
+  /// Said when verification is refused and the code has not yet expired.
+  ///
+  /// Deliberately not "wrong code": the guide warns against calling a
+  /// step-up failure that without first ruling out expiry, and a creator who
+  /// typed it correctly from a stale email would be told they cannot read.
+  static const givingCodeWrong =
+      'That code did not work. Check it, or send a new one.';
+  static const givingCodeExpired = 'That code has expired. Send a new one.';
+  static const givingCodeResendTooSoon =
+      'A code was just sent. Give it a moment before asking for another.';
+
+  /// The challenge is spent: no code will work on it again.
+  static const givingCodeAttemptsUsed =
+      'Too many tries on that code. Send a new one to carry on.';
+
+  /// Shown on the barrier that covers a write while it is in flight.
+  static const givingWorking = 'Working…';
+  static const givingUploading = 'Uploading…';
   static const givingChangeProviderNote =
       'To switch providers, add another rail instead. This update changes '
       'the destination, country, currency, or legal recipient name.';
@@ -1910,6 +2142,9 @@ abstract final class AppStrings {
   static const givingSubmitted = 'Sent for review.';
   static const givingUploadDocument = 'Upload';
   static const givingReplaceDocument = 'Replace';
+  // The track card's own action, which reads as a step rather than as the
+  // button on one row.
+  static const givingUploadDocuments = 'Upload documents';
   static const givingDocumentOnFile = 'Document on file';
   static const givingDocumentOnFileBody =
       'Uploaded privately. Drop or choose a new file to replace it.';
@@ -1933,8 +2168,11 @@ abstract final class AppStrings {
   static const givingKycFirstName = 'First name';
   static const givingKycLastName = 'Last name';
   static const givingKycDateOfBirth = 'Date of birth';
-  static const givingKycDateOfBirthHint = 'YYYY-MM-DD';
+  // No format hint: the date is chosen from a wheel and written out in the
+  // one shape the route takes, so there is nothing left to get wrong.
+  static const givingKycDateOfBirthHint = 'Choose a date';
   static const givingKycPhone = 'Phone number';
+  static const givingKycPhoneInvalid = 'Enter a valid phone number.';
   static const givingKycIdType = 'Identity document type';
   static const givingKycIdNumber = 'Identity document number';
   static String givingKycIdNumberHint(String provider) =>

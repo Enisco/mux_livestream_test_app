@@ -12,6 +12,8 @@ import 'package:test_app/features/creator/views/widgets/impact_sheets.dart'
     show showReportSheet;
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/data/share_link_action.dart';
+import 'package:test_app/features/giving/data/give_action.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
@@ -55,6 +57,7 @@ Future<void> showCardActionsSheet(
   WebFeedItem item, {
   EngagementRepo? repo,
   EngagementStore? store,
+  GivingCapabilityStore? givingCapabilities,
   bool Function(String feature)? requireAccount,
   bool isOwn = false,
 }) async {
@@ -87,11 +90,24 @@ Future<void> showCardActionsSheet(
           fallback: item.isFollowingCreator,
         );
 
+  // Asked before the sheet is built, because a row cannot appear after it is
+  // open. Normally free: the detail screen behind this sheet has already
+  // looked the same ministry up, and the answer is held for the session.
+  final canGive =
+      creatorId != null &&
+      (givingCapabilities ?? getIt<GivingCapabilityStore>()).known(creatorId) ==
+          true;
+
   final actions = <LibraryAction>[
     const LibraryAction(
       label: AppStrings.cardShare,
       icon: HugeIcons.strokeRoundedShare08,
     ),
+    if (canGive)
+      const LibraryAction(
+        label: AppStrings.cardGiveNow,
+        icon: HugeIcons.strokeRoundedGift,
+      ),
     // PARKED(1.5): playlists hold media only, and widening them is not
     // planned — so the row is absent on blog, devotional and event cards
     // rather than present and refused.
@@ -295,11 +311,24 @@ Future<void> showCardActionsSheet(
         say(AppStrings.cardActionFailed);
       }
 
+    case AppStrings.cardGiveNow:
+      // Only drawn when the ministry is known to be able to receive, so the
+      // giver is not sent at a refusal. The gift names no source media: a
+      // card is not necessarily a livestream, and that is the only kind the
+      // server attributes to.
+      if (creatorId == null || !context.mounted) return;
+      await startGive(
+        context,
+        creatorId: creatorId,
+        ministryName: creatorName,
+        requireAccount: gate,
+      );
+
     default:
       // Add to calendar needs the device calendar and no route; Prayer
-      // request, Give now and Submit testimony belong to flows that are not
-      // built or are parked. The sheet does not draw a row it cannot honour,
-      // so reaching here means a label was added without a case.
+      // request and Submit testimony belong to flows that are not built or
+      // are parked. The sheet does not draw a row it cannot honour, so
+      // reaching here means a label was added without a case.
       logger.w('Card sheet: unhandled action "$picked"');
   }
 }

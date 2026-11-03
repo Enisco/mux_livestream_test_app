@@ -154,6 +154,19 @@ class _SignInScreenState extends State<SignInScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 22),
+          // The link in the header is easy to miss above the fold on a short
+          // phone, and someone who has no account has nothing to type into
+          // this form — so the way out of it is a control of its own.
+          //
+          // `go` rather than `push`: signing up is not a detour from signing
+          // in, and replacing the screen leaves the sign-up back button
+          // pointing at the auth landing, where the rest of the ways in are.
+          AuthSecondaryButton(
+            key: const ValueKey('sign-in-sign-up'),
+            label: AppStrings.newHereSignUp,
+            onPressed: () => context.go(AppRouter.signUp),
+          ),
         ],
       ),
     );
@@ -187,7 +200,8 @@ class _Header extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             GestureDetector(
-              onTap: () => context.go(AppRouter.welcome),
+              key: const ValueKey('sign-in-sign-up-link'),
+              onTap: () => context.go(AppRouter.signUp),
               child: Text(
                 AppStrings.signUpLink,
                 style: AppStyles.label(

@@ -63,7 +63,15 @@ class _Device extends DeviceInfoService {
 /// A server that rotates refresh tokens and refuses a spent one, and that
 /// answers 401 to anything carrying a stale access token.
 class _RotatingServer implements HttpClientAdapter {
-  _RotatingServer({required this.liveRefresh, required this.liveAccess});
+  _RotatingServer({
+    required this.liveRefresh,
+    required this.liveAccess,
+    this.alwaysRefuses,
+  });
+
+  /// A path that answers 401 however good the token is — a refusal about the
+  /// request, not the session.
+  final String? alwaysRefuses;
 
   /// The only refresh token the server will still accept.
   String liveRefresh;
@@ -101,6 +109,13 @@ class _RotatingServer implements HttpClientAdapter {
       return _json(200, {
         'success': true,
         'data': {'accessToken': liveAccess, 'refreshToken': liveRefresh},
+      });
+    }
+
+    if (alwaysRefuses case final refused? when options.path.contains(refused)) {
+      return _json(401, {
+        'success': false,
+        'error': 'Maximum OTP attempts exceeded',
       });
     }
 
@@ -217,6 +232,86 @@ void main() {
     expect(expired, isFalse);
     expect(tokens.clears, 0);
   });
+
+  test(
+    'a route that answers 401 forever is replayed once, not forever',
+    () async {
+      // Seen on a device on 2026-11-02: a step-up code the server would not
+      // take came back 401, which the interceptor read as an expired
+      // session. It refreshed, replayed the same rejected code, got 401
+      // again, and went round until the creator force-quit. The guide's
+      // rule is "refresh once and replay the original request" — once.
+      final tokens = _Tokens(access: 'fresh', refresh: 'good');
+      final server = _RotatingServer(
+        liveRefresh: 'good',
+        liveAccess: 'fresh',
+        alwaysRefuses: '/stubborn',
+      );
+      final api = _apiWith(tokens, server);
+
+      await expectLater(
+        api.get<dynamic>('/stubborn'),
+        throwsA(isA<DioException>()),
+      );
+
+      expect(server.refreshCalls, 1);
+      expect(
+        server.paths.where((p) => p.contains('/stubborn')).length,
+        2,
+        reason: 'the original and exactly one replay',
+      );
+    },
+  );
+
+  test('a refused step-up code is not mistaken for a dead session', () async {
+    // Verify answers 401 for a code it will not take, so this route must be
+    // excluded from refresh-on-401 outright: the guide lists the 2FA routes
+    // and says "exclude them explicitly or you will loop".
+    final tokens = _Tokens(access: 'fresh', refresh: 'good');
+    final server = _RotatingServer(
+      liveRefresh: 'good',
+      liveAccess: 'fresh',
+      alwaysRefuses: '/v1/auth/step-up/challenges',
+    );
+    final api = _apiWith(tokens, server);
+
+    var expired = false;
+    ApiService.onSessionExpired = () => expired = true;
+    addTearDown(() => ApiService.onSessionExpired = null);
+
+    await expectLater(
+      api.post<dynamic>(
+        '/v1/auth/step-up/challenges/ch-1/verify',
+        data: const {'code': '123456'},
+      ),
+      throwsA(isA<DioException>()),
+    );
+
+    expect(server.refreshCalls, 0, reason: 'nothing is wrong with the session');
+    expect(server.paths.where((p) => p.contains('/verify')).length, 1);
+    expect(expired, isFalse);
+    expect(tokens.clears, 0);
+  });
+
+  test(
+    'creating a step-up challenge still refreshes a stale session',
+    () async {
+      // Only verify is excluded. A sheet can sit open long enough for the
+      // access token to expire, and a 401 on *creating* the challenge really
+      // is an expired session.
+      final tokens = _Tokens(access: 'stale', refresh: 'good');
+      final server = _RotatingServer(liveRefresh: 'good', liveAccess: 'fresh');
+      final api = _apiWith(tokens, server);
+
+      final response = await api.post<dynamic>(
+        '/v1/auth/step-up/challenges',
+        data: const {'operation': 'activate_givings'},
+      );
+
+      expect(response.statusCode, 200);
+      expect(server.refreshCalls, 1);
+    },
+  );
 
   test('a later 401 starts a fresh refresh, not a stale one', () async {
     final tokens = _Tokens(access: 'stale', refresh: 'good');

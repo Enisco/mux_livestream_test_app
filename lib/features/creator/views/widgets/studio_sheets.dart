@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/core/router.dart';
 import 'package:test_app/features/creator/views/widgets/studio_parts.dart';
 import 'package:test_app/models/creator_models/dashboard_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
@@ -180,6 +182,35 @@ class CreateSheet extends StatelessWidget {
   }
 }
 
+/// What the switcher's two non-studio rows do, in one place.
+///
+/// Three of the four tabs that open this sheet used to handle only
+/// `switchTo` and drop the other two answers on the floor: **Back to
+/// watching** worked from the Studio tab and nowhere else, and **Studio
+/// Settings** worked nowhere at all — on the Studio tab it answered with a
+/// snackbar repeating the sentence already printed under it.
+///
+/// The studio to switch *to* is handed back rather than acted on here,
+/// because what each tab has to throw away first differs: Giving drops its
+/// application and options, Impact drops its assignees.
+String? applyStudiosOutcome(
+  BuildContext context,
+  StudiosOutcome? choice, {
+  VoidCallback? onLeave,
+}) {
+  if (choice == null) return null;
+  if (choice.leave) {
+    onLeave?.call();
+    return null;
+  }
+  if (choice.switchTo case final creatorId?) return creatorId;
+  // Settings: one screen showing what the channel already has. Not the
+  // onboarding chain — that asks for the four in turn with every field
+  // empty, which is right the first time and wrong every time after it.
+  context.go(AppRouter.studioProfile);
+  return null;
+}
+
 /// Which studio the switcher should show as the open one.
 ///
 /// The dashboard context is the answer when there is one. There is not
@@ -263,6 +294,7 @@ class StudiosSheet extends StatelessWidget {
           name: current.displayName,
           handle: current.handle,
           role: current.role,
+          avatarKey: current.avatarKey,
           selected: true,
           onTap: null,
         ),
@@ -273,6 +305,7 @@ class StudiosSheet extends StatelessWidget {
             name: studio.displayName,
             handle: studio.handle,
             role: studio.role,
+            avatarKey: studio.avatarKey,
             selected: false,
             onTap: () => onPick(StudiosOutcome.switchTo(studio.creatorId)),
           ),
@@ -343,12 +376,14 @@ class _StudioRow extends StatelessWidget {
     required this.role,
     required this.selected,
     required this.onTap,
+    this.avatarKey,
     this.rowKey,
   });
 
   final String name;
   final String handle;
   final String role;
+  final String? avatarKey;
   final bool selected;
   final VoidCallback? onTap;
   final Key? rowKey;
@@ -378,7 +413,7 @@ class _StudioRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            StudioAvatar(size: 34.s),
+            StudioAvatar(size: 34.s, avatarKey: avatarKey),
             SizedBox(width: 12.s),
             Expanded(
               child: Column(

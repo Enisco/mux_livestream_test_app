@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/shared/services/log_redaction.dart';
 import 'package:test_app/models/auth_models/auth_models.dart';
 import 'package:test_app/shared/services/device_info_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
@@ -90,6 +91,36 @@ class ApiService {
   set httpClientAdapter(HttpClientAdapter adapter) =>
       _dio.httpClientAdapter = adapter;
 
+  /// Marks a request that has already been replayed after a refresh.
+  static const _replayed = 'gtube_replayed_after_refresh';
+
+  /// Routes whose 401 is an answer, not an expired session.
+  ///
+  /// The auth guide names this and says what happens if you skip it:
+  /// *"Never attempt refresh-on-401 for the auth routes themselves (login,
+  /// logout, refresh, the 2FA routes). Exclude them explicitly or you will
+  /// loop."*
+  ///
+  /// Step-up is the one that bit. `POST .../step-up/challenges/:id/verify`
+  /// answers **401** for a code it will not take — *"Maximum OTP attempts
+  /// exceeded"* — which has nothing to do with the session. Refreshing and
+  /// replaying it re-submits the same rejected code forever, which is what
+  /// a creator sees as a button that spins and never stops.
+  static bool _isAuthRoute(String path) =>
+      path.contains(ApiEndpoints.refresh) ||
+      path.contains(ApiEndpoints.login) ||
+      path.contains(ApiEndpoints.register) ||
+      path.contains(ApiEndpoints.beaconsAuth) ||
+      // The login-time 2FA exchange: there is no session to refresh yet.
+      path.contains('/2fa/challenges') ||
+      // Only the verify step. Creating or resending a challenge still 401s
+      // for a genuinely expired access token, and a step-up sheet can sit
+      // open long enough for that to happen — those should refresh as
+      // usual, which the replay guard above keeps to one attempt.
+      (path.endsWith('/verify') &&
+          (path.contains(ApiEndpoints.stepUpChallenges) ||
+              path.contains('/two-factor/')));
+
   InterceptorsWrapper _buildInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -110,7 +141,7 @@ class ApiService {
       onResponse: (response, handler) {
         logger.d(
           '← ${response.statusCode} ${response.requestOptions.method} '
-          '${response.requestOptions.path}\n${response.data}',
+          '${response.requestOptions.path}\n${redactSecrets(response.data)}',
         );
         return handler.next(response);
       },
@@ -121,14 +152,16 @@ class ApiService {
 
         logger.e(
           '← $statusCode ${error.requestOptions.method} $path: ${error.message}'
-          '${responseBody != null ? '\n  response: $responseBody' : ''}',
+          '${responseBody != null ? '\n  response: '
+                    '${redactSecrets(responseBody)}' : ''}',
         );
 
         if (statusCode == 401 &&
-            !path.contains(ApiEndpoints.refresh) &&
-            !path.contains(ApiEndpoints.login) &&
-            !path.contains(ApiEndpoints.register) &&
-            !path.contains(ApiEndpoints.beaconsAuth)) {
+            !_isAuthRoute(path) &&
+            // "Refresh once and replay. On a second failure, log out."
+            // Without this the replay goes back through this interceptor,
+            // 401s again, refreshes again, and never stops.
+            error.requestOptions.extra[_replayed] != true) {
           // A guest has no session to expire. Without this, a stale access
           // token that outlived its refresh token drags anyone browsing
           // signed-out onto the sign-in screen.
@@ -150,6 +183,7 @@ class ApiService {
             try {
               final newToken = await _tokenStorage.accessToken;
               final retryOpts = error.requestOptions;
+              retryOpts.extra[_replayed] = true;
               retryOpts.headers['Authorization'] = 'Bearer $newToken';
               final response = await _dio.fetch(retryOpts);
               return handler.resolve(response);

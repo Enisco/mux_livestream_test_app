@@ -163,6 +163,12 @@ class _CreatorTopicsSheetState extends State<CreatorTopicsSheet> {
                       _TopicRow(
                         topic: category.name,
                         on: _chosen.contains(category.slug),
+                        // Eight are chosen and this is not one of them: the
+                        // row reads as unavailable rather than looking live
+                        // and answering with a snackbar.
+                        locked:
+                            !_chosen.contains(category.slug) &&
+                            _chosen.length >= AppStrings.creatorCategoryMax,
                         // The server refuses the whole request over eight, so
                         // the ninth is refused here instead of being sent.
                         onChanged: (value) {
@@ -222,11 +228,19 @@ class _TopicRow extends StatelessWidget {
     required this.topic,
     required this.on,
     required this.onChanged,
+    this.locked = false,
   });
 
   final String topic;
   final bool on;
   final ValueChanged<bool> onChanged;
+
+  /// The eighth topic is chosen and this is a ninth. Still tappable — the
+  /// snackbar is what says why — but dimmed, so the limit is visible before
+  /// it is hit rather than only after.
+  final bool locked;
+
+  static const _lockedOpacity = 0.4;
 
   @override
   Widget build(BuildContext context) {
@@ -234,19 +248,22 @@ class _TopicRow extends StatelessWidget {
       key: ValueKey('topic-$topic'),
       behavior: HitTestBehavior.opaque,
       onTap: () => onChanged(!on),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                topic,
-                style: AppStyles.label(13, weight: AppStyles.bold),
+      child: Opacity(
+        opacity: locked ? _lockedOpacity : 1,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  topic,
+                  style: AppStyles.label(13, weight: AppStyles.bold),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            _Switch(on: on),
-          ],
+              const SizedBox(width: 12),
+              _Switch(on: on),
+            ],
+          ),
         ),
       ),
     );

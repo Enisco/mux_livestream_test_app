@@ -14,6 +14,9 @@ import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/shared/components/markdown_body.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/engagement/data/share_link_action.dart';
+import 'package:test_app/features/giving/data/give_action.dart';
+import 'package:test_app/features/giving/data/giving_capability_store.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount, relativeAge;
@@ -158,6 +161,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   bool _failed = false;
 
   final _store = GetIt.instance<EngagementStore>();
+  final _giving = GetIt.instance<GivingCapabilityStore>();
 
   /// What the payload said, before the store has anything newer.
   EngagementState _baseline = const EngagementState();
@@ -166,6 +170,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
 
   bool _reported = false;
   bool _authed = false;
+  bool _canGive = false;
 
   /// Mirrors `viewerProgress.completedEntryIds`, updated as days are marked.
   Set<String> _completedEntryIds = const {};
@@ -305,19 +310,70 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   /// Library rows carry only a creatorId, so the header would otherwise show
   /// "0 Subscribers" and no verified badge.
   Future<void> _resolveCreator() async {
+    final creatorId = _ministryId;
+    if (creatorId.isNotEmpty) unawaited(_askCanGive(creatorId));
     if (widget.item.creator != null) return;
-    final creatorId =
-        _post?.creatorId ??
-        _devotional?.creatorId ??
-        _event?.creatorId ??
-        widget.item.profileCreatorId;
-    if (creatorId == null || creatorId.isEmpty) return;
+    if (creatorId.isEmpty) return;
     try {
       final creator = await _repo.fetchCreatorById(creatorId);
       if (mounted) setState(() => _creator = creator);
     } catch (e) {
       logger.w('creator lookup failed', error: e);
     }
+  }
+
+  /// Who the gift would go to. The payload names the creator in a different
+  /// place per entity type, and a library row names it nowhere but the hit.
+  String get _ministryId =>
+      _creator?.id ??
+      _post?.creatorId ??
+      _devotional?.creatorId ??
+      _event?.creatorId ??
+      widget.item.profileCreatorId ??
+      '';
+
+  /// Whether to draw Give on the impact row.
+  Future<void> _askCanGive(String creatorId) async {
+    if (_creator?.isOwnedByViewer ?? false) return;
+    final can = await _giving.ensure(creatorId);
+    if (mounted && can) setState(() => _canGive = true);
+  }
+
+  /// Hands off to the web surface.
+  ///
+  /// No `sourceMediaId`: nothing on this screen is media. Posts, devotionals
+  /// and events are content-service entities, and the giving source is
+  /// validated against media alone — naming one of these would be refused.
+  Future<void> _give() async {
+    final creatorId = _ministryId;
+    if (creatorId.isEmpty) return;
+    await startGive(
+      context,
+      creatorId: creatorId,
+      ministryName: _creatorName,
+      requireAccount: _requireAccount,
+    );
+  }
+
+  /// Mints a share link and puts it on the clipboard. Share had no handler
+  /// before Give arrived beside it.
+  Future<void> _share() async {
+    final url = await copyShareLink(
+      engagement: _engagement,
+      targetType: _targetType,
+      targetId: _id,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          url ?? AppStrings.cardShareUnavailable,
+          style: AppStyles.body(13),
+        ),
+        backgroundColor: AppColors.base2,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   /// These payloads carry counts but not the viewer's own state, so an already
@@ -439,6 +495,9 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                       fallback: _baseline,
                     );
                   },
+                  canGive: _canGive,
+                  onShare: () => unawaited(_share()),
+                  onGive: () => unawaited(_give()),
                 ),
                 const DetailDivider(),
                 SizedBox(height: 20.s),
