@@ -11,6 +11,8 @@ import 'package:test_app/features/creator/views/widgets/live_prayers_sheet.dart'
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/shared/services/live_socket_service.dart';
 import 'package:test_app/shared/services/media_permissions.dart';
+import 'package:test_app/shared/services/playback_controller.dart';
+import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'package:test_app/features/creator/repo/livestream_repo.dart';
 import 'package:test_app/features/creator/views/widgets/live_broadcast_parts.dart';
 import 'package:test_app/models/creator_models/livestream_models.dart';
@@ -46,6 +48,8 @@ class LiveBroadcastScreen extends StatefulWidget {
     this.replayPolicy = ReplayPolicy.autoPublish,
     this.controller,
     this.ask,
+    this.wakelock,
+    this.playback,
   });
 
   final String mediaId;
@@ -61,6 +65,13 @@ class LiveBroadcastScreen extends StatefulWidget {
   /// How the camera and microphone are asked for. Supplied by a test.
   final PermissionAsk? ask;
 
+  /// What keeps the screen awake. Supplied by a test.
+  final ScreenWakelock? wakelock;
+
+  /// The app's own media playback, stopped on the way in. Supplied by a
+  /// test; otherwise taken from the locator if it is registered.
+  final PlaybackHandle? playback;
+
   @override
   State<LiveBroadcastScreen> createState() => _LiveBroadcastScreenState();
 
@@ -72,6 +83,15 @@ class LiveBroadcastScreen extends StatefulWidget {
   /// which is what an emulator usually does — left a spinner running
   /// indefinitely.
   static const connectTimeout = Duration(seconds: 45);
+
+  /// How long the ending overlay will wait for the backend to acknowledge.
+  ///
+  /// The dio client sets `connectTimeout` but no `receiveTimeout`, so a
+  /// server that accepts the request and never answers would hold `_end`
+  /// for ever — and the overlay cannot be dismissed, so the creator would
+  /// be stuck on it. The push is already stopped by then, so the backend
+  /// closes the broadcast on its own encoder patience either way.
+  static const endTimeout = Duration(seconds: 20);
 }
 
 /// Where a broadcast is in its life, as this screen sees it.
@@ -125,11 +145,26 @@ enum LiveLossAction {
 class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     with WidgetsBindingObserver {
   late final _repo = widget.live ?? LivestreamRepo();
+  late final _wakelock = widget.wakelock ?? screenWakelock;
+
+  /// Nullable on purpose: the locator is not set up in a widget test, and
+  /// the same `isRegistered` guard is how the live socket is reached.
+  late final PlaybackHandle? _playback =
+      widget.playback ??
+      (GetIt.instance.isRegistered<PlaybackController>()
+          ? GetIt.instance<PlaybackController>()
+          : null);
   late final ApiVideoLiveStreamController _controller =
       widget.controller ??
       ApiVideoLiveStreamController(
         initialAudioConfig: AudioConfig(),
         initialVideoConfig: VideoConfig.withDefaultBitrate(),
+        // A creator going live is talking to their own congregation, so
+        // the camera that should already be pointing at them is the front
+        // one. The plugin's own default is `back`. `live-flip` in the
+        // stat bar switches, and the plugin reads the live position rather
+        // than assuming, so it stays correct from either start.
+        initialCameraPosition: CameraPosition.front,
         onConnectionSuccess: _onRtmpUp,
         onConnectionFailed: _onRtmpFailed,
         onDisconnection: _onRtmpDown,
@@ -170,11 +205,21 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // For the whole life of the screen, not just while on air: a creator
+    // framing a shot or reading a failure is no more likely to be touching
+    // the phone than one who is mid-sermon, and one hold paired with one
+    // release has no state machine to get wrong.
+    unawaited(_wakelock.hold());
+    // Nothing stopped the feed when a broadcast started, so a video still
+    // playing kept its audio and the microphone put it straight into the
+    // livestream. Going live is as exclusive as playback gets.
+    unawaited(_playback?.stop());
     _begin();
   }
 
   @override
   void dispose() {
+    unawaited(_wakelock.release());
     WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     _tick?.cancel();
@@ -437,6 +482,10 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   }
 
   Future<void> _end() async {
+    // Ending is already under way; a second run would stop the stream
+    // twice and pop twice, and the second pop takes the screen underneath.
+    if (_phase == LivePhase.ending) return;
+
     setState(() => _phase = LivePhase.ending);
     _poll?.cancel();
     _tick?.cancel();
@@ -446,9 +495,14 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
       // The camera is stopping either way.
     }
     try {
-      await _repo.end(widget.mediaId);
+      await _repo.end(widget.mediaId).timeout(LiveBroadcastScreen.endTimeout);
     } on LiveException catch (e) {
       logger.w('End refused', error: e);
+    } on TimeoutException catch (e) {
+      // Leaving is better than holding someone on a spinner that has no
+      // way out. The broadcast is off the air from the viewer's side
+      // already; the backend reconciles when the encoder stays away.
+      logger.w('End not acknowledged in time', error: e);
     }
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -599,9 +653,17 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
             child: switch (_phase) {
               LivePhase.preparing || LivePhase.connecting => _connecting(),
               LivePhase.failed => _failed(),
-              LivePhase.live || LivePhase.ending => _onAirOverlay(),
+              LivePhase.live => _onAirOverlay(),
+              // Ending has the screen to itself, below and unsafe-area'd.
+              LivePhase.ending => const SizedBox.shrink(),
             },
           ),
+          // Over the preview, the countdown and the notch alike. Ending
+          // used to keep the whole on-air overlay up — LIVE pill, clock,
+          // chat — with only the End button quietly going inert, so for
+          // the few seconds it takes nothing said the tap had landed and
+          // creators pressed it again.
+          if (_phase == LivePhase.ending) _ending(),
         ],
       ),
     ),
@@ -644,6 +706,44 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
           child: Text(
             AppStrings.goLiveCancel,
             style: AppStyles.label(13, color: AppColors.neutral300),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// No way out of this one on purpose: the broadcast is already stopping
+  /// and there is nothing left to decide. [LiveBroadcastScreen.endTimeout]
+  /// is what stops it being a trap.
+  Widget _ending() => Container(
+    key: const ValueKey('live-ending'),
+    color: AppColors.overlayDark,
+    alignment: Alignment.center,
+    padding: EdgeInsets.symmetric(horizontal: 32.s),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 44.s,
+          height: 44.s,
+          child: CircularProgressIndicator(
+            strokeWidth: 3.s,
+            color: AppColors.brandPrimary,
+          ),
+        ),
+        SizedBox(height: 22.s),
+        Text(
+          AppStrings.goLiveEnding,
+          style: AppStyles.label(15, weight: AppStyles.bold),
+        ),
+        SizedBox(height: 8.s),
+        Text(
+          AppStrings.goLiveEndingBody,
+          textAlign: TextAlign.center,
+          style: AppStyles.body(
+            13,
+            color: AppColors.neutral400,
+            lineHeight: 18 / 13,
           ),
         ),
       ],

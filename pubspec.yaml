@@ -2,7 +2,7 @@ name: test_app
 description: "A new Flutter project."
 publish_to: "none"
 
-version: 1.0.15+10
+version: 1.0.16+11
 
 environment:
   sdk: ^3.11.0
@@ -40,6 +40,9 @@ dependencies:
   sizing: ^2.0.1
   country_flags: ^4.1.2
   url_launcher: ^6.3.2
+  # Already pulled in by media_kit_video; depended on directly because
+  # the broadcast screens hold it themselves.
+  wakelock_plus: ^1.5.2
   app_links: ^7.2.1
   hugeicons: ^1.1.7
   audio_service: ^0.18.19

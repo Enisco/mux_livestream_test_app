@@ -1156,6 +1156,12 @@ abstract final class AppStrings {
   static const goLiveConnecting = 'Connecting…';
   static const goLiveConnectingBody =
       'Your stream is starting.\nStay on this screen.';
+  static const flipCamera = 'Switch camera';
+  static const goLiveEnding = 'Ending your livestream…';
+  static const goLiveEndingBody =
+      'Closing the stream and letting your viewers go.\n'
+      'Please keep the app open for a moment.';
+
   static const goLiveLivePill = 'LIVE';
   static const goLiveEnd = 'End';
   static const goLiveNoGiving = '—';

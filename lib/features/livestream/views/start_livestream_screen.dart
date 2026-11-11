@@ -11,6 +11,7 @@ import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/player/views/player_screen.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/media_permissions.dart';
+import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -35,10 +36,13 @@ class _StreamCredentials {
 enum _Phase { initializing, error, idle, creating, live, ending }
 
 class StartLivestreamScreen extends StatefulWidget {
-  const StartLivestreamScreen({super.key, this.ask});
+  const StartLivestreamScreen({super.key, this.ask, this.wakelock});
 
   /// How the camera and microphone are asked for. Supplied by a test.
   final PermissionAsk? ask;
+
+  /// What keeps the screen awake. Supplied by a test.
+  final ScreenWakelock? wakelock;
 
   @override
   State<StartLivestreamScreen> createState() => _StartLivestreamScreenState();
@@ -47,6 +51,8 @@ class StartLivestreamScreen extends StatefulWidget {
 class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     with WidgetsBindingObserver {
   late final ApiVideoLiveStreamController _controller;
+
+  late final _wakelock = widget.wakelock ?? screenWakelock;
 
   _Phase _phase = _Phase.initializing;
   String? _initError;
@@ -70,10 +76,15 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // The screen locked mid-broadcast. A creator talking to a camera is
+    // not touching the phone, so the idle timer has nothing to go on.
+    unawaited(_wakelock.hold());
 
     _controller = ApiVideoLiveStreamController(
       initialAudioConfig: AudioConfig(),
       initialVideoConfig: VideoConfig.withDefaultBitrate(),
+      // The creator is the subject; the plugin's own default is `back`.
+      initialCameraPosition: CameraPosition.front,
       onConnectionSuccess: _onConnectionSuccess,
       onConnectionFailed: _onConnectionFailed,
       onDisconnection: _onDisconnection,
@@ -85,6 +96,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
 
   @override
   void dispose() {
+    unawaited(_wakelock.release());
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
@@ -93,7 +105,11 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!_controller.isInitialized) return;
-    if (state == AppLifecycleState.inactive) {
+    // `inactive` is not backgrounded: it fires for a notification banner,
+    // an incoming-call banner, the app switcher being peeked at. Tearing
+    // the broadcast down for any of those ended livestreams that nothing
+    // had actually interrupted. `paused` is the app really leaving.
+    if (state == AppLifecycleState.paused) {
       _controller.stop();
     } else if (state == AppLifecycleState.resumed) {
       _controller.startPreview();
@@ -287,6 +303,10 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   }
 
   Future<void> _endStream() async {
+    // Ending already; running it again would stop the stream twice and
+    // ask the backend to end the same broadcast twice.
+    if (_phase == _Phase.ending) return;
+
     setState(() => _phase = _Phase.ending);
     try {
       await _controller.stop();
@@ -508,19 +528,27 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
           ),
         ),
         if (isLoading)
-          Container(
-            color: Colors.black54,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(color: AppColors.primary),
-                  const SizedBox(height: 16),
-                  Text(
-                    loadingLabel,
-                    style: const TextStyle(color: AppColors.textSecondary),
-                  ),
-                ],
+          // Absorbing, not just covering: a `Container` paints over the
+          // page but `RenderDecoratedBox` does not claim the hit, so every
+          // tap went straight through the scrim to the End button behind
+          // it — which is how a creator ends up sending the same request
+          // three times while watching a spinner.
+          AbsorbPointer(
+            key: const ValueKey('live-busy'),
+            child: Container(
+              color: Colors.black54,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primary),
+                    const SizedBox(height: 16),
+                    Text(
+                      loadingLabel,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -538,6 +566,21 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
           children: [
             Container(color: AppColors.surface),
             ApiVideoCameraPreview(controller: _controller),
+            // This screen had no way to change camera at all, on or off
+            // air. The plugin reads the live position before switching,
+            // so it is right whichever one started.
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                key: const ValueKey('start-live-flip'),
+                tooltip: AppStrings.flipCamera,
+                onPressed: () => unawaited(_controller.switchCamera()),
+                icon: const Icon(Icons.cameraswitch_rounded),
+                color: Colors.white,
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+              ),
+            ),
             if (_isStreaming)
               Positioned(
                 top: 12,
