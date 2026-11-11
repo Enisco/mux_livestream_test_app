@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '14.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,39 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    target.build_configurations.each do |config|
+      # Apple refuses an upload targeting below 15.0 from April 2027, and a
+      # pod left on its own older default drags the warning back in. Raise
+      # only: a pod that needs something newer keeps it, or it would be
+      # built against a version it does not support.
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f
+      if current < 15.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+
+      # permission_handler_apple compiles **every** permission out unless
+      # the matching macro is defined: `PermissionHandlerEnums.h` is a wall
+      # of `#ifndef PERMISSION_X / #define PERMISSION_X 0`, and a group with
+      # its macro at 0 falls to `UnknownPermissionStrategy`, whose
+      # `requestPermission:` answers `PermissionStatusPermanentlyDenied`
+      # without ever reaching the system. That is why going live on iOS
+      # showed no prompt at all and failed instantly while Android — which
+      # has no such gate — worked: nothing was wrong with the Dart.
+      #
+      # Only what the app actually asks for is switched on. The rest stay at
+      # the plugin's own 0, which keeps their frameworks and their API usage
+      # out of the binary and off the App Store privacy report.
+      #
+      # Read through `Array()` because CocoaPods stores this as a string
+      # for some pods and a list for others, and `'A=1' + ['B=1']` is a
+      # TypeError that would stop `pod install` with nothing useful said.
+      defined = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS']
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] =
+        (defined.nil? ? ['$(inherited)'] : Array(defined)) + [
+          'PERMISSION_CAMERA=1',
+          'PERMISSION_MICROPHONE=1',
+        ]
+    end
   end
 end

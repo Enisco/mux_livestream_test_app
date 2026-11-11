@@ -10,6 +10,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/creator/views/widgets/live_prayers_sheet.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/shared/services/live_socket_service.dart';
+import 'package:test_app/shared/services/media_permissions.dart';
 import 'package:test_app/features/creator/repo/livestream_repo.dart';
 import 'package:test_app/features/creator/views/widgets/live_broadcast_parts.dart';
 import 'package:test_app/models/creator_models/livestream_models.dart';
@@ -44,6 +45,7 @@ class LiveBroadcastScreen extends StatefulWidget {
     this.live,
     this.replayPolicy = ReplayPolicy.autoPublish,
     this.controller,
+    this.ask,
   });
 
   final String mediaId;
@@ -55,6 +57,9 @@ class LiveBroadcastScreen extends StatefulWidget {
 
   /// Supplied by a test; otherwise the screen makes its own.
   final ApiVideoLiveStreamController? controller;
+
+  /// How the camera and microphone are asked for. Supplied by a test.
+  final PermissionAsk? ask;
 
   @override
   State<LiveBroadcastScreen> createState() => _LiveBroadcastScreenState();
@@ -71,6 +76,27 @@ class LiveBroadcastScreen extends StatefulWidget {
 
 /// Where a broadcast is in its life, as this screen sees it.
 enum LivePhase { preparing, connecting, live, ending, failed }
+
+/// What "Try again" means for the failure on screen.
+///
+/// A failure before the camera is open and the ingest window is armed has
+/// nothing to reconnect to: retrying it is the whole attempt again. One
+/// after that is a reconnect, and the backend is still holding the window
+/// open — so it must not go back through setup.
+enum LiveRetry {
+  /// Start over: ask for the camera, open it, arm, push.
+  start,
+
+  /// Arm and push again over a camera that is already running.
+  ///
+  /// The default, and the safe one: it is chosen by the phase being wrong
+  /// nowhere, only by the two failures that happen before the camera is
+  /// opened saying so outright. Deriving it from [LivePhase] would be
+  /// wrong — `preparing` also covers an arm that failed with the camera
+  /// already running, and starting that over would initialise a live
+  /// controller a second time.
+  reconnect,
+}
 
 /// What losing the RTMP push means, given where the broadcast had got to.
 ///
@@ -113,6 +139,18 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   LivePhase _phase = LivePhase.preparing;
   String? _failure;
 
+  /// Whether the failure on screen is one only Settings can clear.
+  bool _failureNeedsSettings = false;
+
+  /// What "Try again" has to do about the failure on screen.
+  ///
+  /// Not one thing: a lost push happens with a live camera and an armed
+  /// window behind it, so retrying is a reconnect. A refused camera
+  /// happens before any of that exists, and reconnecting would push a
+  /// stream that was never opened — which is what the button did, so it
+  /// could not recover even after the creator fixed the permission.
+  LiveRetry _retryAs = LiveRetry.reconnect;
+
   LivestreamStudio _studio = LivestreamStudio.empty;
   Timer? _poll;
   StreamSubscription<LiveEvent>? _liveEvents;
@@ -153,6 +191,16 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A creator sent to Settings comes back to the error they left behind;
+    // the permission they just granted is the whole reason they went. iOS
+    // usually restarts the app on that change and never gets here, but
+    // Android does, and it should not need a second tap.
+    if (state == AppLifecycleState.resumed &&
+        _phase == LivePhase.failed &&
+        _retryAs == LiveRetry.start) {
+      unawaited(_retry());
+      return;
+    }
     if (!_controller.isInitialized) return;
     if (state == AppLifecycleState.resumed) {
       _controller.startPreview();
@@ -164,19 +212,35 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   // ---- getting on air ----------------------------------------------------
 
   Future<void> _begin() async {
-    final camera = await Permission.camera.request();
-    final mic = await Permission.microphone.request();
+    final access = await MediaPermissions.cameraAndMicrophone(ask: widget.ask);
     if (!mounted) return;
-    if (!camera.isGranted || !mic.isGranted) {
-      return _fail(AppStrings.goLiveNeedsCamera);
+    if (!access.isGranted) {
+      // Blocked is a different dead end from refused: iOS asks once, so
+      // "Try again" against a standing no is a button that can only fail.
+      return _fail(
+        access.needsSettings
+            ? AppStrings.goLiveCameraBlocked
+            : AppStrings.goLiveNeedsCamera,
+        settings: access.needsSettings,
+        retryAs: LiveRetry.start,
+      );
     }
 
     try {
-      await _controller.initialize();
+      // `initialize()` guards nothing of its own: it invokes the plugin's
+      // `create` again, overwrites `_eventSubscription` without cancelling
+      // the old one, and leaves a second native session running. Reaching
+      // it twice became possible when "Try again" started coming back
+      // through here, which it has to for a camera that was refused.
+      if (!_controller.isInitialized) await _controller.initialize();
       await _controller.startPreview();
     } catch (e) {
+      // Not a permission problem — the permission was just granted. Saying
+      // so sent creators to a Settings screen with nothing wrong on it.
       logger.e('Camera init failed', error: e);
-      if (mounted) _fail(AppStrings.goLiveNeedsCamera);
+      if (mounted) {
+        _fail(AppStrings.goLiveCameraFailed, retryAs: LiveRetry.start);
+      }
       return;
     }
     if (!mounted) return;
@@ -228,7 +292,11 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     });
   }
 
-  void _fail(String message) {
+  void _fail(
+    String message, {
+    bool settings = false,
+    LiveRetry retryAs = LiveRetry.reconnect,
+  }) {
     _connectWatchdog?.cancel();
     // Nothing on the failure screen reads the counters, and the snapshot
     // poll otherwise kept asking every few seconds for as long as the
@@ -238,6 +306,8 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     setState(() {
       _phase = LivePhase.failed;
       _failure = message;
+      _failureNeedsSettings = settings;
+      _retryAs = retryAs;
     });
   }
 
@@ -452,9 +522,19 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   /// a retry after a slow failure could easily fall outside the one taken
   /// out at the start.
   Future<void> _retry() async {
+    if (_retryAs == LiveRetry.start) {
+      // Nothing was ever armed or pushed; this is the first attempt again.
+      setState(() {
+        _phase = LivePhase.preparing;
+        _failure = null;
+        _failureNeedsSettings = false;
+      });
+      return _begin();
+    }
     setState(() {
       _phase = LivePhase.connecting;
       _failure = null;
+      _failureNeedsSettings = false;
     });
     _armConnectWatchdog();
     try {
@@ -593,9 +673,26 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
           ),
         ),
         SizedBox(height: 22.s),
+        if (_failureNeedsSettings) ...[
+          GestureDetector(
+            key: const ValueKey('live-failed-settings'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => unawaited(openAppSettings()),
+            child: Text(
+              AppStrings.openSettings,
+              style: AppStyles.label(
+                13,
+                weight: AppStyles.bold,
+                color: AppColors.brandPrimary,
+              ),
+            ),
+          ),
+          SizedBox(height: 14.s),
+        ],
         // A failed connection is usually a network blip, and the session is
         // still sitting there waiting — so trying again should not mean
-        // setting the whole broadcast up a second time.
+        // setting the whole broadcast up a second time. It stays on a
+        // blocked permission too: coming back from Settings needs it.
         GestureDetector(
           key: const ValueKey('live-failed-retry'),
           behavior: HitTestBehavior.opaque,

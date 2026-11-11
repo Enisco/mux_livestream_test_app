@@ -10,6 +10,7 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/player/views/player_screen.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
+import 'package:test_app/shared/services/media_permissions.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -34,7 +35,10 @@ class _StreamCredentials {
 enum _Phase { initializing, error, idle, creating, live, ending }
 
 class StartLivestreamScreen extends StatefulWidget {
-  const StartLivestreamScreen({super.key});
+  const StartLivestreamScreen({super.key, this.ask});
+
+  /// How the camera and microphone are asked for. Supplied by a test.
+  final PermissionAsk? ask;
 
   @override
   State<StartLivestreamScreen> createState() => _StartLivestreamScreenState();
@@ -46,6 +50,12 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
 
   _Phase _phase = _Phase.initializing;
   String? _initError;
+
+  /// Whether the error on screen is one only Settings can clear.
+  bool _needsSettings = false;
+
+  /// Whether it was the camera that would not open, rather than a refusal.
+  bool _cameraFailed = false;
 
   _StreamCredentials? _credentials;
   bool _isStreaming = false;
@@ -91,13 +101,18 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   }
 
   Future<void> _initCamera() async {
-    final camera = await Permission.camera.request();
-    final mic = await Permission.microphone.request();
+    final access = await MediaPermissions.cameraAndMicrophone(ask: widget.ask);
     if (!mounted) return;
-    if (!camera.isGranted || !mic.isGranted) {
+    if (!access.isGranted) {
       setState(() {
         _phase = _Phase.error;
-        _initError = AppStrings.cameraPermDeniedBody;
+        // Refused once is not the same as refused for good: only the
+        // second has anything for Settings to fix.
+        _needsSettings = access.needsSettings;
+        _cameraFailed = false;
+        _initError = access.needsSettings
+            ? AppStrings.cameraPermDeniedBody
+            : AppStrings.cameraPermAskAgainBody;
       });
       return;
     }
@@ -110,7 +125,12 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
       if (mounted) {
         setState(() {
           _phase = _Phase.error;
-          _initError = e.toString();
+          _needsSettings = false;
+          _cameraFailed = true;
+          // `e.toString()` was put on screen here, which showed a creator
+          // a Dart exception and sent them to Settings over a permission
+          // that had just been granted. The detail belongs in the log.
+          _initError = AppStrings.goLiveCameraFailed;
         });
       }
     }
@@ -344,9 +364,14 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
             color: AppColors.textTertiary,
           ),
           const SizedBox(height: 24),
-          const Text(
-            AppStrings.cameraPermNeeded,
-            style: TextStyle(
+          Text(
+            // The same view carries both a refused permission and a camera
+            // that would not open; one heading for the two of them named
+            // the wrong problem for whichever it was not.
+            _cameraFailed
+                ? AppStrings.cameraFailedTitle
+                : AppStrings.cameraPermNeeded,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -361,7 +386,16 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
           ),
           const SizedBox(height: 32),
           OutlinedButton(
-            onPressed: openAppSettings,
+            key: const ValueKey('start-live-recover'),
+            onPressed: _needsSettings
+                ? openAppSettings
+                : () {
+                    // Back to the spinner first: the ask can take a moment
+                    // and a button that leaves the error on screen reads
+                    // as a button that did nothing.
+                    setState(() => _phase = _Phase.initializing);
+                    unawaited(_initCamera());
+                  },
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: const BorderSide(color: AppColors.primary),
@@ -370,7 +404,9 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(AppStrings.openSettings),
+            child: Text(
+              _needsSettings ? AppStrings.openSettings : AppStrings.feedRetry,
+            ),
           ),
         ],
       ),

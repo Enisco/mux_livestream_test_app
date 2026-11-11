@@ -1177,6 +1177,15 @@ abstract final class AppStrings {
   // What can go wrong.
   static const goLiveNeedsCamera =
       'GospelTube needs the camera and microphone to broadcast.';
+
+  /// Said instead when the system will not ask again, because "Try again"
+  /// cannot help and saying it would be a loop with no way out.
+  static const goLiveCameraBlocked =
+      'Camera and microphone access is turned off for GospelTube. Turn it '
+      'back on in Settings to broadcast.';
+  static const goLiveCameraFailed =
+      'The camera could not be started. Close anything else using it and '
+      'try again.';
   static const goLiveConflict =
       'Another broadcast is already running on this channel.';
   static const goLiveNotArmed =
@@ -1775,10 +1784,18 @@ abstract final class AppStrings {
   static const password = 'Password';
 
   static const cameraPermNeeded = 'Camera & Microphone Access Required';
+
+  /// The heading when the camera itself would not start. Nothing to do
+  /// with access — saying "Access Required" over a permission that was
+  /// just granted sends the creator looking for a switch that is already
+  /// on.
+  static const cameraFailedTitle = 'The camera would not start';
   static const cameraPermBody =
       'GTube needs camera and microphone access\nto stream live video.';
   static const cameraPermDeniedBody =
       'Camera access was denied. Open Settings to\nenable camera for GTube.';
+  static const cameraPermAskAgainBody =
+      'GospelTube needs the camera and microphone\nto stream live video.';
   static const creatingStream = 'Creating stream…';
   static const goLive = 'Go Live';
   static const rtmpUrl = 'RTMP URL';
