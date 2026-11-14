@@ -154,6 +154,7 @@ class ContentCategory {
     required this.slug,
     required this.name,
     this.description = '',
+    this.contentTypes = const [],
     this.sortOrder = 0,
     this.isActive = true,
   });
@@ -161,6 +162,17 @@ class ContentCategory {
   final String slug;
   final String name;
   final String description;
+
+  /// What this category may be filed against — `media`, `post`, `event`,
+  /// `creator` and the devotional kinds.
+  ///
+  /// **Not every category takes every kind.** `devotionals` is a written
+  /// taxonomy only (`post`, `devotional_series`, `devotional_entry`,
+  /// `creator`), so offering it when filing a video or a livestream earns
+  /// a 400: *"Categories not supported for media: devotionals"*. Read off
+  /// staging 2026-11-13; `live-services` is the narrowest of the rest,
+  /// taking only `media`, `event` and `creator`.
+  final List<String> contentTypes;
 
   /// The order the taxonomy is meant to be shown in; the API numbers them
   /// from 1 and the onboarding chips follow it rather than payload order.
@@ -175,9 +187,42 @@ class ContentCategory {
         slug: json['slug'] as String? ?? '',
         name: json['name'] as String? ?? '',
         description: json['description'] as String? ?? '',
+        contentTypes: [
+          for (final type in json['contentTypes'] as List? ?? const [])
+            if (type is String) type,
+        ],
         sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
         isActive: json['isActive'] as bool? ?? true,
       );
+
+  /// Whether this category may be filed against [scope].
+  ///
+  /// An empty [contentTypes] means the taxonomy did not say — an older
+  /// API, or a payload without the field — and nothing is hidden on a
+  /// guess.
+  bool supports(CategoryScope scope) =>
+      contentTypes.isEmpty || contentTypes.contains(scope.slug);
+}
+
+/// The kinds of thing a category can be filed against, as `contentTypes`
+/// names them.
+///
+/// A livestream is **[media]**: the session route rejects a category the
+/// taxonomy has not marked for media, in the same words an upload does.
+enum CategoryScope {
+  media,
+  mediaSeries('media_series'),
+  post,
+  devotionalSeries('devotional_series'),
+  devotionalEntry('devotional_entry'),
+  event,
+  creator;
+
+  const CategoryScope([this._slug]);
+
+  final String? _slug;
+
+  String get slug => _slug ?? name;
 }
 
 enum MobileCheckoutStatus {

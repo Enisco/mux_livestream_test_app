@@ -11,7 +11,9 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/player/views/widgets/controls_overlay.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
+import 'package:test_app/shared/services/screen_orientation.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -104,7 +106,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
     _player.pause();
     _player.dispose();
-    _restorePortrait();
+    // Only if this screen actually changed it. See [_tookChrome].
+    if (_tookChrome) _releaseChrome();
     super.dispose();
   }
 
@@ -473,23 +476,47 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _toggleFullscreen() {
     setState(() => _isFullscreen = !_isFullscreen);
     if (_isFullscreen) {
+      _tookChrome = true;
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
     } else {
-      _restorePortrait();
+      _uprightChrome();
     }
     _resetHide();
   }
 
-  void _restorePortrait() {
+  /// Whether this screen has changed the device chrome, which it only does
+  /// by going fullscreen.
+  ///
+  /// A player that never did must put nothing back on the way out: the
+  /// screen underneath may have an orientation policy of its own, and a
+  /// **live broadcast does**. `StartLivestreamScreen` opens this player
+  /// over a running stream to watch it, and restoring the app's four
+  /// orientations there would unlock a broadcast whose encoder takes its
+  /// frame size from the interface. Once set this stays set — having
+  /// narrowed the set once, this screen owns putting it back.
+  bool _tookChrome = false;
+
+  /// Leaving fullscreen: back to an upright player page.
+  void _uprightChrome() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+  }
+
+  /// Leaving the player: hand the app's own set back.
+  ///
+  /// Not [_uprightChrome] — that one is narrower than what the app asked
+  /// for at startup, so using it here left every other screen unable to
+  /// rotate until the app was restarted.
+  void _releaseChrome() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(ScreenOrientation.all);
   }
 
   bool get _analyticsEnabled =>
@@ -752,7 +779,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           Video(
             controller: _videoController,
             controls: NoVideoControls,
-            fit: BoxFit.contain,
+            fit: VideoFit.fullBleed,
           ),
           if (_isBuffering && !_isCompleted)
             const Center(

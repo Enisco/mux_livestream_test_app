@@ -189,6 +189,36 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
     _report('${picked.title} is not built yet');
   }
 
+  /// A row's own detail. It answers true when something was edited behind
+  /// it, so the list does not go on showing the old title.
+  Future<void> _openDetail(StudioContentItem item) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => StudioContentDetailScreen(item: item)),
+    );
+    if ((changed ?? false) && mounted) await _load();
+  }
+
+  /// The trailing control on a row.
+  ///
+  /// The row draws a pencil for a draft and a share icon for anything
+  /// else, so only the pencil may open the editor — wiring the share icon
+  /// to it would do something other than what it shows. A video or
+  /// livestream draft has no update route either way, and still only says
+  /// what the control would do.
+  Future<void> _rowAction(StudioContentItem item) async {
+    final editable =
+        item.isDraft &&
+        (item.kind == StudioContentKind.post ||
+            item.kind == StudioContentKind.event);
+    if (editable) {
+      final saved = await openContentEditor(context, item);
+      if (saved && mounted) await _load();
+      return;
+    }
+    _report(item.isDraft ? AppStrings.contentEdit : AppStrings.contentShare);
+  }
+
   /// The same switcher the Studio tab opens, so all three agree.
   Future<void> _openStudios() async {
     final current = openStudio(widget.context, widget.studios);
@@ -295,18 +325,8 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
                         itemCount: items.length,
                         itemBuilder: (context, i) => StudioContentRow(
                           item: items[i],
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  StudioContentDetailScreen(item: items[i]),
-                            ),
-                          ),
-                          onAction: () => _report(
-                            items[i].isDraft
-                                ? AppStrings.contentEdit
-                                : AppStrings.contentShare,
-                          ),
+                          onTap: () => _openDetail(items[i]),
+                          onAction: () => _rowAction(items[i]),
                         ),
                       ),
                     ),

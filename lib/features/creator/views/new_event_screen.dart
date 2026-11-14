@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:sizing/sizing.dart';
@@ -17,6 +19,7 @@ import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/models/creator_models/event_draft_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -33,8 +36,19 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 /// has no maps or geocoding) and "Add to series" (events have no series
 /// field under any name). Two more are added because publishing is refused
 /// without them: a street address with a city, and a meeting link.
+/// The same screen **edits** an event that already exists: pass
+/// [editEventId] and it opens what is filed and saves with
+/// `PATCH /v1/content/calendar/events/{id}`. Publishing state is left
+/// alone, and so is any attached broadcast — the editor never sends
+/// `streamId`.
 class NewEventScreen extends StatefulWidget {
-  const NewEventScreen({super.key, this.creatorId, this.events, this.creators});
+  const NewEventScreen({
+    super.key,
+    this.creatorId,
+    this.events,
+    this.creators,
+    this.editEventId,
+  });
 
   /// Defaults to the signed-in creator.
   final String? creatorId;
@@ -42,6 +56,9 @@ class NewEventScreen extends StatefulWidget {
   /// Both default to the real thing; a test supplies its own.
   final EventRepo? events;
   final CreatorRepo? creators;
+
+  /// The event to open and correct. Null files a new one.
+  final String? editEventId;
 
   @override
   State<NewEventScreen> createState() => _NewEventScreenState();
@@ -66,6 +83,15 @@ class _NewEventScreenState extends State<NewEventScreen> {
   late DateTime _startAt = _nextHour();
   DateTime? _endDate;
 
+  /// The time of day an existing event ends at.
+  ///
+  /// The form only collects an end *date* — "Leave blank if no end date" —
+  /// so a new event ends at whatever time it starts. An event being edited
+  /// already has a real end time, and rebuilding it from the start would
+  /// quietly shorten a 9-to-11 service to nothing. Null for a new event,
+  /// which keeps the original behaviour.
+  TimeOfDay? _endTimeOfDay;
+
   /// An IANA name such as `Africa/Lagos`. `schedule.timezone` is required
   /// and validated, so this is read from the device rather than guessed
   /// from the UTC offset — many zones share one.
@@ -81,6 +107,14 @@ class _NewEventScreenState extends State<NewEventScreen> {
   Set<String> _chosenCategories = {};
 
   bool _working = false;
+
+  /// Where the already-saved cover is, so the well shows it.
+  String? _coverUrl;
+
+  bool _loading = false;
+  bool _loadFailed = false;
+
+  bool get _editing => widget.editEventId != null;
 
   String? get _creatorId => widget.creatorId ?? LocalStorage.creatorId;
 
@@ -107,7 +141,56 @@ class _NewEventScreenState extends State<NewEventScreen> {
       controller.addListener(_onTyped);
     }
     _loadCategories();
-    _loadTimezone();
+    // Only for a new event: an existing one carries the zone it was filed
+    // in, and re-reading the device's would silently move the start time
+    // for a creator editing from another country.
+    if (widget.editEventId case final id?) {
+      unawaited(_open(id));
+    } else {
+      _loadTimezone();
+    }
+  }
+
+  /// Opens what is already filed.
+  Future<void> _open(String eventId) async {
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final filed = await _repo.load(eventId);
+      if (!mounted) return;
+      final draft = filed.draft;
+      setState(() {
+        _titleController.text = draft.title;
+        _descriptionController.text = draft.description;
+        _venueController.text = draft.location.label;
+        _addressController.text = draft.location.addressLine;
+        _cityController.text = draft.location.city;
+        _meetingUrlController.text = draft.location.meetingUrl;
+        _capacityController.text = draft.capacity?.toString() ?? '';
+        _venueType = draft.venueType;
+        _startAt = draft.startAt;
+        _endDate = draft.endAt;
+        _endTimeOfDay = draft.endAt == null
+            ? null
+            : TimeOfDay.fromDateTime(draft.endAt!);
+        _timezone = draft.timezone;
+        _rsvp = draft.rsvpRequired;
+        _visibility = draft.visibility;
+        _chosenCategories = draft.categorySlugs.toSet();
+        _coverFileId = draft.coverImageFileId;
+        _coverUrl = AssetUrlResolver.resolve(filed.coverKey);
+        _loading = false;
+      });
+    } on EventException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
+      _say(_wording(e));
+    }
   }
 
   void _onTyped() => setState(() {});
@@ -147,7 +230,9 @@ class _NewEventScreenState extends State<NewEventScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await _creators.fetchCategories();
+      final categories = await _creators.fetchCategories(
+        forContent: CategoryScope.event,
+      );
       if (!mounted || categories.isEmpty) return;
       setState(() => _categories = categories);
     } catch (e) {
@@ -169,8 +254,8 @@ class _NewEventScreenState extends State<NewEventScreen> {
             _endDate!.year,
             _endDate!.month,
             _endDate!.day,
-            _startAt.hour,
-            _startAt.minute,
+            _endTimeOfDay?.hour ?? _startAt.hour,
+            _endTimeOfDay?.minute ?? _startAt.minute,
           ),
     timezone: _timezone,
     location: EventLocation(
@@ -227,6 +312,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
   Future<void> _pickCategories() async {
     final picked = await CreatorTopicsSheet.show(
       context,
+      scope: CategoryScope.event,
       categories: _categories,
       selected: _chosenCategories,
     );
@@ -319,6 +405,43 @@ class _NewEventScreenState extends State<NewEventScreen> {
 
   Future<void> _saveDraft() => _commit(choice: const PublishChoice.draft());
 
+  /// Saving an edit. One PATCH, and nothing about publishing.
+  Future<void> _saveEdit() async {
+    final eventId = widget.editEventId;
+    final creatorId = _creatorId;
+    if (eventId == null) return;
+    // A new cover has to be uploaded before it can be named, and that
+    // needs a creator. Going ahead without one would save every other
+    // change and drop the picture without saying so.
+    if (_cover != null && creatorId == null) {
+      return _say(AppStrings.newMediaRejected);
+    }
+
+    final capacity = _capacityController.text.trim();
+    if (_rsvp && capacity.isNotEmpty && (int.tryParse(capacity) ?? 0) < 1) {
+      return _say(AppStrings.newEventCapacityFloor);
+    }
+
+    setState(() => _working = true);
+    try {
+      if (_cover case final picked? when creatorId != null) {
+        _coverFileId = await _repo.uploadCover(
+          creatorId: creatorId,
+          image: picked,
+        );
+      }
+      await _repo.update(eventId: eventId, draft: _draft);
+      if (!mounted) return;
+      setState(() => _working = false);
+      _say(AppStrings.editSaved);
+      Navigator.pop(context, true);
+    } on EventException catch (e) {
+      if (!mounted) return;
+      setState(() => _working = false);
+      _say(_wording(e));
+    }
+  }
+
   Future<void> _commit({required PublishChoice choice}) async {
     final publish = choice.timing != PublishTiming.draft;
     final scheduledAt = choice.at;
@@ -391,205 +514,262 @@ class _NewEventScreenState extends State<NewEventScreen> {
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(20.s, 8.s, 20.s, 0),
-              child: const CreatorFlowHeader(
-                title: AppStrings.newEventTitle,
-                subtitle: AppStrings.newEventSubtitle,
+              child: CreatorFlowHeader(
+                title: _editing
+                    ? AppStrings.editEventTitle
+                    : AppStrings.newEventTitle,
+                subtitle: _editing
+                    ? AppStrings.editEventSubtitle
+                    : AppStrings.newEventSubtitle,
               ),
             ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(20.s, 18.s, 20.s, 20.s),
-                children: [
-                  const RequiredLabel(
-                    AppStrings.newEventCover,
-                    required: false,
+            if (_loading)
+              const Expanded(
+                child: Center(
+                  key: ValueKey('event-opening'),
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
                   ),
-                  SizedBox(height: 8.s),
-                  ThumbnailWell(image: _cover, onPick: _pickCover),
-                  SizedBox(height: 18.s),
-
-                  const RequiredLabel(AppStrings.newEventTitleLabel),
-                  SizedBox(height: 8.s),
-                  CreatorTextField(
-                    key: const ValueKey('event-title'),
-                    controller: _titleController,
-                    hint: AppStrings.newEventTitleHint,
-                  ),
-                  SizedBox(height: 18.s),
-
-                  const RequiredLabel(AppStrings.newMediaDescriptionLabel),
-                  SizedBox(height: 8.s),
-                  CreatorTextField(
-                    key: const ValueKey('event-description'),
-                    controller: _descriptionController,
-                    hint: AppStrings.newMediaDescriptionHint,
-                    maxLines: 4,
-                  ),
-                  SizedBox(height: 18.s),
-
-                  const RequiredLabel(
-                    AppStrings.newMediaCategoryLabel,
-                    required: false,
-                  ),
-                  SizedBox(height: 8.s),
-                  CreatorSelectField(
-                    key: const ValueKey('event-category'),
-                    hint: AppStrings.newMediaCategoryHint,
-                    value: _categoryValue.isEmpty ? null : _categoryValue,
-                    onTap: _pickCategories,
-                  ),
-                  SizedBox(height: 18.s),
-
-                  const RequiredLabel(AppStrings.newEventType, required: false),
-                  SizedBox(height: 8.s),
-                  EventTypeCards(
-                    selected: _venueType,
-                    onSelected: (type) => setState(() => _venueType = type),
-                  ),
-                  SizedBox(height: 18.s),
-
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const RequiredLabel(
-                              AppStrings.newEventStartDate,
-                              required: false,
-                            ),
-                            SizedBox(height: 8.s),
-                            PickerField(
-                              fieldKey: const ValueKey('event-start-date'),
-                              value: formatSheetDate(_startAt),
-                              hint: '',
-                              onTap: () => _pickStart(dateOnly: true),
-                            ),
-                          ],
+                ),
+              )
+            else if (_loadFailed)
+              Expanded(
+                child: Center(
+                  key: const ValueKey('event-open-failed'),
+                  child: Padding(
+                    padding: EdgeInsets.all(24.s),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          AppStrings.editCouldNotOpen,
+                          textAlign: TextAlign.center,
+                          style: AppStyles.body(
+                            14,
+                            color: AppColors.neutral400,
+                          ),
                         ),
+                        SizedBox(height: 14.s),
+                        SizedBox(
+                          width: 150.s,
+                          child: PrimaryButton(
+                            key: const ValueKey('event-open-retry'),
+                            label: AppStrings.feedRetry,
+                            height: 44.s,
+                            onPressed: () =>
+                                unawaited(_open(widget.editEventId!)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(20.s, 18.s, 20.s, 20.s),
+                  children: [
+                    const RequiredLabel(
+                      AppStrings.newEventCover,
+                      required: false,
+                    ),
+                    SizedBox(height: 8.s),
+                    ThumbnailWell(
+                      image: _cover,
+                      existingUrl: _coverUrl,
+                      onPick: _pickCover,
+                    ),
+                    SizedBox(height: 18.s),
+
+                    const RequiredLabel(AppStrings.newEventTitleLabel),
+                    SizedBox(height: 8.s),
+                    CreatorTextField(
+                      key: const ValueKey('event-title'),
+                      controller: _titleController,
+                      hint: AppStrings.newEventTitleHint,
+                    ),
+                    SizedBox(height: 18.s),
+
+                    const RequiredLabel(AppStrings.newMediaDescriptionLabel),
+                    SizedBox(height: 8.s),
+                    CreatorTextField(
+                      key: const ValueKey('event-description'),
+                      controller: _descriptionController,
+                      hint: AppStrings.newMediaDescriptionHint,
+                      maxLines: 4,
+                    ),
+                    SizedBox(height: 18.s),
+
+                    const RequiredLabel(
+                      AppStrings.newMediaCategoryLabel,
+                      required: false,
+                    ),
+                    SizedBox(height: 8.s),
+                    CreatorSelectField(
+                      key: const ValueKey('event-category'),
+                      hint: AppStrings.newMediaCategoryHint,
+                      value: _categoryValue.isEmpty ? null : _categoryValue,
+                      onTap: _pickCategories,
+                    ),
+                    SizedBox(height: 18.s),
+
+                    const RequiredLabel(
+                      AppStrings.newEventType,
+                      required: false,
+                    ),
+                    SizedBox(height: 8.s),
+                    EventTypeCards(
+                      selected: _venueType,
+                      onSelected: (type) => setState(() => _venueType = type),
+                    ),
+                    SizedBox(height: 18.s),
+
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const RequiredLabel(
+                                AppStrings.newEventStartDate,
+                                required: false,
+                              ),
+                              SizedBox(height: 8.s),
+                              PickerField(
+                                fieldKey: const ValueKey('event-start-date'),
+                                value: formatSheetDate(_startAt),
+                                hint: '',
+                                onTap: () => _pickStart(dateOnly: true),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: 12.s),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const RequiredLabel(
+                                AppStrings.newEventEndDate,
+                                required: false,
+                              ),
+                              SizedBox(height: 8.s),
+                              PickerField(
+                                fieldKey: const ValueKey('event-end-date'),
+                                value: _endDate == null
+                                    ? ''
+                                    : formatSheetDate(_endDate!),
+                                hint: AppStrings.newEventEndDate,
+                                onTap: _pickEnd,
+                                onClear: () => setState(() => _endDate = null),
+                              ),
+                              const FieldNote(AppStrings.newEventNoEndDate),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 18.s),
+
+                    const RequiredLabel(
+                      AppStrings.newEventTime,
+                      required: false,
+                    ),
+                    SizedBox(height: 8.s),
+                    PickerField(
+                      fieldKey: const ValueKey('event-time'),
+                      value: formatSheetTime(_startAt),
+                      hint: '',
+                      onTap: () => _pickStart(dateOnly: false),
+                    ),
+                    FieldNote(_zoneNote),
+                    SizedBox(height: 18.s),
+
+                    if (physical) ...[
+                      const RequiredLabel(
+                        AppStrings.newEventLocation,
+                        required: false,
                       ),
-                      SizedBox(width: 12.s),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const RequiredLabel(
-                              AppStrings.newEventEndDate,
-                              required: false,
-                            ),
-                            SizedBox(height: 8.s),
-                            PickerField(
-                              fieldKey: const ValueKey('event-end-date'),
-                              value: _endDate == null
-                                  ? ''
-                                  : formatSheetDate(_endDate!),
-                              hint: AppStrings.newEventEndDate,
-                              onTap: _pickEnd,
-                              onClear: () => setState(() => _endDate = null),
-                            ),
-                            const FieldNote(AppStrings.newEventNoEndDate),
-                          ],
-                        ),
+                      SizedBox(height: 8.s),
+                      CreatorTextField(
+                        key: const ValueKey('event-venue'),
+                        controller: _venueController,
+                        hint: AppStrings.newEventLocationHint,
+                      ),
+                      SizedBox(height: 18.s),
+                      const RequiredLabel(AppStrings.newEventAddress),
+                      SizedBox(height: 8.s),
+                      CreatorTextField(
+                        key: const ValueKey('event-address'),
+                        controller: _addressController,
+                        hint: AppStrings.newEventAddressHint,
+                      ),
+                      SizedBox(height: 18.s),
+                      const RequiredLabel(AppStrings.newEventCity),
+                      SizedBox(height: 8.s),
+                      CreatorTextField(
+                        key: const ValueKey('event-city'),
+                        controller: _cityController,
+                        hint: AppStrings.newEventCityHint,
+                      ),
+                      SizedBox(height: 18.s),
+                    ],
+
+                    if (virtual) ...[
+                      const RequiredLabel(AppStrings.newEventMeetingUrl),
+                      SizedBox(height: 8.s),
+                      CreatorTextField(
+                        key: const ValueKey('event-meeting-url'),
+                        controller: _meetingUrlController,
+                        hint: AppStrings.newEventMeetingUrlHint,
+                        keyboardType: TextInputType.url,
+                      ),
+                      SizedBox(height: 18.s),
+                    ],
+
+                    SwitchRow(
+                      rowKey: const ValueKey('event-rsvp'),
+                      title: AppStrings.newEventRsvp,
+                      body: AppStrings.newEventRsvpBody,
+                      value: _rsvp,
+                      onChanged: (on) => setState(() => _rsvp = on),
+                    ),
+                    if (_rsvp) ...[
+                      SizedBox(height: 18.s),
+                      const RequiredLabel(
+                        AppStrings.newEventCapacity,
+                        required: false,
+                      ),
+                      SizedBox(height: 8.s),
+                      CreatorTextField(
+                        key: const ValueKey('event-capacity'),
+                        controller: _capacityController,
+                        hint: AppStrings.newEventCapacityHint,
+                        keyboardType: TextInputType.number,
                       ),
                     ],
-                  ),
-                  SizedBox(height: 18.s),
+                    SizedBox(height: 18.s),
 
-                  const RequiredLabel(AppStrings.newEventTime, required: false),
-                  SizedBox(height: 8.s),
-                  PickerField(
-                    fieldKey: const ValueKey('event-time'),
-                    value: formatSheetTime(_startAt),
-                    hint: '',
-                    onTap: () => _pickStart(dateOnly: false),
-                  ),
-                  FieldNote(_zoneNote),
-                  SizedBox(height: 18.s),
-
-                  if (physical) ...[
                     const RequiredLabel(
-                      AppStrings.newEventLocation,
+                      AppStrings.newEventVisibility,
                       required: false,
                     ),
                     SizedBox(height: 8.s),
-                    CreatorTextField(
-                      key: const ValueKey('event-venue'),
-                      controller: _venueController,
-                      hint: AppStrings.newEventLocationHint,
-                    ),
-                    SizedBox(height: 18.s),
-                    const RequiredLabel(AppStrings.newEventAddress),
-                    SizedBox(height: 8.s),
-                    CreatorTextField(
-                      key: const ValueKey('event-address'),
-                      controller: _addressController,
-                      hint: AppStrings.newEventAddressHint,
-                    ),
-                    SizedBox(height: 18.s),
-                    const RequiredLabel(AppStrings.newEventCity),
-                    SizedBox(height: 8.s),
-                    CreatorTextField(
-                      key: const ValueKey('event-city'),
-                      controller: _cityController,
-                      hint: AppStrings.newEventCityHint,
-                    ),
-                    SizedBox(height: 18.s),
-                  ],
-
-                  if (virtual) ...[
-                    const RequiredLabel(AppStrings.newEventMeetingUrl),
-                    SizedBox(height: 8.s),
-                    CreatorTextField(
-                      key: const ValueKey('event-meeting-url'),
-                      controller: _meetingUrlController,
-                      hint: AppStrings.newEventMeetingUrlHint,
-                      keyboardType: TextInputType.url,
-                    ),
-                    SizedBox(height: 18.s),
-                  ],
-
-                  SwitchRow(
-                    rowKey: const ValueKey('event-rsvp'),
-                    title: AppStrings.newEventRsvp,
-                    body: AppStrings.newEventRsvpBody,
-                    value: _rsvp,
-                    onChanged: (on) => setState(() => _rsvp = on),
-                  ),
-                  if (_rsvp) ...[
-                    SizedBox(height: 18.s),
-                    const RequiredLabel(
-                      AppStrings.newEventCapacity,
-                      required: false,
-                    ),
-                    SizedBox(height: 8.s),
-                    CreatorTextField(
-                      key: const ValueKey('event-capacity'),
-                      controller: _capacityController,
-                      hint: AppStrings.newEventCapacityHint,
-                      keyboardType: TextInputType.number,
+                    CreatorSelectField(
+                      key: const ValueKey('event-visibility'),
+                      hint: AppStrings.contentPublic,
+                      value: switch (_visibility) {
+                        'unlisted' => AppStrings.contentUnlisted,
+                        'private' => AppStrings.contentPrivate,
+                        _ => AppStrings.contentPublic,
+                      },
+                      onTap: _pickVisibility,
                     ),
                   ],
-                  SizedBox(height: 18.s),
-
-                  const RequiredLabel(
-                    AppStrings.newEventVisibility,
-                    required: false,
-                  ),
-                  SizedBox(height: 8.s),
-                  CreatorSelectField(
-                    key: const ValueKey('event-visibility'),
-                    hint: AppStrings.contentPublic,
-                    value: switch (_visibility) {
-                      'unlisted' => AppStrings.contentUnlisted,
-                      'private' => AppStrings.contentPrivate,
-                      _ => AppStrings.contentPublic,
-                    },
-                    onTap: _pickVisibility,
-                  ),
-                ],
+                ),
               ),
-            ),
             _actions(context),
           ],
         ),
@@ -622,15 +802,25 @@ class _NewEventScreenState extends State<NewEventScreen> {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        PrimaryButton(
-          key: const ValueKey('event-publish'),
-          label: AppStrings.newEventPublish,
-          height: 52.s,
-          enabled: _canPublish,
-          loading: _working,
-          onPressed: _publish,
-        ),
-        if (_canSave && !_canPublish) ...[
+        if (_editing)
+          PrimaryButton(
+            key: const ValueKey('event-save-edit'),
+            label: AppStrings.editSaveChanges,
+            height: 52.s,
+            enabled: _canSave && !_loading && !_loadFailed,
+            loading: _working,
+            onPressed: _saveEdit,
+          )
+        else
+          PrimaryButton(
+            key: const ValueKey('event-publish'),
+            label: AppStrings.newEventPublish,
+            height: 52.s,
+            enabled: _canPublish,
+            loading: _working,
+            onPressed: _publish,
+          ),
+        if (!_editing && _canSave && !_canPublish) ...[
           SizedBox(height: 8.s),
           Text(
             switch (_draft.publishBlock) {
@@ -649,19 +839,20 @@ class _NewEventScreenState extends State<NewEventScreen> {
             ),
           ),
         ],
-        SizedBox(height: 12.s),
-        GestureDetector(
-          key: const ValueKey('event-draft'),
-          behavior: HitTestBehavior.opaque,
-          onTap: _canSave && !_working ? _saveDraft : null,
-          child: Text(
-            AppStrings.newMediaSaveDraft,
-            style: AppStyles.label(
-              13,
-              color: _canSave ? AppColors.neutral200 : AppColors.neutral500,
+        if (!_editing) SizedBox(height: 12.s),
+        if (!_editing)
+          GestureDetector(
+            key: const ValueKey('event-draft'),
+            behavior: HitTestBehavior.opaque,
+            onTap: _canSave && !_working ? _saveDraft : null,
+            child: Text(
+              AppStrings.newMediaSaveDraft,
+              style: AppStyles.label(
+                13,
+                color: _canSave ? AppColors.neutral200 : AppColors.neutral500,
+              ),
             ),
           ),
-        ),
       ],
     ),
   );

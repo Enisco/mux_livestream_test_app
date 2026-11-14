@@ -90,6 +90,48 @@ class EventRepo {
     }
   }
 
+  /// What is already filed, so the editor can open it.
+  ///
+  /// `GET /v1/content/calendar/events/{id}` answers the full
+  /// `ContentCalendarEvent`. The cover arrives as a pair the same way a
+  /// post's does: `coverImageFileId` for writes, `coverImageKey` for
+  /// showing.
+  Future<EditableEvent> load(String eventId) async {
+    try {
+      final response = await _api.get(ApiEndpoints.calendarEventById(eventId));
+      final row = (response.data as Map?)?['data'];
+      if (row is! Map<String, dynamic>) {
+        throw const EventException(EventFailure.rejected);
+      }
+      return EditableEvent(
+        draft: EventDraft.fromJson(row),
+        coverKey: row['coverImageKey'] as String?,
+        status: row['status'] as String? ?? '',
+      );
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
+  /// Save an edit. `PATCH /v1/content/calendar/events/{id}`.
+  ///
+  /// Publishing state is left alone, and so is `streamId`: an event with a
+  /// broadcast attached keeps it, because the editor never sends that
+  /// field.
+  Future<void> update({
+    required String eventId,
+    required EventDraft draft,
+  }) async {
+    try {
+      await _api.patch(
+        ApiEndpoints.calendarEventById(eventId),
+        data: draft.toPatchJson(),
+      );
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
   /// Step 3. Publish now, or schedule the listing for later.
   ///
   /// [scheduledAt] must be in the future **and before the event's own
@@ -150,6 +192,22 @@ class EventRepo {
     if (error is List && error.isNotEmpty) return error.join('. ');
     return null;
   }
+}
+
+/// An event as the editor needs it: the fields a write takes, plus where
+/// the cover picture is and what state the event is in.
+class EditableEvent {
+  const EditableEvent({required this.draft, this.coverKey, this.status = ''});
+
+  final EventDraft draft;
+
+  /// `coverImageKey` — a CDN key, not a file id.
+  final String? coverKey;
+
+  /// `draft`, `scheduled`, `published`, `cancelled` or `completed`.
+  final String status;
+
+  bool get isPublished => status == 'published';
 }
 
 /// Why an event could not be filed, in terms the screen can explain.

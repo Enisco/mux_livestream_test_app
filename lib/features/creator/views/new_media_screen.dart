@@ -111,7 +111,9 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   /// slugs the API publishes, so a failure here is not worth a message.
   Future<void> _loadCategories() async {
     try {
-      final categories = await _creators.fetchCategories();
+      final categories = await _creators.fetchCategories(
+        forContent: CategoryScope.media,
+      );
       if (!mounted || categories.isEmpty) return;
       setState(() => _categories = categories);
     } catch (e) {
@@ -251,6 +253,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   Future<void> _pickCategories() async {
     final picked = await CreatorTopicsSheet.show(
       context,
+      scope: CategoryScope.media,
       categories: _categories,
       selected: _chosenCategories,
     );

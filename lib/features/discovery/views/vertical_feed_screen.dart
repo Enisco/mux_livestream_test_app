@@ -21,6 +21,7 @@ import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
+import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
@@ -1026,7 +1027,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     return Video(
       controller: _videoController!,
       controls: NoVideoControls,
-      fit: BoxFit.contain,
+      fit: VideoFit.fullBleed,
     );
   }
 

@@ -1281,12 +1281,36 @@ abstract final class AppStrings {
   static const contentCopyLink = 'Copy link';
   static const contentEditOnWeb = 'Edit on web';
   static const contentManageOnWeb = 'Manage on web';
-  static const contentWebStudioNote =
-      'Title, description, visibility and series are edited on the web '
-      'studio.';
   static const contentWebOnlyAction =
       'Open the web studio to edit this content.';
   static const contentNoPublicLink = 'A shareable link is not available yet.';
+
+  // ---- editing what is already filed --------------------------------------
+
+  static const editSaveChanges = 'Save changes';
+  static const editSaved = 'Your changes are saved.';
+  static const editEditing = 'Editing';
+  static const editCouldNotOpen =
+      'This could not be opened for editing. Check your connection and try '
+      'again.';
+  static const editArticleTitle = 'Edit article';
+  static const editArticleSubtitle = 'Change the headline, cover or words.';
+  static const editEventTitle = 'Edit event';
+  static const editEventSubtitle = 'Change the details, time or place.';
+
+  /// A post. The phone's editor shows a headline, a cover and the words;
+  /// the excerpt, categories and visibility are not on it, and saving
+  /// carries them back untouched rather than clearing them.
+  static const contentPostEditNote =
+      'The headline, cover and words are edited here. The excerpt, topics '
+      'and who can see it stay as they are set on the web studio.';
+
+  /// Video, audio and livestream rows. The media service publishes no
+  /// update route in any integration guide — only create, publish and the
+  /// live session routes — so there is nothing for the phone to call.
+  static const contentMediaEditWeb =
+      'Videos, audio and livestreams are edited on the web studio. Posts and '
+      'events can be edited here.';
   static const contentAnalyticsPro = 'Detailed analytics need the Pro plan.';
   static const studioCreate = '+ Create';
   static const studioToday = 'TODAY';

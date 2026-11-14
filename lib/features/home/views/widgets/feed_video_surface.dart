@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
+import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 
@@ -77,7 +78,7 @@ class _FeedVideoSurfaceState extends State<FeedVideoSurface> {
                 Video(
                   controller: widget.videoController!,
                   controls: null,
-                  fit: BoxFit.cover,
+                  fit: VideoFit.landscapeFrame,
                   // The thumbnail stays behind the frame so the swap has
                   // nothing black to show through while the first frame lands.
                   filterQuality: FilterQuality.medium,

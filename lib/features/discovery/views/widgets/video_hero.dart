@@ -8,6 +8,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/features/discovery/views/widgets/playback_settings_sheet.dart';
+import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -166,7 +167,7 @@ class _VideoHeroState extends State<VideoHero> {
 
   Widget _buildFrame(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 16 / 9,
+      aspectRatio: VideoFit.landscapeAspect,
       child: ColoredBox(
         color: Colors.black,
         child: ValueListenableBuilder<PlaybackState>(
@@ -184,7 +185,7 @@ class _VideoHeroState extends State<VideoHero> {
                     Video(
                       controller: widget.videoController!,
                       controls: null,
-                      fit: BoxFit.contain,
+                      fit: VideoFit.landscapeFrame,
                     )
                   else
                     _HeroStill(url: widget.thumbnailUrl),
@@ -511,7 +512,7 @@ class _FullscreenVideoState extends State<FullscreenVideo> {
                   Video(
                     controller: videoController,
                     controls: null,
-                    fit: BoxFit.contain,
+                    fit: VideoFit.fullBleed,
                   )
                 else
                   const ColoredBox(color: Colors.black),

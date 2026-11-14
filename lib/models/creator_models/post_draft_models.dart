@@ -35,6 +35,59 @@ class PostDraft {
 
   final String? coverThumbnailFileId;
 
+  /// An article as `GET /v1/content/posts/{id}` returns it, so the editor
+  /// can open what is already there.
+  ///
+  /// The cover comes back as **two** fields: `coverThumbnailFileId`, which
+  /// is what a write takes, and `coverThumbnailKey`, which is where the
+  /// picture is. Only the id is carried here; the key is what the screen
+  /// shows, and it is read separately.
+  factory PostDraft.fromJson(Map<String, dynamic> json) => PostDraft(
+    title: json['title'] as String? ?? '',
+    body: json['body'] as String? ?? '',
+    excerpt: json['excerpt'] as String? ?? '',
+    categorySlugs: [
+      for (final slug in json['categorySlugs'] as List? ?? const [])
+        if (slug is String) slug,
+    ],
+    visibility: json['visibility'] as String? ?? 'public',
+    coverThumbnailFileId: json['coverThumbnailFileId'] as String?,
+  );
+
+  PostDraft copyWith({
+    String? title,
+    String? body,
+    String? excerpt,
+    List<String>? categorySlugs,
+    String? visibility,
+    String? coverThumbnailFileId,
+  }) => PostDraft(
+    title: title ?? this.title,
+    body: body ?? this.body,
+    excerpt: excerpt ?? this.excerpt,
+    categorySlugs: categorySlugs ?? this.categorySlugs,
+    visibility: visibility ?? this.visibility,
+    coverThumbnailFileId: coverThumbnailFileId ?? this.coverThumbnailFileId,
+  );
+
+  /// What `PATCH /v1/content/posts/{id}` takes.
+  ///
+  /// Unlike [toJson] this sends empty strings rather than leaving the key
+  /// out, because on an edit an empty field is the creator **clearing**
+  /// something, and a key left out would silently keep the old value.
+  /// `creatorId` is not sent: the route resolves ownership from the path.
+  /// `scheduledAt` is not sent either — it is a publishing decision, and
+  /// setting it from the editor would reschedule a post the creator only
+  /// meant to correct a typo in.
+  Map<String, dynamic> toPatchJson() => {
+    'title': title,
+    'body': body,
+    'excerpt': excerpt,
+    'categorySlugs': categorySlugs,
+    'visibility': visibility,
+    'coverThumbnailFileId': ?coverThumbnailFileId,
+  };
+
   /// What `POST /v1/content/posts` takes.
   ///
   /// `scheduledAt` is deliberately absent: create refuses it ("property

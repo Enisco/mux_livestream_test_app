@@ -11,7 +11,9 @@ import 'package:test_app/features/creator/views/widgets/live_prayers_sheet.dart'
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/shared/services/live_socket_service.dart';
 import 'package:test_app/shared/services/media_permissions.dart';
+import 'package:test_app/features/creator/views/widgets/broadcast_preview.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
+import 'package:test_app/shared/services/screen_orientation.dart';
 import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'package:test_app/features/creator/repo/livestream_repo.dart';
 import 'package:test_app/features/creator/views/widgets/live_broadcast_parts.dart';
@@ -214,12 +216,17 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     // playing kept its audio and the microphone put it straight into the
     // livestream. Going live is as exclusive as playback gets.
     unawaited(_playback?.stop());
+    // Asked here as well as in `_begin`, as early as the screen exists, so
+    // the interface has the longest possible head start to finish rotating
+    // before the encoder reads it.
+    unawaited(ScreenOrientation.lockUpright());
     _begin();
   }
 
   @override
   void dispose() {
     unawaited(_wakelock.release());
+    unawaited(ScreenOrientation.restore());
     WidgetsBinding.instance.removeObserver(this);
     _poll?.cancel();
     _tick?.cancel();
@@ -257,6 +264,17 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   // ---- getting on air ----------------------------------------------------
 
   Future<void> _begin() async {
+    // The lock went out in `initState`; this waits for the screen to have
+    // finished turning. The native SDK takes the encoder's frame size from
+    // the *interface* orientation at the moment the controller is built,
+    // so a creator holding the phone sideways was recording a genuinely
+    // landscape asset — which is why those replays played landscape on the
+    // web and sat letterboxed in a phone's upright player. Being locked
+    // also stops the SDK swapping the frame size mid-broadcast when the
+    // phone is turned.
+    await ScreenOrientation.awaitUpright();
+    if (!mounted) return;
+
     final access = await MediaPermissions.cameraAndMicrophone(ask: widget.ask);
     if (!mounted) return;
     if (!access.isGranted) {
@@ -645,7 +663,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
         fit: StackFit.expand,
         children: [
           if (_controller.isInitialized)
-            ApiVideoCameraPreview(controller: _controller)
+            BroadcastPreview(controller: _controller)
           else
             const ColoredBox(color: Colors.black),
           if (_phase == LivePhase.live) LiveCountdown(value: _countdown),

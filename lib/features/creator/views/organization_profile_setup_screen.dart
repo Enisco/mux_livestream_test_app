@@ -83,7 +83,9 @@ class _OrganizationProfileSetupScreenState
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await _repo.fetchCategories();
+      final categories = await _repo.fetchCategories(
+        forContent: CategoryScope.creator,
+      );
       if (mounted) setState(() => _categories = categories);
     } catch (e) {
       logger.e('Failed to load categories', error: e);
@@ -133,6 +135,7 @@ class _OrganizationProfileSetupScreenState
     if (!mounted || _categories.isEmpty) return;
     final picked = await CreatorTopicsSheet.show(
       context,
+      scope: CategoryScope.creator,
       categories: _categories,
       selected: _selectedSlugs,
     );

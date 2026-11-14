@@ -54,10 +54,36 @@ class EventLocation {
       city.isEmpty &&
       meetingUrl.isEmpty;
 
+  factory EventLocation.fromJson(Map<String, dynamic>? json) => EventLocation(
+    label: json?['label'] as String? ?? '',
+    addressLine: json?['addressLine'] as String? ?? '',
+    city: json?['city'] as String? ?? '',
+    meetingUrl: json?['meetingUrl'] as String? ?? '',
+  );
+
+  /// What a write takes. Empty strings are left out on **create**; an edit
+  /// uses [toPatchJson], which keeps them so a cleared field clears.
   Map<String, dynamic> toJson() => {
     if (label.isNotEmpty) 'label': label,
     if (addressLine.isNotEmpty) 'addressLine': addressLine,
     if (city.isNotEmpty) 'city': city,
+    if (meetingUrl.isNotEmpty) 'meetingUrl': meetingUrl,
+  };
+
+  /// What a PATCH takes: empty strings kept, so a cleared field clears.
+  ///
+  /// **Except `meetingUrl`**, which is left out when empty. It is the one
+  /// field here likely to be format-validated, and a `@IsOptional()` guard
+  /// skips null but not `''` — so an empty string risks "meetingUrl must
+  /// be a URL" on every physical event's edit. That is a far worse failure
+  /// than the limitation it buys: a meeting link can be replaced but not
+  /// emptied from the phone. Unverified either way — the staging gateway
+  /// answers 403 to every unauthenticated path, so this could not be
+  /// probed.
+  Map<String, dynamic> toPatchJson() => {
+    'label': label,
+    'addressLine': addressLine,
+    'city': city,
     if (meetingUrl.isNotEmpty) 'meetingUrl': meetingUrl,
   };
 
@@ -126,6 +152,72 @@ class EventDraft {
   final String visibility;
 
   final String? coverImageFileId;
+
+  /// An event as `GET /v1/content/calendar/events/{id}` returns it.
+  ///
+  /// The row carries the schedule twice — `startAt`/`endAt` at the top
+  /// level *and* inside `schedule` — exactly as the studio list row does.
+  /// The nested pair is read first because it is the one that carries the
+  /// timezone with it, with the flat pair as the fallback.
+  ///
+  /// An unknown `venueType` falls back to `physical` rather than throwing:
+  /// a value this client has not heard of must not cost the creator their
+  /// edit.
+  factory EventDraft.fromJson(Map<String, dynamic> json) {
+    final schedule = json['schedule'] as Map<String, dynamic>?;
+    final registration = json['registration'] as Map<String, dynamic>?;
+    DateTime? at(String key) => DateTime.tryParse(
+      schedule?[key] as String? ?? json[key] as String? ?? '',
+    );
+    return EventDraft(
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      categorySlugs: [
+        for (final slug in json['categorySlugs'] as List? ?? const [])
+          if (slug is String) slug,
+      ],
+      venueType: EventVenueType.values.firstWhere(
+        (v) => v.slug == json['venueType'],
+        orElse: () => EventVenueType.physical,
+      ),
+      startAt: at('startAt')?.toLocal() ?? DateTime.now(),
+      endAt: at('endAt')?.toLocal(),
+      timezone: schedule?['timezone'] as String? ?? 'UTC',
+      location: EventLocation.fromJson(
+        json['location'] as Map<String, dynamic>?,
+      ),
+      rsvpRequired: registration?['required'] as bool? ?? false,
+      capacity: (registration?['capacity'] as num?)?.toInt(),
+      visibility: json['visibility'] as String? ?? 'public',
+      coverImageFileId: json['coverImageFileId'] as String?,
+    );
+  }
+
+  /// What `PATCH /v1/content/calendar/events/{id}` takes.
+  ///
+  /// Empty strings are sent rather than left out, because on an edit an
+  /// empty field is the creator clearing it and an absent key would keep
+  /// the old value. `creatorId` is not sent: ownership comes from the
+  /// path. `registration` is always sent so that turning RSVP **off** is
+  /// a change the API sees rather than one it cannot tell from silence.
+  Map<String, dynamic> toPatchJson() => {
+    'title': title,
+    'description': description,
+    'categorySlugs': categorySlugs,
+    'venueType': venueType.slug,
+    'visibility': visibility,
+    'schedule': {
+      'startAt': startAt.toUtc().toIso8601String(),
+      if (endAt != null) 'endAt': endAt!.toUtc().toIso8601String(),
+      'timezone': timezone,
+    },
+    'location': location.toPatchJson(),
+    'registration': {
+      'required': rsvpRequired,
+      if (rsvpRequired && capacity != null) 'capacity': capacity,
+    },
+    'coverImageFileId': ?coverImageFileId,
+  };
 
   /// What `POST /v1/content/calendar/events` takes.
   ///

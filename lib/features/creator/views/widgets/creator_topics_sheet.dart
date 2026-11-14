@@ -19,6 +19,7 @@ class CreatorTopicsSheet extends StatefulWidget {
     super.key,
     this.categories = const [],
     this.selected = const {},
+    this.scope,
   });
 
   final List<ContentCategory> categories;
@@ -26,17 +27,30 @@ class CreatorTopicsSheet extends StatefulWidget {
   /// Slugs, matching what `saveCreatorProfile` takes.
   final Set<String> selected;
 
+  /// What the chosen categories are about to be filed against.
+  ///
+  /// Given one, the sheet offers only the categories that take it. The
+  /// repo filters too, but this one is what catches a [fallback] that was
+  /// never filtered at all — which is how `devotionals` reached the Go
+  /// Live form and earned *"Categories not supported for media:
+  /// devotionals"* from the session route.
+  final CategoryScope? scope;
+
   /// Returns the chosen slugs, or null if the sheet was dismissed.
   static Future<Set<String>?> show(
     BuildContext context, {
     List<ContentCategory> categories = const [],
     Set<String> selected = const {},
+    CategoryScope? scope,
   }) => showModalBottomSheet<Set<String>>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) =>
-        CreatorTopicsSheet(categories: categories, selected: selected),
+    builder: (_) => CreatorTopicsSheet(
+      categories: categories,
+      selected: selected,
+      scope: scope,
+    ),
   );
 
   /// What `GET /v1/user/categories` actually returns, verbatim, for when
@@ -59,9 +73,50 @@ class CreatorTopicsSheet extends StatefulWidget {
     ('devotionals', 'Devotionals'),
   ];
 
+  /// What each fallback category may be filed against, as the taxonomy
+  /// publishes it. Read off staging 2026-11-13, so a sheet that falls back
+  /// hides the same rows the live list would have.
+  static const fallbackContentTypes = <String, List<String>>{
+    'worship': ['media', 'media_series', 'post', 'event', 'creator'],
+    'sermons': ['media', 'media_series', 'post', 'event', 'creator'],
+    'bible-study': [
+      'media',
+      'post',
+      'devotional_series',
+      'devotional_entry',
+      'event',
+      'creator',
+    ],
+    'prayer': [
+      'media',
+      'post',
+      'devotional_series',
+      'devotional_entry',
+      'event',
+      'creator',
+    ],
+    'gospel-music': ['media', 'media_series', 'post', 'event', 'creator'],
+    'live-services': ['media', 'event', 'creator'],
+    'testimonies': ['media', 'post', 'event', 'creator'],
+    'youth': ['media', 'post', 'event', 'creator'],
+    'family': [
+      'media',
+      'post',
+      'devotional_series',
+      'devotional_entry',
+      'event',
+      'creator',
+    ],
+    'devotionals': ['post', 'devotional_series', 'devotional_entry', 'creator'],
+  };
+
   static List<ContentCategory> get _fallbackCategories => [
     for (final (slug, name) in fallback)
-      ContentCategory(slug: slug, name: name),
+      ContentCategory(
+        slug: slug,
+        name: name,
+        contentTypes: fallbackContentTypes[slug] ?? const [],
+      ),
   ];
 
   @override
@@ -70,9 +125,13 @@ class CreatorTopicsSheet extends StatefulWidget {
 
 class _CreatorTopicsSheetState extends State<CreatorTopicsSheet> {
   late final Set<String> _chosen = {...widget.selected};
-  late final List<ContentCategory> _rows = widget.categories.isEmpty
-      ? CreatorTopicsSheet._fallbackCategories
-      : widget.categories;
+  late final List<ContentCategory> _rows = [
+    for (final row
+        in widget.categories.isEmpty
+            ? CreatorTopicsSheet._fallbackCategories
+            : widget.categories)
+      if (widget.scope == null || row.supports(widget.scope!)) row,
+  ];
 
   @override
   Widget build(BuildContext context) {

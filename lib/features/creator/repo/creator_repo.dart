@@ -188,13 +188,33 @@ class CreatorRepo {
     return HandleAvailability.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<List<ContentCategory>> fetchCategories() async {
+  /// The category taxonomy, as `GET /v1/user/categories` publishes it.
+  ///
+  /// [forContent] is what the categories are about to be filed against.
+  /// Pass it whenever the answer feeds a picker on a form, because **not
+  /// every category takes every kind**: offering `devotionals` while
+  /// filing a livestream earned *"Categories not supported for media:
+  /// devotionals"* from the session route. Left out, the whole taxonomy
+  /// comes back, which is what browsing and interest-picking want.
+  ///
+  /// Retired categories are dropped either way. A deactivated one still
+  /// comes back from the API, and nothing that draws a chip should have
+  /// to remember that.
+  Future<List<ContentCategory>> fetchCategories({
+    CategoryScope? forContent,
+  }) async {
     final response = await _api.get(ApiEndpoints.userCategories);
     final payload = (response.data as Map<String, dynamic>)['data'];
     final rows = (payload as Map<String, dynamic>)['data'] as List<dynamic>;
-    return rows
-        .map((e) => ContentCategory.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return [
+      for (final row in rows)
+        if (row is Map<String, dynamic>)
+          if (ContentCategory.fromJson(row) case final category
+              when category.isActive &&
+                  category.slug.isNotEmpty &&
+                  (forContent == null || category.supports(forContent)))
+            category,
+    ];
   }
 
   CreatorRepo({ApiService? api}) : _injected = api;

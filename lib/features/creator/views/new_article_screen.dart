@@ -22,6 +22,7 @@ import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
 import 'package:test_app/models/creator_models/media_upload_models.dart';
 import 'package:test_app/models/creator_models/post_draft_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -37,14 +38,28 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 ///
 /// Unlike an event, an article **can** be scheduled, so the go-live sheet
 /// is offered here exactly as the design shows.
+///
+/// The same screen **edits** an article that already exists: pass
+/// [editPostId] and it opens what is filed, saves with
+/// `PATCH /v1/content/posts/{id}`, and leaves the publishing state alone —
+/// a creator fixing a typo in a published post expects it to stay
+/// published, and one tidying a draft expects it to stay a draft.
 class NewArticleScreen extends StatefulWidget {
-  const NewArticleScreen({super.key, this.creatorId, this.posts});
+  const NewArticleScreen({
+    super.key,
+    this.creatorId,
+    this.posts,
+    this.editPostId,
+  });
 
   /// Defaults to the signed-in creator.
   final String? creatorId;
 
   /// Defaults to the real thing; a test supplies its own.
   final PostRepo? posts;
+
+  /// The article to open and correct. Null writes a new one.
+  final String? editPostId;
 
   @override
   State<NewArticleScreen> createState() => _NewArticleScreenState();
@@ -69,6 +84,22 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
   List<BodyEmbed> _embeds = const [];
   Timer? _resolveDebounce;
 
+  /// The article as it is filed, when this screen is editing one.
+  ///
+  /// Kept whole rather than torn into controllers because the editor shows
+  /// a headline, a body and a cover — not the excerpt, the categories or
+  /// the visibility. A PATCH built from the controllers alone would send
+  /// those back empty and quietly wipe them.
+  PostDraft? _filed;
+
+  /// Where the already-saved cover is, so the well shows it.
+  String? _coverUrl;
+
+  bool _loading = false;
+  bool _loadFailed = false;
+
+  bool get _editing => widget.editPostId != null;
+
   String? get _creatorId => widget.creatorId ?? LocalStorage.creatorId;
 
   @override
@@ -77,6 +108,7 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
     _titleController.addListener(_onTyped);
     unawaited(_loadByline());
     _bodyController.addListener(_onBodyTyped);
+    if (widget.editPostId case final id?) unawaited(_open(id));
   }
 
   @override
@@ -110,13 +142,46 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
     setState(() => _embeds = embeds);
   }
 
+  /// Opens what is already filed.
+  Future<void> _open(String postId) async {
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final filed = await _repo.load(postId);
+      if (!mounted) return;
+      setState(() {
+        _filed = filed.draft;
+        _titleController.text = filed.draft.title;
+        _bodyController.text = filed.draft.body;
+        _coverFileId = filed.draft.coverThumbnailFileId;
+        _coverUrl = AssetUrlResolver.resolve(filed.coverKey);
+        _loading = false;
+      });
+      unawaited(_resolve());
+    } on PostException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
+      _say(_wording(e));
+    }
+  }
+
   Future<void> _loadByline() async {
     // A byline that cannot be read costs the byline, not the editor.
     final byline = await CreatorRepo().fetchByline();
     if (mounted) setState(() => _byline = byline);
   }
 
-  PostDraft get _draft => PostDraft(
+  /// What the editor has, over what is already filed.
+  ///
+  /// `copyWith` over [_filed] rather than a fresh [PostDraft]: the excerpt,
+  /// the categories and the visibility are not on this screen, and a PATCH
+  /// built without them would clear all three.
+  PostDraft get _draft => (_filed ?? const PostDraft(title: '')).copyWith(
     title: _titleController.text.trim(),
     body: _bodyController.text.trim(),
     coverThumbnailFileId: _coverFileId,
@@ -215,6 +280,44 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
 
   Future<void> _saveDraft() => _commit(const PublishChoice.draft());
 
+  /// Saving an edit. One PATCH, and nothing about publishing.
+  Future<void> _saveEdit() async {
+    final postId = widget.editPostId;
+    final creatorId = _creatorId;
+    if (postId == null) return;
+    // A new cover has to be uploaded before it can be named, and that
+    // needs a creator. Going ahead without one would save every other
+    // change and drop the picture without saying so.
+    if (_cover != null && creatorId == null) {
+      return _say(AppStrings.newMediaRejected);
+    }
+    if (_titleController.text.trim().length > 500) {
+      return _say(AppStrings.articleTitleTooLong);
+    }
+
+    setState(() => _working = true);
+    try {
+      // A cover picked during this edit has not been uploaded yet; one
+      // that came with the article already has a file id.
+      if (_cover case final picked? when creatorId != null) {
+        _coverFileId = await _repo.uploadImage(
+          creatorId: creatorId,
+          kind: ContentAssetKind.cover,
+          image: picked,
+        );
+      }
+      await _repo.update(postId: postId, draft: _draft);
+      if (!mounted) return;
+      setState(() => _working = false);
+      _say(AppStrings.editSaved);
+      Navigator.pop(context, true);
+    } on PostException catch (e) {
+      if (!mounted) return;
+      setState(() => _working = false);
+      _say(_wording(e));
+    }
+  }
+
   Future<void> _commit(PublishChoice choice) async {
     final creatorId = _creatorId;
     if (creatorId == null) return _say(AppStrings.newMediaRejected);
@@ -289,9 +392,13 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(20.s, 8.s, 20.s, 0),
-            child: const CreatorFlowHeader(
-              title: AppStrings.newArticleTitle,
-              subtitle: AppStrings.newArticleSubtitle,
+            child: CreatorFlowHeader(
+              title: _editing
+                  ? AppStrings.editArticleTitle
+                  : AppStrings.newArticleTitle,
+              subtitle: _editing
+                  ? AppStrings.editArticleSubtitle
+                  : AppStrings.newArticleSubtitle,
             ),
           ),
           Padding(
@@ -311,13 +418,52 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
     ),
   );
 
-  Widget _editor() => ListView(
+  Widget _editor() {
+    if (_loading) {
+      return const Center(
+        key: ValueKey('article-opening'),
+        child: CircularProgressIndicator(color: AppColors.brandPrimary),
+      );
+    }
+    if (_loadFailed) {
+      return Center(
+        key: const ValueKey('article-open-failed'),
+        child: Padding(
+          padding: EdgeInsets.all(24.s),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                AppStrings.editCouldNotOpen,
+                textAlign: TextAlign.center,
+                style: AppStyles.body(14, color: AppColors.neutral400),
+              ),
+              SizedBox(height: 14.s),
+              SizedBox(
+                width: 150.s,
+                child: PrimaryButton(
+                  key: const ValueKey('article-open-retry'),
+                  label: AppStrings.feedRetry,
+                  height: 44.s,
+                  onPressed: () => unawaited(_open(widget.editPostId!)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return _form();
+  }
+
+  Widget _form() => ListView(
     padding: EdgeInsets.fromLTRB(20.s, 16.s, 20.s, 20.s),
     children: [
       const RequiredLabel(AppStrings.articleCover, required: false),
       SizedBox(height: 8.s),
       ThumbnailWell(
         image: _cover,
+        existingUrl: _coverUrl,
         onPick: _pickCover,
         emptyLabel: AppStrings.articleAddCover,
       ),
@@ -360,6 +506,18 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
             aspectRatio: 16 / 9,
             child: Image.memory(cover.bytes, fit: BoxFit.cover),
           ),
+        )
+      else if (_coverUrl case final url?)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10.s),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ),
         ),
       SizedBox(height: 14.s),
       Text(
@@ -374,7 +532,7 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
       ],
       SizedBox(height: 8.s),
       Text(
-        '${AppStrings.articleDraftBadge} · '
+        '${_editing ? AppStrings.editEditing : AppStrings.articleDraftBadge} · '
         '${_draft.readMinutes} ${AppStrings.articleReadSuffix}',
         style: AppStyles.label(12, color: AppColors.neutral500),
       ),
@@ -411,43 +569,61 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
                 ),
               ),
               SizedBox(width: 12.s),
-              _publishButton(),
+              _actionButton(),
             ],
           )
         else
+          // The toolbar belongs to editing just as much as to writing:
+          // dropping it in edit mode would leave a creator correcting an
+          // article with no bold, no link and no way to add a picture.
           MarkdownToolbar(
             onTool: _onTool,
             onImage: _insertImage,
-            action: _publishButton(),
+            action: _actionButton(),
           ),
-        SizedBox(height: 10.s),
-        GestureDetector(
-          key: const ValueKey('article-draft'),
-          behavior: HitTestBehavior.opaque,
-          onTap: _canSave && !_working ? _saveDraft : null,
-          child: Text(
-            AppStrings.newMediaSaveDraft,
-            style: AppStyles.label(
-              13,
-              color: _canSave ? AppColors.neutral200 : AppColors.neutral500,
+        if (!_editing) SizedBox(height: 10.s),
+        if (!_editing)
+          GestureDetector(
+            key: const ValueKey('article-draft'),
+            behavior: HitTestBehavior.opaque,
+            onTap: _canSave && !_working ? _saveDraft : null,
+            child: Text(
+              AppStrings.newMediaSaveDraft,
+              style: AppStyles.label(
+                13,
+                color: _canSave ? AppColors.neutral200 : AppColors.neutral500,
+              ),
             ),
           ),
-        ),
       ],
     ),
   );
 
-  Widget _publishButton() => SizedBox(
-    width: 120.s,
-    child: PrimaryButton(
-      key: const ValueKey('article-publish'),
-      label: AppStrings.articlePublish,
-      height: 44.s,
-      enabled: _canPublish,
-      loading: _working,
-      onPressed: _publish,
-    ),
-  );
+  /// What the toolbar's right-hand end does: file a new article, or save
+  /// the edit of one that exists.
+  Widget _actionButton() => _editing
+      ? SizedBox(
+          width: 140.s,
+          child: PrimaryButton(
+            key: const ValueKey('article-save-edit'),
+            label: AppStrings.editSaveChanges,
+            height: 44.s,
+            enabled: _canSave && !_loading && !_loadFailed,
+            loading: _working,
+            onPressed: _saveEdit,
+          ),
+        )
+      : SizedBox(
+          width: 120.s,
+          child: PrimaryButton(
+            key: const ValueKey('article-publish'),
+            label: AppStrings.articlePublish,
+            height: 44.s,
+            enabled: _canPublish,
+            loading: _working,
+            onPressed: _publish,
+          ),
+        );
 }
 
 /// The channel a post goes out as, under the preview's headline.

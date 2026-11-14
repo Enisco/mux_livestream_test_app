@@ -81,7 +81,9 @@ class _GoLiveSetupScreenState extends State<GoLiveSetupScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await _creators.fetchCategories();
+      final categories = await _creators.fetchCategories(
+        forContent: CategoryScope.media,
+      );
       if (!mounted || categories.isEmpty) return;
       setState(() => _categories = categories);
     } catch (e) {
@@ -126,6 +128,7 @@ class _GoLiveSetupScreenState extends State<GoLiveSetupScreen> {
   Future<void> _pickCategories() async {
     final picked = await CreatorTopicsSheet.show(
       context,
+      scope: CategoryScope.media,
       categories: _categories,
       selected: _chosenCategories,
     );

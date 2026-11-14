@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
+import 'package:test_app/features/creator/views/new_article_screen.dart';
+import 'package:test_app/features/creator/views/new_event_screen.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
@@ -14,13 +16,49 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
+/// Opens the editor for [item], if this kind can be edited from a phone.
+///
+/// Posts and calendar events can: the content service publishes
+/// `PATCH /v1/content/posts/{id}` and
+/// `PATCH /v1/content/calendar/events/{id}`, and the screens that write
+/// them already exist, so they open the same form over what is filed.
+///
+/// **Video, audio and livestreams cannot.** The media service publishes no
+/// update route in any integration guide — only create, `publish`, and the
+/// live session routes — so there is nothing for the phone to call, and
+/// pretending otherwise would be a button that fails. Those keep the web
+/// studio.
+///
+/// Answers true when something was saved, so a list can reload.
+Future<bool> openContentEditor(
+  BuildContext context,
+  StudioContentItem item,
+) async {
+  final route = switch (item.kind) {
+    StudioContentKind.post => MaterialPageRoute<bool>(
+      builder: (_) => NewArticleScreen(editPostId: item.id),
+    ),
+    StudioContentKind.event => MaterialPageRoute<bool>(
+      builder: (_) => NewEventScreen(editEventId: item.id),
+    ),
+    _ => null,
+  };
+  if (route == null) return false;
+  final saved = await Navigator.push<bool>(context, route);
+  return saved ?? false;
+}
+
 /// One piece of content: how it is doing, and the three things a creator can
 /// do with it from a phone.
 ///
 /// Four kinds share this screen because they differ only in wording — views
 /// or plays or reads, a runtime or a read time — and in the Going card an
-/// event adds. Editing is not among them: title, description, visibility and
-/// series are the web studio's job, which the footer says outright.
+/// event adds.
+///
+/// A **post or an event** can be edited here: see [openContentEditor].
+/// Video, audio and livestreams cannot — the media service publishes no
+/// update route — so those keep the web studio, and the footer says which
+/// is which rather than telling every creator to go to a desktop.
 ///
 /// **No deltas.** The design shows "+18%" beside each figure. Those come from
 /// `POST /v1/analytics/media/breakdown`, which answers
@@ -33,6 +71,32 @@ class StudioContentDetailScreen extends StatelessWidget {
   final StudioContentItem item;
 
   bool get _isEvent => item.kind == StudioContentKind.event;
+
+  /// Whether this kind has an update route the phone can call.
+  bool get _isEditable =>
+      item.kind == StudioContentKind.post ||
+      item.kind == StudioContentKind.event;
+
+  /// What the footer has to say, or nothing.
+  ///
+  /// It used to say "title, description, visibility and series are edited
+  /// on the web studio" under every kind. That is still true of media, and
+  /// no longer true of a post or an event — saying it on the screen that
+  /// now edits them would send a creator to a desktop for work they can do
+  /// here. An event's form covers everything its API takes, so it needs no
+  /// note at all.
+  String? get _footnote => switch (item.kind) {
+    StudioContentKind.post => AppStrings.contentPostEditNote,
+    StudioContentKind.event => null,
+    _ => AppStrings.contentMediaEditWeb,
+  };
+
+  Future<void> _edit(BuildContext context) async {
+    final saved = await openContentEditor(context, item);
+    // Carry the "something changed" back to the list that pushed this, so
+    // it reloads rather than showing the old title.
+    if (saved && context.mounted) Navigator.pop(context, true);
+  }
 
   void _report(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -136,31 +200,41 @@ class StudioContentDetailScreen extends StatelessWidget {
                     onTap: () => _copyLink(context),
                   ),
                   SizedBox(height: 12.s),
-                  _OutlinedAction(
-                    actionKey: const ValueKey('detail-manage-web'),
-                    icon: HugeIcons.strokeRoundedLinkSquare01,
-                    label: item.kind == StudioContentKind.video
-                        ? AppStrings.contentEditOnWeb
-                        : AppStrings.contentManageOnWeb,
-                    onTap: () =>
-                        _report(context, AppStrings.contentWebOnlyAction),
-                  ),
-                  SizedBox(height: 16.s),
-                  Container(
-                    padding: EdgeInsets.all(14.s),
-                    decoration: BoxDecoration(
-                      color: AppColors.fieldBg,
-                      borderRadius: BorderRadius.circular(10.s),
+                  if (_isEditable)
+                    _OutlinedAction(
+                      actionKey: const ValueKey('detail-edit'),
+                      icon: HugeIcons.strokeRoundedEdit02,
+                      label: AppStrings.contentEdit,
+                      onTap: () => _edit(context),
+                    )
+                  else
+                    _OutlinedAction(
+                      actionKey: const ValueKey('detail-manage-web'),
+                      icon: HugeIcons.strokeRoundedLinkSquare01,
+                      label: item.kind == StudioContentKind.video
+                          ? AppStrings.contentEditOnWeb
+                          : AppStrings.contentManageOnWeb,
+                      onTap: () =>
+                          _report(context, AppStrings.contentWebOnlyAction),
                     ),
-                    child: Text(
-                      AppStrings.contentWebStudioNote,
-                      style: AppStyles.body(
-                        12,
-                        color: AppColors.neutral400,
-                        lineHeight: 17 / 12,
+                  if (_footnote case final note?) ...[
+                    SizedBox(height: 16.s),
+                    Container(
+                      padding: EdgeInsets.all(14.s),
+                      decoration: BoxDecoration(
+                        color: AppColors.fieldBg,
+                        borderRadius: BorderRadius.circular(10.s),
+                      ),
+                      child: Text(
+                        note,
+                        style: AppStyles.body(
+                          12,
+                          color: AppColors.neutral400,
+                          lineHeight: 17 / 12,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

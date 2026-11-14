@@ -331,10 +331,17 @@ class ThumbnailWell extends StatelessWidget {
     required this.image,
     required this.onPick,
     this.emptyLabel,
+    this.existingUrl,
   });
 
   final PickedImage? image;
   final VoidCallback onPick;
+
+  /// A cover that is already saved, for an editor opening something that
+  /// exists. Picking a new one replaces it; until then the well shows what
+  /// the creator chose last time rather than inviting them to add a cover
+  /// they already have.
+  final String? existingUrl;
 
   /// What the empty well invites. An event calls it cover art rather than
   /// a thumbnail, though it goes to the same kind of S3 ticket.
@@ -349,7 +356,7 @@ class ThumbnailWell extends StatelessWidget {
       child: SizedBox(
         height: 96.s,
         width: double.infinity,
-        child: image == null
+        child: image == null && existingUrl == null
             ? Center(
                 child: _pill(emptyLabel ?? AppStrings.newMediaThumbnailCta),
               )
@@ -358,7 +365,15 @@ class ThumbnailWell extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10.s),
-                    child: Image.memory(image!.bytes, fit: BoxFit.cover),
+                    child: image != null
+                        ? Image.memory(image!.bytes, fit: BoxFit.cover)
+                        : Image.network(
+                            existingUrl!,
+                            fit: BoxFit.cover,
+                            // A cover that will not load must not take the
+                            // picker down with it.
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          ),
                   ),
                   Align(
                     alignment: Alignment.bottomCenter,

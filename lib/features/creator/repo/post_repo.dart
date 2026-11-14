@@ -79,6 +79,49 @@ class PostRepo {
     }
   }
 
+  /// What is already filed, so the editor can open it.
+  ///
+  /// `GET /v1/content/posts/{id}` answers the full `ContentPost`. The
+  /// cover arrives as a *pair*: `coverThumbnailFileId` is what a write
+  /// takes, `coverThumbnailKey` is where the picture is. [PostDraft] holds
+  /// the id; the key comes back beside it here so the screen can show what
+  /// the creator already chose instead of an empty cover slot.
+  Future<EditablePost> load(String postId) async {
+    try {
+      final response = await _api.get(ApiEndpoints.contentPostById(postId));
+      final row = (response.data as Map?)?['data'];
+      if (row is! Map<String, dynamic>) {
+        throw const PostException(PostFailure.rejected);
+      }
+      return EditablePost(
+        draft: PostDraft.fromJson(row),
+        coverKey: row['coverThumbnailKey'] as String?,
+        status: row['status'] as String? ?? '',
+      );
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
+  /// Save an edit. `PATCH /v1/content/posts/{id}`.
+  ///
+  /// Publishing state is left alone: a creator correcting a typo in a
+  /// published post expects it to stay published, and one fixing a draft
+  /// expects it to stay a draft.
+  Future<void> update({
+    required String postId,
+    required PostDraft draft,
+  }) async {
+    try {
+      await _api.patch(
+        ApiEndpoints.contentPostById(postId),
+        data: draft.toPatchJson(),
+      );
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
   /// Step 3. The post publishes itself at [at]; nothing else is needed.
   Future<void> schedule({required String postId, required DateTime at}) async {
     try {
@@ -157,6 +200,23 @@ class PostRepo {
     if (error is List && error.isNotEmpty) return error.join('. ');
     return null;
   }
+}
+
+/// A post as the editor needs it: the fields a write takes, plus the two
+/// read-only things the screen shows — where the cover picture is, and
+/// whether this is still a draft.
+class EditablePost {
+  const EditablePost({required this.draft, this.coverKey, this.status = ''});
+
+  final PostDraft draft;
+
+  /// `coverThumbnailKey` — a CDN key, not a file id.
+  final String? coverKey;
+
+  /// `draft`, `scheduled`, `published` or `archived`.
+  final String status;
+
+  bool get isPublished => status == 'published';
 }
 
 /// Why an article could not be filed, in terms the screen can explain.

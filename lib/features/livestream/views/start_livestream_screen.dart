@@ -11,6 +11,7 @@ import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/player/views/player_screen.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/media_permissions.dart';
+import 'package:test_app/shared/services/screen_orientation.dart';
 import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -79,6 +80,10 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     // The screen locked mid-broadcast. A creator talking to a camera is
     // not touching the phone, so the idle timer has nothing to go on.
     unawaited(_wakelock.hold());
+    // Asked as early as the screen exists so the interface has the longest
+    // head start to finish rotating; awaited again in `_initCamera` before
+    // the native controller is built. See [ScreenOrientation.upright].
+    unawaited(ScreenOrientation.lockUpright());
 
     _controller = ApiVideoLiveStreamController(
       initialAudioConfig: AudioConfig(),
@@ -97,6 +102,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   @override
   void dispose() {
     unawaited(_wakelock.release());
+    unawaited(ScreenOrientation.restore());
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
@@ -117,6 +123,13 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   }
 
   Future<void> _initCamera() async {
+    // Before `initialize()`, which is what builds the native controller,
+    // and that reads the *interface* orientation to pick the encoder's
+    // frame size. Sideways meant a landscape recording, so the lock sent
+    // in `initState` has to have landed before the camera is built.
+    await ScreenOrientation.awaitUpright();
+    if (!mounted) return;
+
     final access = await MediaPermissions.cameraAndMicrophone(ask: widget.ask);
     if (!mounted) return;
     if (!access.isGranted) {
@@ -485,7 +498,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                           .getPlaybackToken(mediaId, _clientSessionId);
                       logger.i('WatchStream: opening player → ${token.hlsUrl}');
                       if (!mounted) return;
-                      Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => PlayerScreen.network(
@@ -494,6 +507,11 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                           ),
                         ),
                       );
+                      // The player may have gone fullscreen, which hands
+                      // the app's own orientations back when it closes.
+                      // The broadcast underneath is still running and
+                      // still has to stay upright.
+                      unawaited(ScreenOrientation.lockUpright());
                     } catch (e) {
                       logger.e(
                         'WatchStream: failed to get playback token',
