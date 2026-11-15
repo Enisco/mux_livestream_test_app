@@ -1424,6 +1424,13 @@ class _PromotedBadge extends StatelessWidget {
   }
 }
 
+/// The swipe feed's own mark, which is **not** `LiveBadge`.
+///
+/// Deliberately a different badge: this one sits on a full-bleed video
+/// over the creator's handle, where the home card's translucent outlined
+/// pill disappears. It is solid red with a dot, as the swipe feed's design
+/// draws it. If the two are ever to be one, it is the design that has to
+/// decide that, not a refactor.
 class _LiveBadge extends StatelessWidget {
   const _LiveBadge();
 
@@ -1441,7 +1448,7 @@ class _LiveBadge extends StatelessWidget {
           Icon(Icons.circle, color: Colors.white, size: 7),
           SizedBox(width: 4),
           Text(
-            'LIVE',
+            AppStrings.liveBadge,
             style: TextStyle(
               color: Colors.white,
               fontSize: 11,

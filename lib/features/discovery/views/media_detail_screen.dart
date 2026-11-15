@@ -437,6 +437,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     return VideoHero(
       playback: _playback,
       target: _target,
+      // The aggregate knows; the feed row that opened this screen may not,
+      // so the detail's own flag wins once it has loaded.
+      isLive: _detail?.media.isLiveNow ?? widget.item.isLiveNow,
       videoController: _playback.videoController,
       playbackUrl: _detail?.playback?.playbackUrl,
       thumbnailUrl:
@@ -463,6 +466,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             children: [
               DetailTitleBlock(
                 title: title,
+                isLive: media.isLiveNow,
                 viewsLabel: media.views > 0
                     ? '${formatCount(media.views)} Views'
                     : null,

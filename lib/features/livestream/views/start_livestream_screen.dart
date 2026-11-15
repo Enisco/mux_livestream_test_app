@@ -504,6 +504,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                           builder: (_) => PlayerScreen.network(
                             networkUrl: token.hlsUrl,
                             title: 'Your Livestream',
+                            isLive: true,
                           ),
                         ),
                       );

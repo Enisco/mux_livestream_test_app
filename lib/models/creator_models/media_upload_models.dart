@@ -13,6 +13,8 @@
 /// response schema.
 library;
 
+import 'package:test_app/shared/services/asset_url_resolver.dart';
+
 /// What is being uploaded. The `slug` is the API's `mediaType`.
 ///
 /// The ceilings are staging's own `constraints.maxSizeBytes`, held here so an
@@ -117,7 +119,12 @@ class MediaUploadTicket {
     );
   }
 
-  /// What `POST /v1/media` takes as `sourceUploadId`.
+  /// Mux's id for this upload.
+  ///
+  /// Nothing sends it back any more: on the draft-first flow the ticket is
+  /// already bound to the row, so the row is named by its own id. It is
+  /// kept because it is what the screen holds to know a ticket was minted,
+  /// and because it is the handle in Mux's own logs.
   final String uploadId;
 
   final String uploadUrl;
@@ -167,6 +174,187 @@ class PublishChoice {
   final DateTime? at;
 }
 
+/// Where a media row stands. The guide's own list, plus the three the
+/// refusals name (`under_review`, `blocked`, `archived`) and a fallback,
+/// so a status this client has not heard of costs the creator nothing.
+enum MediaStatus {
+  /// No source yet, or the source was removed.
+  draft,
+
+  /// Uploaded; Mux is preparing playback.
+  processing,
+
+  /// Playable, not published. Unpublishing returns here.
+  ready,
+
+  /// Will publish at `scheduledAt`.
+  scheduled,
+
+  /// Live on the channel, for its visibility.
+  published,
+
+  /// Mux could not process the file. The source has to go and another
+  /// one be uploaded.
+  failed,
+
+  underReview('under_review'),
+  blocked,
+  archived,
+
+  /// Something newer than this client.
+  unknown;
+
+  const MediaStatus([this._slug]);
+
+  final String? _slug;
+
+  String get slug => _slug ?? name;
+
+  static MediaStatus of(String? raw) {
+    for (final status in values) {
+      if (status != unknown && status.slug == raw) return status;
+    }
+    return unknown;
+  }
+}
+
+/// A media row as the creator's own routes answer it: `POST
+/// /v1/media/drafts`, `GET /v1/media/{id}` and `PATCH /v1/media/{id}` all
+/// return the same shape, and every one of them returns the whole row.
+///
+/// It carries two jobs. **An upload** needs the id to work against and the
+/// `updatedAt` the next `request-upload` has to quote back — the row is
+/// created before the bytes go anywhere, so the details have somewhere to
+/// live while the file uploads and an interrupted upload leaves something
+/// the creator can come back to. **An edit** needs the rest: what is
+/// already filed, so the form opens on it rather than on blanks.
+///
+/// One class and one parse for both, because it is one route answering one
+/// shape. It was called `MediaDraft` while only the upload read it; a
+/// published row is not a draft, and the editor reads those too.
+class FiledMedia {
+  const FiledMedia({
+    required this.id,
+    this.updatedAt,
+    this.status = MediaStatus.unknown,
+    this.kind,
+    this.title = '',
+    this.description = '',
+    this.categorySlugs = const [],
+    this.visibility,
+    this.thumbnailKey,
+    this.scheduledAt,
+    this.publishedAt,
+  });
+
+  factory FiledMedia.fromJson(Map<String, dynamic> json) => FiledMedia(
+    id: json['id'] as String? ?? '',
+    updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
+    status: MediaStatus.of(json['status'] as String?),
+    kind: switch (json['type']) {
+      'music' => MediaUploadKind.music,
+      'video' => MediaUploadKind.video,
+      // A livestream row comes back through the same route and is not an
+      // upload kind at all. Null rather than a wrong guess.
+      _ => null,
+    },
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String? ?? '',
+    categorySlugs: [
+      for (final slug in json['categorySlugs'] as List? ?? const [])
+        if (slug is String && slug.isNotEmpty) slug,
+    ],
+    visibility: MediaVisibility.values
+        .where((v) => v.slug == json['visibility'])
+        .firstOrNull,
+    thumbnailKey: json['thumbnailKey'] as String?,
+    scheduledAt: DateTime.tryParse(
+      json['scheduledAt'] as String? ?? '',
+    )?.toLocal(),
+    publishedAt: DateTime.tryParse(
+      json['publishedAt'] as String? ?? '',
+    )?.toLocal(),
+  );
+
+  final String id;
+
+  /// What `expectedMediaUpdatedAt` carries. The upload route refuses a
+  /// ticket when the row has moved on since this was read.
+  final DateTime? updatedAt;
+
+  final MediaStatus status;
+
+  /// Video or audio. Null for a livestream row, or a type this client has
+  /// not heard of.
+  final MediaUploadKind? kind;
+
+  final String title;
+  final String description;
+  final List<String> categorySlugs;
+
+  /// Who can see it — or **null when the row did not say**, which is not
+  /// the same as private.
+  ///
+  /// Nullable on purpose. Falling back to a value would mean the editor
+  /// showing a definite answer it does not have, and then *sending it*:
+  /// read a public video's visibility wrong and the save that fixed its
+  /// title would take it off the channel. Null means the field shows no
+  /// value and the key is left out of the PATCH, so the row keeps
+  /// whatever it has until a creator chooses.
+  final MediaVisibility? visibility;
+
+  /// A thumbnail the creator uploaded, as a CDN key. A video left to Mux
+  /// carries none — see [thumbnailUrl].
+  final String? thumbnailKey;
+
+  /// Local time. Set means the row publishes itself then.
+  final DateTime? scheduledAt;
+
+  /// Local time. Set, ever, closes scheduling for good — see
+  /// [canBeScheduled].
+  final DateTime? publishedAt;
+
+  bool get isUsable => id.isNotEmpty;
+
+  /// Whether this row may be opened in the editor at all.
+  ///
+  /// Creator Studio does not open `archived` media for editing, and a row
+  /// under review or blocked is not the creator's to change — the same
+  /// three the `DELETE /source` refusal names.
+  bool get isEditable => switch (status) {
+    MediaStatus.archived ||
+    MediaStatus.blocked ||
+    MediaStatus.underReview => false,
+    _ => true,
+  };
+
+  /// Whether `scheduledAt` can still be set.
+  ///
+  /// The route *"answers 400 for a time that has passed, and for media
+  /// that has ever been published, even if it was unpublished since"*. An
+  /// unpublished row keeps its `publishedAt`, which is what makes this
+  /// answerable at all; `status` alone could not tell the difference.
+  bool get canBeScheduled =>
+      publishedAt == null && status != MediaStatus.published;
+
+  /// What to show in the thumbnail well, or null when there is nothing.
+  ///
+  /// Two sources because the API has two: a thumbnail the creator uploaded
+  /// is a CDN key, and a video left to Mux has a generated still behind the
+  /// public asset route instead.
+  ///
+  /// **The proxy route is only asked for when it can answer.** It is
+  /// generated for *public, published* media alone, so pointing an
+  /// unpublished row at it would hand the well a URL that 404s — and the
+  /// well, seeing a URL, would offer "Change thumbnail" over an empty box
+  /// rather than inviting one to be uploaded. Null is the honest answer.
+  String? get thumbnailUrl =>
+      AssetUrlResolver.resolve(thumbnailKey) ??
+      (status == MediaStatus.published && visibility == MediaVisibility.public
+          ? AssetUrlResolver.mediaThumbnail(id)
+          : null);
+}
+
 /// Why an upload could not go through, in terms the screen can explain.
 enum MediaUploadFailure {
   /// Bigger than the server's ceiling.
@@ -186,8 +374,26 @@ enum MediaUploadFailure {
   /// "scheduledAt must be in the future".
   scheduleInPast,
 
+  /// 409: the draft was saved after the client read it, so the
+  /// `expectedMediaUpdatedAt` quoted back is stale. The repo reads the row
+  /// again and retries once; this only reaches a screen if that fails too.
+  draftChanged,
+
+  /// 409: the draft already has a source. Replacing it means dropping that
+  /// one first. The repo does so and retries once.
+  sourceAlreadyUploaded,
+
   /// The creator backed out mid-upload.
   cancelled,
+
+  /// 404. The row is gone — deleted from the web studio, or by another
+  /// member of the channel, while this screen held it.
+  notFound,
+
+  /// 401 or 403. These routes check the member's role: an editor may do
+  /// everything here, a viewer nothing. Also what an expired session
+  /// looks like.
+  notAllowed,
 
   network,
   rejected,

@@ -298,6 +298,43 @@ class StudioContentItem {
 
   bool get isDraft => state == StudioContentState.draft;
 
+  /// Whether this row can be opened in a phone editor.
+  ///
+  /// Two conditions, and both are about the API rather than the design:
+  ///
+  ///  * **Its kind has an update route the phone calls.** A post, an
+  ///    event, a video and a piece of audio do. A livestream does not —
+  ///    a broadcast is configured through
+  ///    `PATCH /v1/media/live/streams/{id}`, which nothing here writes.
+  ///  * **Its state is one anybody may change.** Archived, blocked and
+  ///    under review are not: Creator Studio does not open archived media
+  ///    for editing, and the same three are what `DELETE /source` refuses.
+  ///
+  /// **A replay is editable**, and deliberately so. It is a `video` row of
+  /// its own that a broadcast left behind, not the broadcast; retitling
+  /// last Sunday's service recording is very likely the most common edit
+  /// a creator wants, and `PATCH /v1/media/{id}` takes it.
+  ///
+  /// The editor checks the state again when it opens, from the row the API
+  /// answers rather than the one the list is holding — a list can be
+  /// minutes old, and archiving happens elsewhere.
+  bool get isEditableHere {
+    final kindAllows = switch (kind) {
+      StudioContentKind.post ||
+      StudioContentKind.event ||
+      StudioContentKind.video ||
+      StudioContentKind.audio => true,
+      StudioContentKind.livestream => false,
+    };
+    final stateAllows = switch (state) {
+      StudioContentState.archived ||
+      StudioContentState.blocked ||
+      StudioContentState.inReview => false,
+      _ => true,
+    };
+    return kindAllows && stateAllows;
+  }
+
   /// Broadcast, not uploaded. The two are created through entirely separate
   /// routes and the studio should never present one as the other.
   bool get isLivestream => kind == StudioContentKind.livestream;

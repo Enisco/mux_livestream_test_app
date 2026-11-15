@@ -46,14 +46,27 @@ abstract final class ApiEndpoints {
   static String creatorEventsSearch(String creatorId) =>
       '/v1/content/calendar/events/creator/$creatorId/search';
 
-  /// Uploading a video or a piece of audio. Three calls, in this order:
-  /// a ticket, the bytes straight to Mux as a **PUT**, then the row.
-  /// A livestream uses none of these — see the live provision routes.
+  /// Uploading a video or a piece of audio, draft-first — the order the
+  /// media guide documents and Creator Studio uses: the row, then a ticket
+  /// **bound to that row**, then the bytes straight to Mux as a **PUT**,
+  /// then the details. A livestream uses none of these — see the live
+  /// provision routes.
+  ///
+  /// `POST /v1/media` (create from a loose `sourceUploadId`) is the older
+  /// way and the guide now marks its contract unconfirmed, with no shipped
+  /// client. It is not used here.
+  static const mediaDrafts = '$_media/drafts';
   static const mediaRequestUpload = '$_media/request-upload';
   static const mediaThumbnailUploadUrl = '$_media/thumbnail/upload-url';
-  static const createMedia = _media;
 
+  /// `GET` reads it as its creator, `PATCH` edits details, thumbnail or
+  /// schedule — on a draft or on something already published.
   static String mediaById(String mediaId) => '$_media/$mediaId';
+
+  /// `DELETE` drops the uploaded file and keeps the details, putting the
+  /// row back to `draft` with `scheduledAt` cleared. **409** for anything
+  /// published. This is how a file is replaced.
+  static String mediaSource(String mediaId) => '$_media/$mediaId/source';
 
   /// Takes `{visibility}` and nothing else. It may be called while the
   /// upload is still processing: the backend publishes once Mux is ready.

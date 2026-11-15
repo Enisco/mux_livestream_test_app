@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -57,15 +58,35 @@ const _file = PickedMediaFile(
 );
 
 class _FakeApi implements ApiService {
-  _FakeApi({this.body, this.error});
+  _FakeApi({this.body, this.error, Map<String, Map<String, dynamic>>? bodies})
+    : bodies = bodies ?? {};
 
   Map<String, dynamic>? body;
   DioException? error;
 
+  /// Per-route answers, for a flow that touches more than one route.
+  /// Falls back to [body] for anything not named here.
+  final Map<String, Map<String, dynamic>> bodies;
+
+  /// Refusals queued per route, taken one per call. A draft-first upload
+  /// recovers from the first 409 and succeeds on the second attempt, so a
+  /// single [error] cannot express it.
+  final Map<String, List<DioException>> refusals = {};
+
   final List<String> paths = [];
   final Map<String, Map<String, dynamic>> sent = {};
 
-  /// Only the category list is fetched with a GET.
+  Map<String, dynamic> _answer(String path) =>
+      bodies[path] ?? body ?? const <String, dynamic>{};
+
+  void _maybeRefuse(String path) {
+    final queued = refusals[path];
+    if (queued != null && queued.isNotEmpty) throw queued.removeAt(0);
+    if (error != null) throw error!;
+  }
+
+  /// The category list, unless the route was named in [bodies] — reading a
+  /// draft back is a GET too.
   @override
   Future<Response<T>> get<T>(
     String path, {
@@ -73,16 +94,18 @@ class _FakeApi implements ApiService {
     Options? options,
   }) async {
     paths.add(path);
+    _maybeRefuse(path);
     return Response<T>(
       requestOptions: RequestOptions(path: path),
       data:
-          const {
-                'data': {
-                  'data': [
-                    {'slug': 'sermons', 'name': 'Sermons'},
-                  ],
-                },
-              }
+          (bodies[path] ??
+                  const {
+                    'data': {
+                      'data': [
+                        {'slug': 'sermons', 'name': 'Sermons'},
+                      ],
+                    },
+                  })
               as T,
     );
   }
@@ -96,10 +119,41 @@ class _FakeApi implements ApiService {
   }) async {
     paths.add(path);
     if (data is Map<String, dynamic>) sent[path] = data;
-    if (error != null) throw error!;
+    _maybeRefuse(path);
     return Response<T>(
       requestOptions: RequestOptions(path: path),
-      data: (body ?? const <String, dynamic>{}) as T,
+      data: _answer(path) as T,
+    );
+  }
+
+  @override
+  Future<Response<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    paths.add(path);
+    if (data is Map<String, dynamic>) sent[path] = data;
+    _maybeRefuse(path);
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: _answer(path) as T,
+    );
+  }
+
+  @override
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    paths.add(path);
+    _maybeRefuse(path);
+    return Response<T>(
+      requestOptions: RequestOptions(path: path),
+      data: _answer(path) as T,
     );
   }
 
@@ -107,6 +161,28 @@ class _FakeApi implements ApiService {
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError(invocation.memberName.toString());
 }
+
+/// A draft as the write routes answer it.
+Map<String, dynamic> _draftBody({
+  String id = 'm1',
+  String updatedAt = '2026-11-13T09:12:44.120Z',
+  String status = 'draft',
+}) => {
+  'data': {'id': id, 'updatedAt': updatedAt, 'status': status},
+};
+
+FiledMedia _draft({String id = 'm1'}) =>
+    FiledMedia.fromJson(_draftBody(id: id)['data']! as Map<String, dynamic>);
+
+/// A 409, the way the upload route answers one.
+DioException _conflict(String message) => DioException(
+  requestOptions: RequestOptions(path: '/v1/media/request-upload'),
+  response: Response(
+    requestOptions: RequestOptions(path: '/v1/media/request-upload'),
+    statusCode: 409,
+    data: {'success': false, 'data': null, 'error': message},
+  ),
+);
 
 DioException _refusal(List<String> errors) => DioException(
   requestOptions: RequestOptions(path: '/v1/media/request-upload'),
@@ -235,6 +311,7 @@ void main() {
         creatorId: 'c1',
         kind: MediaUploadKind.video,
         file: _file,
+        draft: _draft(),
       );
 
       final body = api.sent['/v1/media/request-upload']!;
@@ -258,6 +335,7 @@ void main() {
           creatorId: 'c1',
           kind: MediaUploadKind.video,
           file: _file,
+          draft: _draft(),
         ),
         throwsA(
           isA<MediaUploadException>()
@@ -284,6 +362,7 @@ void main() {
           creatorId: 'c1',
           kind: MediaUploadKind.video,
           file: _file,
+          draft: _draft(),
         ),
         throwsA(
           isA<MediaUploadException>().having(
@@ -305,6 +384,7 @@ void main() {
           creatorId: 'c1',
           kind: MediaUploadKind.video,
           file: _file,
+          draft: _draft(),
         ),
         throwsA(
           isA<MediaUploadException>().having(
@@ -316,18 +396,141 @@ void main() {
       );
     });
 
-    test('creating a row sends only what POST /v1/media accepts', () async {
+    test('the draft is filed before a byte moves, and stays private', () async {
+      final api = _FakeApi(bodies: {'/v1/media/drafts': _draftBody()});
+
+      final draft = await MediaUploadRepo(
+        api,
+      ).createDraft(creatorId: 'c1', kind: MediaUploadKind.video);
+
+      expect(draft.id, 'm1');
+      expect(draft.updatedAt, DateTime.utc(2026, 11, 13, 9, 12, 44, 120));
+      final body = api.sent['/v1/media/drafts']!;
+      expect(body['creatorId'], 'c1');
+      expect(body['type'], 'video');
+      // Nothing reaches the channel until publish says so.
+      expect(body['visibility'], 'private');
+    });
+
+    test('a draft answered without updatedAt is read again', () async {
+      // The ticket has to quote it back, so a guess is not good enough.
       final api = _FakeApi(
-        body: const {
-          'data': {'id': 'm1'},
+        bodies: {
+          '/v1/media/drafts': const {
+            'data': {'id': 'm9'},
+          },
+          '/v1/media/m9': _draftBody(id: 'm9'),
         },
       );
 
-      final at = DateTime.utc(2026, 10, 5, 18);
-      final id = await MediaUploadRepo(api).createMedia(
+      final draft = await MediaUploadRepo(
+        api,
+      ).createDraft(creatorId: 'c1', kind: MediaUploadKind.video);
+
+      expect(api.paths, ['/v1/media/drafts', '/v1/media/m9']);
+      expect(draft.updatedAt, isNotNull);
+    });
+
+    test('the ticket is bound to the row it will fill', () async {
+      final api = _FakeApi(body: _ticketBody());
+
+      await MediaUploadRepo(api).requestUpload(
         creatorId: 'c1',
         kind: MediaUploadKind.video,
-        uploadId: 'up_123',
+        file: _file,
+        draft: _draft(),
+      );
+
+      final body = api.sent['/v1/media/request-upload']!;
+      expect(body['mediaId'], 'm1');
+      expect(body['expectedMediaUpdatedAt'], '2026-11-13T09:12:44.120Z');
+    });
+
+    test('a draft that moved on is read again and asked again', () async {
+      final api = _FakeApi(
+        body: _ticketBody(),
+        bodies: {
+          '/v1/media/m1': _draftBody(updatedAt: '2026-11-13T10:00:00.000Z'),
+        },
+      );
+      api.refusals['/v1/media/request-upload'] = [
+        _conflict('The media draft changed since it was read'),
+      ];
+
+      final ticket = await MediaUploadRepo(api).requestUpload(
+        creatorId: 'c1',
+        kind: MediaUploadKind.video,
+        file: _file,
+        draft: _draft(),
+      );
+
+      expect(ticket.uploadId, 'up_123');
+      expect(api.paths, [
+        '/v1/media/request-upload',
+        '/v1/media/m1',
+        '/v1/media/request-upload',
+      ]);
+      // And the second attempt carries the fresh stamp, not the stale one.
+      expect(
+        api.sent['/v1/media/request-upload']!['expectedMediaUpdatedAt'],
+        '2026-11-13T10:00:00.000Z',
+      );
+    });
+
+    test('a draft that already holds a file drops it first', () async {
+      final api = _FakeApi(
+        body: _ticketBody(),
+        bodies: {'/v1/media/m1': _draftBody()},
+      );
+      api.refusals['/v1/media/request-upload'] = [
+        _conflict('This media is already processing an uploaded asset'),
+      ];
+
+      await MediaUploadRepo(api).requestUpload(
+        creatorId: 'c1',
+        kind: MediaUploadKind.video,
+        file: _file,
+        draft: _draft(),
+      );
+
+      expect(api.paths, [
+        '/v1/media/request-upload',
+        '/v1/media/m1/source',
+        '/v1/media/m1',
+        '/v1/media/request-upload',
+      ]);
+    });
+
+    test('but it only tries once more', () async {
+      final api = _FakeApi(bodies: {'/v1/media/m1': _draftBody()});
+      api.refusals['/v1/media/request-upload'] = [
+        _conflict('The media draft changed since it was read'),
+        _conflict('The media draft changed since it was read'),
+      ];
+
+      await expectLater(
+        MediaUploadRepo(api).requestUpload(
+          creatorId: 'c1',
+          kind: MediaUploadKind.video,
+          file: _file,
+          draft: _draft(),
+        ),
+        throwsA(
+          isA<MediaUploadException>().having(
+            (e) => e.failure,
+            'failure',
+            MediaUploadFailure.draftChanged,
+          ),
+        ),
+      );
+    });
+
+    test('the details go on as a PATCH to the row', () async {
+      final api = _FakeApi();
+
+      final at = DateTime.utc(2026, 11, 20, 9);
+      await MediaUploadRepo(api).updateMedia(
+        mediaId: 'm1',
         title: 'Walking by faith',
         description: 'A message on trusting God.',
         categorySlugs: const ['sermons'],
@@ -336,36 +539,36 @@ void main() {
         scheduledAt: at,
       );
 
-      expect(id, 'm1');
-      final body = api.sent['/v1/media']!;
-      expect(body['sourceUploadId'], 'up_123');
+      final body = api.sent['/v1/media/m1']!;
+      expect(body['title'], 'Walking by faith');
       expect(body['visibility'], 'public');
       expect(body['thumbnailFileId'], 'f1');
       expect(body['scheduledAt'], at.toIso8601String());
-      // Both belong to a livestream session, and POST /v1/media refuses
-      // them: "property scheduledTimezone should not exist".
+      // The upload is already bound to the row; nothing names it again.
+      expect(body.containsKey('sourceUploadId'), isFalse);
+      // Both belong to a livestream session.
       expect(body.containsKey('scheduledTimezone'), isFalse);
       expect(body.containsKey('notifyFollowers'), isFalse);
     });
 
-    test('a draft carries no schedule and stays private', () async {
-      final api = _FakeApi(
-        body: const {
-          'data': {'id': 'm2'},
-        },
-      );
+    test('an empty field is left out rather than sent blank', () async {
+      // A draft being filled in for the first time: absent and empty mean
+      // the same thing, and absent cannot trip a validator.
+      final api = _FakeApi();
 
-      await MediaUploadRepo(api).createMedia(
-        creatorId: 'c1',
-        kind: MediaUploadKind.video,
-        uploadId: 'up_123',
+      await MediaUploadRepo(api).updateMedia(
+        mediaId: 'm2',
         title: 'Draft',
+        description: '',
         visibility: MediaVisibility.private,
       );
 
-      final body = api.sent['/v1/media']!;
+      final body = api.sent['/v1/media/m2']!;
       expect(body['visibility'], 'private');
+      expect(body.containsKey('description'), isFalse);
+      expect(body.containsKey('categorySlugs'), isFalse);
       expect(body.containsKey('scheduledAt'), isFalse);
+      expect(body.containsKey('thumbnailFileId'), isFalse);
     });
 
     test(
@@ -378,12 +581,11 @@ void main() {
         );
 
         await expectLater(
-          MediaUploadRepo(api).createMedia(
+          MediaUploadRepo(api).requestUpload(
             creatorId: 'c1',
             kind: MediaUploadKind.video,
-            uploadId: 'stale',
-            title: 'T',
-            visibility: MediaVisibility.public,
+            file: _file,
+            draft: _draft(),
           ),
           throwsA(
             isA<MediaUploadException>().having(
@@ -402,10 +604,8 @@ void main() {
       );
 
       await expectLater(
-        MediaUploadRepo(api).createMedia(
-          creatorId: 'c1',
-          kind: MediaUploadKind.video,
-          uploadId: 'up_123',
+        MediaUploadRepo(api).updateMedia(
+          mediaId: 'm1',
           title: 'T',
           visibility: MediaVisibility.public,
           scheduledAt: DateTime(2020),
@@ -418,6 +618,48 @@ void main() {
           ),
         ),
       );
+    });
+
+    test('the screen makes the row before it asks for a ticket', () {
+      // The ticket is bound to the row, so the order is the whole point of
+      // the change. A widget test cannot reach this: picking a file goes
+      // through the platform.
+      final source = File(
+        'lib/features/creator/views/new_media_screen.dart',
+      ).readAsStringSync();
+
+      final draftAt = source.indexOf('_repo.createDraft(');
+      final ticketAt = source.indexOf('_repo.requestUpload(');
+      expect(draftAt, greaterThan(0), reason: 'no draft is filed at all');
+      expect(ticketAt, greaterThan(draftAt));
+    });
+
+    test('and fills it with a PATCH, not a second create', () {
+      final source = File(
+        'lib/features/creator/views/new_media_screen.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('_repo.updateMedia('));
+      expect(
+        source,
+        isNot(contains('createMedia')),
+        reason:
+            'POST /v1/media has no shipped client and an unconfirmed '
+            'contract; the guide lists it under routes not covered',
+      );
+    });
+
+    test('swapping the file keeps the row that was already filed', () {
+      // Otherwise every re-pick strands an empty draft in the creator's
+      // library.
+      final source = File(
+        'lib/features/creator/views/new_media_screen.dart',
+      ).readAsStringSync();
+      final from = source.indexOf('void _removeFile()');
+      final body = source.substring(from, source.indexOf('\n  }', from));
+
+      expect(from, greaterThan(0));
+      expect(body, isNot(contains('_draft = null')));
     });
 
     test('publish takes visibility and nothing else', () async {
@@ -472,6 +714,7 @@ void main() {
         creatorId: 'c1',
         kind: MediaUploadKind.music,
         file: _track,
+        draft: _draft(),
       );
 
       final body = api.sent['/v1/media/request-upload']!;

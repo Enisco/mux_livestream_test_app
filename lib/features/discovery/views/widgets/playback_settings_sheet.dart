@@ -13,20 +13,34 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// pick. Quality is offered only when the stream actually has more than one
 /// rendition to choose between, so a progressive file shows speed alone
 /// rather than a menu with a single entry.
+///
+/// **A live broadcast is offered no speed.** It plays at the rate it is
+/// being published; 1.5x would run the viewer into the present and 0.5x
+/// would leave them further behind every second. Quality still applies —
+/// a live stream usually carries several renditions — so [isLive] drops
+/// the speed block and keeps the rest.
 Future<void> showPlaybackSettings(
   BuildContext context, {
   required PlaybackHandle playback,
+  bool isLive = false,
 }) => showModalBottomSheet<void>(
   context: context,
   backgroundColor: Colors.transparent,
   isScrollControlled: true,
-  builder: (_) => PlaybackSettingsSheet(playback: playback),
+  builder: (_) => PlaybackSettingsSheet(playback: playback, isLive: isLive),
 );
 
 class PlaybackSettingsSheet extends StatelessWidget {
-  const PlaybackSettingsSheet({super.key, required this.playback});
+  const PlaybackSettingsSheet({
+    super.key,
+    required this.playback,
+    this.isLive = false,
+  });
 
   final PlaybackHandle playback;
+
+  /// Whether the stream behind this sheet is being broadcast right now.
+  final bool isLive;
 
   static String rateLabel(double rate) =>
       rate == 1.0 ? AppStrings.speedNormal : '${_trim(rate)}x';
@@ -60,37 +74,47 @@ class PlaybackSettingsSheet extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 18.s),
-              Text(
-                AppStrings.playbackSpeed,
-                style: AppStyles.heading(15, letterSpacing: -0.2),
-              ),
-              SizedBox(height: 10.s),
-              ValueListenableBuilder<double>(
-                valueListenable: playback.rate,
-                builder: (context, rate, _) => Wrap(
-                  spacing: 8.s,
-                  runSpacing: 8.s,
-                  children: [
-                    for (final choice in PlaybackController.rateChoices)
-                      _Pill(
-                        key: ValueKey('speed-$choice'),
-                        label: rateLabel(choice),
-                        selected: rate == choice,
-                        onTap: () => playback.setRate(choice),
-                      ),
-                  ],
+              if (!isLive) ...[
+                Text(
+                  AppStrings.playbackSpeed,
+                  style: AppStyles.heading(15, letterSpacing: -0.2),
                 ),
-              ),
+                SizedBox(height: 10.s),
+                ValueListenableBuilder<double>(
+                  valueListenable: playback.rate,
+                  builder: (context, rate, _) => Wrap(
+                    spacing: 8.s,
+                    runSpacing: 8.s,
+                    children: [
+                      for (final choice in PlaybackController.rateChoices)
+                        _Pill(
+                          key: ValueKey('speed-$choice'),
+                          label: rateLabel(choice),
+                          selected: rate == choice,
+                          onTap: () => playback.setRate(choice),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
               ValueListenableBuilder<List<String>>(
                 valueListenable: playback.qualities,
                 builder: (context, qualities, _) {
                   // Nothing to choose between: one rendition, or a stream
-                  // whose renditions are not known.
-                  if (qualities.isEmpty) return const SizedBox.shrink();
+                  // whose renditions are not known. On a live broadcast
+                  // that would leave the sheet with nothing in it at all,
+                  // so it says why instead.
+                  if (qualities.isEmpty) {
+                    if (!isLive) return const SizedBox.shrink();
+                    return Text(
+                      AppStrings.liveQualityAutomatic,
+                      style: AppStyles.body(13, color: AppColors.neutral400),
+                    );
+                  }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(height: 22.s),
+                      if (!isLive) SizedBox(height: 22.s),
                       Text(
                         AppStrings.videoQuality,
                         style: AppStyles.heading(15, letterSpacing: -0.2),

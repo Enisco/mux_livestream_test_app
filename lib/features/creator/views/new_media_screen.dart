@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter/material.dart';
 import 'package:sizing/sizing.dart';
@@ -11,7 +13,11 @@ import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts
 import 'package:test_app/features/creator/views/widgets/creator_setup_fields.dart';
 import 'package:test_app/features/creator/views/widgets/creator_topics_sheet.dart';
 import 'package:test_app/features/creator/views/widgets/go_live_sheet.dart';
+import 'package:test_app/features/creator/views/widgets/moment_picker.dart';
+import 'package:test_app/features/creator/views/widgets/new_event_parts.dart'
+    show FieldNote;
 import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
+import 'package:test_app/features/creator/views/widgets/visibility_sheet.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/models/creator_models/media_upload_models.dart';
 import 'package:test_app/shared/components/primary_button.dart';
@@ -34,6 +40,27 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 /// in while the upload runs — which is what the design shows. Publishing
 /// waits for the bytes to land: the API would accept the row sooner, but
 /// leaving the screen mid-upload would then strand it with nothing coming.
+///
+/// The same screen **edits** a row that already exists: pass [editMediaId]
+/// and it opens what is filed and saves with `PATCH /v1/media/{id}`, the
+/// way the article and event editors do. Three things are different in
+/// that mode, and each is a deliberate answer to what the route allows:
+///
+///  * **No file.** The row already holds one. Replacing it means
+///    `DELETE /v1/media/{id}/source` — refused outright for anything
+///    published — then a fresh upload, which is a different job from
+///    correcting a title. The form says where that is done.
+///  * **Visibility is on the form.** On an upload it is decided by the
+///    go-live sheet (a draft is private, anything going out is public);
+///    on an edit it is a field of its own, because changing who can see
+///    something is most of why a creator opens this screen.
+///  * **The schedule is editable, while it still can be.** `scheduledAt`
+///    is refused for anything that has ever been published, so the field
+///    is only drawn when [FiledMedia.canBeScheduled] says so.
+///
+/// Publishing state is never touched by an edit: no publish call, no
+/// unpublish. Someone fixing a typo in a published video expects it to
+/// stay published, and someone tidying a draft expects it to stay a draft.
 class NewMediaScreen extends StatefulWidget {
   const NewMediaScreen({
     super.key,
@@ -41,10 +68,14 @@ class NewMediaScreen extends StatefulWidget {
     this.creatorId,
     this.uploads,
     this.creators,
+    this.editMediaId,
   });
 
   /// Video or audio. `music` is the API's word for what the design and the
   /// studio both call Audio.
+  ///
+  /// On an edit this comes from the row the studio opened, which already
+  /// knows: it decides the copy, not the behaviour.
   final MediaUploadKind kind;
 
   /// Defaults to the signed-in creator.
@@ -54,12 +85,18 @@ class NewMediaScreen extends StatefulWidget {
   final MediaUploadRepo? uploads;
   final CreatorRepo? creators;
 
+  /// The media row to open and correct. Null uploads a new one.
+  final String? editMediaId;
+
   @override
   State<NewMediaScreen> createState() => _NewMediaScreenState();
 }
 
 class _NewMediaScreenState extends State<NewMediaScreen> {
-  bool get _audio => widget.kind.isAudio;
+  /// The row's own type outranks the caller's: on an edit the studio hands
+  /// over a kind read from a list that may be minutes old, and the copy on
+  /// this screen should say what the row actually is.
+  bool get _audio => (_filed?.kind ?? widget.kind).isAudio;
 
   late final _repo = widget.uploads ?? MediaUploadRepo();
   late final _creators = widget.creators ?? CreatorRepo();
@@ -69,6 +106,12 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   PickedMediaFile? _file;
   MediaUploadTicket? _ticket;
   CancelToken? _cancel;
+
+  /// The row, made before the first byte moves. One per visit: swapping
+  /// the file reuses it rather than leaving the first one orphaned, and
+  /// the upload route's own "already processing" refusal is what clears
+  /// the old source out of the way.
+  FiledMedia? _draft;
 
   /// Bytes on the wire, and the future that finishes when they all are.
   int _sent = 0;
@@ -83,6 +126,38 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
 
   bool _working = false;
 
+  // ---- edit mode only ----------------------------------------------------
+
+  /// The row as it is filed, when this screen is editing one.
+  ///
+  /// Kept whole rather than torn into controllers because the save needs
+  /// what the form does not show: whether a file is in yet, whether the row
+  /// has ever been published, and what schedule it already carries.
+  FiledMedia? _filed;
+
+  /// Who can see it. Only on the form when editing; an upload's visibility
+  /// is decided by the go-live sheet.
+  ///
+  /// Null until the row says, and null is sent as nothing: see
+  /// [FiledMedia.visibility] for why a guess here is dangerous.
+  MediaVisibility? _visibility;
+
+  /// The moment it publishes itself, as the form currently has it. Null
+  /// means not scheduled — which, against a row that *was* scheduled, is
+  /// the creator clearing it.
+  DateTime? _scheduledAt;
+
+  bool _loading = false;
+
+  /// What to say instead of the form, when the row could not be opened.
+  String? _loadFailure;
+
+  /// Whether that failure is worth a Retry. A row that is archived or not
+  /// this member's to edit will not become either by asking again.
+  bool _retryable = true;
+
+  bool get _editing => widget.editMediaId != null;
+
   String? get _creatorId => widget.creatorId ?? LocalStorage.creatorId;
 
   @override
@@ -93,6 +168,48 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     _titleController.addListener(_onTyped);
     _descriptionController.addListener(_onTyped);
     _loadCategories();
+    if (widget.editMediaId case final id?) unawaited(_open(id));
+  }
+
+  /// Opens what is already filed.
+  Future<void> _open(String mediaId) async {
+    setState(() {
+      _loading = true;
+      _loadFailure = null;
+      _retryable = true;
+    });
+    try {
+      final filed = await _repo.readMedia(mediaId);
+      if (!mounted) return;
+      if (!filed.isEditable) {
+        // The studio does not offer these, but a row can be archived
+        // between the list loading and this screen opening.
+        setState(() {
+          _loading = false;
+          _loadFailure = AppStrings.editMediaNotEditable;
+          _retryable = false;
+        });
+        return;
+      }
+      setState(() {
+        _filed = filed;
+        _titleController.text = filed.title;
+        _descriptionController.text = filed.description;
+        _chosenCategories = filed.categorySlugs.toSet();
+        _visibility = filed.visibility;
+        _scheduledAt = filed.scheduledAt;
+        _loading = false;
+      });
+    } on MediaUploadException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailure = _explain(e);
+        _retryable =
+            e.failure != MediaUploadFailure.notAllowed &&
+            e.failure != MediaUploadFailure.notFound;
+      });
+    }
   }
 
   void _onTyped() => setState(() {});
@@ -130,6 +247,35 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       _thumbnail != null &&
       _titleController.text.trim().isNotEmpty &&
       _descriptionController.text.trim().isNotEmpty;
+
+  /// What an **edit** needs, which is only a title.
+  ///
+  /// The thumbnail is already up and picking a new one is optional. So is
+  /// the description, and that is the point: an old row filed without one
+  /// would otherwise have its Save greyed out for no stated reason, so a
+  /// creator could not correct its title without first writing a
+  /// description they were never asked for. The API requires neither.
+  bool get _canSaveEdit =>
+      _filed != null &&
+      _titleController.text.trim().isNotEmpty &&
+      !_schedulePast;
+
+  /// A moment the creator has just moved into the past.
+  ///
+  /// [pickMoment] puts a floor under the *date* wheel only, so choosing an
+  /// earlier hour on today's date is the easy way to land here — which is
+  /// why the go-live sheet marks the same mistake inline rather than
+  /// waiting for the tap on Save.
+  ///
+  /// A schedule that merely *arrived* stale is not flagged: it is not
+  /// resent, so it cannot fail, and painting it red would accuse the
+  /// creator of something they did not do.
+  bool get _schedulePast {
+    final at = _scheduledAt;
+    return at != null &&
+        at != _filed?.scheduledAt &&
+        !at.isAfter(DateTime.now());
+  }
 
   void _say(String message) {
     if (!mounted) return;
@@ -179,10 +325,17 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     final cancel = CancelToken();
     _cancel = cancel;
     try {
+      final draft =
+          _draft ??
+          await _repo.createDraft(creatorId: creatorId, kind: widget.kind);
+      if (!mounted) return;
+      setState(() => _draft = draft);
+
       final ticket = await _repo.requestUpload(
         creatorId: creatorId,
         kind: widget.kind,
         file: file,
+        draft: draft,
       );
       if (!mounted) return;
       setState(() => _ticket = ticket);
@@ -221,6 +374,9 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       _upload = null;
       _sent = 0;
       _uploadFailed = false;
+      // `_draft` deliberately survives. The row is already filed, so the
+      // next pick fills the same one instead of leaving this one behind
+      // with nothing in it.
     });
   }
 
@@ -265,6 +421,43 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     setState(() => _chosenCategories = picked);
   }
 
+  Future<void> _pickVisibility() async {
+    final chosen = await VisibilitySheet.show(context, current: _visibility);
+    if (!mounted || chosen == null) return;
+    setState(() => _visibility = chosen);
+  }
+
+  /// One wheel for the day, another for the clock — the same pair the
+  /// go-live sheet shows, because it is the same field.
+  Future<void> _pickSchedule({required bool dateOnly}) async {
+    final now = DateTime.now();
+    // A schedule only makes sense in the future: the route refuses one
+    // that has already passed.
+    final from = _scheduledAt == null || _scheduledAt!.isBefore(now)
+        ? _nextHour()
+        : _scheduledAt!;
+    final picked = await pickMoment(
+      context,
+      initial: from,
+      dateOnly: dateOnly,
+      minimum: now,
+    );
+    if (picked == null || !mounted) return;
+    setState(
+      () => _scheduledAt = mergeMoment(from, picked, dateOnly: dateOnly),
+    );
+  }
+
+  static DateTime _nextHour() {
+    final now = DateTime.now();
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+    ).add(const Duration(hours: 1));
+  }
+
   String get _categoryValue {
     if (_chosenCategories.isEmpty) return '';
     final names = [
@@ -276,6 +469,78 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
             slug,
     ];
     return names.join(', ');
+  }
+
+  // ---- saving an edit ----------------------------------------------------
+
+  /// One PATCH, and nothing about publishing.
+  Future<void> _saveEdit() async {
+    final mediaId = widget.editMediaId;
+    final filed = _filed;
+    final creatorId = _creatorId;
+    if (mediaId == null || filed == null) return;
+    // A new thumbnail has to be uploaded before it can be named, and that
+    // needs a creator. Going ahead without one would save every other
+    // change and drop the picture without saying so.
+    if (_thumbnail != null && _thumbnailFileId == null && creatorId == null) {
+      return _say(AppStrings.newMediaRejected);
+    }
+
+    final title = _titleController.text.trim();
+    final description = _descriptionController.text.trim();
+    if (title.length > 180) return _say(AppStrings.newMediaTitleTooLong);
+    if (description.length > 5000) {
+      return _say(AppStrings.newMediaDescriptionTooLong);
+    }
+    if (_chosenCategories.length > 8) {
+      return _say(AppStrings.newMediaCategoryMax);
+    }
+
+    // Only a schedule the creator actually moved is sent. Resending the
+    // one already filed would be refused the moment it fell into the past,
+    // taking an otherwise valid edit down with it.
+    final scheduleMoved = _scheduledAt != filed.scheduledAt;
+    final clearSchedule = scheduleMoved && _scheduledAt == null;
+    final scheduledAt = scheduleMoved ? _scheduledAt : null;
+    if (scheduledAt != null && !scheduledAt.isAfter(DateTime.now())) {
+      return _say(AppStrings.newMediaSchedulePast);
+    }
+
+    setState(() => _working = true);
+    try {
+      // A thumbnail picked during this edit has not been uploaded yet; the
+      // one that came with the row needs nothing and is never resent.
+      if (_thumbnail case final picked? when creatorId != null) {
+        _thumbnailFileId ??= await _repo.uploadThumbnail(
+          creatorId: creatorId,
+          image: picked,
+        );
+      }
+
+      await _repo.saveEdits(
+        mediaId: mediaId,
+        title: title,
+        // Left out only when it was empty and still is: sending `''` there
+        // would risk a validator refusal to no purpose. Anything the
+        // creator actually changed goes, an emptied field included.
+        description: description.isEmpty && filed.description.isEmpty
+            ? null
+            : description,
+        categorySlugs: _chosenCategories.toList(growable: false),
+        visibility: _visibility,
+        thumbnailFileId: _thumbnailFileId,
+        scheduledAt: scheduledAt,
+        clearSchedule: clearSchedule,
+      );
+      if (!mounted) return;
+      setState(() => _working = false);
+      _say(AppStrings.editSaved);
+      Navigator.pop(context, true);
+    } on MediaUploadException catch (e) {
+      if (!mounted) return;
+      setState(() => _working = false);
+      _say(_explain(e));
+    }
   }
 
   // ---- publishing --------------------------------------------------------
@@ -305,10 +570,12 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
 
     setState(() => _working = true);
     try {
-      // Wait for the bytes. The API would take the row now, but a half-sent
-      // file with nobody on the screen to finish it helps no one.
+      // Wait for the bytes. The API would publish the row now and hold it
+      // until Mux is ready, but a half-sent file with nobody on the screen
+      // to finish it helps no one.
       await _upload;
-      if (_uploadFailed || _ticket == null) {
+      final draft = _draft;
+      if (_uploadFailed || _ticket == null || draft == null) {
         throw const MediaUploadException(MediaUploadFailure.rejected);
       }
 
@@ -325,10 +592,8 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
           ? MediaVisibility.private
           : MediaVisibility.public;
 
-      final mediaId = await _repo.createMedia(
-        creatorId: creatorId,
-        kind: widget.kind,
-        uploadId: _ticket!.uploadId,
+      await _repo.updateMedia(
+        mediaId: draft.id,
         title: title,
         description: description,
         categorySlugs: _chosenCategories.toList(growable: false),
@@ -341,7 +606,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       // itself, and a draft is not published at all.
       if (choice.timing == PublishTiming.now) {
         await _repo.publish(
-          mediaId: mediaId,
+          mediaId: draft.id,
           visibility: MediaVisibility.public,
         );
       }
@@ -398,8 +663,15 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     MediaUploadFailure.network => AppStrings.newMediaNetwork,
     MediaUploadFailure.ticketExpired => AppStrings.newMediaExpired,
     MediaUploadFailure.scheduleInPast => AppStrings.newMediaSchedulePast,
-    // The quota message is the server's own and names the plan's number, so
-    // it is shown verbatim when there is one.
+    // Both 409s are the upload route's flow control and the repo answers
+    // them itself. Reaching here means the second attempt was refused too,
+    // which a creator can only meet by trying again. The quota message is
+    // the server's own and names the plan's number, so it is shown
+    // verbatim when there is one.
+    MediaUploadFailure.notFound => AppStrings.editMediaGone,
+    MediaUploadFailure.notAllowed => AppStrings.editMediaNotYours,
+    MediaUploadFailure.draftChanged ||
+    MediaUploadFailure.sourceAlreadyUploaded ||
     MediaUploadFailure.quotaReached ||
     MediaUploadFailure.cancelled ||
     MediaUploadFailure.rejected => AppStrings.newMediaRejected,
@@ -409,8 +681,6 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final file = _file;
-
     return Scaffold(
       backgroundColor: AppColors.base1,
       body: SafeArea(
@@ -420,76 +690,247 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
             Padding(
               padding: EdgeInsets.fromLTRB(20.s, 8.s, 20.s, 0),
               child: CreatorFlowHeader(
-                title: _audio
-                    ? AppStrings.newAudioTitle
-                    : AppStrings.newVideoTitle,
-                subtitle: _audio
-                    ? AppStrings.newAudioSubtitle
-                    : AppStrings.newVideoSubtitle,
+                title: switch ((_editing, _audio)) {
+                  (true, true) => AppStrings.editAudioTitle,
+                  (true, false) => AppStrings.editVideoTitle,
+                  (false, true) => AppStrings.newAudioTitle,
+                  (false, false) => AppStrings.newVideoTitle,
+                },
+                subtitle: switch ((_editing, _audio)) {
+                  (true, true) => AppStrings.editAudioSubtitle,
+                  (true, false) => AppStrings.editVideoSubtitle,
+                  (false, true) => AppStrings.newAudioSubtitle,
+                  (false, false) => AppStrings.newVideoSubtitle,
+                },
               ),
             ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.fromLTRB(20.s, 18.s, 20.s, 20.s),
-                children: [
-                  if (file == null)
-                    MediaPickCard(
-                      hint: _audio
-                          ? AppStrings.newAudioPickHint
-                          : AppStrings.newVideoPickHint,
-                      selectLabel: _audio
-                          ? AppStrings.newAudioSelect
-                          : AppStrings.newVideoSelect,
-                      onPick: _pickFile,
-                    )
-                  else
-                    MediaFileCard(
-                      kind: widget.kind,
-                      file: file,
-                      sent: _sent,
-                      failed: _uploadFailed,
-                      onRemove: _removeFile,
-                    ),
-                  SizedBox(height: 18.s),
-                  const RequiredLabel(AppStrings.newMediaThumbnail),
-                  SizedBox(height: 8.s),
-                  ThumbnailWell(image: _thumbnail, onPick: _pickThumbnail),
-                  SizedBox(height: 18.s),
-                  const RequiredLabel(AppStrings.newMediaTitleLabel),
-                  SizedBox(height: 8.s),
-                  CreatorTextField(
-                    key: const ValueKey('media-title'),
-                    controller: _titleController,
-                    hint: AppStrings.newMediaTitleHint,
-                  ),
-                  SizedBox(height: 18.s),
-                  const RequiredLabel(AppStrings.newMediaDescriptionLabel),
-                  SizedBox(height: 8.s),
-                  CreatorTextField(
-                    key: const ValueKey('media-description'),
-                    controller: _descriptionController,
-                    hint: AppStrings.newMediaDescriptionHint,
-                    maxLines: 4,
-                  ),
-                  SizedBox(height: 18.s),
-                  const RequiredLabel(
-                    AppStrings.newMediaCategoryLabel,
-                    required: false,
-                  ),
-                  SizedBox(height: 8.s),
-                  CreatorSelectField(
-                    key: const ValueKey('media-category'),
-                    hint: AppStrings.newMediaCategoryHint,
-                    value: _categoryValue.isEmpty ? null : _categoryValue,
-                    onTap: _pickCategories,
-                  ),
-                ],
-              ),
-            ),
-            _actions(context),
+            Expanded(child: _body()),
+            // Nothing to act on while the row is still being read, and
+            // nothing to act on at all when it could not be.
+            if (!_loading && _loadFailure == null) _actions(context),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Center(
+        key: ValueKey('media-opening'),
+        child: CircularProgressIndicator(color: AppColors.brandPrimary),
+      );
+    }
+    if (_loadFailure case final message?) {
+      return Center(
+        key: const ValueKey('media-open-failed'),
+        child: Padding(
+          padding: EdgeInsets.all(24.s),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: AppStyles.body(14, color: AppColors.neutral400),
+              ),
+              if (_retryable) ...[
+                SizedBox(height: 14.s),
+                SizedBox(
+                  width: 150.s,
+                  child: PrimaryButton(
+                    key: const ValueKey('media-open-retry'),
+                    label: AppStrings.feedRetry,
+                    height: 44.s,
+                    onPressed: () => unawaited(_open(widget.editMediaId!)),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+    return _form();
+  }
+
+  Widget _form() {
+    final file = _file;
+    final filed = _filed;
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(20.s, 18.s, 20.s, 20.s),
+      children: [
+        // The file card belongs to an upload. On an edit the row already
+        // holds its file, and swapping it is a different operation the
+        // phone does not offer — so the form says where that is done
+        // instead of showing a control that cannot do it.
+        if (_editing) ...[
+          if (_sourceNote case final note?) ...[
+            FieldNote(note),
+            SizedBox(height: 14.s),
+          ],
+        ] else ...[
+          if (file == null)
+            MediaPickCard(
+              hint: _audio
+                  ? AppStrings.newAudioPickHint
+                  : AppStrings.newVideoPickHint,
+              selectLabel: _audio
+                  ? AppStrings.newAudioSelect
+                  : AppStrings.newVideoSelect,
+              onPick: _pickFile,
+            )
+          else
+            MediaFileCard(
+              kind: widget.kind,
+              file: file,
+              sent: _sent,
+              failed: _uploadFailed,
+              onRemove: _removeFile,
+            ),
+          SizedBox(height: 18.s),
+        ],
+        // Required on an upload, where there is nothing to fall back on;
+        // optional on an edit, where there already is one.
+        RequiredLabel(AppStrings.newMediaThumbnail, required: !_editing),
+        SizedBox(height: 8.s),
+        ThumbnailWell(
+          image: _thumbnail,
+          existingUrl: filed?.thumbnailUrl,
+          onPick: _pickThumbnail,
+        ),
+        SizedBox(height: 18.s),
+        const RequiredLabel(AppStrings.newMediaTitleLabel),
+        SizedBox(height: 8.s),
+        CreatorTextField(
+          key: const ValueKey('media-title'),
+          controller: _titleController,
+          hint: AppStrings.newMediaTitleHint,
+        ),
+        SizedBox(height: 18.s),
+        RequiredLabel(AppStrings.newMediaDescriptionLabel, required: !_editing),
+        SizedBox(height: 8.s),
+        CreatorTextField(
+          key: const ValueKey('media-description'),
+          controller: _descriptionController,
+          hint: AppStrings.newMediaDescriptionHint,
+          maxLines: 4,
+        ),
+        SizedBox(height: 18.s),
+        const RequiredLabel(AppStrings.newMediaCategoryLabel, required: false),
+        SizedBox(height: 8.s),
+        CreatorSelectField(
+          key: const ValueKey('media-category'),
+          hint: AppStrings.newMediaCategoryHint,
+          value: _categoryValue.isEmpty ? null : _categoryValue,
+          onTap: _pickCategories,
+        ),
+        if (_editing) ...[
+          SizedBox(height: 18.s),
+          const RequiredLabel(
+            AppStrings.newMediaVisibilityLabel,
+            required: false,
+          ),
+          SizedBox(height: 8.s),
+          CreatorSelectField(
+            key: const ValueKey('media-visibility'),
+            hint: AppStrings.newMediaVisibilityHint,
+            // No value rather than a wrong one when the row did not say.
+            value: _visibility == null
+                ? null
+                : VisibilitySheet.label(_visibility!),
+            onTap: _pickVisibility,
+          ),
+          // Setting a published row unlisted leaves the phone with no link
+          // to hand over: only publish mints a share token.
+          if (_visibility == MediaVisibility.unlisted)
+            const FieldNote(AppStrings.visibilityUnlistedNoLink),
+          SizedBox(height: 18.s),
+          ?_schedule(filed),
+        ],
+      ],
+    );
+  }
+
+  /// What the row's own status means for the edit in front of the creator.
+  ///
+  /// The first three say something about the file that is specific to the
+  /// state it is in; every other state shares the one caveat that applies
+  /// to a row with a file in it — the file can be changed, but not here.
+  /// Nothing at all before the row has loaded.
+  String? get _sourceNote => switch (_filed?.status) {
+    MediaStatus.draft => AppStrings.editMediaNoFile,
+    MediaStatus.processing => AppStrings.editMediaProcessing,
+    MediaStatus.failed => AppStrings.editMediaFailed,
+    null => null,
+    _ => AppStrings.editMediaFileOnWeb,
+  };
+
+  /// The schedule, when the route will still take one.
+  ///
+  /// `scheduledAt` is refused for anything that has ever been published,
+  /// even if it was unpublished since — so rather than offering a field
+  /// that can only fail, a row past that point is told why it has none.
+  Widget? _schedule(FiledMedia? filed) {
+    if (filed == null) return null;
+    if (!filed.canBeScheduled) {
+      return const FieldNote(AppStrings.newMediaScheduleClosed);
+    }
+    final at = _scheduledAt;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const RequiredLabel(AppStrings.newMediaScheduleLabel, required: false),
+        SizedBox(height: 8.s),
+        Row(
+          children: [
+            Expanded(
+              child: CreatorSelectField(
+                key: const ValueKey('media-schedule-date'),
+                hint: AppStrings.newMediaScheduleHint,
+                value: at == null ? null : formatSheetDate(at),
+                onTap: () => unawaited(_pickSchedule(dateOnly: true)),
+              ),
+            ),
+            SizedBox(width: 12.s),
+            Expanded(
+              child: CreatorSelectField(
+                key: const ValueKey('media-schedule-time'),
+                hint: AppStrings.newMediaScheduleHint,
+                value: at == null ? null : formatSheetTime(at),
+                onTap: () => unawaited(_pickSchedule(dateOnly: false)),
+              ),
+            ),
+          ],
+        ),
+        if (_schedulePast) ...[
+          SizedBox(height: 10.s),
+          Text(
+            AppStrings.newMediaSchedulePast,
+            key: const ValueKey('media-schedule-past'),
+            style: AppStyles.label(
+              12,
+              color: AppColors.destructive,
+              lineHeight: 16 / 12,
+            ),
+          ),
+        ],
+        if (at != null) ...[
+          const FieldNote(AppStrings.newMediaScheduleNote),
+          SizedBox(height: 4.s),
+          GestureDetector(
+            key: const ValueKey('media-schedule-clear'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _scheduledAt = null),
+            child: Text(
+              AppStrings.newMediaScheduleClear,
+              style: AppStyles.label(12, color: AppColors.brandPrimary),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -509,27 +950,41 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        PrimaryButton(
-          key: const ValueKey('media-publish'),
-          label: AppStrings.newMediaPublish,
-          height: 52.s,
-          enabled: _complete,
-          loading: _working,
-          onPressed: _publish,
-        ),
-        SizedBox(height: 12.s),
-        GestureDetector(
-          key: const ValueKey('media-draft'),
-          behavior: HitTestBehavior.opaque,
-          onTap: _complete && !_working ? _saveDraft : null,
-          child: Text(
-            AppStrings.newMediaSaveDraft,
-            style: AppStyles.label(
-              13,
-              color: _complete ? AppColors.neutral200 : AppColors.neutral500,
+        // An edit has one button and no second thought. "Save as draft"
+        // is a publishing decision, and an edit makes none: the row keeps
+        // whatever state it was already in.
+        if (_editing)
+          PrimaryButton(
+            key: const ValueKey('media-save-edit'),
+            label: AppStrings.editSaveChanges,
+            height: 52.s,
+            enabled: _canSaveEdit,
+            loading: _working,
+            onPressed: () => unawaited(_saveEdit()),
+          )
+        else ...[
+          PrimaryButton(
+            key: const ValueKey('media-publish'),
+            label: AppStrings.newMediaPublish,
+            height: 52.s,
+            enabled: _complete,
+            loading: _working,
+            onPressed: _publish,
+          ),
+          SizedBox(height: 12.s),
+          GestureDetector(
+            key: const ValueKey('media-draft'),
+            behavior: HitTestBehavior.opaque,
+            onTap: _complete && !_working ? _saveDraft : null,
+            child: Text(
+              AppStrings.newMediaSaveDraft,
+              style: AppStyles.label(
+                13,
+                color: _complete ? AppColors.neutral200 : AppColors.neutral500,
+              ),
             ),
           ),
-        ),
+        ],
       ],
     ),
   );

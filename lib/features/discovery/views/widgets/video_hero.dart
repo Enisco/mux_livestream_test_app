@@ -8,6 +8,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/features/discovery/views/widgets/playback_settings_sheet.dart';
+import 'package:test_app/shared/components/live_badge.dart';
 import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -29,6 +30,7 @@ class VideoHero extends StatefulWidget {
     this.playbackUrl,
     this.thumbnailUrl,
     this.onBack,
+    this.isLive = false,
   });
 
   final PlaybackHandle playback;
@@ -37,6 +39,10 @@ class VideoHero extends StatefulWidget {
   final String? playbackUrl;
   final String? thumbnailUrl;
   final VoidCallback? onBack;
+
+  /// Broadcasting right now: the controls lose their scrubber and carry
+  /// the LIVE badge instead.
+  final bool isLive;
 
   @override
   State<VideoHero> createState() => _VideoHeroState();
@@ -135,6 +141,7 @@ class _VideoHeroState extends State<VideoHero> {
             opaque: true,
             barrierColor: Colors.black,
             pageBuilder: (_, _, _) => FullscreenVideo(
+              isLive: widget.isLive,
               playback: widget.playback,
               mediaId: _mediaId,
               videoController: widget.videoController,
@@ -208,6 +215,7 @@ class _VideoHeroState extends State<VideoHero> {
                     child: IgnorePointer(
                       ignoring: !_showControls,
                       child: _Controls(
+                        isLive: widget.isLive,
                         playback: widget.playback,
                         state: state,
                         active: active,
@@ -257,6 +265,7 @@ class _Controls extends StatelessWidget {
     required this.onFullscreen,
     this.onBack,
     this.compact = false,
+    this.isLive = false,
   });
 
   final PlaybackHandle playback;
@@ -269,6 +278,9 @@ class _Controls extends StatelessWidget {
   /// The fullscreen surface has no back arrow of its own — its close control
   /// is the same fullscreen button, toggled.
   final bool compact;
+
+  /// A broadcast in progress. See [_BottomBar].
+  final bool isLive;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +342,7 @@ class _Controls extends StatelessWidget {
               playback: playback,
               state: state,
               active: active,
+              isLive: isLive,
               onFullscreen: onFullscreen,
               fullscreenIcon: compact
                   ? Icons.fullscreen_exit_rounded
@@ -342,6 +355,16 @@ class _Controls extends StatelessWidget {
   }
 }
 
+/// The row along the bottom of a player.
+///
+/// **A live broadcast gets no scrubber.** There is nothing to scrub to: the
+/// duration is however much of the stream has been published so far, so it
+/// grows under the thumb, and the far end of the track is the present
+/// moment rather than an ending. Every platform that carries live video
+/// either hides the track or turns it into a DVR window with a "back to
+/// live" control; none of them hands over a plain seek bar that reads
+/// `1:04 / 1:27` and keeps moving. In its place goes the same LIVE badge
+/// the card and the title row carry.
 class _BottomBar extends StatefulWidget {
   const _BottomBar({
     required this.playback,
@@ -349,11 +372,13 @@ class _BottomBar extends StatefulWidget {
     required this.active,
     required this.onFullscreen,
     required this.fullscreenIcon,
+    this.isLive = false,
   });
 
   final PlaybackHandle playback;
   final PlaybackState state;
   final bool active;
+  final bool isLive;
   final VoidCallback onFullscreen;
   final IconData fullscreenIcon;
 
@@ -378,43 +403,48 @@ class _BottomBarState extends State<_BottomBar> {
 
     return Row(
       children: [
-        Text(
-          formatClock(
-            _dragging == null
-                ? (widget.active ? widget.state.position : Duration.zero)
-                : Duration(milliseconds: _dragging!.round()),
-          ),
-          style: AppStyles.label(11, color: Colors.white),
-        ),
-        Expanded(
-          child: SliderTheme(
-            data: SliderThemeData(
-              trackHeight: 2.5,
-              activeTrackColor: AppColors.brandPrimary,
-              inactiveTrackColor: Colors.white30,
-              thumbColor: AppColors.brandPrimary,
-              overlayColor: AppColors.brandPrimary.withValues(alpha: 0.15),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+        if (widget.isLive) ...[
+          const LiveBadge(fontSize: LiveBadge.readingFontSize),
+          const Spacer(),
+        ] else ...[
+          Text(
+            formatClock(
+              _dragging == null
+                  ? (widget.active ? widget.state.position : Duration.zero)
+                  : Duration(milliseconds: _dragging!.round()),
             ),
-            child: Slider(
-              value: total <= 0 ? 0 : position.toDouble(),
-              max: total <= 0 ? 1 : total,
-              onChanged: total <= 0
-                  ? null
-                  : (v) => setState(() => _dragging = v),
-              onChangeEnd: total <= 0
-                  ? null
-                  : (v) {
-                      widget.playback.seek(Duration(milliseconds: v.round()));
-                      setState(() => _dragging = null);
-                    },
+            style: AppStyles.label(11, color: Colors.white),
+          ),
+          Expanded(
+            child: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 2.5,
+                activeTrackColor: AppColors.brandPrimary,
+                inactiveTrackColor: Colors.white30,
+                thumbColor: AppColors.brandPrimary,
+                overlayColor: AppColors.brandPrimary.withValues(alpha: 0.15),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+              ),
+              child: Slider(
+                value: total <= 0 ? 0 : position.toDouble(),
+                max: total <= 0 ? 1 : total,
+                onChanged: total <= 0
+                    ? null
+                    : (v) => setState(() => _dragging = v),
+                onChangeEnd: total <= 0
+                    ? null
+                    : (v) {
+                        widget.playback.seek(Duration(milliseconds: v.round()));
+                        setState(() => _dragging = null);
+                      },
+              ),
             ),
           ),
-        ),
-        Text(
-          formatClock(widget.active ? widget.state.duration : Duration.zero),
-          style: AppStyles.label(11, color: Colors.white),
-        ),
+          Text(
+            formatClock(widget.active ? widget.state.duration : Duration.zero),
+            style: AppStyles.label(11, color: Colors.white),
+          ),
+        ],
         SizedBox(width: 4.s),
         ValueListenableBuilder<bool>(
           valueListenable: widget.playback.muted,
@@ -426,7 +456,11 @@ class _BottomBarState extends State<_BottomBar> {
         _IconButton(
           key: const ValueKey('playback-settings'),
           icon: Icons.settings_rounded,
-          onTap: () => showPlaybackSettings(context, playback: widget.playback),
+          onTap: () => showPlaybackSettings(
+            context,
+            playback: widget.playback,
+            isLive: widget.isLive,
+          ),
         ),
         _IconButton(icon: widget.fullscreenIcon, onTap: widget.onFullscreen),
       ],
@@ -463,12 +497,16 @@ class FullscreenVideo extends StatefulWidget {
     super.key,
     required this.playback,
     required this.mediaId,
+    this.isLive = false,
     this.videoController,
   });
 
   final PlaybackHandle playback;
   final String mediaId;
   final VideoController? videoController;
+
+  /// Broadcasting right now. See [_BottomBar].
+  final bool isLive;
 
   @override
   State<FullscreenVideo> createState() => _FullscreenVideoState();
@@ -517,6 +555,7 @@ class _FullscreenVideoState extends State<FullscreenVideo> {
                 else
                   const ColoredBox(color: Colors.black),
                 _Controls(
+                  isLive: widget.isLive,
                   playback: playback,
                   state: state,
                   active: active,

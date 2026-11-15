@@ -5,12 +5,14 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/creator/views/new_article_screen.dart';
 import 'package:test_app/features/creator/views/new_event_screen.dart';
+import 'package:test_app/features/creator/views/new_media_screen.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
 import 'package:test_app/features/discovery/views/media_detail_screen.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
+import 'package:test_app/models/creator_models/media_upload_models.dart';
 import 'package:test_app/models/creator_models/studio_content_models.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -18,22 +20,30 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Opens the editor for [item], if this kind can be edited from a phone.
 ///
-/// Posts and calendar events can: the content service publishes
-/// `PATCH /v1/content/posts/{id}` and
-/// `PATCH /v1/content/calendar/events/{id}`, and the screens that write
-/// them already exist, so they open the same form over what is filed.
+/// Four of the five kinds can, each through its own service's update route:
 ///
-/// **Video, audio and livestreams cannot.** The media service publishes no
-/// update route in any integration guide — only create, `publish`, and the
-/// live session routes — so there is nothing for the phone to call, and
-/// pretending otherwise would be a button that fails. Those keep the web
-/// studio.
+///  * a post — `PATCH /v1/content/posts/{id}`
+///  * an event — `PATCH /v1/content/calendar/events/{id}`
+///  * a video or a piece of audio — `PATCH /v1/media/{id}`
+///
+/// Each opens the same form that *writes* that kind, over what is filed.
+///
+/// **A livestream cannot.** A broadcast is not an upload: it is
+/// provisioned and configured through `PATCH /v1/media/live/streams/{id}`,
+/// a different route with a different shape, and no screen here writes it.
+/// It keeps the web studio.
+///
+/// A row that is archived, blocked or under review is nobody's to edit
+/// from here — `isEditable` on the media row says the same, and the
+/// editor checks again on open, because a row can be archived between a
+/// list loading and this being tapped.
 ///
 /// Answers true when something was saved, so a list can reload.
 Future<bool> openContentEditor(
   BuildContext context,
   StudioContentItem item,
 ) async {
+  if (!item.isEditableHere) return false;
   final route = switch (item.kind) {
     StudioContentKind.post => MaterialPageRoute<bool>(
       builder: (_) => NewArticleScreen(editPostId: item.id),
@@ -41,7 +51,15 @@ Future<bool> openContentEditor(
     StudioContentKind.event => MaterialPageRoute<bool>(
       builder: (_) => NewEventScreen(editEventId: item.id),
     ),
-    _ => null,
+    StudioContentKind.video => MaterialPageRoute<bool>(
+      builder: (_) =>
+          NewMediaScreen(kind: MediaUploadKind.video, editMediaId: item.id),
+    ),
+    StudioContentKind.audio => MaterialPageRoute<bool>(
+      builder: (_) =>
+          NewMediaScreen(kind: MediaUploadKind.music, editMediaId: item.id),
+    ),
+    StudioContentKind.livestream => null,
   };
   if (route == null) return false;
   final saved = await Navigator.push<bool>(context, route);
@@ -55,10 +73,10 @@ Future<bool> openContentEditor(
 /// or plays or reads, a runtime or a read time — and in the Going card an
 /// event adds.
 ///
-/// A **post or an event** can be edited here: see [openContentEditor].
-/// Video, audio and livestreams cannot — the media service publishes no
-/// update route — so those keep the web studio, and the footer says which
-/// is which rather than telling every creator to go to a desktop.
+/// **Everything but a livestream can be edited here**: see
+/// [openContentEditor]. A broadcast is configured through its own live
+/// route and keeps the web studio, and the footer says which is which
+/// rather than telling every creator to go to a desktop.
 ///
 /// **No deltas.** The design shows "+18%" beside each figure. Those come from
 /// `POST /v1/analytics/media/breakdown`, which answers
@@ -72,24 +90,31 @@ class StudioContentDetailScreen extends StatelessWidget {
 
   bool get _isEvent => item.kind == StudioContentKind.event;
 
-  /// Whether this kind has an update route the phone can call.
-  bool get _isEditable =>
-      item.kind == StudioContentKind.post ||
-      item.kind == StudioContentKind.event;
+  /// Whether this row has an update route the phone can call, and is in a
+  /// state anyone is allowed to change.
+  bool get _isEditable => item.isEditableHere;
 
   /// What the footer has to say, or nothing.
   ///
   /// It used to say "title, description, visibility and series are edited
-  /// on the web studio" under every kind. That is still true of media, and
-  /// no longer true of a post or an event — saying it on the screen that
-  /// now edits them would send a creator to a desktop for work they can do
-  /// here. An event's form covers everything its API takes, so it needs no
-  /// note at all.
-  String? get _footnote => switch (item.kind) {
-    StudioContentKind.post => AppStrings.contentPostEditNote,
-    StudioContentKind.event => null,
-    _ => AppStrings.contentMediaEditWeb,
-  };
+  /// on the web studio" under every kind. That is now true of none of them
+  /// but a livestream — saying it on a screen that does the editing would
+  /// send a creator to a desktop for work they can do here. An event's
+  /// form covers everything its API takes, so it needs no note at all.
+  ///
+  /// A row nobody may edit says why instead of what is editable.
+  String? get _footnote {
+    if (!item.isEditableHere && item.kind != StudioContentKind.livestream) {
+      return AppStrings.editMediaNotEditable;
+    }
+    return switch (item.kind) {
+      StudioContentKind.post => AppStrings.contentPostEditNote,
+      StudioContentKind.event => null,
+      StudioContentKind.video ||
+      StudioContentKind.audio => AppStrings.contentMediaEditNote,
+      StudioContentKind.livestream => AppStrings.contentMediaEditWeb,
+    };
+  }
 
   Future<void> _edit(BuildContext context) async {
     final saved = await openContentEditor(context, item);
@@ -211,9 +236,7 @@ class StudioContentDetailScreen extends StatelessWidget {
                     _OutlinedAction(
                       actionKey: const ValueKey('detail-manage-web'),
                       icon: HugeIcons.strokeRoundedLinkSquare01,
-                      label: item.kind == StudioContentKind.video
-                          ? AppStrings.contentEditOnWeb
-                          : AppStrings.contentManageOnWeb,
+                      label: AppStrings.contentManageOnWeb,
                       onTap: () =>
                           _report(context, AppStrings.contentWebOnlyAction),
                     ),

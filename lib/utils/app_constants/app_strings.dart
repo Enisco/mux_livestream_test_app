@@ -1035,6 +1035,66 @@ abstract final class AppStrings {
   static const newMediaPublish = 'Upload & publish';
   static const newMediaSaveDraft = 'Save as draft instead';
 
+  /// The same screen, opened on a row that already exists. The file is not
+  /// part of it: this edits the details around a file that is already up.
+  static const editVideoTitle = 'Edit video';
+  static const editAudioTitle = 'Edit audio';
+  static const editVideoSubtitle =
+      'Change the thumbnail, title, description, topics or who can see it.';
+  static const editAudioSubtitle =
+      'Change the cover, title, description, topics or who can see it.';
+
+  static const newMediaVisibilityLabel = 'Who can see it';
+  static const newMediaVisibilityHint = 'Choose who can see this';
+  static const visibilityPublic = 'Public';
+  static const visibilityUnlisted = 'Unlisted';
+  static const visibilityPrivate = 'Private';
+  static const visibilityPublicBody = 'Anyone can find it on your channel.';
+  static const visibilityUnlistedBody =
+      'Only people with the link can watch it.';
+  static const visibilityPrivateBody = 'Only your channel team can see it.';
+
+  /// Making published media unlisted through the edit route returns no
+  /// share token — only publish does, and each publish of unlisted media
+  /// mints a new one that stops older links working. So the phone cannot
+  /// hand over a link for what it just unlisted, and says so.
+  static const visibilityUnlistedNoLink =
+      'Unlisted. The link for it is on the web studio.';
+
+  static const newMediaScheduleLabel = 'Publishes on';
+  static const newMediaScheduleHint = 'Not scheduled';
+  static const newMediaScheduleClear = 'Remove schedule';
+  static const newMediaScheduleNote =
+      'It publishes itself at this time, or as soon as processing finishes '
+      'if that is later.';
+
+  /// Why the schedule field is not on the form. The route refuses
+  /// `scheduledAt` for anything that has ever been published, even if it
+  /// was unpublished since.
+  static const newMediaScheduleClosed =
+      'This has been published before, so it can no longer be scheduled.';
+
+  /// What the row's own status means for the edit in front of the creator.
+  static const editMediaNoFile =
+      'No file has been uploaded into this yet. The details save all the '
+      'same, and the file can be added from the web studio.';
+  static const editMediaProcessing =
+      'The file is still being processed. The details save now and apply '
+      'when it is ready.';
+  static const editMediaFailed =
+      'The file could not be processed. Replacing it is done on the web '
+      'studio; the details below still save.';
+  static const editMediaFileOnWeb =
+      'Replacing the file itself is done on the web studio.';
+  static const editMediaNotEditable =
+      'This cannot be edited: it is archived, blocked, or under review.';
+
+  static const editMediaGone =
+      'This no longer exists. It may have been deleted elsewhere.';
+  static const editMediaNotYours =
+      'You do not have permission to edit this. Sign in again, or ask an '
+      'owner of the channel.';
+
   // A calendar event. Nothing here is uploaded or transcoded; an event
   // lives in the content service, not the media one.
   static const newEventTitle = 'New event';
@@ -1279,7 +1339,6 @@ abstract final class AppStrings {
   static const contentComments = 'Comments';
   static const contentGoingLabel = 'Going';
   static const contentCopyLink = 'Copy link';
-  static const contentEditOnWeb = 'Edit on web';
   static const contentManageOnWeb = 'Manage on web';
   static const contentWebOnlyAction =
       'Open the web studio to edit this content.';
@@ -1305,12 +1364,20 @@ abstract final class AppStrings {
       'The headline, cover and words are edited here. The excerpt, topics '
       'and who can see it stay as they are set on the web studio.';
 
-  /// Video, audio and livestream rows. The media service publishes no
-  /// update route in any integration guide — only create, publish and the
-  /// live session routes — so there is nothing for the phone to call.
+  /// Video and audio rows. `PATCH /v1/media/{id}` carries every field the
+  /// form shows; the file itself and series membership are the two things
+  /// the phone leaves alone.
+  static const contentMediaEditNote =
+      'The thumbnail, title, description, topics, visibility and schedule '
+      'are edited here. Replacing the file and changing the series stay on '
+      'the web studio.';
+
+  /// A livestream row. Broadcasts are not uploads: they are provisioned and
+  /// configured through `PATCH /v1/media/live/streams/{id}`, a different
+  /// route with a different shape, and no screen here writes it.
   static const contentMediaEditWeb =
-      'Videos, audio and livestreams are edited on the web studio. Posts and '
-      'events can be edited here.';
+      'Livestreams are configured on the web studio. Videos, audio, posts '
+      'and events can be edited here.';
   static const contentAnalyticsPro = 'Detailed analytics need the Pro plan.';
   static const studioCreate = '+ Create';
   static const studioToday = 'TODAY';
@@ -1789,6 +1856,12 @@ abstract final class AppStrings {
   /// The player's settings sheet.
   static const playbackSpeed = 'Playback speed';
   static const videoQuality = 'Quality';
+
+  /// The settings sheet for a live broadcast that publishes a single
+  /// rendition: speed does not apply and there is no quality to pick, so
+  /// the sheet says why rather than opening empty.
+  static const liveQualityAutomatic =
+      'Quality is chosen automatically while this broadcast is live.';
   static const speedNormal = 'Normal';
 
   /// Manage following — what a ministry was last doing.

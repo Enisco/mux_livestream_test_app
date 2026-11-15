@@ -4,6 +4,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/components/live_badge.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -31,11 +32,17 @@ class DetailTitleBlock extends StatelessWidget {
     required this.title,
     this.viewsLabel,
     this.dateLabel,
+    this.isLive = false,
   });
 
   final String title;
   final String? viewsLabel;
   final String? dateLabel;
+
+  /// Broadcasting right now. The badge is the one from the live card on
+  /// the home feed, so a viewer who tapped that card sees the same mark on
+  /// the page it opened.
+  final bool isLive;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +51,27 @@ class DetailTitleBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(title, style: AppStyles.heading(18, lineHeight: 28 / 18)),
+        if (isLive)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Nudged down to sit against the title's cap height rather
+              // than its line box.
+              Padding(
+                padding: EdgeInsets.only(top: 5.s),
+                child: const LiveBadge(fontSize: LiveBadge.readingFontSize),
+              ),
+              SizedBox(width: 8.s),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppStyles.heading(18, lineHeight: 28 / 18),
+                ),
+              ),
+            ],
+          )
+        else
+          Text(title, style: AppStyles.heading(18, lineHeight: 28 / 18)),
         if (meta.isNotEmpty) ...[
           SizedBox(height: 4.s),
           Text(

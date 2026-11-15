@@ -68,6 +68,7 @@ class _JoinLivestreamScreenState extends State<JoinLivestreamScreen> {
             mediaId: status.mediaId,
             creatorId: creatorId,
             mediaType: MediaTypes.livestream,
+            isLive: true,
             source: AnalyticsSource.external,
           ),
         ),

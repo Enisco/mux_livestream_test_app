@@ -6,12 +6,24 @@ import 'package:test_app/features/player/views/widgets/seek_button.dart';
 import 'package:test_app/features/player/views/widgets/speed_selector.dart';
 import 'package:test_app/features/player/views/widgets/video_progress_bar.dart';
 import 'package:test_app/features/player/views/widgets/volume_control.dart';
+import 'package:test_app/shared/components/live_badge.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
+/// The controls drawn over the player screen's video.
+///
+/// **A live broadcast is a different instrument.** There is no scrubber,
+/// no skip, and no speed: the far end of a live stream is the present
+/// moment, so there is nowhere to seek to and no rate to play it at other
+/// than the one it is being published at. What it gets instead is the same
+/// LIVE badge the home feed card and the detail title row carry, so the
+/// viewer can tell at a glance which kind of video they are watching.
 class ControlsOverlay extends StatelessWidget {
   final String title;
+
+  /// Whether this stream is being broadcast right now.
+  final bool isLive;
   final bool isPlaying;
   final bool isCompleted;
   final Duration position;
@@ -38,6 +50,7 @@ class ControlsOverlay extends StatelessWidget {
   const ControlsOverlay({
     super.key,
     required this.title,
+    this.isLive = false,
     required this.isPlaying,
     required this.isCompleted,
     required this.position,
@@ -79,11 +92,12 @@ class ControlsOverlay extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _TopBar(title: title, onBack: onBack),
+          _TopBar(title: title, isLive: isLive, onBack: onBack),
           const Spacer(),
           _CenterControls(
             isPlaying: isPlaying,
             isCompleted: isCompleted,
+            isLive: isLive,
             onPlayPause: onPlayPause,
             onSeekBack: onSeekBack,
             onSeekForward: onSeekForward,
@@ -92,6 +106,7 @@ class ControlsOverlay extends StatelessWidget {
           _BottomBar(
             position: position,
             duration: duration,
+            isLive: isLive,
             volume: volume,
             playbackSpeed: playbackSpeed,
             isFullscreen: isFullscreen,
@@ -114,8 +129,13 @@ class ControlsOverlay extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   final String title;
+  final bool isLive;
   final VoidCallback onBack;
-  const _TopBar({required this.title, required this.onBack});
+  const _TopBar({
+    required this.title,
+    required this.onBack,
+    this.isLive = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -133,6 +153,10 @@ class _TopBar extends StatelessWidget {
               ),
               onPressed: onBack,
             ),
+            if (isLive) ...[
+              const LiveBadge(fontSize: LiveBadge.readingFontSize),
+              const SizedBox(width: 8.0),
+            ],
             Expanded(
               child: Text(
                 title,
@@ -152,6 +176,7 @@ class _TopBar extends StatelessWidget {
 class _CenterControls extends StatelessWidget {
   final bool isPlaying;
   final bool isCompleted;
+  final bool isLive;
   final VoidCallback onPlayPause;
   final VoidCallback onSeekBack;
   final VoidCallback onSeekForward;
@@ -162,6 +187,7 @@ class _CenterControls extends StatelessWidget {
     required this.onPlayPause,
     required this.onSeekBack,
     required this.onSeekForward,
+    this.isLive = false,
   });
 
   @override
@@ -169,15 +195,21 @@ class _CenterControls extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SeekButton(icon: Icons.replay_10_rounded, onTap: onSeekBack),
-        const SizedBox(width: 32.0),
+        // Nothing to skip back into and nothing to skip forward to: the
+        // live edge is already the furthest the stream goes.
+        if (!isLive) ...[
+          SeekButton(icon: Icons.replay_10_rounded, onTap: onSeekBack),
+          const SizedBox(width: 32.0),
+        ],
         PlayPauseButton(
           isPlaying: isPlaying,
           isCompleted: isCompleted,
           onTap: onPlayPause,
         ),
-        const SizedBox(width: 32.0),
-        SeekButton(icon: Icons.forward_10_rounded, onTap: onSeekForward),
+        if (!isLive) ...[
+          const SizedBox(width: 32.0),
+          SeekButton(icon: Icons.forward_10_rounded, onTap: onSeekForward),
+        ],
       ],
     );
   }
@@ -186,6 +218,7 @@ class _CenterControls extends StatelessWidget {
 class _BottomBar extends StatelessWidget {
   final Duration position;
   final Duration duration;
+  final bool isLive;
   final double volume;
   final double playbackSpeed;
   final bool isFullscreen;
@@ -203,6 +236,7 @@ class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.position,
     required this.duration,
+    this.isLive = false,
     required this.volume,
     required this.playbackSpeed,
     required this.isFullscreen,
@@ -227,13 +261,14 @@ class _BottomBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            VideoProgressBar(
-              position: position,
-              duration: duration,
-              onSeek: onSeek,
-              onDragStart: onProgressDragStart,
-              onDragEnd: onProgressDragEnd,
-            ),
+            if (!isLive)
+              VideoProgressBar(
+                position: position,
+                duration: duration,
+                onSeek: onSeek,
+                onDragStart: onProgressDragStart,
+                onDragEnd: onProgressDragEnd,
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Row(
@@ -245,12 +280,15 @@ class _BottomBar extends StatelessWidget {
                     current: currentQuality,
                     onSelected: onQualityChanged,
                   ),
-                  const SizedBox(width: 8.0),
-                  SpeedSelector(
-                    current: playbackSpeed,
-                    speeds: speeds,
-                    onSelected: onSpeedChanged,
-                  ),
+                  // A live stream plays at the rate it is published.
+                  if (!isLive) ...[
+                    const SizedBox(width: 8.0),
+                    SpeedSelector(
+                      current: playbackSpeed,
+                      speeds: speeds,
+                      onSelected: onSpeedChanged,
+                    ),
+                  ],
                   const SizedBox(width: 4.0),
                   IconButton(
                     icon: Icon(

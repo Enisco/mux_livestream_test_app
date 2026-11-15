@@ -27,11 +27,19 @@ class PlayerScreen extends StatefulWidget {
   final String? mediaType;
   final String source;
 
+  /// Whether this stream is being broadcast right now.
+  ///
+  /// A live stream is not seekable — see [ControlsOverlay] — and the
+  /// caller is the only one who knows: an HLS playlist that is still being
+  /// written looks like a short finished one to the player, and grows.
+  final bool isLive;
+
   const PlayerScreen.file({super.key, required this.filePath, this.title})
     : networkUrl = null,
       mediaId = null,
       creatorId = null,
       mediaType = null,
+      isLive = false,
       source = AnalyticsSource.unknown;
 
   const PlayerScreen.network({
@@ -41,6 +49,7 @@ class PlayerScreen extends StatefulWidget {
     this.mediaId,
     this.creatorId,
     this.mediaType,
+    this.isLive = false,
     this.source = AnalyticsSource.unknown,
   }) : filePath = null;
 
@@ -431,8 +440,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  /// Live **now**, which is not the same as having been opened as live.
+  ///
+  /// When a broadcast stops, its playlist gains an ENDLIST and the player
+  /// reports completion: from that moment the same URL is a finished
+  /// recording, and treating it as live would leave a viewer with no
+  /// scrubber on something that has an end. It also closes the one hole
+  /// in the seek gate — the replay control seeks to zero through
+  /// [_togglePlay] rather than through [_seek], and by the time it can be
+  /// tapped this is false.
+  bool get _isLive => widget.isLive && !_isCompleted;
+
   void _seek(Duration offset) {
-    if (_duration == Duration.zero) return;
+    // One gate for every way of asking: the overlay's skip buttons, a
+    // double-tap on either half of the picture, and the arrow keys.
+    if (_isLive || _duration == Duration.zero) return;
     final t = _position + offset;
     final Duration target;
     if (t < Duration.zero) {
@@ -448,7 +470,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _seekFraction(double fraction) {
-    if (_duration == Duration.zero) return;
+    if (_isLive || _duration == Duration.zero) return;
     final target = Duration(
       milliseconds: (fraction * _duration.inMilliseconds).round(),
     );
@@ -795,6 +817,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               duration: const Duration(milliseconds: 250),
               child: ControlsOverlay(
                 title: _displayTitle,
+                isLive: _isLive,
                 isPlaying: _isPlaying,
                 isCompleted: _isCompleted,
                 position: _position,

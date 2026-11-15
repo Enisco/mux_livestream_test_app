@@ -121,12 +121,10 @@ const _eventRow = {
   },
 };
 
-StudioContentItem _item(StudioContentKind kind) => StudioContentItem(
-  id: 'x1',
-  kind: kind,
-  title: 'Something',
-  state: StudioContentState.published,
-);
+StudioContentItem _item(
+  StudioContentKind kind, {
+  StudioContentState state = StudioContentState.published,
+}) => StudioContentItem(id: 'x1', kind: kind, title: 'Something', state: state);
 
 void main() {
   setUpAll(loadAppFonts);
@@ -442,7 +440,11 @@ void main() {
   });
 
   group('which kinds offer it', () {
-    Future<void> pump(WidgetTester tester, StudioContentKind kind) async {
+    Future<void> pump(
+      WidgetTester tester,
+      StudioContentKind kind, {
+      StudioContentState state = StudioContentState.published,
+    }) async {
       tester.view.physicalSize = const Size(390 * 3, 1200 * 3);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
@@ -450,8 +452,9 @@ void main() {
       await tester.pumpWidget(
         SizingBuilder(
           baseSize: const Size(390, 844),
-          builder: (_) =>
-              MaterialApp(home: StudioContentDetailScreen(item: _item(kind))),
+          builder: (_) => MaterialApp(
+            home: StudioContentDetailScreen(item: _item(kind, state: state)),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -483,24 +486,55 @@ void main() {
       expect(find.byKey(const ValueKey('detail-edit')), findsOneWidget);
     });
 
-    testWidgets('a video does not, because there is no route to call', (
+    testWidgets('a video offers Edit, now that there is a route', (
       tester,
     ) async {
-      // The media service publishes create, publish and the live session
-      // routes and no update. A button here would be one that fails.
+      // This test used to assert the opposite, and said why: the media
+      // guide published create, publish and the live session routes and no
+      // update, so a button here would have been one that fails. The
+      // guide's 2026-11-14 revision added `PATCH /v1/media/{id}`.
       await pump(tester, StudioContentKind.video);
+
+      expect(find.byKey(const ValueKey('detail-edit')), findsOneWidget);
+      expect(find.byKey(const ValueKey('detail-manage-web')), findsNothing);
+      // And it is told what the phone covers, not sent to a desktop.
+      expect(find.text(AppStrings.contentMediaEditNote), findsOneWidget);
+      expect(find.text(AppStrings.contentMediaEditWeb), findsNothing);
+    });
+
+    testWidgets('so does audio', (tester) async {
+      await pump(tester, StudioContentKind.audio);
+
+      expect(find.byKey(const ValueKey('detail-edit')), findsOneWidget);
+      expect(find.text(AppStrings.contentMediaEditNote), findsOneWidget);
+    });
+
+    testWidgets('a livestream still does not', (tester) async {
+      // A broadcast is not an upload. It is configured through
+      // `PATCH /v1/media/live/streams/{id}` — a different route with a
+      // different shape — and nothing here writes it.
+      await pump(tester, StudioContentKind.livestream);
 
       expect(find.byKey(const ValueKey('detail-edit')), findsNothing);
       expect(find.byKey(const ValueKey('detail-manage-web')), findsOneWidget);
       expect(find.text(AppStrings.contentMediaEditWeb), findsOneWidget);
     });
 
-    testWidgets('and neither does a livestream or audio', (tester) async {
-      await pump(tester, StudioContentKind.livestream);
-      expect(find.byKey(const ValueKey('detail-edit')), findsNothing);
+    testWidgets('nor does a row nobody may change', (tester) async {
+      for (final state in [
+        StudioContentState.archived,
+        StudioContentState.blocked,
+        StudioContentState.inReview,
+      ]) {
+        await pump(tester, StudioContentKind.video, state: state);
 
-      await pump(tester, StudioContentKind.audio);
-      expect(find.byKey(const ValueKey('detail-edit')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('detail-edit')),
+          findsNothing,
+          reason: '$state is not the creator\'s to edit',
+        );
+        expect(find.text(AppStrings.editMediaNotEditable), findsOneWidget);
+      }
     });
   });
 }

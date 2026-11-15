@@ -27,13 +27,14 @@ Future<void> _pump(
 
 StudioContentItem _media({
   String type = 'video',
+  String status = 'published',
   int views = 1204,
   int? duration = 2538,
 }) => StudioContentItem.fromMedia({
   'id': 'm1',
   'type': type,
   'title': 'The Prodigal Returns',
-  'status': 'published',
+  'status': status,
   'visibility': 'public',
   'durationSeconds': duration,
   'analyticsViews': views,
@@ -46,7 +47,7 @@ StudioContentItem _media({
 void main() {
   setUpAll(loadAppFonts);
 
-  testWidgets('a video names itself, its figures and its web-only edit', (
+  testWidgets('a video names itself, its figures and its own editor', (
     tester,
   ) async {
     await _pump(tester, _media());
@@ -57,7 +58,19 @@ void main() {
     expect(find.text(AppStrings.studioViews), findsOneWidget);
     expect(find.text('1.2K'), findsOneWidget);
     expect(find.text('42:18'), findsOneWidget);
-    expect(find.text(AppStrings.contentEditOnWeb), findsOneWidget);
+    // `PATCH /v1/media/{id}` exists, so this is no longer a trip to a
+    // desktop — the row offers Edit and says what the phone covers.
+    expect(find.byKey(const ValueKey('detail-edit')), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-manage-web')), findsNothing);
+    expect(find.text(AppStrings.contentMediaEditNote), findsOneWidget);
+  });
+
+  testWidgets('an archived video is not offered to anyone', (tester) async {
+    await _pump(tester, _media(status: 'archived'));
+
+    expect(find.byKey(const ValueKey('detail-edit')), findsNothing);
+    expect(find.byKey(const ValueKey('detail-manage-web')), findsOneWidget);
+    expect(find.text(AppStrings.editMediaNotEditable), findsOneWidget);
   });
 
   testWidgets('a livestream is titled and counted as a broadcast', (
@@ -70,8 +83,9 @@ void main() {
     expect(find.text(AppStrings.contentKindVideo), findsNothing);
     expect(find.text(AppStrings.contentWatchedLiveLabel), findsOneWidget);
     expect(find.text(AppStrings.studioViews), findsNothing);
-    expect(find.text(AppStrings.contentEditOnWeb), findsNothing);
+    expect(find.byKey(const ValueKey('detail-edit')), findsNothing);
     expect(find.text(AppStrings.contentManageOnWeb), findsOneWidget);
+    expect(find.text(AppStrings.contentMediaEditWeb), findsOneWidget);
   });
 
   testWidgets('a slug is shown as words, not as a slug', (tester) async {
@@ -79,12 +93,12 @@ void main() {
     expect(find.textContaining('Bible study'), findsOneWidget);
   });
 
-  testWidgets('audio counts plays and manages on the web', (tester) async {
+  testWidgets('audio counts plays and is edited here too', (tester) async {
     await _pump(tester, _media(type: 'music'));
 
     expect(find.text(AppStrings.contentKindAudio), findsOneWidget);
     expect(find.text(AppStrings.contentPlaysLabel), findsOneWidget);
-    expect(find.text(AppStrings.contentManageOnWeb), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-edit')), findsOneWidget);
     expect(find.text(AppStrings.studioViews), findsNothing);
   });
 

@@ -6,6 +6,7 @@ import 'package:test_app/features/home/data/feed_autoplay_coordinator.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/features/home/views/widgets/feed_video_surface.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/components/live_badge.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -378,7 +379,7 @@ class _CreatorRow extends StatelessWidget {
                     ],
                     if (data.kind == FeedCardKind.live) ...[
                       SizedBox(width: 4.s),
-                      const _LivePill(),
+                      const LiveBadge(),
                     ],
                   ],
                 ),
@@ -708,30 +709,6 @@ class _Pill extends StatelessWidget {
           color: AppColors.neutral100,
           weight: AppStyles.bold,
           lineHeight: 16 / 8,
-        ),
-      ),
-    );
-  }
-}
-
-class _LivePill extends StatelessWidget {
-  const _LivePill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 7.109.s, vertical: 1.777.s),
-      decoration: BoxDecoration(
-        color: AppColors.livePillFill,
-        borderRadius: BorderRadius.circular(10.663.s),
-        border: Border.all(color: AppColors.red500, width: 1.185.s),
-      ),
-      child: Text(
-        AppStrings.liveBadge,
-        style: AppStyles.label(
-          5.924,
-          weight: AppStyles.bold,
-          lineHeight: 9.478 / 5.924,
         ),
       ),
     );

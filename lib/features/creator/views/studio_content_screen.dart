@@ -203,14 +203,11 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
   ///
   /// The row draws a pencil for a draft and a share icon for anything
   /// else, so only the pencil may open the editor — wiring the share icon
-  /// to it would do something other than what it shows. A video or
-  /// livestream draft has no update route either way, and still only says
-  /// what the control would do.
+  /// to it would do something other than what it shows. Which kinds have
+  /// an editor at all is [StudioContentItem.isEditableHere]; a livestream
+  /// draft has none, and still only says what the control would do.
   Future<void> _rowAction(StudioContentItem item) async {
-    final editable =
-        item.isDraft &&
-        (item.kind == StudioContentKind.post ||
-            item.kind == StudioContentKind.event);
+    final editable = item.isDraft && item.isEditableHere;
     if (editable) {
       final saved = await openContentEditor(context, item);
       if (saved && mounted) await _load();
