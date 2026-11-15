@@ -20,10 +20,7 @@ abstract final class ApiEndpoints {
 
   static String creatorById(String id) => '$_creator/$id';
 
-  /// `kind` is `avatar` or `banner`. The onboarding-scoped twin
-  /// (`/v1/creator/onboard/{kind}/upload-url`) mints a file owned by the
-  /// *user*, which `PATCH /v1/creator/{id}` then refuses — so once the
-  /// channel exists, this is the one to use.
+  /// `kind` is `avatar` or `banner`.
   static String creatorAssetUploadUrl(String creatorId, String kind) =>
       '$_creator/$creatorId/$kind/upload-url';
 
@@ -49,12 +46,7 @@ abstract final class ApiEndpoints {
   /// Uploading a video or a piece of audio, draft-first — the order the
   /// media guide documents and Creator Studio uses: the row, then a ticket
   /// **bound to that row**, then the bytes straight to Mux as a **PUT**,
-  /// then the details. A livestream uses none of these — see the live
-  /// provision routes.
-  ///
-  /// `POST /v1/media` (create from a loose `sourceUploadId`) is the older
-  /// way and the guide now marks its contract unconfirmed, with no shipped
-  /// client. It is not used here.
+  /// then the details.
   static const mediaDrafts = '$_media/drafts';
   static const mediaRequestUpload = '$_media/request-upload';
   static const mediaThumbnailUploadUrl = '$_media/thumbnail/upload-url';
@@ -129,18 +121,15 @@ abstract final class ApiEndpoints {
   static const shareLinks = '/v1/engagement/share-links';
 
   /// Eight target types: `media`, `post`, `devotional`, `devotional_entry`,
-  /// `event`, `testimony`, `verse_of_day`, `comment` — plus `user_playlist`,
-  /// which is a **report** target only and not an engagement target.
-  /// A session is required; a signed-out reader must sign in first.
+  /// `event`, `testimony`, `verse_of_day`, `comment` — plus
+  /// `user_playlist`, which is a **report** target only and not an
+  /// engagement target.
   static const engagementReports = '/v1/engagement/reports';
 
   static const userCategories = '/v1/user/categories';
   static const userProfile = '/v1/user/profile';
 
-  /// The account's own record. Probed on 2026-10-07: it takes `firstName`,
-  /// `lastName`, `phone`, `gender` and `countryCode`, and **refuses**
-  /// `email`, `password`, `language` and `avatarFileId` — a photo goes
-  /// through the two avatar routes instead.
+  /// The account's own record.
   static String user(String id) => '/v1/user/$id';
 
   // ---- Notifications ----------------------------------------------------
@@ -212,10 +201,6 @@ abstract final class ApiEndpoints {
 
   /// The creator's Impact inbox — prayers, testimonies and the comment
   /// moderation queue.
-  ///
-  /// The reads hang off the creator; **the writes do not.** A `PATCH` takes
-  /// the row's own id and carries no creator segment, which is why these are
-  /// two families rather than one builder.
   static String creatorPrayers(String creatorId) =>
       '/v1/creator/$creatorId/engagement/prayers';
   static String creatorPrayerSummary(String creatorId) =>
@@ -292,12 +277,6 @@ abstract final class ApiEndpoints {
       '$_media/live/streams/$mediaId/cancel';
 
   /// The prayer **bodies** for a broadcast, not a count.
-  ///
-  /// On the live namespace rather than a `streamId` filter on the creator
-  /// inbox: the inbox is authorised for `owner | admin | editor`, but the
-  /// studio is also held by a `streamer` — filtering it would have shipped a
-  /// list the person actually broadcasting cannot open. Do **not** fall back
-  /// to the inbox on a refusal; it will refuse too, for another reason.
   static String livePrayers(String mediaId) =>
       '$_media/live/streams/$mediaId/prayers';
 
@@ -331,34 +310,22 @@ abstract final class ApiEndpoints {
   static const beacons = '/v1/analytics/beacons';
   static const beaconsAuth = '/v1/analytics/beacons/auth';
 
-  /// Global discovery across every indexed entity. This is **OpenSearch**,
-  /// a different mechanism from the Prisma-backed `SEARCH_*` routes used for
-  /// creator-scoped catalogue reads — do not use it to list one creator's
-  /// library.
+  /// Global discovery across every indexed entity.
   static const publicSearch = '/v1/search/public/query';
 
-  /// Type-ahead over the same index. **Undocumented** — the integration
-  /// guide lists it as not yet client-integrated, so the contract below was
-  /// probed against staging on 2026-10-05: `?q=&size=1..20&entityTypes=`,
-  /// answering `{hits: [{entityType, entityId, title, subtitle}]}`.
+  /// Type-ahead over the same index.
   static const publicSearchAutocomplete = '/v1/search/public/autocomplete';
 
   static const continueWatching = '/v1/analytics/viewer/continue-watching';
 
   /// The viewer's own library.
-  ///
-  /// The two history deletes are **hide-through-an-instant** operations, not
-  /// row deletions: each answers with the timestamp history is suppressed up
-  /// to, and watching the same thing again brings it back.
   static const viewerHistory = '/v1/discovery/viewer/history';
   static String viewerHistoryItem(String targetType, String targetId) =>
       '/v1/discovery/viewer/history/$targetType/$targetId';
   static const myLiked = '/v1/engagement/interactions/me/liked';
 
   /// Playlists hold **media only**; posts, events and devotionals use the
-  /// `favorite` interaction instead. The list is a Prisma advanced search, so
-  /// it pages by number rather than by cursor.
-  /// The reader's own records, across every ministry they have dealt with.
+  /// `favorite` interaction instead.
   static const myEvents = '/v1/content/calendar/events/mine';
   static String eventRsvp(String id) => '/v1/content/calendar/events/$id/rsvp';
   static String eventRsvpReminder(String id) =>
@@ -392,15 +359,7 @@ abstract final class ApiEndpoints {
       '/v1/public/media/$id/playback-info';
 
   // ---- Creator Giving ---------------------------------------------------
-  //
-  // Two families under one feature. `/payment/earnings/*` is the creator's
-  // side — the recipient application, its rails, and what they have earned.
-  // `/payment/giving/funds*` is the purposes givers choose between. The
-  // donor's own routes (`checkout`, `quote`, `me/gifts`) are elsewhere in
-  // this file and are a different reader entirely.
-  //
-  // Rail enrolment and every configuration change are step-up gated: a code
-  // is emailed, and the grant it mints is spent on the very next call.
+  // Two families under one feature.
 
   static const _earnings = '/v1/payment/earnings';
 
@@ -464,20 +423,12 @@ abstract final class ApiEndpoints {
   static const givingFunds = '/v1/payment/giving/funds';
   static String givingFund(String fundId) => '$givingFunds/$fundId';
 
-  // ---- Donor Giving ------------------------------------------------------
-  //
-  // The giving half of the feature: what a *reader* calls to offer a gift.
-  // Flutter's share of the flow is small by contract — capability, funds,
-  // then a browser handoff — because amount, fee breakdown and payment all
-  // live on the first-party web surface. See
-  // `creator-giving-and-recipient-integration-guide.md` section 9.
+  // ---- Donor Giving
+  // ------------------------------------------------------ The giving half
+  // of the feature: what a *reader* calls to offer a gift.
 
   /// Whether this ministry can accept gifts at all. Public on purpose: the
   /// Give action has to be drawn or withheld before anyone signs in.
-  ///
-  /// Answers `200 {available: false}` rather than an error for an ineligible
-  /// creator, and deliberately says nothing about *why* — the guide forbids
-  /// inferring or showing a reason.
   static String givingCapability(String creatorId) =>
       '/v1/public/payment/giving/creators/$creatorId/capability';
 
@@ -486,14 +437,6 @@ abstract final class ApiEndpoints {
       '/v1/public/payment/giving/creators/capabilities';
 
   /// The purposes a giver may choose between, as a *giver* sees them.
-  ///
-  /// Not in the integration guide — found by probing on 2026-10-29. The
-  /// documented `/v1/payment/giving/funds?creatorId=` is the creator's own
-  /// management list and answers **403 "Not allowed to manage this
-  /// creator's giving funds"** to anyone else. This route is the donor-side
-  /// projection: active funds only, no counts, no plan limits. It needs a
-  /// session (401 without one) and, like the management list, creates the
-  /// reserved `general` fund as a side effect, so it is never empty.
   static String givingCreatorFunds(String creatorId) =>
       '/v1/payment/giving/creators/$creatorId/funds';
 

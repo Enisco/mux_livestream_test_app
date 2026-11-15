@@ -14,25 +14,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Paystack's settlement account, collected here rather than at Paystack.
-///
-/// Unlike Stripe, Paystack has **no hosted onboarding page** — section 8 of
-/// the integration guide gives three ordinary routes (banks, resolve,
-/// subaccount), so "Continue setup" has nowhere to send anyone. It used to
-/// answer with a snackbar saying to finish on the provider, which was a
-/// dead end and, for this provider, untrue.
-///
-/// Three rules from that section shape the screen:
-///
-/// - **The resolved name is shown for explicit confirmation.** The number
-///   is resolved against the bank first and the account name that comes
-///   back is put in front of the creator before anything is created.
-/// - **No bypass.** A name that does not match the legal recipient is a
-///   review blocker the server raises as `bank_account_name_review`; the
-///   client neither edits the resolved name nor offers a way past it.
-/// - **This is not identity verification.** An active subaccount completes
-///   the technical provider step only — GospelTube's review still follows,
-///   which the screen says rather than leaving the creator to assume they
-///   are finished.
 class GivingPaystackScreen extends StatefulWidget {
   const GivingPaystackScreen({
     super.key,
@@ -86,9 +67,7 @@ class _GivingPaystackScreenState extends State<GivingPaystackScreen> {
   void initState() {
     super.initState();
     unawaited(_loadBanks());
-    // A resolved name belongs to the number it was resolved for. Editing
-    // the number afterwards would otherwise leave the old name on screen
-    // and let it be connected.
+    // A resolved name belongs to the number it was resolved for.
     _accountNumber.addListener(_forgetResolution);
   }
 
@@ -296,9 +275,8 @@ class _GivingPaystackScreenState extends State<GivingPaystackScreen> {
             fieldKey: const ValueKey('paystack-account-number'),
           ),
           // Its own control rather than something the submit does on the
-          // way past, because the guide asks for the name to be confirmed
-          // — which means it has to be on screen before anything is
-          // created.
+          // way past, because the guide asks for the name to be confirmed —
+          // which means it has to be on screen before anything is created.
           GivingOutlineButton(
             key: const ValueKey('paystack-check'),
             label: AppStrings.givingPaystackCheck,

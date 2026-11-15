@@ -12,13 +12,6 @@ import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Which camera a broadcast starts on.
-///
-/// `ApiVideoLiveStreamController`'s own default is `CameraPosition.back`,
-/// so going live pointed the camera away from the creator. The position is
-/// only applied inside `initialize()`, as a `setCameraPosition` over the
-/// plugin channel — so this builds the screen's *real* controller against
-/// a stubbed channel and reads what it asked for. A test that injected a
-/// fake controller could not see this at all.
 const _controllerChannel = MethodChannel('video.api.livestream/controller');
 const _eventChannel = MethodChannel('video.api.livestream/events');
 

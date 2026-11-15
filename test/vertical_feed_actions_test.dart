@@ -5,13 +5,6 @@ import 'package:test_app/features/engagement/data/vertical_feed_actions.dart';
 import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 
 /// The feed's right-hand rail, which shipped inert.
-///
-/// Every button there called an auth guard that returned true for a
-/// signed-in reader and then did nothing — so for everyone with an account,
-/// liking, following and commenting on a video in the feed were no-ops. What
-/// these pin down is that each one now reaches the shared store, that the
-/// counts come from it rather than from the row, and that the guard still
-/// stops a signed-out reader before anything is posted.
 class _Recorder {
   final List<(String, String, String)> interactions = [];
   final List<(String, bool)> follows = [];

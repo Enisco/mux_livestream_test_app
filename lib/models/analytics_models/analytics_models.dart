@@ -38,11 +38,6 @@ abstract final class AnalyticsSource {
   static const following = 'following';
 
   /// The viewer's own library — History, Liked, Saved and playlists.
-  ///
-  /// Deliberately **one** value rather than four: the distinction that
-  /// matters to a creator is *the viewer went looking for this* versus *a
-  /// rail put it in front of them*. Shipped 2026-10-26; these opens used to
-  /// report `unknown`, which hid them among clicks with no known surface.
   static const library = 'library';
   static const suggestedContent = 'suggested_content';
   static const search = 'search';
@@ -84,10 +79,6 @@ abstract final class MediaTypes {
 }
 
 /// What a beacon points at.
-///
-/// The contract allows exactly one target: media beacons carry `mediaId`, and
-/// everything else carries `contentType` + `contentId`. Sending both, or the
-/// wrong one, is rejected at ingest.
 abstract final class ContentTypes {
   static const creator = 'creator';
   static const mediaSeries = 'media_series';
@@ -108,9 +99,6 @@ abstract final class ContentTypes {
   };
 
   /// Maps a discovery feed `entityType` onto a beacon content type.
-  ///
-  /// Returns null for `media`, which is targeted by `mediaId` instead, and for
-  /// anything unrecognised.
   static String? fromEntityType(String? entityType) => switch (entityType) {
     'creator' || 'user' => creator,
     'media_series' => mediaSeries,

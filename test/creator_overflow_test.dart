@@ -26,14 +26,6 @@ import 'helpers/load_app_fonts.dart';
 
 /// Every screen the creator studio gained, drawn at the sizes real phones
 /// come in and at the text size readers actually set.
-///
-/// A `RenderFlex overflowed` is reported as a caught exception rather than a
-/// failure, so a screen can look fine in one viewport and be broken in
-/// another without anything noticing. These pump each one and insist there
-/// was no exception at all.
-///
-/// The sizes are real: a small Android phone, an iPhone 14/15, and a large
-/// phone. 1.3 is roughly iOS "Large"; Android goes further still.
 const _sizes = <(String, Size)>[
   ('small phone', Size(320, 568)),
   ('iPhone 14', Size(390, 844)),
@@ -144,10 +136,6 @@ LivestreamStudio _studio({String currency = 'NGN', int gross = 1800000}) =>
     });
 
 /// Drags the form until [target] has been built, or gives up.
-///
-/// `scrollUntilVisible` needs a single Scrollable, and these forms have one
-/// per text field as well as the list itself, so this walks the list by
-/// hand.
 Future<bool> _bringIntoView(WidgetTester tester, Finder target) async {
   for (var i = 0; i < 12; i++) {
     if (target.evaluate().isNotEmpty) return true;

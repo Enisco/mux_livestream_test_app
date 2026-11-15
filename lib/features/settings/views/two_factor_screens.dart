@@ -16,24 +16,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Two-factor authentication: one switch, and a code we email.
-///
-/// **This replaced four screens** (`11599-107177`, `-107746`, `-107859`,
-/// `-108005`) that described TOTP — a QR code, a secret to type into an
-/// authenticator app, recovery codes. None of that exists. The backend ruled
-/// on 2026-10-19 that the second factor is an emailed code, per account, and
-/// asked for the screens to be redrawn before anything was built against it
-/// (`docs/mobile-api-gap-responses.md` §3.5). The QR tile, the secret chip and
-/// the `qr_flutter` dependency went with them.
-///
-/// The asymmetry is deliberate and worth preserving if this is ever redrawn
-/// again:
-///
-/// - **Turning it on takes no password.** The emailed code is the proof, and
-///   it doubles as a check that codes actually arrive — so nobody can switch
-///   2FA on against a mailbox they cannot read and strand themselves.
-/// - **Turning it off takes the current password.** It is the one direction an
-///   attacker on a stolen session wants, and an emailed code would be the same
-///   factor being removed.
 class TwoFactorScreen extends StatefulWidget {
   const TwoFactorScreen({super.key, this.repo});
 
@@ -48,10 +30,6 @@ class _TwoFactorScreenState extends State<TwoFactorScreen> {
   late final _repo = widget.repo ?? AccountRepo();
 
   /// The account's own setting, straight off the cached `User`.
-  ///
-  /// An account that has never touched the switch still reports `true`: the
-  /// second factor used to be platform-wide, so existing accounts default to
-  /// on rather than silently getting weaker on deploy.
   late bool _on = LocalStorage.cachedTwoFactorEnabled;
   bool _busy = false;
 

@@ -6,14 +6,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// What the channel mostly puts out.
-///
-/// This is the creator's answer, not the viewer's: Settings has a topics sheet
-/// too, but that one shapes a feed, while this one labels a channel. They are
-/// kept apart so the two lists can diverge, which they already do.
-///
-/// The rows are the real categories from `GET /v1/creator/categories`; the
-/// design's own list stands in only when that call returned nothing, so the
-/// sheet is never empty.
 class CreatorTopicsSheet extends StatefulWidget {
   const CreatorTopicsSheet({
     super.key,
@@ -28,12 +20,6 @@ class CreatorTopicsSheet extends StatefulWidget {
   final Set<String> selected;
 
   /// What the chosen categories are about to be filed against.
-  ///
-  /// Given one, the sheet offers only the categories that take it. The
-  /// repo filters too, but this one is what catches a [fallback] that was
-  /// never filtered at all — which is how `devotionals` reached the Go
-  /// Live form and earned *"Categories not supported for media:
-  /// devotionals"* from the session route.
   final CategoryScope? scope;
 
   /// Returns the chosen slugs, or null if the sheet was dismissed.
@@ -55,11 +41,6 @@ class CreatorTopicsSheet extends StatefulWidget {
 
   /// What `GET /v1/user/categories` actually returns, verbatim, for when
   /// that call fails.
-  ///
-  /// These are not the design's nine labels. Slugging those the obvious way
-  /// produced `preaching`, `marriage-family` and the rest, every one of
-  /// which the API refuses — *"Unsupported categories: preaching"* — so an
-  /// onboarding that fell back would have been rejected on save.
   static const fallback = <(String, String)>[
     ('worship', 'Worship'),
     ('sermons', 'Sermons'),

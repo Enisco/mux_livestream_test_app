@@ -13,15 +13,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Muted and blocked, and the only way back from either.
-///
-/// **The blocked list is not optional.** A blocked creator is hidden from
-/// every surface a viewer could rediscover them on — feeds, Explore, search,
-/// even their own channel page — so without this screen the `DELETE` is
-/// unreachable and a block can never be lifted.
-///
-/// The asymmetry between the two halves is what these pin: mute keeps the
-/// follow and leaves the channel reachable, block drops the follow and takes
-/// the channel away, and **unblocking does not re-follow**.
 class _FakeApi implements ApiService {
   _FakeApi({this.listFails = false, this.deleteFails = false});
 

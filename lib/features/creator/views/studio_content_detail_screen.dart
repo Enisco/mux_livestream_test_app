@@ -19,26 +19,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Opens the editor for [item], if this kind can be edited from a phone.
-///
-/// Four of the five kinds can, each through its own service's update route:
-///
-///  * a post — `PATCH /v1/content/posts/{id}`
-///  * an event — `PATCH /v1/content/calendar/events/{id}`
-///  * a video or a piece of audio — `PATCH /v1/media/{id}`
-///
-/// Each opens the same form that *writes* that kind, over what is filed.
-///
-/// **A livestream cannot.** A broadcast is not an upload: it is
-/// provisioned and configured through `PATCH /v1/media/live/streams/{id}`,
-/// a different route with a different shape, and no screen here writes it.
-/// It keeps the web studio.
-///
-/// A row that is archived, blocked or under review is nobody's to edit
-/// from here — `isEditable` on the media row says the same, and the
-/// editor checks again on open, because a row can be archived between a
-/// list loading and this being tapped.
-///
-/// Answers true when something was saved, so a list can reload.
 Future<bool> openContentEditor(
   BuildContext context,
   StudioContentItem item,
@@ -68,21 +48,6 @@ Future<bool> openContentEditor(
 
 /// One piece of content: how it is doing, and the three things a creator can
 /// do with it from a phone.
-///
-/// Four kinds share this screen because they differ only in wording — views
-/// or plays or reads, a runtime or a read time — and in the Going card an
-/// event adds.
-///
-/// **Everything but a livestream can be edited here**: see
-/// [openContentEditor]. A broadcast is configured through its own live
-/// route and keeps the web studio, and the footer says which is which
-/// rather than telling every creator to go to a desktop.
-///
-/// **No deltas.** The design shows "+18%" beside each figure. Those come from
-/// `POST /v1/analytics/media/breakdown`, which answers
-/// `403 Advanced analytics requires the Pro plan or higher` — so a Free
-/// creator has none, and the response shape could not be read to build for
-/// the Pro case. The lifetime totals on the row are shown instead.
 class StudioContentDetailScreen extends StatelessWidget {
   const StudioContentDetailScreen({super.key, required this.item});
 
@@ -95,14 +60,6 @@ class StudioContentDetailScreen extends StatelessWidget {
   bool get _isEditable => item.isEditableHere;
 
   /// What the footer has to say, or nothing.
-  ///
-  /// It used to say "title, description, visibility and series are edited
-  /// on the web studio" under every kind. That is now true of none of them
-  /// but a livestream — saying it on a screen that does the editing would
-  /// send a creator to a desktop for work they can do here. An event's
-  /// form covers everything its API takes, so it needs no note at all.
-  ///
-  /// A row nobody may edit says why instead of what is editable.
   String? get _footnote {
     if (!item.isEditableHere && item.kind != StudioContentKind.livestream) {
       return AppStrings.editMediaNotEditable;
@@ -371,11 +328,6 @@ class StudioContentDetailScreen extends StatelessWidget {
 }
 
 /// The still, with what kind it is and how long it runs.
-///
-/// This was a grey box reading "View content" — the row already carried a
-/// `thumbnailKey`, and a video left to Mux has a generated first frame behind
-/// the public asset route, so there was a picture to show all along. Tapping
-/// it opens the same player a viewer gets, rather than describing one.
 class _Hero extends StatelessWidget {
   const _Hero({required this.item});
 

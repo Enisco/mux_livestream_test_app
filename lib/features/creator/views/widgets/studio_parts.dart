@@ -63,12 +63,6 @@ class StudioPill extends StatelessWidget {
 }
 
 /// The studio's logo in a ring, the way the rest of the app draws a creator.
-///
-/// `avatarKey` is a storage key on the public CDN rather than a URL — the
-/// same shape the discovery feed sends — so it goes through
-/// [AssetUrlResolver.resolve]. A build with no `CDN_BASE_URL`, a studio with
-/// no logo, and a key that fails to load all land on the same placeholder
-/// ring, because artwork is never worth a broken-image box for.
 class StudioAvatar extends StatelessWidget {
   const StudioAvatar({super.key, required this.size, this.avatarKey});
 

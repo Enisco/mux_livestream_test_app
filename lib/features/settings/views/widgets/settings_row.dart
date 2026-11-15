@@ -39,9 +39,6 @@ class SettingsSection extends StatelessWidget {
 }
 
 /// One setting: what it is, what it is currently, and the way to change it.
-///
-/// The trailing control says how the row behaves — amber words for something
-/// edited in place, a chevron for somewhere else to go.
 class SettingsRow extends StatelessWidget {
   const SettingsRow({
     super.key,

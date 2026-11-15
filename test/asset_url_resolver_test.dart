@@ -6,11 +6,7 @@ import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 
-/// Only media rows arrive with a resolved `thumbnailUrl`. Posts, events,
-/// devotional series, media series and creator avatars carry a bare storage
-/// key — `public/thumbnail/{creatorId}/{uuid}.jpg` — which is the path of a
-/// public object on the CDN. Those cards used to render with no artwork at
-/// all because nothing put the host in front of the key.
+/// Only media rows arrive with a resolved `thumbnailUrl`.
 const _cdn = 'https://cdn.example.test';
 
 WebFeedItem _item(String entityType, Map<String, dynamic> meta) =>
@@ -100,10 +96,7 @@ void main() {
     });
 
     test('a video published without a cover still gets a still', () {
-      // The rung that was missing everywhere on the viewer side. A
-      // `mux_auto` row carries neither a URL nor a key — only the public
-      // asset proxy can answer for it, and a surface that stops at
-      // `imageFor` draws an empty box for good.
+      // The rung that was missing everywhere on the viewer side.
       expect(
         AssetUrlResolver.mediaImage(
           mediaId: 'm1',
@@ -115,8 +108,7 @@ void main() {
 
     test('a row that says its thumbnail is manual is not asked twice', () {
       // The proxy is minted only for a public, published, Mux-generated
-      // still. A manual row either has its key or has nothing, so asking
-      // would be one 404 per row.
+      // still.
       expect(
         AssetUrlResolver.mediaImage(mediaId: 'm1', source: 'manual'),
         isNull,
@@ -158,8 +150,8 @@ void main() {
 
     test('a media row climbs to the proxy; everything else stops short', () {
       // One getter so every surface reads the same ladder: the detail
-      // hero's poster, the search row, the feed card, the discover grid,
-      // a creator's profile grid and the playlist screens all took
+      // hero's poster, the search row, the feed card, the discover grid, a
+      // creator's profile grid and the playlist screens all took
       // `meta.thumbnailUrl` raw at some point, and each one drew an empty
       // box for a video published without a cover.
       final video = _item('media', {

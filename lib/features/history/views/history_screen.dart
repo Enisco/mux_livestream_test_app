@@ -21,17 +21,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// What the reader has watched and read, newest first.
-///
-/// A rail of part-watched things across the top, then everything else grouped
-/// by the day it happened. Typing narrows the list without leaving the screen.
-///
-/// **Clearing hides; it does not delete.** Both delete routes answer with the
-/// instant history is suppressed up to, and watching the same thing again
-/// brings it back — so the confirmation says "hide", not "delete for ever".
-///
-/// Searching narrows what has been loaded, not what the route returns: there
-/// is no `q` on the history route, and the design's field sits over the list
-/// rather than above a server search.
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, this.repo});
 
@@ -151,9 +140,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// The rail across the top: what was started and not finished.
-  ///
-  /// Taken from the same rows rather than a second read — a history entry
-  /// already carries how far in the viewer got.
   List<HistoryResumeItem> get _resume {
     if (_query.isNotEmpty) return const [];
     return [
@@ -214,10 +200,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// The per-row overflow: one action, because the route offers one.
-  ///
-  /// This used to answer "History actions is not built yet" while
-  /// `ViewerLibraryRepo.hideFromHistory` sat unused — the DELETE has been
-  /// there since the library work.
   Future<void> _rowMenu(HistoryEntry entry) async {
     if (entry.targetType.isEmpty || entry.id.isEmpty) return;
     final remove = await showModalBottomSheet<bool>(
@@ -281,10 +263,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// Take one row out, optimistically.
-  ///
-  /// The row goes immediately because the list is the only feedback a reader
-  /// gets, and comes back if the write refuses — leaving it gone while the
-  /// server still holds it would make the next refresh look like a bug.
   Future<void> _remove(HistoryEntry entry) async {
     final before = _loaded;
     setState(() => _loaded = _without(_loaded, entry.id));
@@ -300,9 +278,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// The days again without one row, dropping any day left empty.
-  ///
-  /// A heading with nothing under it reads as a rendering fault, which is
-  /// what taking the last row of a day out would otherwise leave behind.
   static List<HistoryDay> _without(List<HistoryDay> days, String id) => [
     for (final day in days)
       if ([
@@ -391,10 +366,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   /// Hide everything watched up to now.
-  ///
-  /// The route suppresses history through an instant rather than deleting
-  /// rows, so the list empties but anything watched again comes back. The
-  /// confirmation copy says so.
   Future<void> _clear() async {
     try {
       await _repo.clearHistory();

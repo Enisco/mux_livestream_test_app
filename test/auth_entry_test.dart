@@ -16,15 +16,6 @@ import 'package:test_app/utils/app_constants/app_theme.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Getting between the three auth screens.
-///
-/// Reported from the app: sign-in had no way to create an account beyond a
-/// 16pt link tucked under the title, and the sign-up screen's back button
-/// did nothing — `context.pop()` against a screen that was navigated to
-/// rather than pushed is a no-op, the same fault the creator polish chain
-/// had.
-///
-/// Nothing here calls the gateway; the fake exists only because `AuthRepo`
-/// resolves its dependencies in its field initialisers.
 class _FakeApi implements ApiService {
   @override
   dynamic noSuchMethod(Invocation invocation) =>

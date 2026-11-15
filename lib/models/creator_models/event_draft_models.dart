@@ -1,17 +1,7 @@
 /// Putting a calendar event on a creator's channel.
-///
-/// Events are not media: no file is uploaded, nothing is transcoded, and
-/// they live in the content service rather than the media one. What they
-/// share with an upload is the cover image — the same S3 presigned POST.
-///
-/// Everything here was read off staging; the route's own refusals are
-/// quoted where they settled a question.
 library;
 
 /// `venueType`, which the API restricts to exactly these three.
-///
-/// The design calls the first one "In Person"; the API calls it
-/// **`physical`**, and refuses `in_person` outright.
 enum EventVenueType {
   physical,
   virtual,
@@ -71,15 +61,6 @@ class EventLocation {
   };
 
   /// What a PATCH takes: empty strings kept, so a cleared field clears.
-  ///
-  /// **Except `meetingUrl`**, which is left out when empty. It is the one
-  /// field here likely to be format-validated, and a `@IsOptional()` guard
-  /// skips null but not `''` — so an empty string risks "meetingUrl must
-  /// be a URL" on every physical event's edit. That is a far worse failure
-  /// than the limitation it buys: a meeting link can be replaced but not
-  /// emptied from the phone. Unverified either way — the staging gateway
-  /// answers 403 to every unauthenticated path, so this could not be
-  /// probed.
   Map<String, dynamic> toPatchJson() => {
     'label': label,
     'addressLine': addressLine,
@@ -154,15 +135,6 @@ class EventDraft {
   final String? coverImageFileId;
 
   /// An event as `GET /v1/content/calendar/events/{id}` returns it.
-  ///
-  /// The row carries the schedule twice — `startAt`/`endAt` at the top
-  /// level *and* inside `schedule` — exactly as the studio list row does.
-  /// The nested pair is read first because it is the one that carries the
-  /// timezone with it, with the flat pair as the fallback.
-  ///
-  /// An unknown `venueType` falls back to `physical` rather than throwing:
-  /// a value this client has not heard of must not cost the creator their
-  /// edit.
   factory EventDraft.fromJson(Map<String, dynamic> json) {
     final schedule = json['schedule'] as Map<String, dynamic>?;
     final registration = json['registration'] as Map<String, dynamic>?;
@@ -194,12 +166,6 @@ class EventDraft {
   }
 
   /// What `PATCH /v1/content/calendar/events/{id}` takes.
-  ///
-  /// Empty strings are sent rather than left out, because on an edit an
-  /// empty field is the creator clearing it and an absent key would keep
-  /// the old value. `creatorId` is not sent: ownership comes from the
-  /// path. `registration` is always sent so that turning RSVP **off** is
-  /// a change the API sees rather than one it cannot tell from silence.
   Map<String, dynamic> toPatchJson() => {
     'title': title,
     'description': description,
@@ -220,12 +186,6 @@ class EventDraft {
   };
 
   /// What `POST /v1/content/calendar/events` takes.
-  ///
-  /// `recurrence` is left alone: `mode` currently accepts only `none`, so
-  /// there is nothing to choose. `seriesId` is not sent because **events
-  /// have no series** — the API refuses the property under every name
-  /// tried, and the event it returns carries no such field
-  /// (OPEN_ISSUES 20).
   Map<String, dynamic> toJson(String creatorId) => {
     'creatorId': creatorId,
     'title': title,

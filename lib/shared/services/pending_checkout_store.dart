@@ -4,10 +4,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// The in-flight checkout attempt. It outlives the process because the creator
 /// leaves the app to pay, and the attempt has to be recognisable when they come
 /// back — or on the next cold start if they never do.
-///
-/// The idempotency key is stored beside the session id because the API demands
-/// a *stable* key per attempt: replaying it returns the same session with a
-/// fresh launch ticket, while a new key while one is live is rejected with 409.
 abstract class PendingCheckoutStore {
   Future<String?> get sessionId;
   Future<String?> get attemptKey;

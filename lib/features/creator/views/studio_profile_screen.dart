@@ -21,26 +21,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The studio's own settings: logo, cover and about, on one screen.
-///
-/// This exists because the switcher used to open the **onboarding** chain —
-/// four screens in sequence, every field starting empty — at a creator who
-/// had already filled all three. Setting something up and changing
-/// something that exists are different jobs: the first wants one decision
-/// at a time and a way to skip, and the second wants to see what is there
-/// and touch only the one thing that is wrong.
-///
-/// So this screen reads the channel first and shows it. Each image is its
-/// own control, the about text comes back in the field, and **nothing is
-/// written until Save**: a reader who picks a photo, thinks better of it
-/// and backs out has changed nothing. That is what makes the uploads safe
-/// to do eagerly — an object stays in `quarantine/` until a save references
-/// its id, which is exactly what quarantine is for.
-///
-/// What it deliberately does not carry: channel name, page address and
-/// categories, which the integration guide puts on the web studio's
-/// settings form along with a warning that changing a handle breaks links
-/// a community already shares. And no social links — *"There is no
-/// social-links field, deliberately."*
 class StudioProfileScreen extends StatefulWidget {
   const StudioProfileScreen({super.key, this.repo, this.assets, this.picker});
 

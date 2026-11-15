@@ -1,8 +1,4 @@
 /// What the reader has given, and the paperwork that came back.
-///
-/// Every amount is a preformatted string: the currency, its grouping and the
-/// converted figure all come from the ministry's own settings, so the screen
-/// prints what it is handed rather than formatting anything itself.
 library;
 
 import 'package:test_app/utils/app_constants/app_strings.dart';

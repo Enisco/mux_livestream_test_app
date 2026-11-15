@@ -34,25 +34,6 @@ class HandoffResult {
 }
 
 /// Starts the mobile→web handoff, for a subscription or for a gift.
-///
-/// The app's only job is to create the durable session and open the launch URL
-/// in a system browser. Plan, amount, provider and payment all live on the web
-/// surface, and the outcome is read back from the session — never from the
-/// browser.
-///
-/// The two products differ in three ways that matter here, and each is
-/// deliberate rather than incidental:
-///
-/// - **A subscription resumes; a gift does not.** One live subscription
-///   attempt is allowed per creator, so its idempotency key is stored and
-///   replayed to pick the same session back up. Gifts coexist, and a second
-///   gift is a second gift — replaying a key there would quietly reopen the
-///   first one instead of starting a new one.
-/// - **Giving is gated separately.** `giving.available` is its own flag on the
-///   capabilities read and is not implied by `platformSubscription`.
-/// - **A gift may lose its attribution and still be a gift.** Source media is
-///   validated at creation, so a refusal drops the attribution and offers the
-///   gift anyway.
 class CheckoutHandoffService {
   CheckoutHandoffService({
     MobileCheckoutRepo? repo,
@@ -97,9 +78,6 @@ class CheckoutHandoffService {
       'giving:creator:$creatorId:attempt:${_uuid.v4()}';
 
   /// Whether this storefront may sell a subscription at all.
-  ///
-  /// The guide is explicit that the purchase action is *hidden* rather than
-  /// disabled when this is false, so the screen asks before drawing it.
   Future<bool> canPurchaseSubscription() async {
     try {
       final caps = await _repo.fetchCapabilities(
@@ -113,10 +91,6 @@ class CheckoutHandoffService {
   }
 
   /// Whether this storefront may take gifts at all.
-  ///
-  /// Separate from whether a *ministry* can receive one — that is the public
-  /// capability projection, and both have to agree before Give is offered.
-  /// This is the store's rule and applies to every ministry at once.
   Future<bool> canGive() async {
     try {
       final caps = await _repo.fetchCapabilities(
@@ -130,10 +104,6 @@ class CheckoutHandoffService {
   }
 
   /// Creates the durable session and opens it in a system browser.
-  ///
-  /// No plan is named here: the session body carries only purpose, creator,
-  /// platform, storefront and idempotency key. Tier, interval, currency and
-  /// provider are chosen on the web surface.
   Future<HandoffResult> start({
     required String creatorId,
     String? planTier,
@@ -178,16 +148,6 @@ class CheckoutHandoffService {
   }
 
   /// Creates a giving session and opens it in a system browser.
-  ///
-  /// No amount is named here, and none can be: the app does not quote, does
-  /// not see a fee breakdown and never touches card data. What it may carry is
-  /// *context* — which purpose the gift is for, and which piece of content it
-  /// was offered from — so the web surface opens on the right thing.
-  ///
-  /// [sourceMediaId] is attribution, not identity. The server validates it
-  /// when the session is created and refuses more than it accepts, so a
-  /// refusal retries once without it: an unattributed gift is a gift, and a
-  /// giver turned away at the first tap is not.
   Future<HandoffResult> startGiving({
     required String creatorId,
     String? fundSlug,
@@ -260,16 +220,13 @@ class CheckoutHandoffService {
       sourceMediaId: sourceMediaId,
     );
     // Remembered before the browser opens: the return link can arrive while
-    // this app is backgrounded, and an id written afterwards may not be there
-    // in time to recognise it.
+    // this app is backgrounded, and an id written afterwards may not be
+    // there in time to recognise it.
     await _givingStore.remember(handoff.session.id);
     return _launch(handoff.session.id, handoff.launch);
   }
 
   /// Mints a fresh ticket for a gift already under way and reopens it.
-  ///
-  /// Used when the giver comes back having neither paid nor cancelled: the
-  /// session is still good, only the one-minute ticket has gone.
   Future<HandoffResult> resumeGiving(String sessionId) async {
     try {
       return await _launch(sessionId, await _repo.relaunch(sessionId));
@@ -280,10 +237,6 @@ class CheckoutHandoffService {
   }
 
   /// Abandons a gift the giver walked away from.
-  ///
-  /// Never fabricates a failed payment: a session whose PSP checkout already
-  /// started stays `processing` on the server regardless of what is asked
-  /// here, which is why the result is not reported as a cancellation.
   Future<void> cancelGiving(String sessionId) async {
     try {
       await _repo.cancel(sessionId);

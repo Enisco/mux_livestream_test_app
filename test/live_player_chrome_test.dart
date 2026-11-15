@@ -1,10 +1,7 @@
 // What a viewer sees when the video in front of them is going out live
-// right now, rather than sitting finished on a CDN.
-//
-// Three surfaces carry live video and each had to learn the same two
-// things: there is nothing to seek to, and the viewer should be told.
-// The LIVE badge is one widget shared with the home feed's live card, so
-// all four places are the same mark at different sizes.
+// right now, rather than sitting finished on a CDN. Three surfaces carry
+// live video and each had to learn the same two things: there is nothing to
+// seek to, and the viewer should be told.
 
 import 'dart:io';
 
@@ -81,9 +78,7 @@ void main() {
   group('the LIVE badge is one badge', () {
     test('the swipe feed keeps its own, and says why', () {
       // Not an oversight: a translucent outlined pill disappears over a
-      // full-bleed video, so that surface draws a solid badge. What must
-      // not happen is a *third* one appearing by accident, or the word
-      // being hardcoded away from AppStrings.
+      // full-bleed video, so that surface draws a solid badge.
       final feed = File(
         'lib/features/discovery/views/vertical_feed_screen.dart',
       ).readAsStringSync();
@@ -94,9 +89,7 @@ void main() {
     });
 
     test('the feed card draws it rather than its own pill', () {
-      // The card's private pill was deleted in favour of this widget. If
-      // the card grows another one the four marks can drift apart again,
-      // which is the whole reason the badge was extracted.
+      // The card's private pill was deleted in favour of this widget.
       final card = File(
         'lib/features/home/views/widgets/feed_card.dart',
       ).readAsStringSync();
@@ -268,9 +261,7 @@ void main() {
 
   group('seeking a live stream', () {
     // The player screen cannot be mounted here — media_kit needs libmpv —
-    // so the gate is read off the source. It matters because the overlay
-    // is only one of three ways to ask for a seek: a double-tap on either
-    // half of the picture and the arrow keys go to the same two methods.
+    // so the gate is read off the source.
     final player = File(
       'lib/features/player/views/player_screen.dart',
     ).readAsStringSync();
@@ -309,11 +300,10 @@ void main() {
     });
 
     test('the poster the hero is given is the whole ladder', () {
-      // media_kit keeps this screen off the harness, and the bug it had
-      // was in what it *passed*: the hero was handed
-      // `playback.thumbnailUrl ?? meta.thumbnailUrl`, neither of which a
-      // video published without a cover has, so the frame sat black until
-      // the first one decoded.
+      // media_kit keeps this screen off the harness, and the bug it had was
+      // in what it *passed*: the hero was handed `playback.thumbnailUrl ??
+      // meta.thumbnailUrl`, neither of which a video published without a
+      // cover has, so the frame sat black until the first one decoded.
       final detail = File(
         'lib/features/discovery/views/media_detail_screen.dart',
       ).readAsStringSync();

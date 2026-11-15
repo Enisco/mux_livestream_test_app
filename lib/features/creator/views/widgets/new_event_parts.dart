@@ -10,9 +10,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 /// The pieces the New event screen is made of.
 
 /// In Person, Virtual or Hybrid — three cards, one chosen.
-///
-/// The API calls the first one `physical`; the design calls it "In Person".
-/// The two are not interchangeable: `in_person` is refused outright.
 class EventTypeCards extends StatelessWidget {
   const EventTypeCards({
     super.key,

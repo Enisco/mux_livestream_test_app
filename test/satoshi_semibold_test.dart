@@ -5,10 +5,7 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// SemiBold had no static cut, so `AppStyles.semiBold` fell back to the
-/// nearest weight. The variable face covers it now — but only because every
-/// style carries the exact weight as a `FontVariation`, which is what
-/// actually instances a variable font. Registering the file alone would
-/// render it at the face's default (900).
+/// nearest weight.
 void main() {
   setUpAll(loadAppFonts);
 

@@ -10,10 +10,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 
 /// A feed card's video area: thumbnail until the card earns playback, then the
 /// shared player in the same frame.
-///
-/// The mute button is deliberately the only thing here that reacts to a touch.
-/// Everything else falls through to the card, so a tap opens the detail and the
-/// video carries on from where it had reached.
 class FeedVideoSurface extends StatefulWidget {
   const FeedVideoSurface({
     super.key,
@@ -55,9 +51,9 @@ class _FeedVideoSurfaceState extends State<FeedVideoSurface> {
     final playback = widget.playback;
     final coordinator = widget.coordinator;
 
-    // Without a coordinator this surface never autoplays, so it must not show
-    // a live frame or a mute toggle it cannot act on — search results and
-    // "Up next" rows are stills that open on tap.
+    // Without a coordinator this surface never autoplays, so it must not
+    // show a live frame or a mute toggle it cannot act on — search results
+    // and "Up next" rows are stills that open on tap.
     if (playback == null || coordinator == null) return widget.child;
 
     return VisibilityDetector(

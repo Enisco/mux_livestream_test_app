@@ -19,22 +19,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// What has arrived, what is still held, and the only place a withdrawal
 /// can be asked for.
-///
-/// The card at the top is the part that has to be read carefully, because
-/// the two kinds of rail behave differently and the difference is real
-/// money:
-///
-/// - A **direct** rail (Stripe, Paystack) is settled by its PSP on the PSP's
-///   own schedule. There is nothing to withdraw, and the screen says so
-///   rather than showing a disabled button that looks like a bug.
-/// - A **provider-held** rail (Khaime) accumulates a balance that is paid
-///   out only when the creator asks. Withdraw is offered only while
-///   `availability` is `withdrawable`, and is disabled outright while a
-///   request is already in flight — the server refuses a second one, so the
-///   in-flight amount is shown instead of letting a creator submit and fail.
-///
-/// A balance the provider could not report is said out loud. It is never
-/// rendered as a zero, which would read as "your money is gone".
 class GivingEarningsScreen extends StatefulWidget {
   const GivingEarningsScreen({super.key, required this.creatorId, this.repo});
 
@@ -115,12 +99,6 @@ class _GivingEarningsScreenState extends State<GivingEarningsScreen> {
 
   /// How many further pages the refunds tab will pull through before it
   /// gives up and says there is nothing.
-  ///
-  /// Refunds have no route of their own: they are transactions whose refund
-  /// state has moved, filtered here. So a full page can contain none while
-  /// plenty exist further back, and stopping at the first page would tell a
-  /// creator they have had no refunds when they have. Bounded, because the
-  /// alternative is walking a year of gifts on one tap.
   static const _refundLookahead = 4;
 
   /// The list under the overview, which changes with the tab as well as the
@@ -360,7 +338,6 @@ class _GivingEarningsScreenState extends State<GivingEarningsScreen> {
     // "All funds" is a real choice, so it cannot be modelled as a null
     // result: the picker returns null when it is dismissed too, and reading
     // that as "all funds" silently threw away the filter a creator had set.
-    // Each row is wrapped, and only an unwrapped null means "cancelled".
     final options = <_FundChoice>[
       const _FundChoice(null),
       for (final fund in _funds.funds) _FundChoice(fund),
@@ -548,9 +525,9 @@ class _RailBalanceCard extends StatelessWidget {
           ],
           SizedBox(height: 14.s),
           if (!rail.custodyMode.isProviderHeld)
-            // A direct rail has no withdrawal at all, which is a property of
-            // the rail rather than a temporary state — so it is explained,
-            // not disabled.
+            // A direct rail has no withdrawal at all, which is a property
+            // of the rail rather than a temporary state — so it is
+            // explained, not disabled.
             Text(
               AppStrings.earningsNoWithdrawal,
               style: AppStyles.label(

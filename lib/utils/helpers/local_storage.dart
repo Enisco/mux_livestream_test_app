@@ -127,10 +127,6 @@ class LocalStorage {
   }
 
   /// The account's own second-factor setting.
-  ///
-  /// Defaults to **true** when absent: the second factor used to be
-  /// platform-wide, so an account that has never touched the switch is on,
-  /// and assuming off would draw a switch that disagrees with the server.
   static bool get cachedTwoFactorEnabled {
     final raw = getString(cachedUserKey);
     if (raw == null) return true;
@@ -174,19 +170,10 @@ class LocalStorage {
   }
 
   /// Replace the cached account wholesale.
-  ///
-  /// Every `cached…` getter above reads one blob, so the way to keep them in
-  /// step after a write is to store the `User` the route answered with rather
-  /// than patching fields in.
   static Future<bool> cacheUser(Map<String, dynamic> user) =>
       setString(cachedUserKey, jsonEncode(user));
 
   /// Patch a few fields of the cached account.
-  ///
-  /// For the one write that does **not** answer with a `User`: the password
-  /// change answers how the session fared and when the password changed, and
-  /// without folding that in the account menu goes on reporting the old date
-  /// until the next profile read.
   static Future<bool> mergeCachedUser(Map<String, dynamic> patch) async {
     final raw = getString(cachedUserKey);
     if (raw == null) return false;

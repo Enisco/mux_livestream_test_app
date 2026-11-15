@@ -33,11 +33,6 @@ Future<void> _pump(
 }
 
 /// Playlists as staging answers them since 2026-10-15.
-///
-/// Three things changed that day and all three are encoded here: `visibility`
-/// is writable, the detail read carries hydrated `items` (so the client no
-/// longer runs a second search over `orderedMediaIds`), and the server counts
-/// `unavailableCount` itself.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.rows = const [],
@@ -359,8 +354,7 @@ void main() {
   group('the detail screen', () {
     testWidgets('draws its items in the playlist\'s own order', (tester) async {
       // The read carries `items` already hydrated and already in order, so
-      // nothing is fetched twice and nothing is re-sorted. It used to cost a
-      // second search whose relevance ranking had to be undone.
+      // nothing is fetched twice and nothing is re-sorted.
       _register(
         ids: const ['m1', 'm2', 'm3'],
         hits: [
@@ -506,9 +500,7 @@ void main() {
 
   group('the repo', () {
     /// One `items` entry, as the detail read now sends it: a media search
-    /// hit, `meta` and `creator` included. Before 2026-10-15 the read gave
-    /// `orderedMediaIds` alone and the client hydrated them with a second
-    /// search; it does not any more.
+    /// hit, `meta` and `creator` included.
     Map<String, dynamic> item(String id, {double? seconds, String? title}) => {
       'entityType': 'media',
       'entityId': id,
@@ -521,9 +513,7 @@ void main() {
     testWidgets('a cover URL is fetched, not looked up as an asset', (
       tester,
     ) async {
-      // `covers` holds URLs. The mosaic drew them with `Image.asset`, left
-      // over from the dummy artwork, so every real cover threw "Unable to
-      // load asset" and painted a red plate over the card.
+      // `covers` holds URLs.
       _register();
       await _pump(
         tester,

@@ -23,15 +23,6 @@ import 'helpers/load_app_fonts.dart';
 
 /// The creator's Impact inbox — prayers, testimonies and the comment
 /// moderation queue.
-///
-/// The contracts under test are the creator-side ones in
-/// `docs/API_INTEGRATION_GUIDES/client-creator-and-dashboard-integration.md`,
-/// which are a different family from the viewer-side engagement routes. Most
-/// of what these guard is the handful of places where doing the obvious thing
-/// would be wrong: a status slug that is not the one the design says, an
-/// unassign that must travel as an explicit `null`, a queue that holds only
-/// two of a comment's states, and an identity the gateway has deliberately
-/// masked.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.prayers = const [],
@@ -210,8 +201,7 @@ Future<_FakeApi> _pump(
   await GetIt.instance.reset();
   GetIt.instance.registerSingleton<ApiService>(api);
   // The bell in this screen's header reads the one store every bell in the
-  // app reads, from `initState`. It is registered lazily on the fake API
-  // above, so the count it draws is this test's own.
+  // app reads, from `initState`.
   GetIt.instance.registerLazySingleton<NotificationStore>(
     () => NotificationStore(repo: NotificationRepo(api: api)),
   );

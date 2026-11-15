@@ -51,18 +51,10 @@ class AppRouter {
   static const String studio = '/studio';
 
   /// The studio's own settings — logo, cover and about, on one screen.
-  ///
-  /// Not the onboarding chain at [creatorPhoto]: that asks for the four in
-  /// turn and starts every field empty, which is right the first time and
-  /// wrong every time after it.
   static const String studioProfile = '/studio-profile';
   static const String creatorProfile = '/creator';
 
   /// Profile by id — the form every in-app creator affordance uses.
-  ///
-  /// [tab] names the tab to open on, for the affordances that point at one
-  /// part of a profile rather than the whole of it — "View on wall" wants the
-  /// testimonies, not the latest uploads.
   static String creatorProfileById(String id, {String? tab}) =>
       '/creator?id=$id${tab == null ? '' : '&tab=$tab'}';
 

@@ -20,8 +20,7 @@ class OnboardingBackground extends StatelessWidget {
             // The incoming minimums are the parent's, and on a viewport
             // taller than 2.6:1 the scaled plate is shorter than that
             // minimum — which is a non-normalized constraint, not a small
-            // gap. Loosening both ends lets the plate be whatever size the
-            // crop needs.
+            // gap.
             minWidth: 0,
             minHeight: 0,
             maxWidth: width,

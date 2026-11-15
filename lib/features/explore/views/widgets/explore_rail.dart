@@ -6,9 +6,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Side inset for everything on Explore that is not a scrolling rail.
-///
-/// The design draws section content at 18 and the search field at 20; 20 wins
-/// so the field, the headers and the chips share one edge.
 const double kExploreGutter = 20;
 
 /// Vertical space between one section and the next.
@@ -43,9 +40,9 @@ class ExploreSectionHeader extends StatelessWidget {
                 ),
               ),
             ),
-            // No chevron where there is nowhere to go: Trending and Continue
-            // watching are orderings rather than kinds, so no type tab means
-            // either of them.
+            // No chevron where there is nowhere to go: Trending and
+            // Continue watching are orderings rather than kinds, so no type
+            // tab means either of them.
             if (onSeeAll != null) ...[
               SizedBox(width: 8.s),
               Icon(
@@ -62,16 +59,6 @@ class ExploreSectionHeader extends StatelessWidget {
 }
 
 /// A header above a horizontally scrolling row of cards.
-///
-/// The row is laid out with the gutter as its padding rather than the
-/// section's, so cards scroll past the screen edge instead of stopping short
-/// of it — that overflow is what tells the reader there is more to the right.
-///
-/// It takes its height from the tallest card rather than being told one. An
-/// earlier version passed a fixed height worked out from the design, which
-/// overflowed the moment a card grew by a pixel — a sponsored badge, a font
-/// metric, a longer count. A rail holds a handful of cards, so building them
-/// all is cheaper than being wrong about how tall they are.
 class ExploreRail extends StatelessWidget {
   const ExploreRail({
     super.key,

@@ -30,16 +30,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Explore: the catalogue as rails — what is live now, what the reader left
 /// unfinished, and what is worth starting.
-///
-/// Two things to know about this screen:
-///
-/// - **A quiet rail is not drawn at all.** A browse that comes back empty
-///   means "not right now"; a heading over no cards reads as a claim that the
-///   whole category is empty. So each rail is conditional, and the screen only
-///   shows an error when *everything* failed.
-/// - **Explore is its own attribution source.** Every click beacon from here
-///   carries `explore`, not `home_feed`, or a creator cannot tell Explore
-///   discovery from the feed in their "How people find you" breakdown.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key, this.repo});
 
@@ -115,21 +105,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   /// Follow from the rail, without leaving it.
-  ///
-  /// The store holds the optimistic state and reconciles against the server,
-  /// which is what the card's button reads — subscriber counts are written
-  /// back from analytics and are never a read-back of the act just taken.
   Future<void> _toggleFollow(ExploreCreatorRef creator) async {
     if (creator.id.isEmpty) return;
     await getIt<EngagementStore>().toggleFollow(creator.id);
   }
 
   /// The design's second hero action.
-  ///
-  /// Playlists are the one thing on this screen with no live source yet —
-  /// `lib/features/library` still runs on `playlist_dummy_data.dart` — so
-  /// adding to one would go nowhere. Saying so beats a button that appears
-  /// to work.
   void _addToPlaylist() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

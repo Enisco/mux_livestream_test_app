@@ -80,12 +80,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   static const trendingTopic = 'Trending';
 
   /// Chip label → the slug it filters on, built from `/v1/user/categories`.
-  ///
-  /// This used to be a hardcoded five: it labelled `sermons` as "Preaching",
-  /// which is not what the API calls it, and left `prayer`, `gospel-music`,
-  /// `live-services`, `testimonies`, `family` and `devotionals` with no chip
-  /// at all. Labels and slugs come from the same row now, so a chip can only
-  /// ever send the slug it is named after.
   Map<String, List<String>> _topicSlugs = const {trendingTopic: []};
 
   List<String> _topics = const [trendingTopic];
@@ -109,9 +103,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Nothing should autoplay behind a locked screen or another app; audio the
-    // reader started is left alone, since that is the one thing meant to keep
-    // going in the background.
+    // Nothing should autoplay behind a locked screen or another app; audio
+    // the reader started is left alone, since that is the one thing meant
+    // to keep going in the background.
     if (state == AppLifecycleState.resumed) {
       _autoplay.resume();
     } else {
@@ -125,9 +119,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   }
 
   /// Fills in like/save state for rows just loaded.
-  ///
-  /// The feed payload does not carry the viewer's own interactions, so without
-  /// this every card renders unliked until its detail screen is opened.
   Future<void> _hydrateInteractions(List<WebFeedItem> rows) async {
     if (!_authed || rows.isEmpty) return;
 
@@ -156,10 +147,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   }
 
   /// Following needs a session; guests only ever get the public feed.
-  ///
-  /// `following_only` is rejected outright without auth ("Following feed
-  /// requires authentication"), so it is never sent for a guest — the tab shows
-  /// its empty state instead, which is where signing in is offered.
   String get _mode => switch (_tab) {
     HomeTab.following when _authed => 'following_only',
     _ => _authed ? 'mixed' : 'explore_only',
@@ -348,16 +335,6 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   }
 
   /// The `…` on a card: share, hide, mute, block and the rest.
-  ///
-  /// Share needs no account; everything else does, which the sheet gates
-  /// through [_requireAccount] rather than refusing the whole sheet.
-  /// Looks up, in one request, which of these ministries can take a gift.
-  ///
-  /// **Live rows only.** The guide offers Give from a feed on eligible
-  /// livestream menus and nowhere else in a feed, and asking about every
-  /// ministry on every page would be a request a scroll does not need. The
-  /// answers land in the session-wide store, so a card's overflow sheet can
-  /// read them without a wait of its own.
   Future<void> _primeGiving(List<WebFeedItem> rows) => _giving.prime([
     for (final row in rows)
       if (row.isLiveNow) row.profileCreatorId ?? '',

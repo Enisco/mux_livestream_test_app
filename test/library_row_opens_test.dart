@@ -31,17 +31,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Tapping a library row must open the thing it is a picture of.
-///
-/// Every one of these screens used to answer a tap with a snackbar saying the
-/// row's own title "is not built yet", because the row models kept only the
-/// fields the design draws and threw away the entity type and id a detail
-/// screen is opened by. The rows are enriched search hits, so the hit is now
-/// carried whole — and these pin both halves: that the mappers keep it, and
-/// that each screen's tap uses it.
-///
-/// The fixtures use `media_series` rows deliberately: the series screen is the
-/// cheapest destination to let build, so a test can assert the push landed
-/// rather than only that a snackbar was absent.
 
 class _NoopAnalytics implements AnalyticsService {
   @override

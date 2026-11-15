@@ -28,10 +28,6 @@ class PlayerScreen extends StatefulWidget {
   final String source;
 
   /// Whether this stream is being broadcast right now.
-  ///
-  /// A live stream is not seekable — see [ControlsOverlay] — and the
-  /// caller is the only one who knows: an HLS playlist that is still being
-  /// written looks like a short finished one to the player, and grows.
   final bool isLive;
 
   const PlayerScreen.file({super.key, required this.filePath, this.title})
@@ -441,14 +437,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// Live **now**, which is not the same as having been opened as live.
-  ///
-  /// When a broadcast stops, its playlist gains an ENDLIST and the player
-  /// reports completion: from that moment the same URL is a finished
-  /// recording, and treating it as live would leave a viewer with no
-  /// scrubber on something that has an end. It also closes the one hole
-  /// in the seek gate — the replay control seeks to zero through
-  /// [_togglePlay] rather than through [_seek], and by the time it can be
-  /// tapped this is false.
   bool get _isLive => widget.isLive && !_isCompleted;
 
   void _seek(Duration offset) {
@@ -512,14 +500,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   /// Whether this screen has changed the device chrome, which it only does
   /// by going fullscreen.
-  ///
-  /// A player that never did must put nothing back on the way out: the
-  /// screen underneath may have an orientation policy of its own, and a
-  /// **live broadcast does**. `StartLivestreamScreen` opens this player
-  /// over a running stream to watch it, and restoring the app's four
-  /// orientations there would unlock a broadcast whose encoder takes its
-  /// frame size from the interface. Once set this stays set — having
-  /// narrowed the set once, this screen owns putting it back.
   bool _tookChrome = false;
 
   /// Leaving fullscreen: back to an upright player page.
@@ -532,10 +512,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   /// Leaving the player: hand the app's own set back.
-  ///
-  /// Not [_uprightChrome] — that one is narrower than what the app asked
-  /// for at startup, so using it here left every other screen unable to
-  /// rotate until the app was restarted.
   void _releaseChrome() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(ScreenOrientation.all);

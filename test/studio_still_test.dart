@@ -4,23 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_app/models/creator_models/studio_content_models.dart';
 
 /// Stills in the Content tab.
-///
-/// Reported from the app: a published video showed a grey tile with a camera
-/// glyph in the list, and a grey box reading "View content" on its detail —
-/// while the row from `POST /v1/media/creator/{id}/search` already carried
-///
-/// ```
-/// thumbnailKey: public/thumbnail/{creatorId}/…-image_….jpeg
-/// thumbnailSource: manual
-/// muxPlaybackId: UK12nV0001HppPN…
-/// ```
-///
-/// The key was parsed and then dropped by both widgets.
-///
-/// Two sources, because the API uses two: an uploaded cover is a CDN key, and
-/// a video left to Mux carries **no key at all** — its generated first frame
-/// comes from `GET /v1/public/media/{id}/assets/thumbnail`, which is public
-/// and 302s to a signed Mux image (verified on staging, 2026-09-26).
 const _cdn = 'https://cdn.example.test';
 const _api = 'https://api.example.test';
 

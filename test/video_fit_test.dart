@@ -6,11 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_app/shared/components/video_fit.dart';
 
 /// Every `Video(...)` constructor call in [source], with its arguments.
-///
-/// Found by balancing brackets rather than by a regular expression, so a
-/// nested call in an argument cannot end the match early. `FullscreenVideo(`
-/// and the like are skipped: the character before the match has to be one
-/// that cannot be part of an identifier.
 List<String> _videoCalls(String source) {
   final calls = <String>[];
   final word = RegExp(r'[A-Za-z0-9_]');

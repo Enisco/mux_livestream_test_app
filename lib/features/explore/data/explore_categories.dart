@@ -3,17 +3,6 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/models/explore_models/explore_models.dart';
 
 /// The browse chips at the foot of Explore.
-///
-/// **These are the ten slugs the platform actually ships**
-/// (`PLATFORM_CONTENT_CATEGORIES`, served by `GET /v1/user/categories`), not a
-/// list of plausible-sounding topics. An earlier version of this screen
-/// offered `preaching`, `fellowship`, `missions` and `discipleship`, none of
-/// which exist — a filter built on one would have matched nothing and a
-/// creator could never have tagged content into it.
-///
-/// Only the icons are local: the API serves a slug, a name and a sort order,
-/// and says nothing about artwork. The labels here follow the API's `name`
-/// so the chip and the filter agree.
 abstract final class ExploreCategories {
   static const all = <ExploreCategory>[
     ExploreCategory(

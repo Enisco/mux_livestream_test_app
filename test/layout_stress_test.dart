@@ -31,10 +31,7 @@ import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'helpers/load_app_fonts.dart';
 
-/// Nothing on these screens controls its own content. A title can be a
-/// paragraph, a creator can have no name at all, and the phone can be a 320pt
-/// iPhone SE. Each case here pumps a real widget and fails on any exception
-/// Flutter raises — an overflow included.
+/// Nothing on these screens controls its own content.
 
 /// Long enough to burst any row that is not told to ellipsize.
 const _long =

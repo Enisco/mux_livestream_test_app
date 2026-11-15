@@ -7,10 +7,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// One wheel for the day, another for the clock.
-///
-/// The two are deliberately separate: every screen that asks for a moment
-/// shows a Date field and a Time field side by side, and moving one should
-/// never quietly move the other.
 Future<DateTime?> pickMoment(
   BuildContext context, {
   required DateTime initial,

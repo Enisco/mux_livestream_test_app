@@ -4,11 +4,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:test_app/shared/services/media_permissions.dart';
 
 /// Telling "ask me again" apart from "the system will never ask again".
-///
-/// Both go-live screens collapsed the two into `!isGranted` and offered
-/// "Try again", which on iOS is a button that cannot work: the system asks
-/// for the camera exactly once, and after a refusal every later request
-/// returns immediately. Only Settings can move it.
 void main() {
   group('what came back', () {
     test('both yes is a yes', () {

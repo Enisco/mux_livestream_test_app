@@ -14,10 +14,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// `GET /v1/user/categories` as staging answers it, 2026-11-13.
-///
-/// Trimmed to the fields that matter and to the rows that settle something:
-/// `devotionals` is the one that takes no media, `live-services` the one
-/// that takes the fewest kinds otherwise.
 const _taxonomy = {
   'data': {
     'data': [

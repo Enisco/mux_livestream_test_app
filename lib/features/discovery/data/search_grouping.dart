@@ -2,10 +2,6 @@ import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// How a result is presented.
-///
-/// The design draws three groups because its sample only held three kinds. The
-/// feed returns more, so every kind gets a group rather than being forced into
-/// one that misnames it.
 enum SearchGroupKind {
   ministries(AppStrings.searchGroupMinistries),
   videos(AppStrings.searchGroupVideos, AppStrings.searchKindVideo),
@@ -36,10 +32,6 @@ class SearchGroup {
 }
 
 /// Sorts results into the groups the screen renders, in a fixed order.
-///
-/// Order is by usefulness, not by count: a reader searching a ministry's name
-/// wants the ministry itself first, and an event is time-sensitive enough to
-/// deserve the bottom slot where it will not be scrolled past.
 abstract final class SearchGrouping {
   static const _order = [
     SearchGroupKind.ministries,

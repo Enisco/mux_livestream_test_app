@@ -1,22 +1,4 @@
 /// The coarse funnel state, as `PATCH /v1/user/me/onboarding-state` types it.
-///
-/// The contract declares every one of these fields as a bare
-/// `{"type": "object"}`, so the allowed values are invisible in the schema.
-/// They are not invisible to the validator, which names them on refusal —
-/// these four lists were read off staging that way on 2026-09-26:
-///
-/// ```
-/// status      must be one of: not_started, in_progress, completed, skipped
-/// intent      must be one of: watch, creator
-/// step        must be one of: platform_intent, viewer_preferences,
-///                            creator_profile_type, creator_profile_form,
-///                            subscription_plan
-/// creatorType must be one of: individual, organization
-/// ```
-///
-/// One trap worth keeping: the app's own word for the creator intent is
-/// "ministry", which the API refuses. Everything user-facing may say
-/// ministry; everything on the wire says `creator`.
 library;
 
 enum OnboardingStatus {

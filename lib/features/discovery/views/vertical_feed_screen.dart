@@ -32,22 +32,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Full-screen swipeable playback.
-///
-/// Reached two ways, both of them a continuation of something the reader was
-/// already watching rather than a destination of its own:
-///
-///  * from a video's detail page, where "similar" becomes a feed you keep
-///    swiping through instead of a list you tap back and forth in;
-///  * from a ministry's library, where it plays that ministry's own run.
-///
-/// Seeding matters: opening this from a video has to *start on that video*,
-/// which is what [anchorMediaId] is for. The feed's own ordering is only
-/// used when nothing seeded it.
-/// Where the anchor goes.
-///
-/// Kept out of the widget so the rule itself can be tested: the feed route
-/// treats `anchorMediaId` as a relevance hint and may return it anywhere, so
-/// "open this one in the feed" has to place it.
 abstract final class VerticalFeedOrdering {
   static List<T> anchorFirst<T>(
     List<T> items,
@@ -123,12 +107,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
 
   /// Teach the shared store what a page of rows says, then what the viewer
   /// has already done to them.
-  ///
-  /// Two steps because they come from different places: the counts ride along
-  /// on the feed row, but whether *this* viewer liked it is one batched call
-  /// the feed route does not answer. Without the first step every heart shows
-  /// zero until it is tapped; without the second, a video the reader liked
-  /// last week opens unliked and a second tap takes the like away.
   void _seedEngagement(List<VerticalFeedItem> rows) {
     VerticalFeedActions.seedRows(_store, rows);
     if (_isLoggedIn) unawaited(_seedInteractions(rows));
@@ -245,10 +223,6 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
   }
 
   /// Puts the video the reader came from first.
-  ///
-  /// `anchorMediaId` steers relevance but does not guarantee position — the
-  /// anchor came back third on staging — and opening "watch this one in the
-  /// feed" on somebody else's video would be plainly wrong.
   List<VerticalFeedItem> _ordered(List<VerticalFeedItem> items) =>
       VerticalFeedOrdering.anchorFirst<VerticalFeedItem>(
         items,
@@ -528,9 +502,10 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     super.initState();
     _creatorHandle = widget.item.creatorHandle;
     _creatorDisplayName = widget.item.creatorDisplayName;
-    // A like made here has to be the like the detail screen and the home card
-    // show, so the counts are read from the shared store rather than kept
-    // locally — which means this page repaints when anything moves them.
+    // A like made here has to be the like the detail screen and the home
+    // card show, so the counts are read from the shared store rather than
+    // kept locally — which means this page repaints when anything moves
+    // them.
     _store.addListener(_onEngagementChanged);
     if (widget.isActive) _seedFollowing();
     if (widget.isActive) {
@@ -554,9 +529,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     if (!widget.isActive && !widget.preload && (old.isActive || old.preload)) {
       _disposePlayer();
     }
-    // The session check resolves a beat after the first page is built, so the
-    // page the reader opened on is still showing `isLoggedIn: false` when it
-    // first asks. Ask again the moment that flips.
+    // The session check resolves a beat after the first page is built, so
+    // the page the reader opened on is still showing `isLoggedIn: false`
+    // when it first asks.
     if (widget.isLoggedIn && !old.isLoggedIn && widget.isActive) {
       _seedFollowing();
     }
@@ -1050,13 +1025,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   }
 
   /// Find out whether this viewer already follows the ministry on screen.
-  ///
-  /// The feed route does not say, and guessing "not following" draws a +
-  /// on a ministry the reader subscribed to last month — then the tap
-  /// unfollows them, because the toggle flips whatever it was told. One read
-  /// per ministry, only while its video is the one playing, and the shared
-  /// store keeps the answer for the rest of the session: swiping back through
-  /// a run of the same ministry's videos costs nothing.
   Future<void> _seedFollowing() async {
     final creatorId = widget.item.creatorId;
     if (!widget.isLoggedIn ||
@@ -1128,9 +1096,9 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
               ),
               const SizedBox(height: 24),
               _FeedActionButton(
-                // Filled and brand-coloured once it is the viewer's own like,
-                // which is the only thing that tells them the tap landed —
-                // the count moves by one and one is easy to miss.
+                // Filled and brand-coloured once it is the viewer's own
+                // like, which is the only thing that tells them the tap
+                // landed — the count moves by one and one is easy to miss.
                 icon: state.liked
                     ? IconsaxPlusBold.heart
                     : IconsaxPlusLinear.heart,
@@ -1332,9 +1300,7 @@ class _AvatarButton extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    // Following turns the badge grey with a tick. It stays on
-                    // screen rather than disappearing, because a badge that
-                    // vanishes leaves no way to unfollow from here.
+                    // Following turns the badge grey with a tick.
                     color: following
                         ? AppColors.neutral700
                         : AppColors.brandPrimary,
@@ -1425,12 +1391,6 @@ class _PromotedBadge extends StatelessWidget {
 }
 
 /// The swipe feed's own mark, which is **not** `LiveBadge`.
-///
-/// Deliberately a different badge: this one sits on a full-bleed video
-/// over the creator's handle, where the home card's translucent outlined
-/// pill disappears. It is solid red with a dot, as the swipe feed's design
-/// draws it. If the two are ever to be one, it is the design that has to
-/// decide that, not a refactor.
 class _LiveBadge extends StatelessWidget {
   const _LiveBadge();
 

@@ -1,8 +1,4 @@
 // Detail payloads for the content types that are *not* media.
-//
-// `GET /v1/discovery/media/:id/detail` only knows media — asking it for a
-// post, devotional or event returns 404. Each of these has its own public
-// route (see docs/OPEN_ISSUES.md, issue 26).
 
 class ContentEngagement {
   const ContentEngagement({
@@ -262,9 +258,6 @@ class EventDetail {
 }
 
 /// `GET /v1/public/media/series/{id}` — a run of videos and tracks.
-///
-/// The feed row only says how many of each there are; this is what names
-/// them, in the order the creator arranged.
 class MediaSeriesDetail {
   const MediaSeriesDetail({
     required this.id,

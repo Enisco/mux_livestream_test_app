@@ -5,15 +5,6 @@ import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 
 /// The like/follow wiring for one page of the vertical feed.
-///
-/// The same reason [FeedCardActions] exists, for the one surface it cannot
-/// serve: that class speaks `WebFeedItem` and the feed's rows are
-/// [VerticalFeedItem]s. Keeping the four steps here rather than inside a
-/// screen that cannot be widget-tested — its pages build real media_kit
-/// players — is what makes the behaviour testable at all, which matters
-/// because these buttons shipped inert once already.
-///
-/// Every row in this feed is media, so the target type is never in question.
 class VerticalFeedActions {
   const VerticalFeedActions({
     required this.store,
@@ -56,9 +47,6 @@ class VerticalFeedActions {
 
   /// Record what a page of rows says, so the hearts carry real counts before
   /// anyone touches them.
-  ///
-  /// Only the counts: whether *this* viewer liked a row is a separate
-  /// batched read the feed route does not answer.
   static void seedRows(EngagementStore store, List<VerticalFeedItem> rows) {
     for (final row in rows) {
       if (row.mediaId.isEmpty) continue;

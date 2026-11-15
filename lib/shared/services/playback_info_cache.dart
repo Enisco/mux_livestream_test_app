@@ -3,11 +3,6 @@ import 'dart:convert';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 
 /// Holds resolved playback URLs for as long as they are actually valid.
-///
-/// These are signed links: the Mux URL carries a JWT whose `exp` is the real
-/// deadline. Serving one past that point does not fail loudly — the player
-/// simply never produces a frame and the card sits at 0:00 — so the token's own
-/// expiry is what governs here, not a flat guess.
 class PlaybackInfoCache {
   /// Used when a URL carries no readable expiry.
   static const _fallbackTtl = Duration(minutes: 5);

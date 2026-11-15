@@ -82,17 +82,6 @@ class LiveStatPill extends StatelessWidget {
 }
 
 /// What the giving pill reads.
-///
-/// `metrics.giving` is null when the payment service is unreachable, and
-/// the contract is explicit that a zero must not be shown in a made-up
-/// currency then — so it shows a dash. Totals in different settlement
-/// currencies are never added together; the pill shows the first, and
-/// names its currency so the figure cannot be read as the wrong money.
-///
-/// The amount arrives in minor units with no exponent alongside it, so two
-/// decimal places are assumed. That holds for NGN and USD; a zero-decimal
-/// currency such as JPY would read a hundred times small, which is why the
-/// code is shown rather than a bare number.
 String givingLabel(LivestreamStudio studio) {
   if (studio.giving == null) return AppStrings.goLiveNoGiving;
   final total = studio.headlineGiving;
@@ -113,10 +102,6 @@ String _grouped(int value) {
 
 /// The counters along the top of a broadcast, with the camera flip pinned
 /// to the end.
-///
-/// The pills scroll rather than compete for room: a giving total names its
-/// currency, so the row's width is not something the screen can predict,
-/// and on a narrow phone it overflowed by 140 pixels when it tried.
 class LiveStatBar extends StatelessWidget {
   const LiveStatBar({
     super.key,
@@ -426,10 +411,6 @@ class _Action extends StatelessWidget {
 }
 
 /// "1:04" — how long this has been going out.
-///
-/// The clock runs from the server's `startedAt`, which can be a moment
-/// ahead of the device's own. Left alone that read "0:-5", so anything
-/// before zero is simply zero.
 String formatElapsed(Duration elapsed) {
   final safe = elapsed.isNegative ? Duration.zero : elapsed;
   final seconds = safe.inSeconds.remainder(60).toString().padLeft(2, '0');

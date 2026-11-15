@@ -16,26 +16,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Offering a gift, from wherever the giver happened to be.
-///
-/// Every Give button in the app ends here — the channel header, a content
-/// page's impact row, a card's overflow sheet. Writing the sequence out per
-/// screen is how the buttons ended up doing nothing on all of them, so it
-/// lives here once.
-///
-/// The order matters and each step earns its place:
-///
-/// 1. **Sign in first.** Giving is authenticated, and discovering that after
-///    the browser has opened means paying twice for the same decision.
-/// 2. **Ask whether this ministry can receive.** The projection is cached, so
-///    this is usually free, and it is re-checked here rather than trusted from
-///    whenever the button was drawn.
-/// 3. **Ask what the gift is for**, but only when there is a real choice. One
-///    fund is not a choice, and the reserved `general` fund means there is
-///    always at least one.
-/// 4. **Hand off.** Amount, currency, fees and card details are the web
-///    surface's; the app never sees any of them.
-///
-/// Returns true when the browser actually opened.
 Future<bool> startGive(
   BuildContext context, {
   required String creatorId,
@@ -51,10 +31,7 @@ Future<bool> startGive(
   if (requireAccount != null && !requireAccount('give to this ministry')) {
     return false;
   }
-  // Two taps would be two gifts. Giving sessions coexist by design, so the
-  // server will happily create a second one and the giver ends up with two
-  // browser tabs and two things to pay for. The barrier below stops the
-  // second tap reaching anything; this stops one that slipped past it.
+  // Two taps would be two gifts.
   if (_inFlight.contains(creatorId)) return false;
   _inFlight.add(creatorId);
 
@@ -76,8 +53,7 @@ Future<bool> startGive(
   try {
     // Three round trips stand between the tap and the browser — capability,
     // funds, then the session — and on a real device that was thirteen
-    // seconds of a button that looked broken. The barrier says what is
-    // happening and absorbs further taps while it does.
+    // seconds of a button that looked broken.
     final capable = await runBusy(
       context,
       () => store.ensure(creatorId),
@@ -144,8 +120,7 @@ Future<bool> startGive(
         say(AppStrings.giveUnavailableHere);
       case HandoffOutcome.alreadyActive:
         // Giving sessions coexist, so this is not reachable for a gift
-        // today. It is answered rather than ignored so a server-side change
-        // to that rule surfaces as a message instead of a dead button.
+        // today.
         final id = result.sessionId;
         if (id != null && context.mounted) {
           appRouter.push(AppRouter.givingStatus, extra: id);
@@ -162,15 +137,8 @@ Future<bool> startGive(
 }
 
 /// Ministries with a gift being prepared right now.
-///
-/// Keyed by ministry rather than held globally: giving to one while another
-/// is mid-flight is unusual but not wrong, and a single flag would block it.
 final _inFlight = <String>{};
 
 /// Forgets every gift in flight.
-///
-/// This set outlives any one call by design, which in a test means one case
-/// abandoning a gift mid-flight would silently disable Give for every case
-/// after it.
 @visibleForTesting
 void resetGiveGuard() => _inFlight.clear();

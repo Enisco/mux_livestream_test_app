@@ -165,13 +165,6 @@ class ContentCategory {
 
   /// What this category may be filed against — `media`, `post`, `event`,
   /// `creator` and the devotional kinds.
-  ///
-  /// **Not every category takes every kind.** `devotionals` is a written
-  /// taxonomy only (`post`, `devotional_series`, `devotional_entry`,
-  /// `creator`), so offering it when filing a video or a livestream earns
-  /// a 400: *"Categories not supported for media: devotionals"*. Read off
-  /// staging 2026-11-13; `live-services` is the narrowest of the rest,
-  /// taking only `media`, `event` and `creator`.
   final List<String> contentTypes;
 
   /// The order the taxonomy is meant to be shown in; the API numbers them
@@ -196,19 +189,12 @@ class ContentCategory {
       );
 
   /// Whether this category may be filed against [scope].
-  ///
-  /// An empty [contentTypes] means the taxonomy did not say — an older
-  /// API, or a payload without the field — and nothing is hidden on a
-  /// guess.
   bool supports(CategoryScope scope) =>
       contentTypes.isEmpty || contentTypes.contains(scope.slug);
 }
 
 /// The kinds of thing a category can be filed against, as `contentTypes`
 /// names them.
-///
-/// A livestream is **[media]**: the session route rejects a category the
-/// taxonomy has not marked for media, in the same words an upload does.
 enum CategoryScope {
   media,
   mediaSeries('media_series'),
@@ -265,10 +251,7 @@ class CheckoutCapabilities {
   final bool subscriptionAvailable;
   final String? subscriptionReason;
 
-  /// Whether this storefront may take gifts. **Gated separately** from
-  /// subscriptions, and the guide says why: store rules for optional gifts,
-  /// fundraising, nonprofit status and platform fees are not the rules for a
-  /// SaaS plan, so one being open says nothing about the other.
+  /// Whether this storefront may take gifts.
   final bool givingAvailable;
   final String? givingReason;
 
@@ -344,14 +327,6 @@ class CheckoutEntitlement {
 /// Canonical state of a mobile→web checkout attempt. The only thing the app
 /// trusts; return-link query parameters are navigation, not proof.
 /// The giving half of a checkout session.
-///
-/// Present only on a `purpose: giving` session, and **entirely null until the
-/// donor actually pays** — a freshly created session carries the keys with no
-/// values, which is normal rather than a failure. Probed on staging
-/// 2026-10-29.
-///
-/// `creatorNet` stays null until settlement actuals are finalized, so it is
-/// never shown as what the ministry received.
 class GivingSessionState {
   const GivingSessionState({
     this.givingPaymentId,
@@ -427,13 +402,6 @@ class MobileCheckoutSession {
   bool get isGiving => purpose == givingPurpose;
 
   /// Completion, which means a different thing per purpose.
-  ///
-  /// A subscription is not done when the provider says so — entitlements have
-  /// to agree, or the creator is told they are on Pro before they are. A gift
-  /// grants nothing, so there is no second view to wait for: `succeeded` is
-  /// the end of it, and settlement to the ministry carries on afterwards
-  /// without the donor. Reading the subscription rule on a gift would leave
-  /// every completed gift reported as still processing, forever.
   bool get isSettled =>
       status == MobileCheckoutStatus.succeeded &&
       (isGiving || entitlementsReady);
@@ -494,10 +462,6 @@ class MobileCheckoutHandoff {
 }
 
 /// Whether the signed-in reader has a channel.
-///
-/// Three answers, not two: a reader with no channel should be invited to
-/// start one, but a reader whose lookup merely failed should not be — that
-/// invitation would walk them into `POST /v1/creator/onboard` and a 409.
 class ChannelLookup {
   const ChannelLookup._(this.id, this.state);
 

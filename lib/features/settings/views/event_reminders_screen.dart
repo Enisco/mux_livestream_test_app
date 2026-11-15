@@ -15,22 +15,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Whether to be reminded about events, and how long beforehand.
-///
-/// Runs on `GET`/`PATCH /v1/notification/preferences`, which gained the two
-/// reminder fields on 2026-10-26.
-///
-/// Three things the contract insists on, all of them visible here:
-///
-/// - **Five offsets, not four.** `120` is in the set because RSVP rows
-///   already held it; dropping it would have orphaned reminders viewers had
-///   set. See [reminderOffsets].
-/// - **"Off" and "the organiser's schedule" are different states.**
-///   `eventRemindersEnabled: false` is off; `eventReminderMinutes: null` means
-///   follow whatever the organiser set. So there are two controls, and the
-///   picker has no Off row.
-/// - **It applies to RSVPs made from now on.** It does not move reminders on
-///   events already RSVP'd to, which is why the note says "from now on"
-///   rather than "your events".
 class EventRemindersScreen extends StatefulWidget {
   const EventRemindersScreen({super.key, this.repo});
 

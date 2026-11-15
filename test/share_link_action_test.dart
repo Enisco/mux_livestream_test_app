@@ -7,12 +7,6 @@ import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/shared/services/api_service.dart';
 
 /// Minting a link, which two surfaces now do through one helper.
-///
-/// The rule that matters is the one the route's own doc states and the card
-/// sheet's tests already pin: **minting is not sharing**. Nothing here posts
-/// an `interactionType: "share"` interaction, because a reader who opens a
-/// sheet and changes their mind has not shared anything — counting the mint
-/// would inflate every creator's share count by every abandoned sheet.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.url = 'https://gospeltube.tv/w/abc?analyticsSource=share_link',

@@ -9,19 +9,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The older go-live screen, reached from the landing screen.
-///
-/// It had the same two faults as `LiveBroadcastScreen`: one dead end for a
-/// refusal the system would still ask about, and — once the permission was
-/// granted and the camera itself failed — a heading about permissions, a
-/// raw `e.toString()` for a body, and a button to Settings over a
-/// permission that was not the problem.
-///
-/// `ApiVideoLiveStreamController` is built in `initState` and not
-/// injectable here, so the plugin is registered against a stubbed channel
-/// instead: `create` answers nothing, which is how the camera is made to
-/// fail. Without the registration every call raises `UnimplementedError`
-/// from the platform interface's own defaults, including the `dispose()`
-/// each teardown runs.
 const _channel = MethodChannel('video.api.livestream/controller');
 
 Future<List<Permission>> _pump(

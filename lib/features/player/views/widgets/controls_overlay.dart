@@ -12,13 +12,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The controls drawn over the player screen's video.
-///
-/// **A live broadcast is a different instrument.** There is no scrubber,
-/// no skip, and no speed: the far end of a live stream is the present
-/// moment, so there is nowhere to seek to and no rate to play it at other
-/// than the one it is being published at. What it gets instead is the same
-/// LIVE badge the home feed card and the detail title row carry, so the
-/// viewer can tell at a glance which kind of video they are watching.
 class ControlsOverlay extends StatelessWidget {
   final String title;
 

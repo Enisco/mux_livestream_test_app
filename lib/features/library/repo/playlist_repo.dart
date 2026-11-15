@@ -19,43 +19,6 @@ class PlaylistCoverTooLarge implements Exception {
 }
 
 /// The reader's own running orders.
-///
-/// Staging departed from the guide in three ways when this was written on
-/// 2026-10-06. **All three were fixed server-side on 2026-10-15** and this
-/// class now matches the guide:
-///
-/// - `visibility` is writable on create and on PATCH, so a playlist can be
-///   made public and the design's "Anyone with the link" group has something
-///   to hold.
-/// - The detail read carries its `items` as media search hits — the same
-///   shape `public/query` returns, `meta` and `creator` included — so they
-///   are mapped straight through. This used to cost a second search to put
-///   titles and artwork on `orderedMediaIds`; that hydration is gone.
-/// - `GET /v1/public/media/playlists/{id}` serves a public playlist with no
-///   auth header. Nothing here calls it: a stranger's link has nowhere to
-///   land until there is a share URL and a route for one
-///   (`docs/MOBILE_API_REQUESTS.md` §1.1). It answers 404 for a private
-///   playlist, the same as for one that does not exist.
-///
-/// What is still true:
-///
-/// - The list is a Prisma advanced search, so it pages by number
-///   (`?page=&limit=`) with a `{data, meta}` envelope — not the cursor the
-///   discovery feeds use. Searching is a `title.contains` filter, not a `q`.
-/// - **Adding is not idempotent.** A duplicate answers 409 "Media is already
-///   in this playlist" rather than quietly doing nothing, and a playlist
-///   holds at most 500 items.
-/// - **PARKED(1.5) — a playlist holds media only.** `items` takes `mediaId`;
-///   a post, devotional or event is refused. Ruled **not planned** on
-///   2026-10-19 (`docs/mobile-api-gap-responses.md` §1.5): widening it means
-///   answering what a mixed playlist plays and what its cover is when the
-///   first item is a post. **So the card overflow sheet must not offer "Add
-///   to playlist" on the blog, devotional or event variants.** Unpark when
-///   the items route takes a `targetType`/`targetId` pair.
-/// - **A cover can be uploaded** since 2026-10-26: a presigned S3 POST in a
-///   `playlist_cover` category, then `coverFileId` on the PATCH, which is
-///   also where the upload is confirmed. `coverFileId: null` removes it and
-///   falls back to the derived cover.
 class PlaylistRepo {
   PlaylistRepo({ApiService? api, S3Send? send})
     : _injected = api,
@@ -91,8 +54,6 @@ class PlaylistRepo {
   }
 
   /// `GET /v1/media/playlists/:id` — the owner read, items already hydrated.
-  ///
-  /// The rows arrive in the playlist's own order, so nothing is re-sorted.
   Future<Playlist> fetch(String id) async {
     final response = await _api.get(ApiEndpoints.playlist(id));
     return _detail(_data(response.data));
@@ -115,9 +76,6 @@ class PlaylistRepo {
   }
 
   /// `PATCH /v1/media/playlists/:id`.
-  ///
-  /// Omitting a key leaves it unchanged; [clearDescription] sends an explicit
-  /// `null`, which is what empties it.
   Future<void> update(
     String id, {
     String? title,
@@ -145,14 +103,6 @@ class PlaylistRepo {
   Future<void> delete(String id) => _api.delete(ApiEndpoints.playlist(id));
 
   /// Put a cover on a playlist: ticket, S3, then name the `fileId`.
-  ///
-  /// **The result is visible immediately** — no review step, nothing to poll,
-  /// no pending state to draw. An uploaded cover *overrides* the derived one
-  /// rather than replacing the mechanism, so removing it falls back to the
-  /// first public item again.
-  ///
-  /// JPEG, PNG or WebP, **5 MB** — read from the ticket's `constraints`
-  /// rather than hard-coded, since the server may tighten them.
   Future<void> uploadCover(String playlistId, PickedImage image) async {
     final ticket = await _api.post(
       ApiEndpoints.playlistCoverUploadUrl(playlistId),
@@ -248,8 +198,7 @@ class PlaylistRepo {
       declaredCount: declared,
       runtime: _runtime(items),
       // The server counts these now — content deleted or made private since
-      // it was added. It used to be inferred from how many ids the hydrating
-      // search could not resolve.
+      // it was added.
       unavailableCount:
           (json['unavailableCount'] as num?)?.toInt() ??
           (declared - items.length).clamp(0, declared),
@@ -284,9 +233,6 @@ class PlaylistRepo {
   }
 
   /// "3h 24m" — the whole thing end to end.
-  ///
-  /// A playlist holding something whose runtime is unknown is left without a
-  /// total rather than quietly under-reporting it.
   static String _runtime(List<HistoryEntry> items) {
     var total = Duration.zero;
     for (final item in items) {

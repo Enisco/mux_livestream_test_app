@@ -82,7 +82,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
     unawaited(_wakelock.hold());
     // Asked as early as the screen exists so the interface has the longest
     // head start to finish rotating; awaited again in `_initCamera` before
-    // the native controller is built. See [ScreenOrientation.upright].
+    // the native controller is built.
     unawaited(ScreenOrientation.lockUpright());
 
     _controller = ApiVideoLiveStreamController(
@@ -112,9 +112,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!_controller.isInitialized) return;
     // `inactive` is not backgrounded: it fires for a notification banner,
-    // an incoming-call banner, the app switcher being peeked at. Tearing
-    // the broadcast down for any of those ended livestreams that nothing
-    // had actually interrupted. `paused` is the app really leaving.
+    // an incoming-call banner, the app switcher being peeked at.
     if (state == AppLifecycleState.paused) {
       _controller.stop();
     } else if (state == AppLifecycleState.resumed) {
@@ -125,8 +123,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
   Future<void> _initCamera() async {
     // Before `initialize()`, which is what builds the native controller,
     // and that reads the *interface* orientation to pick the encoder's
-    // frame size. Sideways meant a landscape recording, so the lock sent
-    // in `initState` has to have landed before the camera is built.
+    // frame size.
     await ScreenOrientation.awaitUpright();
     if (!mounted) return;
 
@@ -156,9 +153,9 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
           _phase = _Phase.error;
           _needsSettings = false;
           _cameraFailed = true;
-          // `e.toString()` was put on screen here, which showed a creator
-          // a Dart exception and sent them to Settings over a permission
-          // that had just been granted. The detail belongs in the log.
+          // `e.toString()` was put on screen here, which showed a creator a
+          // Dart exception and sent them to Settings over a permission that
+          // had just been granted.
           _initError = AppStrings.goLiveCameraFailed;
         });
       }
@@ -424,8 +421,8 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                 ? openAppSettings
                 : () {
                     // Back to the spinner first: the ask can take a moment
-                    // and a button that leaves the error on screen reads
-                    // as a button that did nothing.
+                    // and a button that leaves the error on screen reads as
+                    // a button that did nothing.
                     setState(() => _phase = _Phase.initializing);
                     unawaited(_initCamera());
                   },
@@ -510,8 +507,6 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
                       );
                       // The player may have gone fullscreen, which hands
                       // the app's own orientations back when it closes.
-                      // The broadcast underneath is still running and
-                      // still has to stay upright.
                       unawaited(ScreenOrientation.lockUpright());
                     } catch (e) {
                       logger.e(
@@ -549,9 +544,9 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
         if (isLoading)
           // Absorbing, not just covering: a `Container` paints over the
           // page but `RenderDecoratedBox` does not claim the hit, so every
-          // tap went straight through the scrim to the End button behind
-          // it — which is how a creator ends up sending the same request
-          // three times while watching a spinner.
+          // tap went straight through the scrim to the End button behind it
+          // — which is how a creator ends up sending the same request three
+          // times while watching a spinner.
           AbsorbPointer(
             key: const ValueKey('live-busy'),
             child: Container(
@@ -586,8 +581,7 @@ class _StartLivestreamScreenState extends State<StartLivestreamScreen>
             Container(color: AppColors.surface),
             ApiVideoCameraPreview(controller: _controller),
             // This screen had no way to change camera at all, on or off
-            // air. The plugin reads the live position before switching,
-            // so it is right whichever one started.
+            // air.
             Positioned(
               top: 8,
               right: 8,

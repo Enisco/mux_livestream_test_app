@@ -9,12 +9,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The parts every "things of mine" screen is made of.
-///
-/// History, Liked, Saved, My events, prayer requests, testimonies and giving
-/// are the same skeleton in the design: a blurred bar carrying the title and
-/// one action, an optional field to narrow the list, optional filter chips, a
-/// count, then groups of rows — and a tinted disc when there is nothing to
-/// show. They share these so the seven cannot drift apart.
 
 /// The bar over a library screen. It sits over the list rather than scrolling
 /// with it, and blurs what passes underneath, so the action and the field stay

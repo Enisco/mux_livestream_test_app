@@ -5,11 +5,6 @@ import 'package:test_app/shared/services/hls_manifest.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 
 /// Speed and quality, which the redesigned player had lost.
-///
-/// The hard part is quality: media_kit exposes a progressive file's
-/// renditions as selectable video tracks, but an HLS stream's are not tracks
-/// at all — the native player picks one by bitrate. Mux serves HLS, so the
-/// only way to offer a menu is to read the master playlist.
 const _master = '''
 #EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028"
@@ -90,9 +85,7 @@ a.m3u8
 
   group('an offer racing the stream it belongs to', () {
     // The manifest is read over the network while the player is opening, so
-    // the two finish in either order. Getting this wrong loses the quality
-    // menu intermittently, on exactly the fast connections where the
-    // manifest wins.
+    // the two finish in either order.
     test('an offer for the open stream applies at once', () {
       final offers = HlsQualityOffers();
       final ready = offers.offer('a.m3u8', const {

@@ -13,11 +13,6 @@ import 'package:test_app/shared/services/pending_giving_store.dart';
 
 /// The reader's side of Giving: deciding whether to offer a gift, and handing
 /// the gift itself to the web surface.
-///
-/// Every response below was captured from staging on 2026-10-29 rather than
-/// written from the guide — the giving half of a checkout session is not
-/// documented anywhere, and two of its refusals are not what the guide would
-/// lead you to expect.
 
 /// `POST /v1/payment/mobile-web-checkouts` with `purpose: giving`.
 const _createGiving = {
@@ -274,9 +269,9 @@ void main() {
     });
 
     test('a batch answer is keyed by creator, not by position', () async {
-      // The route preserves order, but a dropped row would shift every answer
-      // after it onto the wrong ministry — and the wrong Give button sends a
-      // giver at a ministry that cannot be paid.
+      // The route preserves order, but a dropped row would shift every
+      // answer after it onto the wrong ministry — and the wrong Give button
+      // sends a giver at a ministry that cannot be paid.
       final api = _FakeApi(
         postBody: const {
           'success': true,
@@ -424,8 +419,7 @@ void main() {
     test('the idempotency key satisfies the server\'s own rules', () {
       // Read off a refusal on 2026-10-29: `idempotencyKey must match
       // /^[A-Za-z0-9:_-]+$/` and `must be shorter than or equal to 128
-      // characters`. Neither is in the guide, and a key that breaks either is
-      // a 400 at the moment the giver taps Give.
+      // characters`.
       final key = CheckoutHandoffService.newGivingKey(
         '6a2423ae0e90471cdcb3af5d',
       );
@@ -514,9 +508,9 @@ void main() {
     });
 
     test('a refused source is dropped and the gift still goes ahead', () async {
-      // The server accepts a narrower set than "media the giver can watch" —
-      // a plain video, an audio row and a livestream's own replay are all
-      // refused. Attribution is a nicety; the gift is not.
+      // The server accepts a narrower set than "media the giver can watch"
+      // — a plain video, an audio row and a livestream's own replay are all
+      // refused.
       final api = _FakeApi(getBody: _capabilities, postBody: _createGiving)
         ..postErrorOnce = _badSource;
       final result = await _service(
@@ -574,8 +568,6 @@ void main() {
 
     test('a succeeded gift is settled without entitlements', () {
       // A gift grants nothing, so there is no second view to wait for.
-      // Applying the subscription rule here would report every completed gift
-      // as still processing, forever.
       final session = MobileCheckoutSession.fromJson(
         _givingSession('succeeded'),
       );
@@ -683,9 +675,8 @@ void main() {
 
   group('cancelling a gift', () {
     test('forgets the session even when the server refuses', () async {
-      // Cancellation is best-effort by contract: a session whose payment has
-      // started stays processing regardless. Keeping the id after a failed
-      // cancel would leave a dead attempt matching return links forever.
+      // Cancellation is best-effort by contract: a session whose payment
+      // has started stays processing regardless.
       final api = _FakeApi()..postError = _refusal(500, 'boom');
       final store = InMemoryPendingGivingStore();
       await store.remember('g1');

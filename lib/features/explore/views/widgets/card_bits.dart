@@ -9,10 +9,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The small parts every Explore rail repeats.
-///
-/// They are shared rather than copied because the design draws them
-/// identically on eight different cards — a change to the creator line or the
-/// sponsored marker should land everywhere at once.
 
 /// Artwork, from a bundled placeholder or the network, whichever the row has.
 class ExploreThumb extends StatelessWidget {

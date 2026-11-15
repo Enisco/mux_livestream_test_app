@@ -5,17 +5,6 @@ import 'package:test_app/features/onboarding/views/widgets/interest_chip.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 
 /// A glyph for each slug in the API's taxonomy.
-///
-/// The interest chips used to be the design's own eleven labels, four of which
-/// had no category behind them — so picking only those sent nothing at all and
-/// four real categories (`prayer`, `live-services`, `testimonies`,
-/// `devotionals`) could not be chosen. The chips are drawn from
-/// `GET /v1/user/categories` now, which means the label and slug can never
-/// drift apart again, and this is the one thing the API does not supply.
-///
-/// A slug with no entry here still gets a chip: the taxonomy is the backend's
-/// to grow, and a new category should appear rather than vanish because the
-/// app has no picture for it.
 abstract final class CategoryGlyphs {
   static const _bySlug = <String, String>{
     'worship': AppAssets.iconCatDove,

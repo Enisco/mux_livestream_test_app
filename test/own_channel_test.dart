@@ -14,17 +14,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Your own channel, seen from the viewer side.
-///
-/// Reported from the app: opening "Food for Thought" — the reader's own
-/// ministry — from the You tab showed the public profile offering **Follow**,
-/// **Give Now** and **Subscribe/follow**. You cannot follow or give to
-/// yourself, and the API refuses both, so those were dead ends dressed as
-/// invitations.
-///
-/// Ownership is answered in one place, from two sources: `isOwnedByViewer`
-/// where discovery sends it, and the cached creator id for the routes that do
-/// not — `GET /v1/creator/handle/{handle}` being the one behind the screen
-/// that was wrong.
 const _mine = 'c-mine';
 const _theirs = 'c-theirs';
 
@@ -122,8 +111,8 @@ void main() {
       tester,
     ) async {
       // Being someone else's channel is necessary, not sufficient — a
-      // ministry that has not enrolled cannot take a gift, and the action is
-      // withheld rather than drawn and refused.
+      // ministry that has not enrolled cannot take a gift, and the action
+      // is withheld rather than drawn and refused.
       await _pumpHeader(tester, _profile(_theirs), canGive: false);
       expect(find.text(AppStrings.follow), findsOneWidget);
       expect(find.text(AppStrings.giveNow), findsNothing);

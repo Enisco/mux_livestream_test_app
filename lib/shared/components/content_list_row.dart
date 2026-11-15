@@ -9,11 +9,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// A piece of content as a list row: still on the left, everything needed to
 /// judge it on the right, and an overflow button.
-///
-/// Search results and history entries are the same row in the design, differing
-/// only in what the still carries — a kind glyph, a runtime, a watched bar —
-/// and whether the last line is a meta summary or an event's date and place.
-/// One widget covers both so the two screens cannot drift apart.
 class ContentListRow extends StatelessWidget {
   const ContentListRow({
     super.key,

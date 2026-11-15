@@ -25,9 +25,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Prayer requests and testimonies: two lists of things the reader sent to a
 /// ministry, and what became of each.
-///
-/// They share a card — avatar, author, a status pill, a body, a footer — and
-/// differ in what the pill means and what the footer says.
 
 void _report(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -139,10 +136,7 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
             icon: HugeIcons.strokeRoundedLinkSquare01,
             enabled: !request.aboutIsGeneral,
           ),
-          // No delete. A viewer cannot withdraw a prayer request — only the
-          // receiving ministry changes its status — and the guide is explicit
-          // that the affordance should not be drawn. It used to be here, and
-          // it only ever hid the row until the next load.
+          // No delete.
         ],
         onSelected: (label) {
           Navigator.pop(sheetContext);
@@ -157,9 +151,6 @@ class _PrayerRequestsScreenState extends State<PrayerRequestsScreen> {
   }
 
   /// Open what the request was raised against.
-  ///
-  /// A context-menu action is explicitly not a card click, so no beacon goes
-  /// out — the guide says to count clicks at the surface, not in a menu.
   void _goToContent(PrayerRequest request) {
     if (!openFeedItem(
       context,

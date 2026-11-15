@@ -19,12 +19,6 @@ import 'helpers/load_app_fonts.dart';
 import 'helpers/fixture_time.dart';
 
 /// The bell, and what is behind it.
-///
-/// Shapes are `POST /v1/notification/search` as staging answered on
-/// 2026-10-14 — a page-number `{data, meta}` envelope, `readAt` as the only
-/// read signal, and `status` left at `pending` whether or not a row has been
-/// read. Reading `status` instead of `readAt` would mark every row unread
-/// for ever, which is the mistake these pin against.
 class _FakeApi implements ApiService {
   _FakeApi({this.pages = const [], this.fail = false});
 
@@ -302,9 +296,9 @@ void main() {
 
   group('signing in', () {
     test('drops the previous account\'s studio', () async {
-      // A session that expires never runs `logout`, so without this the next
-      // person to sign in on the device inherited the last one's `creatorId`
-      // — and the studio screens key off nothing else.
+      // A session that expires never runs `logout`, so without this the
+      // next person to sign in on the device inherited the last one's
+      // `creatorId` — and the studio screens key off nothing else.
       SharedPreferences.setMockInitialValues({});
       await LocalStorage.init();
       await LocalStorage.setString(LocalStorage.creatorIdKey, 'someone-else');

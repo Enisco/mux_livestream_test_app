@@ -16,23 +16,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Editing on the phone what was only editable on the web.
-///
-/// Asked for on 2026-11-13: "We should be able to Edit contents on mobile
-/// too. The API needs are in the integration guides."
-///
-/// The guides give update routes for **posts** and **calendar events**:
-/// `PATCH /v1/content/posts/:id` and
-/// `PATCH /v1/content/calendar/events/:id`. They give **none** for a media
-/// row — video, audio and livestream have create, `publish` and the live
-/// session routes and nothing else — so those keep the web studio rather
-/// than getting a button that cannot work. An unauthenticated probe could
-/// not settle it either way: the staging gateway answers 403 to every
-/// path, including one that does not exist.
-///
-/// The regression these mostly guard: the editor shows a headline, a body
-/// and a cover, but a post also has an excerpt, categories and a
-/// visibility. A PATCH assembled from the form alone would send those back
-/// empty and wipe them.
 class _FakeApi implements ApiService {
   _FakeApi({this.getBody, this.error});
 
@@ -205,10 +188,7 @@ void main() {
     });
 
     test('but an empty meeting link is left out, not sent blank', () {
-      // The one field here likely to be format-validated. `@IsOptional()`
-      // skips null, not '', so a blank would risk "must be a URL" on every
-      // physical event's edit — a worse failure than not being able to
-      // empty a link from the phone.
+      // The one field here likely to be format-validated.
       final json = EventDraft(
         title: 'T',
         venueType: EventVenueType.physical,
@@ -309,9 +289,7 @@ void main() {
     });
 
     testWidgets('and keeps the markdown tools it writes with', (tester) async {
-      // Editing is writing. A footer that swapped the toolbar out for a
-      // Save button left a creator correcting an article with no bold, no
-      // link and no way to add a picture.
+      // Editing is writing.
       await pump(tester);
 
       expect(find.byKey(const ValueKey('article-tool-bold')), findsOneWidget);
@@ -323,8 +301,6 @@ void main() {
       tester,
     ) async {
       // The whole point: the editor shows a headline, a body and a cover.
-      // A PATCH built from those alone would clear the excerpt, the
-      // categories and the visibility the creator set on the web.
       final api = await pump(tester);
 
       await tester.tap(find.byKey(const ValueKey('article-save-edit')));
@@ -401,8 +377,7 @@ void main() {
   group('what an edit must not quietly change', () {
     testWidgets('an event keeps the time it actually ends at', (tester) async {
       // The form collects an end *date* only, so a new event ends at
-      // whatever time it starts. Rebuilding an existing one that way
-      // turned a 9-to-11 service into one ending at 9.
+      // whatever time it starts.
       tester.view.physicalSize = const Size(390 * 3, 2200 * 3);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
@@ -471,9 +446,7 @@ void main() {
       tester,
     ) async {
       // The footer said "title, description, visibility and series are
-      // edited on the web studio" under every kind. On the screen that now
-      // edits a post's title, that sends a creator to a desktop for work
-      // they can do here.
+      // edited on the web studio" under every kind.
       await pump(tester, StudioContentKind.post);
 
       expect(find.text(AppStrings.contentMediaEditWeb), findsNothing);
@@ -491,8 +464,7 @@ void main() {
     ) async {
       // This test used to assert the opposite, and said why: the media
       // guide published create, publish and the live session routes and no
-      // update, so a button here would have been one that fails. The
-      // guide's 2026-11-14 revision added `PATCH /v1/media/{id}`.
+      // update, so a button here would have been one that fails.
       await pump(tester, StudioContentKind.video);
 
       expect(find.byKey(const ValueKey('detail-edit')), findsOneWidget);
@@ -510,9 +482,7 @@ void main() {
     });
 
     testWidgets('a livestream still does not', (tester) async {
-      // A broadcast is not an upload. It is configured through
-      // `PATCH /v1/media/live/streams/{id}` — a different route with a
-      // different shape — and nothing here writes it.
+      // A broadcast is not an upload.
       await pump(tester, StudioContentKind.livestream);
 
       expect(find.byKey(const ValueKey('detail-edit')), findsNothing);

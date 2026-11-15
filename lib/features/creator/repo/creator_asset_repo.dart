@@ -7,12 +7,6 @@ import 'package:test_app/shared/services/s3_upload.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// The two images a channel carries, and what staging will accept for each.
-///
-/// The ceilings are not guesses: each `upload-url` response returns its own
-/// `constraints.maxSizeBytes`, and these are what staging answered. They are
-/// held here so the picker can turn an oversized file away before a request
-/// is made, and are re-read from the response on every upload in case the
-/// server tightens them.
 enum CreatorAssetKind {
   avatar('avatar', 2 * 1024 * 1024),
   banner('banner', 8 * 1024 * 1024);
@@ -39,20 +33,6 @@ class AssetUploadResult {
 }
 
 /// Puts a channel photo or banner where the API can see it.
-///
-/// Three steps, all verified against staging:
-///
-///  1. `POST /v1/creator/{id}/{kind}/upload-url` with `{filename, mimeType,
-///     size}` returns `{fileId, uploadUrl, key, fields, expiresAt,
-///     constraints}`. The key lands under `quarantine/`.
-///  2. The bytes go straight to S3 as a presigned **POST** — every entry of
-///     `fields` as a form field, the file last. S3 answers `204`.
-///  3. Nothing is confirmed separately. Saving the creator with the returned
-///     `fileId` is what promotes the key from `quarantine/` to `public/`.
-///
-/// The declared `size` must be the exact byte length: the presigned policy
-/// carries `content-length-range: N,N`, so a mismatch is refused by S3 with
-/// `EntityTooSmall`.
 class CreatorAssetRepo {
   CreatorAssetRepo(this._api);
 

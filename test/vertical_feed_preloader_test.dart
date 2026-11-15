@@ -8,13 +8,9 @@ import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/services/vertical_feed_preloader.dart';
 
 /// The vertical-feed preloader used to warm itself up on every launch, on
-/// every `MainShell` mount and again on every sign-in and sign-out — fetching
-/// the feed and opening three native players for a screen the new design has
-/// no route to. Nothing read them, so they were three decoders and four
-/// requests thrown away per launch.
-///
-/// The warm-up is opt-in now. This holds that line: the only thing that may
-/// start one is a caller that actually wants the players.
+/// every `MainShell` mount and again on every sign-in and sign-out —
+/// fetching the feed and opening three native players for a screen the new
+/// design has no route to.
 class _CountingRepo implements DiscoveryRepo {
   int feedCalls = 0;
 

@@ -8,9 +8,6 @@ import 'package:test_app/shared/services/volume_key_unmuter.dart';
 import 'support/fake_playback.dart';
 
 /// Pressing volume-up on a silent feed video should unmute it.
-///
-/// Mute is player volume 0, so the hardware keys moved the system stream and
-/// left the video exactly as silent — which reads as the buttons not working.
 class _FakeVolume implements VolumeController {
   final _controller = StreamController<double>.broadcast();
 

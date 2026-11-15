@@ -39,9 +39,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Opens the right detail screen for a feed or library row.
-///
-/// The media aggregate only knows media: asking it for a post, devotional or
-/// event returns 404, which every non-media row used to do.
 void openContentDetail(
   BuildContext context,
   WebFeedItem item, {
@@ -83,16 +80,6 @@ void openContentDetail(
 }
 
 /// Open whatever a row stands for, reporting the click first.
-///
-/// Every surface that lists content does the same two things in the same
-/// order — report the click against the surface that was activated, then push
-/// the right screen for the entity type — so they share this rather than each
-/// keeping a copy that drifts.
-///
-/// Returns false when the row carries nothing to open, which is what a caller
-/// says something about: a library row whose content has been deleted or made
-/// private comes back without its hit, and a tap that silently did nothing
-/// would read as a broken screen.
 bool openFeedItem(
   BuildContext context,
   WebFeedItem? item, {
@@ -195,9 +182,6 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   }
 
   /// Marks a devotional day read.
-  ///
-  /// The API records completion but has no route to undo it, so an already-read
-  /// day is left alone rather than pretending it can be cleared.
   Future<void> _markDayRead(
     DevotionalSeriesDetail series,
     DevotionalEntry entry,
@@ -282,9 +266,6 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
 
   /// Reader-side beacons: the page is on screen (`impression`), and the body
   /// it was opened for is available to read (`view_started`).
-  ///
-  /// Content entities are targeted by `contentType` + `contentId`; sending a
-  /// post id as `mediaId` would attach the event to unrelated media.
   void _reportOpened() {
     if (_reported) return;
     final contentType = ContentTypes.fromEntityType(widget.item.entityType);
@@ -340,10 +321,6 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   }
 
   /// Hands off to the web surface.
-  ///
-  /// No `sourceMediaId`: nothing on this screen is media. Posts, devotionals
-  /// and events are content-service entities, and the giving source is
-  /// validated against media alone — naming one of these would be refused.
   Future<void> _give() async {
     final creatorId = _ministryId;
     if (creatorId.isEmpty) return;
@@ -634,11 +611,6 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
 }
 
 /// Where the event is, and a way to get there.
-///
-/// The design draws a map preview with a pin. An event carries only text and
-/// no coordinates, and the app has no maps SDK or key — so instead of a fake
-/// map, the address is handed to whichever map app the reader already has,
-/// which is where they would have gone next anyway.
 class _EventPlaceCard extends StatelessWidget {
   const _EventPlaceCard({required this.event});
 
@@ -923,9 +895,6 @@ class _DayRow extends StatelessWidget {
 }
 
 /// The read/unread control on a devotional day.
-///
-/// Deliberately a small tick rather than a button: the row already carries the
-/// day number and title, and the design keeps the list quiet.
 class _DayCheck extends StatelessWidget {
   const _DayCheck({
     required this.completed,

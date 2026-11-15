@@ -16,19 +16,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The second half of a password reset.
-///
-/// "Check your inbox" was where the flow used to end: the email carries a
-/// token and `POST /v1/auth/password/reset` takes `{token, newPassword}`, but
-/// nothing in the app could spend it.
-///
-/// The Figma section has no frame for this screen — it only draws "send me a
-/// link" (`10618-83676`) — so the layout deliberately mirrors
-/// [ForgotPasswordScreen] rather than inventing a look of its own.
-///
-/// The token arrives one of two ways: a deep link fills [token] in, and
-/// anyone whose link opened in a browser instead can paste the code. Universal
-/// links are not verified on either host yet, so the paste path is the one
-/// that actually works today, not a fallback.
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key, this.token});
 

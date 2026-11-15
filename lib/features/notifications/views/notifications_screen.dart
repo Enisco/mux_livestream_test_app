@@ -18,14 +18,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Everything the platform has told this reader.
-///
-/// Grouped by day the way History is, because they answer the same question —
-/// "what happened, and when". Unread rows carry a dot and a lighter plate;
-/// tapping one marks it read whether or not it has anywhere to go.
-///
-/// The design has no frame for this screen, so it is built from the list
-/// anatomy the rest of the app already uses: a [LibraryHeader] with one
-/// action, day headings, and the same empty and error states.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key, this.repo, this.store});
 
@@ -99,10 +91,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   /// Read the row, then go wherever it points.
-  ///
-  /// The read is optimistic and is not rolled back: a notification shown as
-  /// read when the write failed is a far smaller wrong than one that keeps
-  /// coming back after the reader has dealt with it.
   Future<void> _open(AppNotification row) async {
     if (row.isUnread) {
       setState(() {

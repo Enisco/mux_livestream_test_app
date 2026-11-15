@@ -119,8 +119,6 @@ void main() {
 
   test('anything else is re-encoded to PNG and renamed to match', () async {
     // An iPhone hands over HEIC, which the upload endpoints do not accept.
-    // The bytes here are a PNG wearing a .heic name: what matters is that the
-    // service does not trust the extension and re-encodes.
     FilePicker.platform = _FakePicker(
       _oneFile(name: 'IMG_0042.heic', extension: 'heic', bytes: png),
     );

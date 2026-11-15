@@ -3,28 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The iOS build settings a permission needs before it can be asked for.
-///
-/// Reported from a device on 2026-11-11: going live on iOS never showed the
-/// camera or microphone prompt and failed instantly, while Android was
-/// fine. Nothing was wrong with the Dart.
-///
-/// `permission_handler_apple` compiles **every** permission out by default.
-/// `PermissionHandlerEnums.h` is a wall of
-///
-/// ```objc
-/// #ifndef PERMISSION_CAMERA
-///     #define PERMISSION_CAMERA 0
-/// #endif
-/// ```
-///
-/// and its podspec defines none of them, so a group whose macro is 0 falls
-/// to `UnknownPermissionStrategy`, whose `requestPermission:` answers
-/// `PermissionStatusPermanentlyDenied` without ever reaching the system.
-/// The Podfile is the only place that can switch one on.
-///
-/// A Dart test cannot catch that by running the code, so it reads the build
-/// files instead: every permission the app asks for must be compiled in and
-/// must have its usage string, or the App Store rejects the binary.
 void main() {
   /// Permission.x in Dart -> (its Podfile macro, its Info.plist key).
   const needs = <String, (String, String)>{

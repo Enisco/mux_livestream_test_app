@@ -8,16 +8,6 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 
 /// Watches a feed card and reports it as seen.
-///
-/// Two separate things happen here. Every card that dwells on screen sends the
-/// organic `impression` the funnel is built on; a card carrying server-issued
-/// promotion attribution *additionally* sends the billable
-/// `promoted_qualified_impression`. Each fires at most once per card per screen
-/// session, which is what the beacon contract asks for.
-///
-/// Visibility is event-driven rather than polled: a feed holds dozens of these
-/// at once, and a timer per card would keep ticking for every row the reader
-/// never reaches.
 class PromotedImpressionTracker extends StatefulWidget {
   const PromotedImpressionTracker({
     super.key,
@@ -108,9 +98,7 @@ class _PromotedImpressionTrackerState extends State<PromotedImpressionTracker> {
     _dwell = null;
     if (!mounted || !_wantsAnything) return;
     // A card that was on screen while the app was backgrounded was not
-    // actually seen by anyone. The state is null until the first lifecycle
-    // event arrives, and "not yet known" must not mean "not seen" — that would
-    // silently drop the impressions from the first screen of a cold start.
+    // actually seen by anyone.
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) {
       _visibleSince = null;

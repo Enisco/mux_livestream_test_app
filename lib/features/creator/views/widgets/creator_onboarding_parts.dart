@@ -6,12 +6,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The parts the creator onboarding screens are made of.
-///
-/// Every screen in the section is the same skeleton: a back arrow with the
-/// title beside it, one grey line of explanation under it, then the screen's
-/// own content over a footer. The older onboarding centred a logo and carried
-/// a progress bar and a Skip; this flow does neither, so these live here
-/// rather than reusing the onboarding widgets.
 
 /// Back arrow, title, and the line that says what the screen is for.
 class CreatorFlowHeader extends StatelessWidget {
@@ -141,9 +135,6 @@ class CreatorChoiceCard extends StatelessWidget {
 }
 
 /// How far through the four profile-polish steps the reader is.
-///
-/// The steps can all be skipped, so this is the only thing telling them the
-/// flow is finite.
 class CreatorStepDots extends StatelessWidget {
   const CreatorStepDots({super.key, required this.index, this.count = 4});
 

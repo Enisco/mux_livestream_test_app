@@ -25,10 +25,6 @@ import 'helpers/load_app_fonts.dart';
 
 /// What a giver actually sees: where Give is offered, what it asks, and what
 /// it says afterwards.
-///
-/// The amount step is deliberately missing from all of this — it lives on the
-/// web surface, so there is no screen here that could name a figure the server
-/// has not computed.
 
 const _funds = [
   GivingFundOption(id: 'f1', slug: 'general', name: 'General support'),
@@ -176,10 +172,6 @@ class _GiveApi implements ApiService {
 }
 
 /// A Give button wired to [api], so a tap runs the real flow.
-///
-/// [taps] stands in for the race a modal barrier cannot catch: two taps
-/// delivered in the same frame, before anything is on screen to absorb the
-/// second.
 Widget _giveButton(_GiveApi api, {List<Uri>? opened, int taps = 1}) {
   final repo = DonorGivingRepo(api: api);
   final handoff = CheckoutHandoffService(
@@ -596,8 +588,7 @@ void main() {
 
     testWidgets('never claims the ministry has the money', (tester) async {
       // Settlement follows on its own schedule, and on a provider-held rail
-      // after a hold window. The giver is thanked for the gift, not told a
-      // transfer happened.
+      // after a hold window.
       await show(tester, ['succeeded']);
       expect(find.textContaining('sent to'), findsNothing);
       expect(find.textContaining('paid out'), findsNothing);
@@ -605,8 +596,8 @@ void main() {
 
     testWidgets('thanks without a figure when none came back', (tester) async {
       // The server formats money; the app never composes an amount of its
-      // own, so a settled gift with no echoed charge thanks the giver plainly
-      // rather than printing a blank or a rebuilt figure.
+      // own, so a settled gift with no echoed charge thanks the giver
+      // plainly rather than printing a blank or a rebuilt figure.
       final api = _FakeApi(['succeeded'], withCharge: false);
       await GetIt.instance.reset();
       GetIt.instance.registerSingleton<ApiService>(api);
@@ -688,9 +679,9 @@ void main() {
 
       expect(find.text(AppStrings.giveOpening), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      // Seen on the device on 2026-10-29: a dialog route carries no Material
-      // of its own, and the message came out in the debug fallback style —
-      // yellow, double-underlined.
+      // Seen on the device on 2026-10-29: a dialog route carries no
+      // Material of its own, and the message came out in the debug fallback
+      // style — yellow, double-underlined.
       expect(
         find.ancestor(
           of: find.text(AppStrings.giveOpening),

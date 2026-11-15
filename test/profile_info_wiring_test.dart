@@ -17,12 +17,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Changing your own name and photo.
-///
-/// The auth guide lists `PATCH /v1/user/{id}` and the avatar pair as "not yet
-/// client-integrated — treat as unverified", so the shapes below are what
-/// staging answered on 2026-10-07, not what the guide says. The route takes
-/// `firstName`, `lastName` and `phone` and **refuses** `email`, `password`
-/// and `displayName`, which is why this screen writes only a name.
 class _FakeApi implements ApiService {
   _FakeApi({this.failPatch = false});
 

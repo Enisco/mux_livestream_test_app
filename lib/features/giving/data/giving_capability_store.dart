@@ -6,24 +6,6 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/giving/repo/donor_giving_repo.dart';
 
 /// Who can be given to, remembered for as long as that is safe.
-///
-/// Every surface that draws a Give button needs the same answer about the same
-/// handful of ministries, and the answer is public, cheap and identical for
-/// every reader — so asking once per screen would be several requests for one
-/// fact. This holds it for the session.
-///
-/// Three things it is careful about:
-///
-/// - **Unknown is not false.** [known] answers `null` for a ministry nobody
-///   has asked about, which is what lets a surface tell "no Give button" apart
-///   from "not asked yet" and fetch rather than silently withhold the action.
-/// - **It expires.** A ministry can be restricted mid-session — the guide says
-///   to cache only briefly — so an entry older than [ttl] is re-read. Offering
-///   Give for a ministry that has since been suspended walks the giver into a
-///   refusal they cannot act on.
-/// - **One flight per creator.** Two cards asking at once share a request
-///   instead of racing, which matters most on a feed where the same ministry
-///   appears several times.
 class GivingCapabilityStore extends ChangeNotifier {
   GivingCapabilityStore({DonorGivingRepo? repo})
     : _repo = repo ?? DonorGivingRepo();
@@ -44,10 +26,6 @@ class GivingCapabilityStore extends ChangeNotifier {
   }
 
   /// The answer, fetched if it is not already held.
-  ///
-  /// Never throws: a lookup that fails answers `false`, because a Give button
-  /// drawn on a guess is worse than one missing. The entry is not cached in
-  /// that case, so the next surface tries again.
   Future<bool> ensure(String creatorId) {
     if (creatorId.isEmpty) return Future.value(false);
     final cached = known(creatorId);
@@ -69,9 +47,6 @@ class GivingCapabilityStore extends ChangeNotifier {
   }
 
   /// Looks up a page of ministries in one request.
-  ///
-  /// Ones already held are not asked about again, so a feed that pages in more
-  /// rows only pays for the ministries it has not seen.
   Future<void> prime(Iterable<String> creatorIds) async {
     final wanted = {
       for (final id in creatorIds)

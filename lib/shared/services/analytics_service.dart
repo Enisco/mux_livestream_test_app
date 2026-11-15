@@ -483,11 +483,7 @@ class AnalyticsService with WidgetsBindingObserver {
       'source': AnalyticsSource.normalize(source),
       if (promotion != null) ...promotion.toBeaconFields(),
       'visibleDurationMs': ?visibleDurationMs,
-      // A viewer is authenticated or anonymous, never both. A signed-in viewer
-      // must not be labelled anonymous, but the client cannot name them either:
-      // ingest validates `authenticatedUserId` as a UUID and this platform's
-      // user ids are ObjectIds (see docs/OPEN_ISSUES.md). The authenticated
-      // ingest route carries the bearer token, so the server attributes them.
+      // A viewer is authenticated or anonymous, never both.
       'identity': {
         'sessionId': _session.analyticsSessionId,
         if (!_isSignedIn) 'anonymousViewerId': _session.anonymousViewerId,

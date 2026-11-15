@@ -5,10 +5,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// One page of something, whichever way the route pages.
-///
-/// The three Impact inboxes do not agree: prayers are keyset, testimonies and
-/// comments are page-number. Both are normalised here so the screen asks for
-/// "the next page" and does not care which.
 class ImpactPage<T> {
   const ImpactPage({
     required this.items,
@@ -33,15 +29,6 @@ class ImpactPage<T> {
 }
 
 /// What a congregation has sent a creator.
-///
-/// Every route here is the creator-side inbox documented in
-/// `docs/API_INTEGRATION_GUIDES/client-creator-and-dashboard-integration.md`.
-/// They are a different family from the viewer-side engagement routes: a
-/// viewer's own prayers live under `/v1/engagement/prayers/mine`, and the
-/// public testimony wall under `/v1/public/engagement/testimonies`.
-///
-/// **Reads hang off the creator; writes do not.** Each `PATCH` takes the
-/// row's own id with no creator segment.
 class ImpactRepo {
   ImpactRepo({ApiService? api}) : _injected = api;
 
@@ -52,10 +39,6 @@ class ImpactRepo {
   // ---- Prayers ----------------------------------------------------------
 
   /// `GET /v1/creator/:id/engagement/prayers` — keyset, newest first.
-  ///
-  /// `cursor` is the previous page's `nextCursor`; omit it for the first
-  /// page. `total` is for display only — building an offset from it would
-  /// page the list wrongly.
   Future<ImpactPage<PrayerRequest>> fetchPrayers(
     String creatorId, {
     PrayerFilter? status,
@@ -99,11 +82,6 @@ class ImpactRepo {
 
   /// `PATCH /v1/creator/engagement/prayers/:id`, which takes the **prayer
   /// id**, not a creator id.
-  ///
-  /// Both fields are optional and `null` is not absence: passing
-  /// [unassign] sends an explicit `null` to clear the assignment, while
-  /// leaving both assignment arguments alone keeps whatever is there. Mixing
-  /// those up silently keeps a stale assignee.
   Future<void> updatePrayer(
     String prayerId, {
     PrayerFilter? status,
@@ -152,11 +130,6 @@ class ImpactRepo {
   }
 
   /// `PATCH /v1/creator/engagement/testimonies/:id/moderate`.
-  ///
-  /// One `status` write covers every action the inbox offers:
-  /// approve (`pending → approved`), reject (`pending → rejected`), remove
-  /// from the wall (`approved → rejected`) and restore for review
-  /// (`rejected → pending`).
   Future<void> moderateTestimony(
     String testimonyId,
     TestimonyFilter status,
@@ -171,10 +144,6 @@ class ImpactRepo {
 
   /// `GET /v1/creator/:id/engagement/comments` — **the moderation queue, not
   /// a comment feed.**
-  ///
-  /// It returns only `flagged` and `hidden` rows. Omitting `status` means
-  /// both of those, never "every comment"; `status=visible` is rejected by
-  /// the gateway and nothing here sends it.
   Future<ImpactPage<ImpactComment>> fetchComments(
     String creatorId, {
     CommentFilter filter = CommentFilter.both,
@@ -194,9 +163,6 @@ class ImpactRepo {
   }
 
   /// `PATCH /v1/creator/engagement/comments/:commentId/moderate`.
-  ///
-  /// Moderating to `visible` **removes the row from the queue** — that is
-  /// what the queue is for, so the caller should expect it to disappear.
   Future<void> moderateComment(
     String commentId,
     CommentModeration status,

@@ -5,12 +5,6 @@ import 'package:test_app/shared/services/s3_upload.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// The two images the content service takes, for posts and for events.
-///
-/// `POST /v1/content/assets/upload-url` mints both. They differ only in
-/// where the key lands — `cover` under `thumbnail/`, `body_image` under
-/// `attachment/` — and in what names the `fileId` afterwards: a cover is
-/// `coverThumbnailFileId` / `coverImageFileId`, a body image is referenced
-/// from the markdown as `![alt](file:{id})`.
 enum ContentAssetKind {
   cover('cover'),
   bodyImage('body_image');
@@ -21,12 +15,6 @@ enum ContentAssetKind {
 }
 
 /// Puts a cover or an inline image where the content service can see it.
-///
-/// The same S3 presigned **POST** the channel photo and banner use. Nothing
-/// is confirmed separately: naming the `fileId` on a post or an event is
-/// what promotes the key out of `quarantine/`. Until something does, the
-/// embed resolver answers `available: false, reason: not_uploaded` — which
-/// is not a failure, only an unsaved draft.
 class ContentAssetRepo {
   ContentAssetRepo([ApiService? api]) : _injected = api;
 

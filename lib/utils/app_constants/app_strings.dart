@@ -356,10 +356,9 @@ abstract final class AppStrings {
       "Your previous attempt is still processing. We'll update your plan as "
       'soon as it settles.';
   // ---- Giving (the reader's side) ---------------------------------------
-  //
-  // The app never names an amount, a currency or a fee: the giver chooses all
-  // three on the web surface, and copy that previewed them here would be
-  // guessing at numbers only the server can compute.
+  // The app never names an amount, a currency or a fee: the giver chooses
+  // all three on the web surface, and copy that previewed them here would
+  // be guessing at numbers only the server can compute.
 
   /// The action itself, on a content page's impact row.
   static const give = 'Give';
@@ -577,9 +576,6 @@ abstract final class AppStrings {
       'Your new password must differ from the current one.';
 
   // Two-factor authentication — a switch and an emailed code.
-  //
-  // The TOTP wording is gone with the TOTP screens: there is no authenticator
-  // app, no QR and no recovery codes. See `two_factor_screens.dart`.
   static const twoFactorTitle = 'Two-factor authentication';
   static const twoFactorHeading = 'Add a second lock';
   static const twoFactorBody =
@@ -1010,9 +1006,7 @@ abstract final class AppStrings {
       'Share a sermon, message, or worship song with your community.';
 
   /// The ceilings are staging's own `constraints.maxSizeBytes`: 5 GB for a
-  /// video ticket, 1 GB for a music one. The design says 4 GB on the video
-  /// frame and repeats "MP4 or MOV, up to 4GB" on the audio frame, which
-  /// names neither the right containers nor the right ceiling.
+  /// video ticket, 1 GB for a music one.
   static const newVideoPickHint = 'MP4 or MOV, up to 5GB';
   static const newAudioPickHint = 'MP3, M4A or WAV, up to 1GB';
   static const newVideoSelect = 'Select video';
@@ -1056,8 +1050,7 @@ abstract final class AppStrings {
 
   /// Making published media unlisted through the edit route returns no
   /// share token — only publish does, and each publish of unlisted media
-  /// mints a new one that stops older links working. So the phone cannot
-  /// hand over a link for what it just unlisted, and says so.
+  /// mints a new one that stops older links working.
   static const visibilityUnlistedNoLink =
       'Unlisted. The link for it is on the web studio.';
 
@@ -1387,9 +1380,6 @@ abstract final class AppStrings {
   static const studioFullAnalytics = 'Full analytics';
 
   /// Why "Full analytics" does not open anything on the phone.
-  ///
-  /// The mobile dashboard carries today's four figures and nothing behind
-  /// them: per-item breakdowns are a web-studio screen (OPEN_ISSUES 18).
   static const studioWebAnalyticsNote = 'Full analytics are on the web studio.';
 
   static const studioWebNote =
@@ -1425,11 +1415,6 @@ abstract final class AppStrings {
   /// Likewise for the "needs you" rows.
   /// `dashboard/attention` sends keys and counts, never copy, so the words
   /// live here and an unknown key falls back to the key itself.
-  ///
-  /// The first three are what staging actually sends, confirmed on a live
-  /// studio 2026-10-05 — before that this map guessed, and a creator saw
-  /// `open_prayers` on their dashboard. The rest are kept as aliases in case
-  /// the backend's vocabulary shifts.
   static const studioAttentionTitles = <String, String>{
     'open_prayers': 'Prayer requests',
     'pending_testimonies': 'Testimonies to review',
@@ -1467,15 +1452,10 @@ abstract final class AppStrings {
   static const studiosPersonal = 'Personal';
   static const studiosSwitch = 'Switch studio';
   static const studiosSettings = 'Studio Settings';
-  // What the app itself owns of a studio's settings. The row used to say
-  // settings were managed on the web and answer a tap by repeating that
-  // sentence as a snackbar — a chevron that led nowhere, when the photo,
-  // banner, bio and links screens have been in the app all along.
+  // What the app itself owns of a studio's settings.
   static const studiosSettingsNote = 'Logo, cover and about';
 
-  // The studio's own settings. One screen showing what the channel already
-  // has, because the onboarding chain starts every field empty and asked a
-  // creator who had filled all three to fill them again.
+  // The studio's own settings.
   static const studioProfileTitle = 'Studio settings';
   static const studioProfileSubtitle =
       'What your channel already shows. Change anything that needs it.';
@@ -1542,10 +1522,6 @@ abstract final class AppStrings {
   static const historyClearConfirm = 'Clear all';
 
   /// The per-row overflow.
-  ///
-  /// "Remove from" rather than "Delete": the route suppresses the row through
-  /// an instant rather than deleting it, so watching the same thing again
-  /// brings it back — and a reader told "deleted" would report that as a bug.
   static const historyRemoveOne = 'Remove from history';
   static const historyRemovedOne = 'Removed from your history.';
   static const historyRemoveFailed = 'That did not save. Try again.';
@@ -1608,10 +1584,7 @@ abstract final class AppStrings {
   static const exploreUpcomingEvent = 'Upcoming event';
   static const exploreBrowse = 'Browse';
 
-  /// The results list's own "there is more" control. It used to read "Look
-  /// further back", because a query only reached as far as the feed pages
-  /// already loaded; the search is server-side now, so this is simply the
-  /// next page of results.
+  /// The results list's own "there is more" control.
   static const searchShowMore = 'Show more results';
   static const searchLoadingMore = 'Loading…';
 
@@ -1695,10 +1668,8 @@ abstract final class AppStrings {
   static const prayerStatePrayed = 'Prayed for';
   static const prayerStateResolved = 'Resolved';
 
-  /// The source line when a prayer came from content whose title the gateway
-  /// could not resolve. Absence is normal — deleted content, another
-  /// creator's, or a type with no title at all — so every type the inbox can
-  /// show needs a word of its own rather than a blank line.
+  /// The source line when a prayer came from content whose title the
+  /// gateway could not resolve.
   static String prayerFromType(String targetType) => switch (targetType) {
     'media' => 'From a video',
     'post' => 'From an article',
@@ -1778,10 +1749,7 @@ abstract final class AppStrings {
   static const commentFlaggedPill = 'Flagged comment';
   static const commentHiddenPill = 'Hidden comment';
 
-  /// This tab is a moderation queue, not the whole conversation. Said on the
-  /// screen because "Comments" reads like every comment on your content, and
-  /// a creator who assumes that will think a busy video's empty queue is a
-  /// bug.
+  /// This tab is a moderation queue, not the whole conversation.
   static const commentQueueNote =
       'Only comments reported by viewers or hidden by your team appear here '
       '— not every comment on your content.';
@@ -1888,10 +1856,7 @@ abstract final class AppStrings {
 
   static const cameraPermNeeded = 'Camera & Microphone Access Required';
 
-  /// The heading when the camera itself would not start. Nothing to do
-  /// with access — saying "Access Required" over a permission that was
-  /// just granted sends the creator looking for a switch that is already
-  /// on.
+  /// The heading when the camera itself would not start.
   static const cameraFailedTitle = 'The camera would not start';
   static const cameraPermBody =
       'GTube needs camera and microphone access\nto stream live video.';
@@ -1941,14 +1906,8 @@ abstract final class AppStrings {
   static const authWallGoLive = 'Go live and stream your content';
 
   // ---- Creator Giving ---------------------------------------------------
-  //
   // Wording from the Figma section `12494-149632`, with three places it was
-  // changed deliberately. The design calls the Khaime hold "0 days", which
-  // is the real staging value and is read from the rail rather than written
-  // here. The design labels a provider-held release a "payout"; the
-  // integration guide asks for "release", because the creator asked for it
-  // and it has already happened. And "Estimated proceeds" is never shortened
-  // to "earnings" — the guide forbids showing an estimate as finalized.
+  // changed deliberately.
 
   static const givingTitle = 'Giving';
   static const givingSubtitle =
@@ -2045,16 +2004,12 @@ abstract final class AppStrings {
       'Complete identity, documents and bank details without leaving your '
       'studio.';
   // Stripe's, and only Stripe's: it is the one provider whose onboarding is
-  // a hosted page. Paystack's is three routes the app hosts itself and
-  // Khaime's is the identity form, so saying this of either would send a
-  // creator looking for a website that does not exist.
+  // a hosted page.
   static const givingProviderFormBody =
       'Connect your account and finish verification securely on the '
       'provider.';
 
-  // The Paystack bank form. Paystack v1 is Nigeria and NGN only, and the
-  // provider's own step is a settlement account rather than an identity
-  // check — which is why the note below says review still follows.
+  // The Paystack bank form.
   static String givingPaystackNote(String provider) =>
       '$provider settles each gift straight to this account. GospelTube '
       'keeps the bank code and the last four digits only.';
@@ -2126,9 +2081,7 @@ abstract final class AppStrings {
   static const givingReviewNeedsMore =
       'GospelTube needs something more before it can verify this rail.';
 
-  // Stripe's hosted onboarding. The one provider whose setup really does
-  // happen somewhere else: GospelTube collects none of the identity or
-  // bank details itself, so this screen only mints the link and opens it.
+  // Stripe's hosted onboarding.
   static String givingStripeNote(String provider) =>
       '$provider asks for identity and bank details on its own secure '
       'pages. GospelTube never sees them.';
@@ -2203,10 +2156,6 @@ abstract final class AppStrings {
   static const givingCodeSent = 'A new code is on its way.';
 
   /// Said when verification is refused and the code has not yet expired.
-  ///
-  /// Deliberately not "wrong code": the guide warns against calling a
-  /// step-up failure that without first ruling out expiry, and a creator who
-  /// typed it correctly from a stale email would be told they cannot read.
   static const givingCodeWrong =
       'That code did not work. Check it, or send a new one.';
   static const givingCodeExpired = 'That code has expired. Send a new one.';
@@ -2274,9 +2223,7 @@ abstract final class AppStrings {
   static const givingBanksUnavailable =
       'The bank list could not be loaded. Try again shortly.';
 
-  // The Khaime identity form. Khaime is the one provider whose onboarding
-  // the app hosts, so this is the only place GospelTube asks for identity
-  // details at all — which is why each field says where it goes.
+  // The Khaime identity form.
 
   static String givingKycNote(String provider) =>
       '$provider verifies the recipient and bank account. GospelTube '
@@ -2323,9 +2270,6 @@ abstract final class AppStrings {
       'Enter the settlement account number and the name on it.';
 
   /// `legal_recipient` reads as "Legal recipient".
-  ///
-  /// The ownership values are policy's, not a fixed list, so one the app has
-  /// not seen is humanised rather than shown as a wire value.
   static String givingOwnershipLabel(String wire) => wire.isEmpty
       ? wire
       : wire.replaceAll('_', ' ').substring(0, 1).toUpperCase() +

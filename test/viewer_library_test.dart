@@ -13,11 +13,6 @@ import 'helpers/load_app_fonts.dart';
 import 'helpers/fixture_time.dart';
 
 /// Liked and Saved, which are one screen reading two routes.
-///
-/// Both return enriched search hits — one list mixing media, posts, events and
-/// devotionals — so what matters is that each row names its own kind, that the
-/// grouping follows when the viewer acted rather than when the thing was
-/// published, and that taking a row out sends the right target type.
 class _FakeApi implements ApiService {
   _FakeApi({this.items = const [], this.total, this.fail = false});
 
@@ -257,10 +252,7 @@ void main() {
   group('the shared mapper', () {
     test('a day heading is a local day, not a UTC one', () {
       // The gateway sends UTC and a calendar day is a local idea, so the
-      // heading has to convert before it buckets. Both instants below are
-      // built from local midnight, which is what makes this meaningful in
-      // any zone: east of Greenwich the first one's UTC date is a day
-      // earlier, and west of it the second one's runs a day ahead.
+      // heading has to convert before it buckets.
       final now = DateTime.now();
       final midnight = DateTime(now.year, now.month, now.day);
 

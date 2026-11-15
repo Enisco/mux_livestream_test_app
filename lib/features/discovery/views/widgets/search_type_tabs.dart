@@ -7,10 +7,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The type filter over a set of results.
-///
-/// Only the seven the design draws are offered. [SearchFilter] also carries
-/// `live` and `series`, which the API accepts but this row does not show — they
-/// stay reachable from Home, where the live tab already exists.
 const _tabs = <SearchFilter>[
   SearchFilter.all,
   SearchFilter.creators,

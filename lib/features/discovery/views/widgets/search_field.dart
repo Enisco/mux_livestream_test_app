@@ -8,10 +8,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The search header: a back arrow beside the field.
-///
-/// The field takes a brand-coloured ring while it holds focus and a neutral one
-/// once a query has been committed, which is how the design distinguishes "I am
-/// typing" from "these are the results".
 class SearchHeaderField extends StatelessWidget {
   const SearchHeaderField({
     super.key,

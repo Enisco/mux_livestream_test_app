@@ -1,11 +1,6 @@
 import 'package:test_app/models/history_models/history_models.dart';
 
 /// A running order the reader put together.
-///
-/// The items are [HistoryEntry] because a playlist row and a history row are
-/// the same thing in the design — a still, a title, a creator, a meta line —
-/// and the whole library already speaks that shape. The detail read returns
-/// media search hits, which map straight onto it.
 class Playlist {
   const Playlist({
     required this.id,
@@ -46,10 +41,6 @@ class Playlist {
   final bool ownerVerified;
 
   /// What the server says is in it.
-  ///
-  /// The list read carries no items at all, and the detail read's `items`
-  /// leave out anything no longer public — so counting the array would
-  /// under-report. [itemCount] prefers this.
   final int declaredCount;
 
   /// Entries that can no longer be shown: deleted, or no longer public.

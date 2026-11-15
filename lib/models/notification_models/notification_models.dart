@@ -1,8 +1,4 @@
 /// What the notification service sends, and what the bell reads.
-///
-/// Rows arrive fully rendered — the server resolves `templateKey` against
-/// `templateData` and sends `title` and `body` as text, so nothing here
-/// composes copy from a key.
 library;
 
 /// One notification, as `POST /v1/notification/search` returns it.
@@ -66,9 +62,6 @@ class AppNotification {
 }
 
 /// One page of the bell's list.
-///
-/// The route pages by number with a `{data, meta}` envelope, unlike the
-/// cursor feeds — `meta.next` is the next page number, or null at the end.
 class NotificationPage {
   const NotificationPage({
     required this.items,
@@ -88,16 +81,6 @@ class NotificationPage {
 
 /// The notification preferences, as `GET /v1/notification/preferences`
 /// returns them.
-///
-/// Two fields arrived on 2026-10-26 with the event-reminder default
-/// (`docs/mobile-api-gap-responses.md` §3.4), and the second needs reading
-/// carefully:
-///
-/// **`eventReminderMinutes: null` does not mean "no reminder".** It is the
-/// default state and means *follow whatever the organiser set on the event* —
-/// the same thing `reminderOffsetMinutes: null` has always meant on an RSVP
-/// row. Turning reminders off is `eventRemindersEnabled: false`. They are two
-/// controls, not one picker with an "Off" entry.
 class NotificationPrefs {
   const NotificationPrefs({
     this.email = true,
@@ -127,11 +110,6 @@ class NotificationPrefs {
 }
 
 /// The lead times the platform accepts — **five values, not four**.
-///
-/// One set, shared by the viewer's default and the per-event override, so a
-/// viewer can never set a default their own override cannot express. `120`
-/// is in it because RSVP rows already held it: dropping it to match the
-/// design would have orphaned reminders people had already set.
 const reminderOffsets = <int>[15, 30, 60, 120, 1440];
 
 /// "15 minutes before", "2 hours before", "1 day before".

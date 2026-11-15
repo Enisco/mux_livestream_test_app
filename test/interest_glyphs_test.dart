@@ -5,15 +5,6 @@ import 'package:test_app/features/onboarding/views/widgets/category_glyphs.dart'
 import 'package:test_app/models/creator_models/creator_models.dart';
 
 /// The onboarding chips are the API's taxonomy.
-///
-/// They used to be the design's own eleven labels. Only six mapped onto a
-/// real category, so four chips sent nothing when picked and four categories
-/// — `prayer`, `live-services`, `testimonies`, `devotionals` — could not be
-/// picked at all. Labels and slugs now come from the same place and cannot
-/// drift; the glyph is the one thing the app still supplies, which is what
-/// these cover.
-///
-/// The slug list is `GET /v1/user/categories` on staging, 2026-09-26.
 const _taxonomy = <String>[
   'worship',
   'sermons',

@@ -27,13 +27,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The Studio tab: what the studio is doing today, and what it needs.
-///
-/// Two states of one screen. A studio with steps left shows the numbered card
-/// and "Your studio is ready"; one that is under way shows a count of what
-/// needs attention, a search and a Create button. Both show TODAY.
-///
-/// Every section loads separately — a studio with no payment set up makes the
-/// giving figure fail, which must not empty the rest of the screen.
 class StudioScreen extends StatefulWidget {
   const StudioScreen({
     super.key,
@@ -44,10 +37,6 @@ class StudioScreen extends StatefulWidget {
   });
 
   /// Sends the reader to another tab of the shell.
-  ///
-  /// Most of what this screen points at — the attention feed, the giving
-  /// step, the search icon — already exists as a sibling tab, so it asks the
-  /// shell to switch rather than pushing a second copy over itself.
   final OpenStudioTab? onOpenTab;
 
   /// Every studio the reader can work in. The shell owns the list so all
@@ -137,10 +126,6 @@ class _StudioScreenState extends State<StudioScreen> {
 
   /// A studio still finding its feet leads with the steps rather than with
   /// numbers that are all dashes.
-  ///
-  /// Only meaningful once loaded: before that the screen knows nothing, and
-  /// guessing "established" would show a full dashboard of dashes with a
-  /// Full analytics link behind them.
   bool get _isNew => _steps.any((s) => !s.complete);
 
   void _say(String message) {
@@ -160,16 +145,6 @@ class _StudioScreenState extends State<StudioScreen> {
   static const _givingTab = 3;
 
   /// Open the Impact inbox a "needs you" row belongs to.
-  ///
-  /// The three keys the dashboard actually sends are `open_prayers`,
-  /// `pending_testimonies` and `flagged_comments`; anything else lands on
-  /// Impact's first tab rather than nowhere.
-  /// Where an attention row leads.
-  ///
-  /// Every key used to be assumed to name one of Impact's three inboxes,
-  /// with anything unrecognised falling through to prayers — so
-  /// `failed_content`, which is media whose processing failed, opened the
-  /// prayer inbox and read as somebody waiting on a reply.
   void _openAttention(AttentionItem item) {
     switch (item.destination) {
       case AttentionDestination.prayers:
@@ -182,17 +157,11 @@ class _StudioScreenState extends State<StudioScreen> {
         widget.onOpenTab?.call(_contentTab);
       case AttentionDestination.elsewhere:
         // A key added server-side that this release has no screen for.
-        // Saying so beats opening the wrong inbox — which is what landing
-        // everything unrecognised on prayers amounted to.
         _say(AppStrings.studioAttentionOnWeb);
     }
   }
 
   /// Every studio the reader can work in, since 2026-10-26.
-  ///
-  /// Switching re-points the cached `creatorId` and reloads: per-studio
-  /// permissions are resolved by `dashboard/context`, which is read again for
-  /// whichever one is picked, so nothing else has to be invalidated by hand.
   Future<void> _openStudios() async {
     // Not `_context` alone: a studio whose dashboard refuses this reader has
     // none, and that is the reader who most needs the way out.
@@ -215,12 +184,6 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 
   /// Where a getting-started step actually leads.
-  ///
-  /// Every row used to answer "not built yet", which was wrong twice over:
-  /// the destinations exist, and a checklist whose steps cannot be started
-  /// is worse than no checklist. A completed step still leads somewhere —
-  /// "Complete your profile" is how a creator goes back and changes the
-  /// photo they already set.
   Future<void> _openStep(GettingStartedStep step) async {
     switch (step.key) {
       case 'complete_profile':
@@ -238,9 +201,7 @@ class _StudioScreenState extends State<StudioScreen> {
         );
         if ((went ?? false) && mounted) await _load();
       case 'setup_giving':
-        // Giving is a tab of this shell now. It used to be sent to the web
-        // with team roles, which was true before the Giving tab existed and
-        // has been wrong since.
+        // Giving is a tab of this shell now.
         widget.onOpenTab?.call(_givingTab);
       case 'invite_team':
         // Team roles really are web-studio work, like events and promotions
@@ -378,10 +339,7 @@ class _StudioScreenState extends State<StudioScreen> {
                             item: item,
                             last: i == _attention.length - 1,
                             // Each key names one of the three Impact
-                            // inboxes, so the row opens that tab. The note
-                            // this replaces said there was no creator-side
-                            // inbox to open; there is, and has been since
-                            // Impact shipped.
+                            // inboxes, so the row opens that tab.
                             onTap: () => _openAttention(item),
                           ),
                       ],
@@ -479,9 +437,7 @@ class _StudioScreenState extends State<StudioScreen> {
             children: [
               Text(
                 AppStrings.studioWelcomeBack,
-                // name.isEmpty
-                //     ? AppStrings.studioWelcomePrefix.replaceAll(',', '')
-                //     : '${AppStrings.studioWelcomePrefix} $name',
+                // name.isEmpty ?
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppStyles.heading(22, letterSpacing: -0.6),
@@ -574,8 +530,8 @@ class _StudioScreenState extends State<StudioScreen> {
         Expanded(
           child: StudioStatCard(
             // Nothing in the spec returns a giving figure for a studio with
-            // no payment setup — `earnings/summary` answers 500 — so it shows
-            // a dash until Giving is wired.
+            // no payment setup — `earnings/summary` answers 500 — so it
+            // shows a dash until Giving is wired.
             label: AppStrings.studioGiving,
             value: AppStrings.studioNoFigure,
           ),

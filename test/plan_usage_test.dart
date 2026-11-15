@@ -12,11 +12,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The plan's upload allowance, and the studios a reader can work in.
-///
-/// Both arrived on 2026-10-26. The quota is said **before** a file is picked
-/// because `POST /v1/media` only refuses after one has been uploaded, and the
-/// studio list is what turned "Switch studio" from a row that reported itself
-/// unimplemented into a real switcher.
 class _FakeApi implements ApiService {
   _FakeApi(this.body, {this.fails = false});
 
@@ -255,10 +250,8 @@ void main() {
     });
 
     test('a refused dashboard still names the studio that is open', () {
-      // `dashboard/context` answers 403 to a streamer, who is nevertheless a
-      // member — and is exactly the reader who needs the way out. Without
-      // the fallback the pill is blank and the switcher cannot be opened at
-      // all.
+      // `dashboard/context` answers 403 to a streamer, who is nevertheless
+      // a member — and is exactly the reader who needs the way out.
       const rows = [
         StudioMembership(
           creatorId: 'c1',

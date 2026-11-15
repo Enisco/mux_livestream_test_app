@@ -15,13 +15,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Finishing a password reset.
-///
-/// The flow used to stop at "check your inbox": the email carries a token and
-/// `POST /v1/auth/password/reset` takes `{token, newPassword}`, but nothing in
-/// the app could spend it, so anyone who forgot their password was simply
-/// stuck. The contract here was read off staging — an 8–128 character bound
-/// on the password, and one message, "Invalid or expired reset token.", for a
-/// token that is spent, lapsed or never existed.
 class _FakeApi implements ApiService {
   _FakeApi({this.error});
 

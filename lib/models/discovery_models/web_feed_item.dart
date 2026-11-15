@@ -50,11 +50,6 @@ class WebFeedItem {
 
   /// Whether this row is a video or a track, as opposed to a channel, an
   /// event, a post, a blog, a devotional or a series.
-  ///
-  /// The named types are the exhaustive list the discovery API sends;
-  /// anything else is media, which is also how `FeedCardMapper.kindOf`
-  /// reads it. It matters for artwork: only a media row has a still behind
-  /// the public asset proxy.
   bool get isMediaRow => switch (entityType) {
     'creator' ||
     'user' ||
@@ -68,15 +63,6 @@ class WebFeedItem {
   };
 
   /// This row's artwork, down the whole ladder.
-  ///
-  /// A URL the API resolved, then a storage key with the CDN host in front
-  /// of it, then — for a media row only — the public asset proxy. That
-  /// last rung is the only one a video published without a cover has, and
-  /// every surface that stopped short of it drew an empty box.
-  ///
-  /// Deliberately *not* a channel's avatar: a row's artwork and the face
-  /// beside it are two different pictures, and a card can want both. See
-  /// [avatarUrl].
   String? get stillUrl => isMediaRow
       ? AssetUrlResolver.mediaImage(
           url: meta.thumbnailUrl,
@@ -91,9 +77,6 @@ class WebFeedItem {
 
   /// The face beside this row: the channel's own on a creator row, the
   /// poster's on everything else.
-  ///
-  /// A creator row has no nested `creator` object — it *is* the creator —
-  /// so its avatar arrives on `meta` under its own key.
   String? get avatarUrl => isCreatorRow
       ? AssetUrlResolver.imageFor(url: meta.thumbnailUrl, key: meta.avatarKey)
       : AssetUrlResolver.resolve(creator?.avatarKey);
@@ -170,9 +153,7 @@ class WebFeedCreator {
 
   factory WebFeedCreator.fromJson(Map<String, dynamic> json) => WebFeedCreator(
     // A feed row keys this `creatorId`; a **search hit** — which is what a
-    // playlist's items and the library rows are — keys it `id`. Reading only
-    // the first left every click beacon from those surfaces with no creator
-    // attributed at all.
+    // playlist's items and the library rows are — keys it `id`.
     creatorId: json['creatorId'] as String? ?? json['id'] as String? ?? '',
     displayName: json['displayName'] as String? ?? '',
     handle: json['handle'] as String? ?? '',
@@ -232,10 +213,6 @@ class WebFeedItemMeta {
   final PromotionAttribution? promotion;
 
   /// Which creator this row belongs to.
-  ///
-  /// A **search hit** carries only this — the index does not denormalise the
-  /// creator, so a surface spanning creators resolves names and avatars with
-  /// a second query. A **feed** row has the nested `creator` object instead.
   final String? creatorId;
 
   /// Creator rows.
@@ -253,9 +230,6 @@ class WebFeedItemMeta {
   /// A creator row's own blurb. Shipped 2026-10-26 — it exists on the creator
   /// record and was simply not projected onto search hits, which is why the
   /// channel card drew a blank where the design has two lines.
-  ///
-  /// **Needs a reindex to appear**, so an absent value is normal on rows
-  /// written before the projection landed.
   final String? bio;
   final int? publishedEntryCount;
 
@@ -393,29 +367,22 @@ class RecommendedCreator {
   /// `organization` or `individual` — the avatar ring's colour.
   final String? type;
 
-  factory RecommendedCreator.fromJson(
-    Map<String, dynamic> json,
-  ) => RecommendedCreator(
-    // A feed row keys this `creatorId`; a **search hit** — which is what a
-    // playlist's items and the library rows are — keys it `id`. Reading only
-    // the first left every click beacon from those surfaces with no creator
-    // attributed at all.
-    creatorId: json['creatorId'] as String? ?? json['id'] as String? ?? '',
-    displayName: json['displayName'] as String? ?? '',
-    handle: (json['handle'] as String? ?? '').replaceFirst('@', ''),
-    avatarKey: json['avatarKey'] as String?,
-    isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
-    isFollowing: json['isFollowing'] as bool? ?? false,
-    isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
-    type: json['type'] as String?,
-  );
+  factory RecommendedCreator.fromJson(Map<String, dynamic> json) =>
+      RecommendedCreator(
+        // A feed row keys this `creatorId`; a **search hit** — which is what a
+        // playlist's items and the library rows are — keys it `id`.
+        creatorId: json['creatorId'] as String? ?? json['id'] as String? ?? '',
+        displayName: json['displayName'] as String? ?? '',
+        handle: (json['handle'] as String? ?? '').replaceFirst('@', ''),
+        avatarKey: json['avatarKey'] as String?,
+        isVerified: json['isVerified'] as bool? ?? json['verifiedAt'] != null,
+        isFollowing: json['isFollowing'] as bool? ?? false,
+        isOwnedByViewer: json['isOwnedByViewer'] as bool? ?? false,
+        type: json['type'] as String?,
+      );
 }
 
 /// One row of `GET /v1/analytics/viewer/continue-watching`.
-///
-/// Deliberately thin, because the route is: it answers with references and
-/// positions, and nothing else. The title, artwork and creator come from a
-/// second search keyed on [mediaId].
 class ContinueWatchingRef {
   const ContinueWatchingRef({
     required this.mediaId,

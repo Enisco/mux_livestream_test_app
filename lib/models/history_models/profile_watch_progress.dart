@@ -1,7 +1,4 @@
 /// What the You tab's CONTINUE WATCHING card draws.
-///
-/// Built from the first part-watched row of the reader's history, which
-/// already carries how far in they got and how long the thing runs.
 library;
 
 import 'package:test_app/models/history_models/history_models.dart';
@@ -34,9 +31,6 @@ class ProfileWatchProgress {
 }
 
 /// "24m remaining" — what is left of a part-watched row.
-///
-/// Derived from the runtime on the still and how far in the reader got; a row
-/// with no runtime has nothing to subtract from and says nothing.
 String remainingOf(HistoryEntry row) {
   final clock = row.duration;
   final fraction = row.progress;

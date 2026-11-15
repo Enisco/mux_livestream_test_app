@@ -6,12 +6,6 @@ import 'package:test_app/shared/components/library_parts.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Picking an order for one of the three "mine" lists.
-///
-/// `recent` and `oldest` mean **when the viewer acted** — when they RSVP'd,
-/// asked or submitted. Only events offer a second axis, `start_soonest`,
-/// because only an event has a date of its own worth sorting on; the picker
-/// takes [withStartSoonest] rather than offering a value the other two lists
-/// answer `400` to.
 Future<RecordsSort?> showRecordsSortSheet(
   BuildContext context, {
   required RecordsSort current,

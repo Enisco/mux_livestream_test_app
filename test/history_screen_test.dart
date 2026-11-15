@@ -33,10 +33,6 @@ Future<void> _pump(
 }
 
 /// History as the gateway sends it.
-///
-/// The rows go through the real mapper rather than being hand-built, so what
-/// these exercise is the grouping, the per-kind wording and the progress rule
-/// as well as the screen.
 class _FakeApi implements ApiService {
   _FakeApi({this.items = const [], this.fail = false});
 
@@ -106,8 +102,7 @@ Map<String, dynamic> _row({
     'verifiedAt': verified ? '2026-01-01T00:00:00.000Z' : null,
   },
   // Counts and media type live in `facets`; the artwork, runtime and
-  // progress live in `meta`. Reading a count from the wrong half prints
-  // nothing at all.
+  // progress live in `meta`.
   'facets': {'mediaType': mediaType, 'analyticsViews': views},
   'meta': {
     'durationSeconds': duration,

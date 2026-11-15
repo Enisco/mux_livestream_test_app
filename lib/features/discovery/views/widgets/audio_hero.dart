@@ -11,11 +11,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/duration_format.dart';
 
 /// The listening surface for a track — artwork, transport and scrubber.
-///
-/// An audio detail must not borrow the video layout: there is nothing to watch,
-/// so the space goes to the artwork and the controls instead of a 16:9 frame.
-/// Playback lives in the shared controller, so arriving here while the track is
-/// already playing simply picks it up mid-stream.
 class AudioHero extends StatelessWidget {
   const AudioHero({
     super.key,
@@ -73,7 +68,8 @@ class AudioHero extends StatelessWidget {
           Padding(
             // No status-bar inset here: the screen holds this hero clear of
             // system chrome, so adding it again pushed the whole layout —
-            // back arrow, artwork, title — a notch's height down the screen.
+            // back arrow, artwork, title — a notch's height down the
+            // screen.
             padding: EdgeInsets.fromLTRB(20.s, 12.s, 20.s, 24.s),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -118,13 +114,8 @@ class AudioHero extends StatelessWidget {
                         _Transport(
                           playing: state.isPlaying(mediaId),
                           // A spinner *replaces* the icon here, so it is
-                          // held to the one wait where the icon has
-                          // nothing true to say: before the first sound.
-                          // `!playing` was the wrong test — the engine
-                          // reports playing the moment it is told to, so
-                          // the first tap drew a pause icon over silence.
-                          // A stall later keeps the icon, which stays
-                          // honest and does not flicker.
+                          // held to the one wait where the icon has nothing
+                          // true to say: before the first sound.
                           buffering:
                               active &&
                               state.buffering &&

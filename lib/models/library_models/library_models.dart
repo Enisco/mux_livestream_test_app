@@ -1,8 +1,5 @@
 /// The reader's own records: events they said they would attend, prayers they
 /// asked for, and testimonies they submitted.
-///
-/// Shaped for the screens rather than for any one payload: these come from
-/// three different services, and `ViewerRecordsRepo` does the mapping.
 library;
 
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -51,9 +48,6 @@ class MyEvent {
   final int? reminderMinutes;
 
   /// The event as a row the detail screens take, so the tile opens it.
-  ///
-  /// This read is an RSVP list rather than a search, so there is no hit to
-  /// keep whole — it is assembled from the nested `event` and nothing more.
   final WebFeedItem? source;
 }
 
@@ -101,10 +95,6 @@ class PrayerRequest {
   final PrayerStatus status;
 
   /// What it was asked about, as a row the detail screens take.
-  ///
-  /// Null for a request raised against the ministry itself, and null for one
-  /// whose content has since gone — in both cases there is nothing to open,
-  /// which is why "Go to content" stands down.
   final WebFeedItem? aboutItem;
 }
 

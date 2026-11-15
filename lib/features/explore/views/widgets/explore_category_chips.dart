@@ -8,9 +8,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The Browse block on Explore: every topic the catalogue is filed under.
-///
-/// The pills themselves are [CategoryChipGrid], which search also draws under
-/// a heading of its own.
 class ExploreCategoryChips extends StatelessWidget {
   const ExploreCategoryChips({
     super.key,

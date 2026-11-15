@@ -25,24 +25,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Gifts the congregation has entrusted to this ministry, and the paperwork
 /// that lets them arrive.
-///
-/// The tab is one screen with four faces, and which one it shows comes off
-/// the application rather than off anything remembered here:
-///
-/// - **No application at all** — the route answers `{application: null}` —
-///   is "not requested", and the hero card offers to start one.
-/// - **An application with no rails** is a draft: the recipient is recorded
-///   and a provider has still to be enrolled.
-/// - **Rails under review** can only be waited on, so the cards say who is
-///   reviewing and offer the application rather than a retry.
-/// - **An active rail** is the only state that may say gifts are being
-///   accepted, which the integration guide is explicit about.
-///
-/// Two further rules shape the wiring. Enrolling a rail and changing a live
-/// one both need an emailed code, so each is a three-step dance — challenge,
-/// code, grant — and the grant is spent immediately and never stored. And
-/// `application/options` is re-read on every load, because it is current
-/// policy and not a permanent capability.
 class GivingScreen extends StatefulWidget {
   const GivingScreen({
     super.key,
@@ -131,9 +113,6 @@ class _GivingScreenState extends State<GivingScreen> {
   // ---- Writes ------------------------------------------------------------
 
   /// "Start giving application" — the legal recipient and the terms.
-  ///
-  /// No step-up: the grant belongs to rail enrolment, and this call does not
-  /// consume one.
   Future<void> _startApplication() async {
     final creatorId = _creatorId;
     if (creatorId == null) return;
@@ -203,9 +182,6 @@ class _GivingScreenState extends State<GivingScreen> {
   }
 
   /// Change a live rail's country, currency or legal recipient.
-  ///
-  /// The old configuration keeps taking gifts throughout, so nothing here
-  /// tells the creator that giving has stopped.
   Future<void> _updateRail(GivingRail rail) async {
     final creatorId = _creatorId;
     final application = _application;
@@ -245,9 +221,6 @@ class _GivingScreenState extends State<GivingScreen> {
   }
 
   /// Take a rail in or out of donor routing.
-  ///
-  /// This does not touch its verification — it only stops new gifts being
-  /// routed through it, and payments already in flight keep reconciling.
   Future<void> _setEnabled(GivingRail rail, bool enabled) async {
     final creatorId = _creatorId;
     if (creatorId == null) return;
@@ -257,9 +230,6 @@ class _GivingScreenState extends State<GivingScreen> {
   }
 
   /// Which rail breaks a tie, when two would net the same.
-  ///
-  /// Lower priority wins, so the chosen rail is moved below the rest rather
-  /// than every rail being renumbered.
   Future<void> _setPreferred(GivingRail rail) async {
     final creatorId = _creatorId;
     final rails = _application?.rails ?? const <GivingRail>[];
@@ -276,9 +246,6 @@ class _GivingScreenState extends State<GivingScreen> {
   }
 
   /// Challenge, code, grant.
-  ///
-  /// Returns null whenever the creator backs out at any step, and reports a
-  /// refusal in one place rather than leaving each caller to.
   Future<String?> _stepUp({
     required String creatorId,
     required String operation,
@@ -303,9 +270,7 @@ class _GivingScreenState extends State<GivingScreen> {
     if (mounted) setState(() => _busy = false);
     if (!mounted) return null;
 
-    // The sheet verifies. It stays open on a refusal and says so beside the
-    // field, so backing out is a decision rather than something that just
-    // happens to a creator who mistyped a digit.
+    // The sheet verifies.
     return StepUpCodeSheet.show(
       context,
       title: title,
@@ -317,17 +282,12 @@ class _GivingScreenState extends State<GivingScreen> {
   }
 
   /// Run one write, then re-read.
-  ///
-  /// Everything here changes server-side state the screen renders in several
-  /// places at once, so nothing is applied optimistically: the application
-  /// is read back and believed.
   Future<void> _write(Future<Object?> Function() call) async {
     setState(() => _busy = true);
     try {
       // Behind a barrier: every caller here was reached from a sheet that
       // has already closed, so there is no button left on screen to carry a
-      // spinner. The re-read that follows is covered by the page's own
-      // loading state.
+      // spinner.
       await runBusy(context, call, message: AppStrings.givingWorking);
       if (!mounted) return;
       await _load();
@@ -573,9 +533,6 @@ class _GivingScreenState extends State<GivingScreen> {
   );
 
   /// The two ways out of this tab.
-  ///
-  /// Both are live as soon as an application exists: the reporting routes
-  /// refuse before that and answer for an empty studio after it.
   Widget _actions() => Row(
     children: [
       Expanded(
@@ -756,10 +713,8 @@ class _GivingScreenState extends State<GivingScreen> {
           padding: EdgeInsets.only(bottom: 12.s),
           child: GivingRailCard(
             rail: rail,
-            // The same four answers the rail screen gives, so the tab
-            // and the screen behind it never disagree about whose move
-            // it is. "View application" is for a rail nobody is waiting
-            // on the creator for.
+            // The same four answers the rail screen gives, so the tab and
+            // the screen behind it never disagree about whose move it is.
             actionLabel: rail.status.isActive
                 ? AppStrings.givingUpdateAccount
                 : switch (rail.providerStage) {
@@ -793,10 +748,6 @@ class _GivingScreenState extends State<GivingScreen> {
 
   /// The small print under the rails: what this recipient is, and the one
   /// thing a creator most often gets wrong about rails.
-  ///
-  /// Deliberately **not** [AppStrings.givingRailsBody] — that already sits
-  /// under the section heading a few hundred pixels above, and printing it
-  /// twice on one screen reads as a rendering fault.
   Widget _policyLine(GivingApplication application) => Text(
     '${application.legalClassification?.label ?? ''} · '
     '${givingCountryName(application.countryCode)}. '

@@ -29,10 +29,6 @@ Future<void> _pump(
 }
 
 /// The reader's own records, as the three services answer.
-///
-/// Each read is a different shape — events are a page-number search pairing
-/// an event with the viewer's RSVP, prayers and testimonies are cursor lists
-/// carrying a ministry byline — so the fake answers per path.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.events = const [],
@@ -384,7 +380,6 @@ void main() {
     testWidgets('offers no way to withdraw one', (tester) async {
       // A viewer cannot withdraw a prayer request — only the receiving
       // ministry changes its status — so the affordance must not be drawn.
-      // It used to be, and only ever hid the row until the next load.
       await _pump(
         tester,
         PrayerRequestsScreen(repo: _repo(prayers: [_prayerRow()])),
@@ -539,8 +534,7 @@ void main() {
 
   group('sorting the three "mine" lists', () {
     // `recent` and `oldest` mean **when the viewer acted** — when they
-    // RSVP'd, asked or submitted. Only an event has a date of its own, so
-    // only events offer the third option; the other two lists answer 400.
+    // RSVP'd, asked or submitted.
     testWidgets('every read carries a sort, and recent is the default', (
       tester,
     ) async {

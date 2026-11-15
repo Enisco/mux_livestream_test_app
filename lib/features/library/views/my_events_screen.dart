@@ -20,11 +20,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Events the reader said they would go to, split by whether they still can.
-///
-/// The list spans every ministry the reader has RSVP'd to and includes past
-/// events, so the grouping into Upcoming and Past happens here rather than in
-/// two reads. Tapping a row opens the event; RSVP posts and rolls back if the
-/// write is refused.
 class MyEventsScreen extends StatefulWidget {
   const MyEventsScreen({super.key, this.repo});
 
@@ -116,10 +111,6 @@ class _MyEventsScreenState extends State<MyEventsScreen> {
   }
 
   /// Going, or no longer going.
-  ///
-  /// The row turns over at once and goes back if the write fails — tapping
-  /// it used to flip the button and tell the server nothing, so the RSVP
-  /// came back on the next load.
   Future<void> _toggleRsvp(MyEvent event, {required bool going}) async {
     setState(() {
       going ? _going.remove(event.id) : _going.add(event.id);

@@ -11,11 +11,6 @@ import 'package:test_app/utils/app_constants/app_theme.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The You tab a reader sees before they have signed in.
-///
-/// It was the last piece of the old design left in a screen the app actually
-/// renders: legacy palette, raw `TextStyle`s and unscaled padding inside the
-/// new shell. These hold it to the new design system and to the two ways out
-/// it has to offer, and they sweep the sizes where a pitch like this breaks.
 Future<GoRouter> _pump(WidgetTester tester, Size size) async {
   tester.view.physicalSize = Size(size.width * 3, size.height * 3);
   tester.view.devicePixelRatio = 3;

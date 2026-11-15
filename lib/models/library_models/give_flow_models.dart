@@ -1,17 +1,7 @@
 /// Offering a gift, as the giver sees it.
-///
-/// The donor's share of Giving is deliberately thin. Flutter asks whether a
-/// ministry can be given to, which purpose the gift is for, and then hands the
-/// rest — amount, currency, fee breakdown, card details — to the first-party
-/// web surface in a system browser. Nothing here touches money.
 library;
 
 /// One purpose a gift can be directed at.
-///
-/// The reserved `general` fund always exists and cannot be deactivated, so a
-/// ministry's list is never empty. Slugs are immutable even when a fund is
-/// renamed, which is what makes a shared `?give=` link keep working — so the
-/// slug is what travels, never the name.
 class GivingFundOption {
   const GivingFundOption({
     required this.id,

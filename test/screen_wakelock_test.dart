@@ -3,10 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_app/shared/services/screen_wakelock.dart';
 
 /// The screen locking mid-broadcast.
-///
-/// Reported from the app: a livestream was running and the phone locked
-/// itself. A creator talking to a camera is not touching the phone, so the
-/// idle timer has nothing to go on and will always win.
 void main() {
   group('holding the screen awake', () {
     test(

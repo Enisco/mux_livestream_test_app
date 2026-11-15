@@ -18,15 +18,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Picking what goes into a playlist.
-///
-/// Rows already in it say so and cannot be picked again; the rest carry an Add
-/// button that stays lit once tapped. Returns the ids chosen, or null if the
-/// reader backed out.
-///
-/// What is offered is [suggestions] — anchored on what the playlist already
-/// holds — falling back to what is popular when it is empty and there is
-/// nothing to anchor on. **Playlists hold media only**, so nothing else is
-/// offered here.
 class PlaylistAddScreen extends StatefulWidget {
   const PlaylistAddScreen({
     super.key,

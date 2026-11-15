@@ -157,10 +157,6 @@ class _OrganizationProfileSetupScreenState
   }
 
   /// What is missing, or null when the form is ready.
-  ///
-  /// The six organisation fields are checked here because the server refuses
-  /// an organisation without them, and a 400 after the fact reads as a
-  /// failure rather than as something to fill in.
   String? _whatIsMissing() {
     if (_orgNameCtrl.text.trim().isEmpty) {
       return AppStrings.creatorNameRequired;
@@ -209,9 +205,8 @@ class _OrganizationProfileSetupScreenState
         stateOrProvince: _stateCtrl.text.trim(),
         city: _cityCtrl.text.trim(),
         postalCode: _postalCtrl.text.trim(),
-        // Website is collected but deliberately not sent: links are not being
-        // accepted from creators yet. `POST /v1/creator/onboard` does take a
-        // `website`, so this is the one line to restore when that changes.
+        // Website is collected but deliberately not sent: links are not
+        // being accepted from creators yet.
       );
       // The channel exists now, so the funnel can name it; the plan step is
       // what comes next and it needs a creator to attach a subscription to.
@@ -300,9 +295,8 @@ class _OrganizationProfileSetupScreenState
               ),
             ),
 
-            // Everything below is what `POST /v1/creator/onboard` demands of
-            // an organisation. Without them it answers 400, which is why the
-            // four-field version of this screen could never create a channel.
+            // Everything below is what `POST /v1/creator/onboard` demands
+            // of an organisation.
             const SizedBox(height: 20),
             const CreatorFieldLabel(AppStrings.orgEmailLabel),
             const SizedBox(height: 10),

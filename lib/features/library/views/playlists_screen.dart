@@ -16,10 +16,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Every running order the reader has put together.
-///
-/// **Every playlist here is private.** Staging refuses `visibility` on both
-/// create and update, so the design's "Anyone with the link" group has
-/// nothing to hold and no playlist can be shared — see `docs/OPEN_ISSUES.md`.
 class PlaylistsScreen extends StatefulWidget {
   const PlaylistsScreen({super.key, this.repo});
 
@@ -386,13 +382,6 @@ class PlaylistRow extends StatelessWidget {
 }
 
 /// One tile of the mosaic.
-///
-/// The covers are **URLs** — `meta.thumbnailUrl`, or a CDN key resolved
-/// through `AssetUrlResolver` — not bundled asset paths. This drew them with
-/// `Image.asset`, left over from when playlists ran on dummy artwork, so
-/// every real playlist with a cover threw "Unable to load asset" and showed
-/// a red plate where the still should be. A bundled path is still accepted
-/// for the placeholders that use one.
 class _CoverTile extends StatelessWidget {
   const _CoverTile(this.cover);
 
@@ -421,9 +410,6 @@ class _CoverTile extends StatelessWidget {
 }
 
 /// A playlist's covers tiled into one block.
-///
-/// Four stills make a 2×2; fewer fill what they can; none leaves the plain
-/// panel an empty playlist gets.
 class PlaylistMosaic extends StatelessWidget {
   const PlaylistMosaic({
     super.key,

@@ -45,19 +45,6 @@ class PickResult {
 }
 
 /// Picks an avatar or banner and hands back something uploadable.
-///
-/// Two things stand between the gallery and the API, and both are handled
-/// here rather than at the call site:
-///
-///  * **HEIC.** iPhones shoot HEIC by default, and the upload endpoints accept
-///    only `image/jpeg` and `image/png`. Anything that is not already one of
-///    those is decoded and re-encoded as PNG, which Flutter can do natively —
-///    iOS decodes HEIC through the platform codec.
-///  * **Size.** The two assets have different ceilings, which the ceiling is
-///    passed in for. Both were read off staging's own
-///    `constraints.maxSizeBytes` — see [CreatorAssetKind] — and the check
-///    happens after any transcode, since the re-encoded bytes are what get
-///    uploaded.
 abstract final class CreatorImagePicker {
   static const _jpeg = 'image/jpeg';
   static const _png = 'image/png';

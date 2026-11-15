@@ -265,8 +265,7 @@ void main() {
       await _pump(tester, _hero(playback));
 
       // `playing` is what the engine was *told*, and it is set the moment
-      // play is called — well before a frame exists. The spinner used to
-      // be gated on `!playing`, so this exact state drew nothing.
+      // play is called — well before a frame exists.
       playback.emit(
         mediaId: 'm-video-1',
         kind: PlaybackKind.video,
@@ -366,17 +365,13 @@ void main() {
     test('the frame is not handed over until something has played', () {
       // `Video` needs a real `VideoController`, which needs libmpv, so the
       // swap itself cannot be mounted here — the same reason the player
-      // screen is read rather than pumped. What matters is the gate: an
-      // attached `Video` with nothing decoded paints black, and black over
-      // a poster is a worse picture than the poster.
+      // screen is read rather than pumped.
       final hero = File(
         'lib/features/discovery/views/widgets/video_hero.dart',
       ).readAsStringSync();
 
       expect(hero, contains('state.position > Duration.zero'));
-      // `position`, not `buffering`: this is the *first* start only. Once a
-      // millisecond has played, a later stall keeps the frame it stalled
-      // on rather than flicking back to artwork mid-video.
+      // `position`, not `buffering`: this is the *first* start only.
       expect(
         hero,
         isNot(contains('!state.buffering)\n                    Video')),

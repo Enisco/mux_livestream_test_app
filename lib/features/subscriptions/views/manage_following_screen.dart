@@ -21,17 +21,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Everyone the reader follows, and what each is allowed to notify about.
-///
-/// This ran on a hardcoded list until the routes turned up. Two of those
-/// invented ministries carried `isLive: true` permanently, which is why
-/// ministries appeared to be broadcasting when they were not — the badge had
-/// no source at all. It is real now:
-///
-///  * the list is `GET /v1/discovery/following-creators`,
-///  * "Live now" comes from the feed's own `liveOnly: true` answer,
-///  * unfollow is `DELETE /v1/creator/{id}/subscribe`,
-///  * the notification level rewrites the four `notifyOn*` flags through the
-///    upserting `POST`.
 class ManageFollowingScreen extends StatefulWidget {
   const ManageFollowingScreen({super.key});
 
@@ -107,14 +96,8 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
 
   /// Follows each ministry's public room so a badge appears when they go on
   /// air and — the half that was actually wrong — disappears when they stop.
-  ///
-  /// Without this the badges are only as fresh as the last time the screen
-  /// was opened, which is how a ministry that ended an hour ago can still be
-  /// shown as live.
   Future<void> _watchLive() async {
-    // Live badges are a nicety; the list is the screen. A socket that cannot
-    // be reached, or is not registered at all, must cost the badges and
-    // nothing else.
+    // Live badges are a nicety; the list is the screen.
     if (!GetIt.instance.isRegistered<LiveSocketService>()) return;
     final socket = GetIt.instance<LiveSocketService>();
     try {
@@ -195,9 +178,7 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
       return;
     }
 
-    // The write landed. What follows is housekeeping, and none of it may
-    // undo it — an unfollow that succeeded on the server must not reappear
-    // because a listener was missing.
+    // The write landed.
     if (GetIt.instance.isRegistered<EngagementStore>()) {
       // Every other surface reads the store, so it has to hear about this
       // too, or search, Explore and the feed keep showing "Following" for

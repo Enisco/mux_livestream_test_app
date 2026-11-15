@@ -4,10 +4,6 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The queries this reader has run before, newest first.
-///
-/// Held on the device rather than the server: search history is per-person and
-/// the API has no route for it, so there is nothing to sync. That also means it
-/// survives sign-out, which is the behaviour a reader expects from a phone.
 abstract final class RecentSearches {
   static const _key = 'gtube_recent_searches';
 

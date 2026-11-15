@@ -19,18 +19,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Where a creator chooses whether to pay for the studio.
-///
-/// **The plans themselves are not shown here.** Per the payment guide, the
-/// first-party web surface owns the plan screen: mobile creates a durable
-/// checkout session, opens its `launchUrl` in a system browser, and reads the
-/// outcome back from the session. Tier, billing interval, currency and
-/// provider are all chosen there, so a catalogue on this screen would be a
-/// second source of truth that could only drift — and it would depend on
-/// `GET /v1/payment/saas/plans`, which is unavailable.
-///
-/// Free needs no session at all: it means no subscription, so it goes straight
-/// on. Both creator types arrive here the same way — the handoff needs only a
-/// `creatorId`, which individuals and organisations both have by this point.
 class PlanSelectionScreen extends StatefulWidget {
   const PlanSelectionScreen({super.key});
 

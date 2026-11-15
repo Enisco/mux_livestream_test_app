@@ -11,17 +11,6 @@ import 'package:test_app/shared/services/device_info_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 
 /// Signing in again on every launch.
-///
-/// The server **rotates** refresh tokens: a successful refresh returns a new
-/// one and retires the one it was given. Reusing a spent token answers 401,
-/// which this reproduces — and a cold start is exactly where it bites,
-/// because several requests go out together on an access token that has
-/// just expired and every one of them comes back 401 at once.
-///
-/// Before the fix each of those 401s started its own refresh with the same
-/// token: the first renewed the session and the rest were told 401, which
-/// the interceptor read as "this session is over" and cleared the tokens
-/// that had just been written.
 class _Tokens extends TokenStorageService {
   _Tokens({this.access, this.refresh});
 
@@ -238,9 +227,7 @@ void main() {
     () async {
       // Seen on a device on 2026-11-02: a step-up code the server would not
       // take came back 401, which the interceptor read as an expired
-      // session. It refreshed, replayed the same rejected code, got 401
-      // again, and went round until the creator force-quit. The guide's
-      // rule is "refresh once and replay the original request" — once.
+      // session.
       final tokens = _Tokens(access: 'fresh', refresh: 'good');
       final server = _RotatingServer(
         liveRefresh: 'good',
@@ -296,9 +283,7 @@ void main() {
   test(
     'creating a step-up challenge still refreshes a stale session',
     () async {
-      // Only verify is excluded. A sheet can sit open long enough for the
-      // access token to expire, and a 401 on *creating* the challenge really
-      // is an expired session.
+      // Only verify is excluded.
       final tokens = _Tokens(access: 'stale', refresh: 'good');
       final server = _RotatingServer(liveRefresh: 'good', liveAccess: 'fresh');
       final api = _apiWith(tokens, server);

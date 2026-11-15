@@ -25,20 +25,6 @@ class LibraryPage {
 }
 
 /// What the reader has watched, liked and saved.
-///
-/// Three lists, one row shape. History, Liked and Saved all return enriched
-/// search hits with a `creator` byline, so one mapper feeds all of them and
-/// the screens differ only in the heading they group under.
-///
-/// Two things worth knowing:
-///
-/// - **Removing history hides through an instant; it does not delete rows.**
-///   The routes answer with a `hiddenThrough` / `clearedThrough` timestamp,
-///   and watching the same thing again brings it back. Calling that
-///   "permanently delete" in the UI would be a lie.
-/// - **A page can come back short, or empty with a cursor.** Content deleted
-///   or made private since it was watched is dropped during hydration, so the
-///   caller follows `nextCursor` rather than stopping on a thin page.
 class ViewerLibraryRepo {
   ViewerLibraryRepo({ApiService? api}) : _injected = api;
 
@@ -63,8 +49,6 @@ class ViewerLibraryRepo {
   }
 
   /// `DELETE /v1/discovery/viewer/history/:targetType/:targetId`.
-  ///
-  /// A **hide-through**, not a deletion — see the class note.
   Future<void> hideFromHistory(String targetType, String targetId) =>
       _api.delete(ApiEndpoints.viewerHistoryItem(targetType, targetId));
 
@@ -111,9 +95,7 @@ class ViewerLibraryRepo {
         meta: meta,
         at: at,
         targetType: targetType,
-        // The bar under a history still. A finished row gets none — a full
-        // bar on something already watched reads as "nearly done" — and
-        // neither does one never started, where an empty bar says nothing.
+        // The bar under a history still.
         progress:
             (json['completed'] as bool? ?? false) ||
                 percent == null ||
@@ -179,8 +161,7 @@ class ViewerLibraryRepo {
       progress: progress,
       targetType: targetType,
       // The hit kept whole, so tapping the row opens the thing it stands
-      // for. Only the fields the design draws are unpacked above; the entity
-      // type a post, event or series is opened by is not one of them.
+      // for.
       source: WebFeedItem.fromJson(json),
     );
   }
@@ -197,10 +178,6 @@ class ViewerLibraryRepo {
   // ---- Grouping ---------------------------------------------------------
 
   /// Group rows under Today / Yesterday / a date, in the order they arrived.
-  ///
-  /// [dedupe] drops a repeat of the same thing further down the list:
-  /// something watched again while the viewer is paging moves to the top and
-  /// can appear on two pages.
   static List<HistoryDay> _group(List<_Row> rows, {bool dedupe = false}) {
     final seen = <String>{};
     final buckets = <String, List<HistoryEntry>>{};
@@ -270,12 +247,6 @@ List<HistoryDay> mergeDays(List<HistoryDay> a, List<HistoryDay> b) {
 }
 
 /// "Today", "Yesterday", "12 June" — the headings the design groups under.
-///
-/// The gateway sends UTC, and a calendar day is a local idea. Reading
-/// `.year/.month/.day` straight off the parsed value compares a UTC date
-/// against a local one, so west of Greenwich an evening row headed itself
-/// "Today" a day early, and east of it everything watched between midnight
-/// and the UTC offset was headed "Yesterday". Convert first, then bucket.
 String dayLabel(DateTime? at) {
   if (at == null) return 'Earlier';
   final local = at.toLocal();

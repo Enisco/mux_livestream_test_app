@@ -15,18 +15,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Changing an email address, a password and a language.
-///
-/// All three routes arrived on 2026-10-26
-/// (`docs/mobile-api-gap-responses.md` §3.1, §3.2, §3.3). Three contract
-/// details are pinned here because getting any of them wrong is invisible
-/// until it strands a reader:
-///
-/// - the password change sends **`refreshToken`**, which is the only way the
-///   backend can tell this session from the others and spare it;
-/// - **`currentSessionRetained: false` means sign in again**, and must be
-///   read rather than assumed;
-/// - a language of **null is not English** — it clears the choice, and the
-///   key has to be sent explicitly to do it.
 class _FakeApi implements ApiService {
   _FakeApi({this.retainSession = true, this.failWith});
 
@@ -160,10 +148,7 @@ void main() {
     });
 
     test('the new change date lands in the cache the menu reads', () async {
-      // The one credential route that does not answer with a `User`. Without
-      // folding its `passwordChangedAt` in by hand, the account menu went on
-      // reporting the old date — or "never changed" — until the next profile
-      // read.
+      // The one credential route that does not answer with a `User`.
       await _seed();
       expect(LocalStorage.cachedPasswordChangedAt, isNull);
 

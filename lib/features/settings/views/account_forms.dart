@@ -21,21 +21,6 @@ import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The four screens the account menu's rows lead to. **All four are wired.**
-///
-/// The email and password routes arrived on 2026-10-26
-/// (`docs/mobile-api-gap-responses.md` §3.1, §3.2); before that these two
-/// forms validated and then said they could not save.
-///
-/// Three things the routes insist on, which shape these screens:
-///
-/// - **The email code goes to the new address**, so the OTP screen names it
-///   and the password is proved here, before any mail is sent.
-/// - **A wrong password or a wrong code is a `401` that must not be retried**
-///   — it is slow by design, and five wrong answers lock the password proof
-///   across all three credential routes for fifteen minutes.
-/// - **The password change spares this session** by sending the refresh
-///   token, and says so in `currentSessionRetained`. That is read, not
-///   assumed: without it the next call 401s and the reader is stranded.
 
 void showAccountSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -48,11 +33,6 @@ void showAccountSnack(BuildContext context, String message) {
 }
 
 /// What to put under the field when a credential route refuses.
-///
-/// The backend asks that its own wording for a wrong password or a wrong code
-/// be shown as-is: both are deliberately identical and deliberately vague,
-/// because an authenticated route that takes a password is a password oracle
-/// for anyone holding a stolen access token.
 String accountFailureMessage(AccountException e) => switch (e.failure) {
   AccountFailure.network => AppStrings.settingsOffline,
   AccountFailure.expired => AppStrings.settingsExpiredRestart,
@@ -102,9 +82,6 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
   }
 
   /// `PATCH /v1/user/{id}` with the two fields it accepts.
-  ///
-  /// The screen pops on success so the account menu behind it rebuilds from
-  /// the cache the write just replaced.
   Future<void> _submit() async {
     final problem = AccountFormRules.name(first: _first.text, last: _last.text);
     setState(() => _error = problem);
@@ -272,9 +249,6 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
   bool _busy = false;
 
   /// Ask for a code, then hand over to the OTP screen.
-  ///
-  /// The password is proved here rather than on the code screen, so a wrong
-  /// one is caught before an email goes anywhere.
   Future<void> _submit() async {
     final problem = AccountFormRules.email(
       value: _next.text,
@@ -379,13 +353,9 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
   final _repo = AccountRepo();
   bool _busy = false;
 
-  /// **A phone number is not verified.** `PATCH /v1/user/{id}` takes `phone`
-  /// and writes it; there is no phone OTP route anywhere, and the gap
-  /// responses did not add one — only email got a challenge flow. So this
-  /// saves directly, and the screen does not pretend a code is coming.
-  ///
-  /// The password field the design draws has nothing to prove against here
-  /// either; it is left out rather than collected and discarded.
+  /// **A phone number is not verified.** `PATCH /v1/user/{id}` takes
+  /// `phone` and writes it; there is no phone OTP route anywhere, and the
+  /// gap responses did not add one — only email got a challenge flow.
   Future<void> _submit() async {
     final problem = AccountFormRules.phone(
       value: _next.text,

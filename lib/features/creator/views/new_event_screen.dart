@@ -26,21 +26,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Putting a service or gathering on the calendar.
-///
-/// Nothing here is uploaded or transcoded — an event lives in the content
-/// service and is only ever text, a cover image and a moment. That is why
-/// it does not go through [MediaUploadRepo] and has no upload progress.
-///
-/// Two things the design asks for cannot be built, and are left out rather
-/// than faked: a map preview (the API stores no coordinates, and the app
-/// has no maps or geocoding) and "Add to series" (events have no series
-/// field under any name). Two more are added because publishing is refused
-/// without them: a street address with a city, and a meeting link.
-/// The same screen **edits** an event that already exists: pass
-/// [editEventId] and it opens what is filed and saves with
-/// `PATCH /v1/content/calendar/events/{id}`. Publishing state is left
-/// alone, and so is any attached broadcast — the editor never sends
-/// `streamId`.
 class NewEventScreen extends StatefulWidget {
   const NewEventScreen({
     super.key,
@@ -84,12 +69,6 @@ class _NewEventScreenState extends State<NewEventScreen> {
   DateTime? _endDate;
 
   /// The time of day an existing event ends at.
-  ///
-  /// The form only collects an end *date* — "Leave blank if no end date" —
-  /// so a new event ends at whatever time it starts. An event being edited
-  /// already has a real end time, and rebuilding it from the start would
-  /// quietly shorten a 9-to-11 service to nothing. Null for a new event,
-  /// which keeps the original behaviour.
   TimeOfDay? _endTimeOfDay;
 
   /// An IANA name such as `Africa/Lagos`. `schedule.timezone` is required
@@ -393,10 +372,6 @@ class _NewEventScreenState extends State<NewEventScreen> {
   // ---- filing it ---------------------------------------------------------
 
   /// Publish now, or schedule the listing.
-  ///
-  /// The sheet was left out while `scheduledAt` was refused — the publish
-  /// route took no body, so a schedule sent to it was accepted and silently
-  /// dropped. It validates one since 2026-10-26.
   Future<void> _publish() async {
     final choice = await GoLiveSheet.show(context);
     if (!mounted || choice == null) return;
@@ -410,9 +385,8 @@ class _NewEventScreenState extends State<NewEventScreen> {
     final eventId = widget.editEventId;
     final creatorId = _creatorId;
     if (eventId == null) return;
-    // A new cover has to be uploaded before it can be named, and that
-    // needs a creator. Going ahead without one would save every other
-    // change and drop the picture without saying so.
+    // A new cover has to be uploaded before it can be named, and that needs
+    // a creator.
     if (_cover != null && creatorId == null) {
       return _say(AppStrings.newMediaRejected);
     }

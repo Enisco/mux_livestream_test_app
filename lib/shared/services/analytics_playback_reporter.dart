@@ -3,10 +3,6 @@ import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 
 /// Turns the shared player's session into analytics beacons.
-///
-/// Every surface plays through one controller, so wiring the beacons here means
-/// feed autoplay, the detail hero and the fullscreen view all report correctly
-/// without each screen remembering to.
 class AnalyticsPlaybackReporter implements PlaybackReporter {
   AnalyticsPlaybackReporter(this._analytics);
 

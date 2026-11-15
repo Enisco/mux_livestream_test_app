@@ -1,19 +1,7 @@
 /// What the studio dashboard is built from.
-///
-/// Shaped against what staging actually returns — the dashboard routes publish
-/// no response schemas, so every field here was read off a live call.
 library;
 
 /// Who the reader is in this studio, and what they may do in it.
-///
-/// What a creator has used of their plan, from
-/// `GET /v1/creator/{creatorId}/settings/plan`.
-///
-/// **The upload window is a rolling 30 days, not a calendar month**, because
-/// that is the window the upload guard itself uses — if the screen and the
-/// guard disagreed, a creator would be blocked at a moment the screen could
-/// not explain. So there is no reset instant: the oldest upload simply ages
-/// out. `limit: null` is **unlimited**, not zero.
 class PlanUsage {
   const PlanUsage({
     this.uploadsUsed = 0,
@@ -58,11 +46,6 @@ class PlanUsage {
 }
 
 /// A studio the reader can work in, from `GET /v1/creator/me/memberships`.
-///
-/// Answers both ways access happens: the creator they **own**, and the
-/// organisations they were **added to**. Owned studios come first, and a user
-/// who both owns a studio and holds a member row in it is listed once —
-/// ownership is the stronger claim.
 class StudioMembership {
   const StudioMembership({
     required this.creatorId,
@@ -101,9 +84,6 @@ class StudioMembership {
 }
 
 /// Who the reader is in this studio, and what they may do in it.
-///
-/// The capabilities gate the Create sheet: a member who cannot create a
-/// livestream should not be offered one.
 class DashboardContext {
   const DashboardContext({
     required this.creatorId,
@@ -153,15 +133,6 @@ class DashboardContext {
   final int analyticsWindowDays;
 
   /// Stand in for a context the dashboard refused.
-  ///
-  /// `dashboard/context` answers **403 Insufficient dashboard permissions**
-  /// for a `streamer`, who is nevertheless a member of that studio and sees
-  /// it in `me/memberships`. Without this the studio pill has nothing to
-  /// name, so the switcher cannot be opened — and the reader stuck in a
-  /// studio they cannot use is exactly the one who needs it.
-  ///
-  /// **No capabilities**, deliberately: they are unknown, and an empty map
-  /// offers nothing rather than offering something the routes will refuse.
   factory DashboardContext.fromMembership(StudioMembership studio) =>
       DashboardContext(
         creatorId: studio.creatorId,
@@ -183,9 +154,6 @@ class DashboardContext {
 }
 
 /// One line of the "here's how to start" card.
-///
-/// The server sends keys and completion only — no copy — so the words live in
-/// `AppStrings` and a key it does not know is skipped rather than shown raw.
 class GettingStartedStep {
   const GettingStartedStep({
     required this.key,
@@ -213,12 +181,6 @@ class GettingStartedStep {
 }
 
 /// Which of the studio's inboxes an attention row leads to.
-///
-/// Worked out from the key rather than matched against a closed list, which
-/// is what let `failed_content` through: it fell down a `default` arm that
-/// sent the reader to the prayer inbox, and its two failed uploads were
-/// counted on the Impact tab's badge as if somebody were waiting on a
-/// reply.
 enum AttentionDestination {
   prayers,
   testimonies,
@@ -236,10 +198,6 @@ enum AttentionDestination {
 }
 
 /// What the Impact tab's badge counts.
-///
-/// Its own three inboxes, and nothing else. Summing the whole attention
-/// feed put two failed uploads on the Impact badge, which reads as two
-/// people waiting on a reply nobody owes them.
 int impactBadgeFrom(Iterable<AttentionItem> attention) => attention.fold(
   0,
   (sum, item) => item.destination.isImpact ? sum + item.count : sum,

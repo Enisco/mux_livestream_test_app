@@ -7,11 +7,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The red "LIVE" pill a viewer already knows from the live card on the
 /// home feed.
-///
-/// One widget rather than a copy per surface, because the whole point of
-/// it is recognition: the badge on a detail page has to be the badge from
-/// the card the viewer tapped. Every metric is derived from [fontSize], so
-/// a bigger badge is the same badge rather than a new one.
 class LiveBadge extends StatelessWidget {
   const LiveBadge({super.key, this.fontSize = cardFontSize});
 

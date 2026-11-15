@@ -6,11 +6,6 @@ import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 
 /// The like/save wiring every surface that shows feed cards needs.
-///
-/// Home, search and a creator's profile all render the same card and all need
-/// the same three steps — resolve the row's interaction target, check for an
-/// account, tell the store. Writing that out per screen is how the buttons
-/// ended up working on none of them, so it lives here once.
 class FeedCardActions {
   const FeedCardActions({required this.store, required this.requireAccount});
 
@@ -48,9 +43,6 @@ class FeedCardActions {
   }
 
   /// Opens the row's thread over the surface it was tapped on.
-  ///
-  /// No account check: reading a thread is public, and the sheet gates its own
-  /// composer. Null for a row the comments API has no target for.
   VoidCallback? comment(BuildContext context, WebFeedItem item) {
     final target = InteractionTargets.fromEntityType(item.entityType);
     if (target == null || item.entityId.isEmpty) return null;

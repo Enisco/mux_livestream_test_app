@@ -13,15 +13,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Two-factor, as the backend shipped it on 2026-10-26.
-///
-/// **This replaced a TOTP flow.** The four screens it used to test described a
-/// QR code, a secret and recovery codes; none of that exists and none of it
-/// ever will — the second factor is a code emailed to the address on the
-/// account. See `docs/mobile-api-gap-responses.md` §3.5.
-///
-/// The asymmetry is the thing worth pinning: enabling takes **no password**
-/// (the emailed code is the proof, and proves codes arrive), disabling takes
-/// **the current password** (it is the direction an attacker wants).
 class _FakeApi implements ApiService {
   _FakeApi({this.failDisable = false});
 

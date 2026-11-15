@@ -11,29 +11,9 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 const evidenceMaxBytes = 10 * 1024 * 1024;
 
 /// How one evidence upload ended.
-///
-/// A cancelled pick is neither attached nor a problem, which is why those
-/// are two fields rather than an outcome enum with a silent case.
 typedef EvidenceUpload = ({bool attached, String? fileId, String? problem});
 
 /// Pick a document, ticket it, send it to S3, attach it to the rail's case.
-///
-/// **The attach is the leg that matters.** A file nothing has attached is
-/// invisible to the verification case: GospelTube's review will not see it,
-/// and naming its id in a KYC payload is refused with a validation error
-/// before the request ever reaches the provider.
-///
-/// This is shared rather than written once per screen because the two
-/// verification tracks draw on the same evidence — the guide says to "reuse
-/// what the creator uploaded during GospelTube verification", and each
-/// creator-owned requirement carries the newest non-rejected `fileId` for
-/// exactly that reason. Two copies of this sequence would drift, and the
-/// drift would show up as a document that uploaded fine and satisfied
-/// nothing.
-///
-/// [onPicked] fires once a file is in hand and the upload is about to start,
-/// so a caller can begin its spinner then rather than while the system
-/// picker is still up.
 Future<EvidenceUpload> pickAndAttachEvidence({
   required String creatorId,
   required String railId,

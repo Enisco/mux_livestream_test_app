@@ -21,11 +21,6 @@ class CreatorRepo {
   static const _uuid = Uuid();
 
   /// Creates or updates the channel.
-  ///
-  /// Throws on failure rather than swallowing: the screens that call this go
-  /// on to the plan step, and advancing past a channel that was never created
-  /// leaves the reader paying for nothing. Organisation onboarding currently
-  /// always fails this way — see OPEN_ISSUES.
   Future<String> saveCreatorProfile({
     required String handle,
     required String displayName,
@@ -69,11 +64,6 @@ class CreatorRepo {
   }
 
   /// Onboards, working around a handle that is already taken.
-  ///
-  /// A reader who leaves the handle blank gets one derived from their channel
-  /// name, and two ministries with the same name derive the same handle. The
-  /// server answers 409, and retrying changes nothing — so the second attempt
-  /// suffixes the handle rather than handing back a dead end.
   Future<String> _onboardWithFreeHandle({
     required String handle,
     required String displayName,
@@ -106,10 +96,7 @@ class CreatorRepo {
     } on DioException catch (e) {
       if (e.response?.statusCode != 409) rethrow;
 
-      // Two different things answer 409 here. "User already owns a creator
-      // profile" means this reader has a channel already — retrying with a
-      // new handle would only be refused again, and they would be locked
-      // out of their own studio. Hand back what they already have.
+      // Two different things answer 409 here.
       if (_saysAlreadyACreator(e)) {
         final existing = await fetchAndCacheCreatorId();
         if (existing != null) {
@@ -167,8 +154,7 @@ class CreatorRepo {
       if (displayName != null && displayName.isNotEmpty)
         'displayName': displayName,
       // Sent whenever it is given, empty included: `null` is "leave it
-      // alone" and `''` is "clear it". Dropping the empty one meant a
-      // creator could never take their about text back down.
+      // alone" and `''` is "clear it".
       'bio': ?bio,
       if (categorySlugs != null && categorySlugs.isNotEmpty)
         'categorySlugs': categorySlugs,
@@ -189,17 +175,6 @@ class CreatorRepo {
   }
 
   /// The category taxonomy, as `GET /v1/user/categories` publishes it.
-  ///
-  /// [forContent] is what the categories are about to be filed against.
-  /// Pass it whenever the answer feeds a picker on a form, because **not
-  /// every category takes every kind**: offering `devotionals` while
-  /// filing a livestream earned *"Categories not supported for media:
-  /// devotionals"* from the session route. Left out, the whole taxonomy
-  /// comes back, which is what browsing and interest-picking want.
-  ///
-  /// Retired categories are dropped either way. A deactivated one still
-  /// comes back from the API, and nothing that draws a chip should have
-  /// to remember that.
   Future<List<ContentCategory>> fetchCategories({
     CategoryScope? forContent,
   }) async {
@@ -228,14 +203,6 @@ class CreatorRepo {
   String? get cachedCreatorId => LocalStorage.creatorId;
 
   /// Whether this reader has a channel, and which one.
-  ///
-  /// The cached id is trusted when there is one; otherwise the server is
-  /// asked, because a reader who signs in on a new phone still has their
-  /// channel. `GET /v1/creator/profile` answers **404 "Creator profile not
-  /// found"** when there is none, which is what tells a reader with no
-  /// channel apart from a request that simply failed — and the difference
-  /// matters: one should be invited to start a channel, the other should
-  /// not be told anything at all.
   Future<ChannelLookup> resolveChannel({bool force = false}) async {
     if (!force) {
       final cached = LocalStorage.creatorId;
@@ -264,9 +231,6 @@ class CreatorRepo {
   }
 
   /// Who a post will go out as: the name, handle and tick a reader sees.
-  ///
-  /// The article preview claims to be "exactly how readers will see it", so
-  /// the byline has to be the real channel rather than a placeholder.
   Future<CreatorByline?> fetchByline() async {
     try {
       final response = await _api.get(ApiEndpoints.creatorProfile);
@@ -300,10 +264,7 @@ class CreatorRepo {
     }
   }
 
-  /// Re-reads the profile after checkout. Entitlements land from the PSP
-  /// webhook, so this is the only trustworthy confirmation — never the client.
-  /// Returns the plan tier once it matches [expectedTier], retrying while the
-  /// webhook settles.
+  /// Re-reads the profile after checkout.
   Future<String?> awaitPlanTier(String expectedTier) async {
     const delays = [
       Duration(seconds: 1),

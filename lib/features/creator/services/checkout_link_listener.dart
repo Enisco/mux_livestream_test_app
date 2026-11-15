@@ -10,14 +10,6 @@ import 'package:test_app/shared/services/pending_checkout_store.dart';
 import 'package:test_app/shared/services/pending_giving_store.dart';
 
 /// Catches the checkout return link and hands off to the right status screen.
-///
-/// The link is navigation only. It proves nothing about the payment — the
-/// session id is matched against an attempt this device actually started, and
-/// everything else comes from an authenticated read on the status screen.
-///
-/// One path serves both products, so the id decides which: a subscription has
-/// exactly one live attempt, a gift may be one of several. Matching the gift
-/// list *after* the subscription slot keeps the common case a single read.
 class CheckoutLinkWatcher extends StatefulWidget {
   const CheckoutLinkWatcher({
     super.key,

@@ -211,9 +211,8 @@ void main() {
     test(
       '"already owns a creator profile" opens the channel they have',
       () async {
-        // The same 409 status, a completely different situation: this reader
-        // signed in on a new phone. Retrying with another handle would be
-        // refused again and leave them locked out of their own studio.
+        // The same 409 status, a completely different situation: this
+        // reader signed in on a new phone.
         final api = _FakeApi(
           postErrors: [_status(409, 'User already owns a creator profile')],
           getBody: _profileBody,

@@ -16,21 +16,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The prayer requests sent during a broadcast, so the broadcaster can pray
 /// for them on air.
-///
-/// Until 2026-10-26 the studio reported `metrics.prayers.count` and nothing
-/// readable, so the number on the end-stream card was all there was.
-///
-/// Two things shape this sheet:
-///
-/// - **There is no `isAnonymous`.** The whole point of the list is to pray
-///   for a *named* person, and the platform has no anonymous submission. A
-///   missing name is failed hydration, not a choice, so it falls back
-///   neutrally rather than being labelled anonymous.
-/// - **The count arrives by socket, the bodies do not.**
-///   `livestream.metrics_updated` carries `prayers.count` to the studio room
-///   in realtime; treat it as a nudge and re-fetch the first page when the
-///   count exceeds what is held. Prayer text stays on an authorised
-///   request/response rather than a fan-out room.
 Future<void> showLivePrayersSheet(
   BuildContext context, {
   required String mediaId,
@@ -83,9 +68,9 @@ class _LivePrayersSheetState extends State<_LivePrayersSheet> {
         _loading = false;
       });
     } catch (e) {
-      // Do not fall back to the creator inbox on a refusal: it is authorised
-      // for owner/admin/editor and will refuse a streamer for a different
-      // reason.
+      // Do not fall back to the creator inbox on a refusal: it is
+      // authorised for owner/admin/editor and will refuse a streamer for a
+      // different reason.
       logger.w('Live prayers failed', error: e);
       if (mounted) {
         setState(() {

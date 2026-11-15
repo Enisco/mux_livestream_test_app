@@ -9,36 +9,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// Filing a calendar event.
-///
-/// Three calls, all exercised against staging:
-///
-///  1. `POST /v1/content/assets/upload-url` `{creatorId, category, filename,
-///     mimeType, size}` → an S3 presigned **POST** ticket, the same shape
-///     the channel photo and banner use. `category` is `cover` or
-///     `body_image`; the image must be JPEG, PNG or WebP and **8 MB** or
-///     less.
-///  2. `POST /v1/content/calendar/events` → the event, at `status: draft`.
-///  3. `POST /v1/content/calendar/events/{id}/publish` → `status:
-///     published`.
-///
-/// What staging taught that the guide does not say:
-///
-///  * `venueType` is **`physical` | `virtual` | `hybrid`**. `in_person` is
-///    refused, though that is what the design's first card is called.
-///  * Creating needs only `creatorId`, `title`, `venueType` and
-///    `schedule{startAt, timezone}`. **Publishing** needs more, and says
-///    which: a description always, a street address and city for anything
-///    physical, a meeting link for anything virtual.
-///  * `schedule.timezone` is required and validated as an IANA name —
-///    `Mars/Olympus` and an empty string are both "Invalid schedule".
-///  * **Scheduled publish arrived 2026-10-26.** `scheduledAt` goes on the
-///    *publish* call, not on create or PATCH, and the route validates it now
-///    — it used to take no body at all, so one sent to it was accepted with a
-///    200 and silently dropped. `CalendarEventStatus` gained `scheduled`, so
-///    anything exhaustive over that union needs the new arm.
-///  * `recurrence.mode` still accepts only `none`. A **series** exists now
-///    (`/v1/content/calendar/series`) but it is a label, not recurrence:
-///    adding an event to one creates no other event.
 class EventRepo {
   EventRepo([ApiService? api]) : _injected = api;
 
@@ -91,11 +61,6 @@ class EventRepo {
   }
 
   /// What is already filed, so the editor can open it.
-  ///
-  /// `GET /v1/content/calendar/events/{id}` answers the full
-  /// `ContentCalendarEvent`. The cover arrives as a pair the same way a
-  /// post's does: `coverImageFileId` for writes, `coverImageKey` for
-  /// showing.
   Future<EditableEvent> load(String eventId) async {
     try {
       final response = await _api.get(ApiEndpoints.calendarEventById(eventId));
@@ -114,10 +79,6 @@ class EventRepo {
   }
 
   /// Save an edit. `PATCH /v1/content/calendar/events/{id}`.
-  ///
-  /// Publishing state is left alone, and so is `streamId`: an event with a
-  /// broadcast attached keeps it, because the editor never sends that
-  /// field.
   Future<void> update({
     required String eventId,
     required EventDraft draft,
@@ -133,19 +94,6 @@ class EventRepo {
   }
 
   /// Step 3. Publish now, or schedule the listing for later.
-  ///
-  /// [scheduledAt] must be in the future **and before the event's own
-  /// `startAt`** — two distinct `400`s. Omitting it, or sending null,
-  /// publishes immediately.
-  ///
-  /// **Every readiness check runs when you schedule**, not when the sweep
-  /// fires, so a missing address is refused at the moment the creator taps
-  /// Schedule rather than silently failing to publish two days later.
-  ///
-  /// A `scheduled` event is **not public**: absent from search, the public
-  /// read, the creator's public list and the ICS feed, and RSVP on it is
-  /// refused. An already-published event **cannot** be scheduled, so the
-  /// control is hidden once it is out.
   Future<void> publish(String eventId, {DateTime? scheduledAt}) async {
     try {
       await _api.post(

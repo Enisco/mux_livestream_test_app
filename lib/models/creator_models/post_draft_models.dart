@@ -1,10 +1,4 @@
 /// Writing an article.
-///
-/// A post is markdown and images in the **content** service — nothing is
-/// uploaded to Mux and nothing is transcoded. Its images go through the
-/// same `/v1/content/assets/upload-url` ticket an event's cover does.
-///
-/// Everything here was read off staging.
 library;
 
 /// What a creator is about to file.
@@ -37,11 +31,6 @@ class PostDraft {
 
   /// An article as `GET /v1/content/posts/{id}` returns it, so the editor
   /// can open what is already there.
-  ///
-  /// The cover comes back as **two** fields: `coverThumbnailFileId`, which
-  /// is what a write takes, and `coverThumbnailKey`, which is where the
-  /// picture is. Only the id is carried here; the key is what the screen
-  /// shows, and it is read separately.
   factory PostDraft.fromJson(Map<String, dynamic> json) => PostDraft(
     title: json['title'] as String? ?? '',
     body: json['body'] as String? ?? '',
@@ -71,14 +60,6 @@ class PostDraft {
   );
 
   /// What `PATCH /v1/content/posts/{id}` takes.
-  ///
-  /// Unlike [toJson] this sends empty strings rather than leaving the key
-  /// out, because on an edit an empty field is the creator **clearing**
-  /// something, and a key left out would silently keep the old value.
-  /// `creatorId` is not sent: the route resolves ownership from the path.
-  /// `scheduledAt` is not sent either — it is a publishing decision, and
-  /// setting it from the editor would reschedule a post the creator only
-  /// meant to correct a typo in.
   Map<String, dynamic> toPatchJson() => {
     'title': title,
     'body': body,
@@ -89,9 +70,6 @@ class PostDraft {
   };
 
   /// What `POST /v1/content/posts` takes.
-  ///
-  /// `scheduledAt` is deliberately absent: create refuses it ("property
-  /// scheduledAt should not exist") and it goes on with a PATCH instead.
   Map<String, dynamic> toJson(String creatorId) => {
     'creatorId': creatorId,
     'title': title,
@@ -126,11 +104,6 @@ class PostDraft {
 enum PostPublishBlock { title, body }
 
 /// One `![alt](file:{id})` in a body, as the resolver answers for it.
-///
-/// `POST /v1/content/posts/body-embeds/resolve` takes `{creatorId, body}`
-/// and returns one of these per token. An image that has been uploaded but
-/// is not yet named by a saved post comes back `available: false` with
-/// `reason: not_uploaded` — that is an unsaved draft, not a failure.
 class BodyEmbed {
   const BodyEmbed({
     required this.fileId,

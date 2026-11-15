@@ -3,13 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
 
 /// Swiping into the short-video feed from something already being watched.
-///
-/// The feed existed but nothing opened it. The point of the entry points is
-/// continuity: opening it from a video has to *start on that video*, and
-/// opening it from a ministry's library has to play that ministry. The
-/// vertical-feed route treats `anchorMediaId` as a relevance hint, not a
-/// position — on staging the anchor came back third — so the screen puts it
-/// first itself.
 void main() {
   group('a seeded open is not the general feed', () {
     test('an anchored media counts as seeded', () {

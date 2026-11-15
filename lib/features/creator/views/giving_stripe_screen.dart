@@ -20,27 +20,6 @@ typedef StripeLauncher = Future<bool> Function(Uri uri);
 
 /// Stripe's hosted onboarding, which is the one provider setup that really
 /// does happen somewhere else.
-///
-/// Section 7 of the integration guide: *"GospelTube does not collect
-/// identity documents, beneficial-owner details, or bank details in its
-/// UI."* So this screen collects nothing either. It picks the account
-/// ownership the policy allows, mints a one-time onboarding link and hands
-/// the creator to a real browser.
-///
-/// Three rules shape it:
-///
-/// - **A real browser, never a WebView.** *"use a secure system browser or
-///   supported provider SDK flow, not an untrusted WebView"* — and the
-///   Flutter row of the same section says Connect.js is unsupported in one.
-///   [LaunchMode.inAppBrowserView] is SFSafariViewController and a Chrome
-///   Custom Tab; `inAppWebView` is forbidden.
-/// - **Coming back proves nothing.** *"Returning to the app is not proof of
-///   completion. Poll the application until provider requirements are
-///   empty…"* The screen says so and reads the rail again rather than
-///   marking anything itself.
-/// - **The link is single-use.** Stripe's onboarding links expire, which is
-///   what Stripe's own `refreshUrl` exists for, so the screen keeps a way
-///   to mint a fresh one instead of leaving a creator on a dead page.
 class GivingStripeScreen extends StatefulWidget {
   const GivingStripeScreen({
     super.key,
@@ -66,9 +45,7 @@ class GivingStripeScreen extends StatefulWidget {
   final String? origin;
 
   /// Where Stripe sends the browser when onboarding ends, and when its link
-  /// has gone stale. Both are web pages on the GospelTube app domain — the
-  /// native app is not in this loop and never receives a Stripe callback as
-  /// proof of anything.
+  /// has gone stale.
   static const returnPath = '/earnings/onboarding/return';
   static const refreshPath = '/earnings/onboarding/refresh';
 
@@ -227,10 +204,7 @@ class _GivingStripeScreenState extends State<GivingStripeScreen> {
             ),
           ),
           SizedBox(height: 18.s),
-          // Before the first launch there is one thing to do. Afterwards
-          // the creator is somewhere else, and the two things they may
-          // want are a fresh link — the old one is spent — and a way back
-          // to the rail, which re-reads the truth from the server.
+          // Before the first launch there is one thing to do.
           if (!_launched)
             PrimaryButton(
               key: const ValueKey('stripe-open'),

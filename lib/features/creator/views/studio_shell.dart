@@ -27,12 +27,6 @@ class StudioShell extends StatefulWidget {
 }
 
 /// Sends the reader to another tab of the studio shell.
-///
-/// The Studio tab is a set of pointers — a checklist, an attention feed, a
-/// search icon — and almost everything it points at is another tab of this
-/// same shell rather than a screen to push on top of it. Pushing would leave
-/// the reader on a Giving screen with a back arrow and no nav bar, which is
-/// not where that tab lives.
 typedef OpenStudioTab =
     void Function(int tab, {int impactTab, bool openSearch});
 
@@ -95,10 +89,6 @@ class _StudioShellState extends State<StudioShell> {
   }
 
   /// Open the switcher, and re-point the whole shell if one is picked.
-  ///
-  /// `creatorId` in storage is what every tab reads, so switching is: write
-  /// it, drop the cached context, and load again. Per-studio permissions come
-  /// from `dashboard/context`, which is re-read for the new one.
   Future<void> switchStudio(String creatorId) async {
     await LocalStorage.setString(LocalStorage.creatorIdKey, creatorId);
     if (!mounted) return;
@@ -110,11 +100,6 @@ class _StudioShellState extends State<StudioShell> {
   }
 
   /// How many things are waiting, for the badge on the Impact tab.
-  ///
-  /// This was hardcoded to the design's `18`, which meant every studio
-  /// claimed eighteen things needed attention whatever was actually there.
-  /// It is the sum of the dashboard's attention feed now, and a studio with
-  /// nothing waiting carries no badge at all.
   int _impactBadge = 0;
 
   @override
@@ -132,9 +117,10 @@ class _StudioShellState extends State<StudioShell> {
                 onOpenTab: _openTab,
               ),
               1 => StudioContentScreen(
-                // Keyed on the flag so arriving from the Studio tab's search
-                // icon rebuilds the screen with its field already up, rather
-                // than reusing a state that was built without it.
+                // Keyed on the flag so arriving from the Studio tab's
+                // search icon rebuilds the screen with its field already
+                // up, rather than reusing a state that was built without
+                // it.
                 key: ValueKey('studio-content-$_contentSearch'),
                 context: _context,
                 studios: _studios,
@@ -182,11 +168,6 @@ class _StudioShellState extends State<StudioShell> {
 
 /// The floating four-tab bar.
 /// How much room the floating nav bar needs at the bottom of a shell tab.
-///
-/// A tab's own SnackBar is drawn by that tab's Scaffold, which sits *under*
-/// this bar in the shell's Stack, so a floating one shown without this
-/// clearance is painted behind the bar and never seen. Pinned by a test
-/// against the bar's real height.
 const studioNavClearance = 96.0;
 
 @visibleForTesting

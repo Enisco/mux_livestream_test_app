@@ -622,8 +622,7 @@ void main() {
 
     test('the screen makes the row before it asks for a ticket', () {
       // The ticket is bound to the row, so the order is the whole point of
-      // the change. A widget test cannot reach this: picking a file goes
-      // through the platform.
+      // the change.
       final source = File(
         'lib/features/creator/views/new_media_screen.dart',
       ).readAsStringSync();

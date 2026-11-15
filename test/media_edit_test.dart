@@ -1,10 +1,4 @@
 // Editing a video or a piece of audio that is already filed.
-//
-// The upload flow files a row first and fills it in; this is the other half
-// — opening a row that exists and correcting it with
-// `PATCH /v1/media/{id}`. The rules that matter are all about what the
-// route will and will not take, so most of these tests are about the body
-// that goes out rather than about the pixels.
 
 import 'dart:io';
 
@@ -169,10 +163,7 @@ Future<_FakeApi> _openEditor(
     SizingBuilder(
       baseSize: const Size(390, 844),
       builder: (context) => MaterialApp(
-        // The time wheel reads this. In 12-hour format the hour column
-        // runs 1-12 with a separate AM/PM column, so "one notch back" is
-        // not reliably one hour back; a test that moves the wheel asks
-        // for 24-hour format so it is.
+        // The time wheel reads this.
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: use24h),
           child: child!,
@@ -247,9 +238,9 @@ void main() {
     });
 
     test('only draft means no file is in yet', () {
-      // What the form says about the file turns on this, and `draft` is
-      // the one status that means there is none: *"No source yet, or the
-      // source was removed."*
+      // What the form says about the file turns on this, and `draft` is the
+      // one status that means there is none: *"No source yet, or the source
+      // was removed."*
       expect(MediaStatus.of('draft'), MediaStatus.draft);
       for (final raw in ['processing', 'ready', 'scheduled', 'published']) {
         expect(MediaStatus.of(raw), isNot(MediaStatus.draft), reason: raw);
@@ -331,8 +322,7 @@ void main() {
 
     test('an unpublished row is given nothing at all', () {
       // The public asset proxy is only generated for public, published
-      // media. Handing the well a URL that 404s would make it offer
-      // "Change thumbnail" over an empty box.
+      // media.
       for (final status in ['draft', 'processing', 'ready', 'scheduled']) {
         expect(filed(status: status).thumbnailUrl, isNull, reason: status);
       }
@@ -633,8 +623,8 @@ void main() {
       }
       // "No others" has to be counted, not assumed: the three above being
       // present says nothing about a fourth sitting beside them, and a
-      // value the backend does not accept would be refused on save with
-      // no hint as to which field caused it.
+      // value the backend does not accept would be refused on save with no
+      // hint as to which field caused it.
       const controls = {
         'visibility-confirm',
         'visibility-cancel',
@@ -657,8 +647,8 @@ void main() {
       tester,
     ) async {
       // Requiring one here would grey out Save with no explanation, so a
-      // creator could not correct an old row's title without first
-      // writing a description nobody asked them for.
+      // creator could not correct an old row's title without first writing
+      // a description nobody asked them for.
       final api = await _openEditor(tester, row: _row(description: ''));
 
       final button = tester.widget<PrimaryButton>(
@@ -747,17 +737,14 @@ void main() {
       tester,
     ) async {
       // The picker floors the *date* wheel at today but leaves the clock
-      // free, so an earlier hour on today's date is one notch away. The
-      // go-live sheet marks that inline; waiting for the tap on Save to
-      // say so would leave the field looking accepted.
+      // free, so an earlier hour on today's date is one notch away.
       await _openEditor(tester, row: _row(status: 'ready'), use24h: true);
 
       await tester.tap(find.byKey(const ValueKey('media-schedule-time')));
       await tester.pumpAndSettle();
 
       // The wheel opens on the next round hour, between one and sixty
-      // minutes ahead. One notch back is the hour that has begun, which
-      // is behind the present moment whatever the clock says.
+      // minutes ahead.
       final hours = find.byType(ListWheelScrollView).first;
       final gesture = await tester.startGesture(tester.getCenter(hours));
       await gesture.moveBy(const Offset(0, 16));
@@ -785,8 +772,8 @@ void main() {
       tester,
     ) async {
       // The creator did not do this and the save does not resend it, so
-      // marking the field red would accuse them of a mistake they have
-      // not made — and greying out Save would trap the row.
+      // marking the field red would accuse them of a mistake they have not
+      // made — and greying out Save would trap the row.
       final past = DateTime.now()
           .subtract(const Duration(days: 2))
           .toUtc()
@@ -804,9 +791,7 @@ void main() {
     });
 
     testWidgets('an unchanged schedule is not resent', (tester) async {
-      // A schedule filed last week may now be in the past. Resending it
-      // would be refused as "scheduledAt must be in the future" and take
-      // an otherwise valid edit down with it.
+      // A schedule filed last week may now be in the past.
       final past = DateTime.now()
           .subtract(const Duration(days: 2))
           .toUtc()
@@ -851,8 +836,7 @@ void main() {
   group('the form fits a phone', () {
     // The fields are added in edit mode — visibility, the two schedule
     // wheels, the notes — and a Row of two date fields is the one that can
-    // run off the side. A RenderFlex overflow fails the test on its own,
-    // so these only have to draw.
+    // run off the side.
     testWidgets('on a 390-wide screen, with everything on', (tester) async {
       final at = DateTime.now()
           .add(const Duration(days: 3))
@@ -1016,10 +1000,8 @@ void main() {
 
     test('the screen uploads a new thumbnail before it saves', () {
       // Asserted on the source, not by driving the picker: the picker
-      // decodes and measures the image, and image decoding never settles
-      // on a widget test's fake clock. What matters is the order — a
-      // PATCH that went first would save every other change and drop the
-      // picture without saying so.
+      // decodes and measures the image, and image decoding never settles on
+      // a widget test's fake clock.
       final screen = File(
         'lib/features/creator/views/new_media_screen.dart',
       ).readAsStringSync();

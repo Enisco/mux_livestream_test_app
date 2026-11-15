@@ -1,8 +1,4 @@
 /// What the reader has watched and read, and where they left off.
-///
-/// Shaped for the screen rather than for any one payload: History, Liked and
-/// Saved return the same enriched search hit under different envelopes, so one
-/// model feeds all three and `ViewerLibraryRepo` does the mapping.
 library;
 
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
@@ -72,18 +68,9 @@ class HistoryEntry {
   final String? eventTime;
 
   /// What to pass to an engagement call for this row.
-  ///
-  /// The list gives it as `engagementTargetType` (or `historyTargetType`),
-  /// and that is the value to use — mapping it from [kind] would guess, and
-  /// a devotional entry is not a devotional series.
   final String targetType;
 
   /// The row as discovery sent it, kept whole so a tap can open the thing.
-  ///
-  /// History, Liked, Saved and a playlist's running order are all enriched
-  /// search hits, which is exactly what the detail screens take — so the hit
-  /// is carried rather than reassembled from the fields above, which would
-  /// lose the entity type a post, event or series is opened by.
   final WebFeedItem? source;
 
   bool get isEvent => kind == HistoryKind.event;

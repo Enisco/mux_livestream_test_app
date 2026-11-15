@@ -4,18 +4,8 @@ import 'dart:io';
 import 'package:test_app/core/logger.dart';
 
 /// The renditions an HLS master playlist advertises.
-///
-/// media_kit does not expose HLS variants as selectable video tracks — the
-/// native player picks one by bitrate — so the only way to offer a quality
-/// menu for a Mux stream is to read the manifest and map each label onto the
-/// bitrate ceiling that pins it.
 abstract final class HlsManifest {
   /// Label → bitrate ceiling, e.g. `{'1080p': 5_000_000, '720p': 2_800_000}`.
-  ///
-  /// Returns empty for anything that is not a master playlist, including a
-  /// media playlist (one rendition, nothing to choose) and a failed fetch.
-  /// Quality is an extra; a manifest that will not load must never sit
-  /// between a reader and their video.
   static Map<String, int> parse(String content) {
     final byLabel = <String, int>{};
     for (final line in content.split('\n')) {

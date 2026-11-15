@@ -13,10 +13,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// A ministry to follow: a large ringed avatar with a follow badge hung off
 /// its lower edge, over name, handle and subscriber count.
-///
-/// The ring colour carries the account kind — purple for an organisation,
-/// cyan for a person — which is the only thing distinguishing the design's two
-/// variants.
 class ExploreCreatorCard extends StatelessWidget {
   const ExploreCreatorCard({
     super.key,
@@ -67,10 +63,7 @@ class ExploreCreatorCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Sized to hold the badge as well as the avatar. A Stack does
-            // not hit-test children drawn outside its bounds, so hanging the
-            // badge off the edge with a negative offset would have left it
-            // visible but dead to touch.
+            // Sized to hold the badge as well as the avatar.
             SizedBox(
               height: 69.s,
               width: 62.s,

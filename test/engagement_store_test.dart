@@ -273,10 +273,7 @@ void main() {
   });
 
   group('hiding', () {
-    // The muted and blocked lists are seeded whole, from one read each. An
-    // `ids.where(set.add).isNotEmpty` here seeded only the first id, because
-    // `where` is lazy and stops at the first element that passes — so every
-    // creator after the first still read as unmuted on every card.
+    // The muted and blocked lists are seeded whole, from one read each.
     test('seeding muted takes the whole list, not just the first', () {
       final store = _store(_Server());
       store.seedMuted(['c1', 'c2', 'c3']);

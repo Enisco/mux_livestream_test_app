@@ -125,9 +125,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       );
       if (!mounted) return;
       // Mux serves HLS, whose renditions media_kit does not expose as
-      // tracks — the quality menu has to read them off the manifest. Left
-      // unawaited on purpose: a slow or missing manifest costs the menu, not
-      // the video.
+      // tracks — the quality menu has to read them off the manifest.
       final playbackUrl = detail.playback?.playbackUrl;
       if (playbackUrl != null && playbackUrl.isNotEmpty) {
         unawaited(_offerQualities(playbackUrl));
@@ -275,11 +273,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   );
 
   /// The still for this media, down the whole ladder.
-  ///
-  /// The aggregate's signed URL first, then whatever the row that opened
-  /// this screen was already carrying, then the public asset proxy — which
-  /// is the only one of the three a video published without a cover has,
-  /// and the reason this screen used to sit black until the first frame.
   String? get _stillUrl => AssetUrlResolver.mediaImage(
     url: _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
     key: widget.item.meta.thumbnailKey,
@@ -288,9 +281,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   );
 
   /// Mints a share link and puts it on the clipboard.
-  ///
-  /// The row's Share had no handler at all until Give was added beside it —
-  /// a dead button next to a live one reads as the live one being broken too.
   Future<void> _share() async {
     final url = await copyShareLink(
       engagement: _engagementRepo,
@@ -318,13 +308,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 
   /// Hands off to the web surface, naming this content as the source.
-  ///
-  /// Only a livestream is named. The server validates source media when the
-  /// session is created and accepts a narrower set than "media the giver can
-  /// watch" — a plain video, an audio row and even a livestream's own replay
-  /// are all refused — so sending one anywhere else would buy a round-trip
-  /// and a retry for nothing. The retry still exists as a safety net; this
-  /// just keeps the common case to one request.
   Future<void> _give() async {
     final creator = _detail?.creator;
     if (creator == null) return;
@@ -406,9 +389,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                         )
                       : _error != null
                       ? _buildError()
-                      // Rebuilt on any engagement change, wherever it was made —
-                      // a like on the card behind this page, a comment posted in
-                      // the sheet over it.
+                      // Rebuilt on any engagement change, wherever it was
+                      // made — a like on the card behind this page, a
+                      // comment posted in the sheet over it.
                       : ListenableBuilder(
                           listenable: _store,
                           builder: (context, _) => _buildInfo(),
@@ -571,9 +554,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   Widget _buildError() => ErrorStateView(onRetry: _fetchDetail);
 
   /// Pulls another page of "Up next".
-  ///
-  /// The detail aggregate returns a first batch inline; anything past that comes
-  /// from the suggestions route, which is the only way to see more than ten.
   Future<void> _loadMoreSuggestions() async {
     if (_loadingSuggestions || _suggestionsCursor == null) return;
     setState(() => _loadingSuggestions = true);

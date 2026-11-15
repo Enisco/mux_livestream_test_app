@@ -59,11 +59,6 @@ class FollowedMinistry {
   });
 
   /// One row of `GET /v1/discovery/following-creators`.
-  ///
-  /// `isLive` is **not** in this payload and is not guessed from it — the
-  /// screen fills it in from the live feed. A hardcoded `true` is exactly
-  /// what made ministries look like they were broadcasting when they were
-  /// not.
   factory FollowedMinistry.fromJson(
     Map<String, dynamic> json, {
     bool isLive = false,

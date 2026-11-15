@@ -38,10 +38,6 @@ class SpyAnalytics implements AnalyticsService {
 const _dwell = Duration(milliseconds: 20);
 
 /// Puts [child] on screen, or [offset] pixels below it when pushed away.
-///
-/// Deliberately not inside a scroll view: `VisibilityDetector` does not report
-/// through one under `flutter_test`, which would make these tests measure the
-/// harness rather than the widget.
 Future<void> _pump(
   WidgetTester tester,
   Widget child, {

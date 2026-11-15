@@ -3,13 +3,6 @@ import 'dart:async';
 import 'package:test_app/shared/services/playback_controller.dart';
 
 /// Decides which feed card is allowed to autoplay.
-///
-/// Cards report how much of themselves is on screen; this picks the one that
-/// dominates the viewport and starts it after a short dwell, so flicking
-/// through the feed does not thrash the decoder on every card it passes.
-///
-/// Only one card can win at a time, which is what keeps the single-stream rule
-/// intact while the reader scrolls.
 class FeedAutoplayCoordinator {
   FeedAutoplayCoordinator({
     required this.playback,
@@ -23,9 +16,6 @@ class FeedAutoplayCoordinator {
   final Duration dwell;
 
   /// How much of a card must be visible to hold or win playback.
-  ///
-  /// Half: once a card is more than halfway out of view, in either direction,
-  /// it gives up playback to whichever card is now most visible.
   final double threshold;
 
   final Map<String, double> _visible = {};
@@ -84,11 +74,6 @@ class FeedAutoplayCoordinator {
   }
 
   /// The most-visible card, provided it clears [threshold].
-  ///
-  /// A card that already holds playback keeps it while it still qualifies, so a
-  /// rival that edges ahead by a pixel cannot steal mid-view. That protection
-  /// starts only once the card has actually opened — until then it is just a
-  /// candidate waiting out its dwell, and a better one should take its place.
   String? get winner {
     final held = _current;
     if (held != null &&
@@ -113,9 +98,7 @@ class FeedAutoplayCoordinator {
 
     final next = winner;
     if (next == _current) {
-      // Same card still in charge. Re-arm only if it has not been handed to the
-      // player at all — testing `isPlaying` here would re-fire all through
-      // buffering, and each re-fire used to toggle the new video straight off.
+      // Same card still in charge.
       if (next != null && !playback.isActive(next) && _timer == null) {
         _startDwell(next);
       }

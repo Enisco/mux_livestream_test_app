@@ -22,9 +22,6 @@ enum CreatorType {
 }
 
 /// Who the channel is for.
-///
-/// The answer decides which setup form comes next and, later, whether the
-/// studio has one owner or a team, so it is asked before anything is typed.
 class CreatorTypeScreen extends StatelessWidget {
   const CreatorTypeScreen({super.key});
 

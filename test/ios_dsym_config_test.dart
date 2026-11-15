@@ -3,20 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 /// A dSYM in the archive for every framework that does not bring one.
-///
-/// App Store Connect answered an upload with eighteen "Upload Symbols
-/// Failed" warnings, one per framework `media_kit_libs_ios_video` vendors:
-/// the libmpv and FFmpeg stack arrives as prebuilt, already-stripped
-/// `.xcframework` slices with no DWARF and no `.dSYM` beside them, so
-/// Xcode has nothing to collect and the archive goes up incomplete.
-///
-/// `dsymutil` writes a bundle carrying the binary's UUID even when there
-/// is no debug info to put in it, which is what the check asks for. The
-/// alternative — unchecking "Upload your app's symbols" — would have cost
-/// the app's own symbols too.
-///
-/// Nothing about this can be caught by running the app: it is a build
-/// phase, a shell script and an archive, so it is read off disk here.
 String get _pbxproj =>
     File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
 
@@ -117,8 +103,7 @@ void main() {
 
     test('after the frameworks it reads have been embedded', () {
       // The frameworks are read out of the built app bundle, so a phase
-      // ahead of the one that puts them there sees an empty folder. This
-      // is the ordering a `pod install` could disturb.
+      // ahead of the one that puts them there sees an empty folder.
       final phases = _runnerPhases();
       final embed = phases.indexWhere(
         (p) => p.contains('Embed Pods Frameworks'),
@@ -167,8 +152,7 @@ void main() {
 
     test('a dSYM already there is left alone', () {
       // A pod Xcode builds from source already has a real dSYM in this
-      // folder. Replacing one with a stub would lose symbols the archive
-      // was carrying, which is worse than the warning being fixed here.
+      // folder.
       final root = _fakeBuild(['Ass']);
       final dwarf = File(
         '${root.path}/dsyms/Ass.framework.dSYM/Contents/Resources/DWARF/Ass',
@@ -195,8 +179,8 @@ void main() {
     test('dsymutil is not allowed to fill the build log', () {
       // Mpv.framework kept its debug map while the object files it names
       // stayed on whoever built libmpv, so dsymutil reports every one as
-      // unreadable — hundreds of lines Xcode would promote into the
-      // build's warning list, burying anything real.
+      // unreadable — hundreds of lines Xcode would promote into the build's
+      // warning list, burying anything real.
       final root = _fakeBuild(['Ass', 'Mpv']);
       final result = _runPhase(root, format: 'dwarf-with-dsym');
       final lines = (result.stdout as String)

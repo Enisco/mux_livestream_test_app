@@ -10,21 +10,6 @@ import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 
 /// Everything on the Explore tab, in one load.
-///
-/// **Explore introduces no routes of its own.** Every rail is a composition of
-/// reads that already exist — mostly `POST /v1/search/public/query` with no
-/// `q` and a `sort`, which is the supported way to browse a catalogue. (A
-/// `"*"` wildcard is not, and does not behave.)
-///
-/// Two things shape this class:
-///
-/// - **Search hits carry no creator.** The index stores `meta.creatorId` and
-///   nothing else, so each rail of content needs one further query to put a
-///   name and an avatar under its cards. They are batched per load, not per
-///   card.
-/// - **An empty rail is hidden, not drawn empty.** A browse that returns
-///   nothing means "not right now"; a heading over no cards reads as a claim
-///   that the category has nothing in it.
 class ExploreRepo {
   ExploreRepo({DiscoveryRepo? discovery})
     : _discovery = discovery ?? GetIt.instance<DiscoveryRepo>();
@@ -32,14 +17,8 @@ class ExploreRepo {
   final DiscoveryRepo _discovery;
 
   /// Load every rail at once.
-  ///
-  /// Each rail is independent: one failing leaves the rest alone and simply
-  /// does not appear, because a half-drawn Explore is better than an error
-  /// page over content that loaded fine.
   Future<ExplorePage> load() async {
-    // Continue watching is signed-in only. Asking anonymously would just
-    // earn a 401 per load, and the guide says to hide the rail rather than
-    // render it empty.
+    // Continue watching is signed-in only.
     final signedIn = await GetIt.instance<TokenStorageService>().hasSession;
 
     // Started together, awaited after — the rails do not wait on each other.
@@ -61,7 +40,7 @@ class ExploreRepo {
       // The banner is the top trending item rather than a sold placement:
       // search marks a promoted hit but mints no delivery token, so a
       // dedicated sponsored slot here could never record a billable
-      // impression. See the note in the discovery guide.
+      // impression.
       hero: top.isEmpty ? null : _hero(top.first),
       trending: top,
       live: await live,
@@ -112,10 +91,6 @@ class ExploreRepo {
   }
 
   /// What the reader left unfinished.
-  ///
-  /// The route answers with bare references, so the rows are hydrated by a
-  /// second query and then **put back in the order the viewer watched in** —
-  /// search ranks by relevance and will not preserve it.
   Future<List<ExploreCard>> _continueWatching() async {
     final refs = await _discovery.fetchContinueWatching(limit: 10);
     if (refs.isEmpty) return const [];
@@ -197,9 +172,6 @@ class ExploreRepo {
   // ---- Hits to cards ----------------------------------------------------
 
   /// Map hits onto cards, resolving the creators in one further query.
-  ///
-  /// If that lookup fails the cards still render — without a byline rather
-  /// than not at all.
   Future<List<ExploreCard>> _cards(List<WebFeedItem> hits) async {
     if (hits.isEmpty) return const [];
     final creators = await _creatorsFor(hits);
@@ -334,9 +306,7 @@ class ExplorePage {
   final List<ExploreCreatorRef> ministries;
   final List<ExploreEvent> events;
 
-  // There is no "topics you follow" rail here. `user-app` has one, built on
-  // `preferenceBoostCategorySlugs`, but this app's design ends at Browse —
-  // and `searchPublic` still takes the boost when a rail wants it.
+  // There is no "topics you follow" rail here.
 
   /// Nothing came back at all, as against one rail being quiet.
   bool get isEmpty =>

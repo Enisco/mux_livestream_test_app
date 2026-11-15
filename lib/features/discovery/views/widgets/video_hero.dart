@@ -17,10 +17,6 @@ import 'package:test_app/utils/helpers/duration_format.dart';
 
 /// The watching surface on a media detail — the video itself, with the full
 /// set of controls the feed card deliberately withholds.
-///
-/// It is pinned by its parent so the rest of the page scrolls beneath it, which
-/// is what keeps playback unbroken while the reader reads on. Nothing here
-/// pushes a route to play, so arriving from a card continues mid-stream.
 class VideoHero extends StatefulWidget {
   const VideoHero({
     super.key,
@@ -71,18 +67,14 @@ class _VideoHeroState extends State<VideoHero> {
 
   /// Opening a video means watching it, so it starts on arrival rather than
   /// asking for one more tap.
-  ///
-  /// A card that was already playing is left alone — [PlaybackController.play]
-  /// would resume it anyway, but not touching it keeps the handover silent.
   void _autoStart() {
     if (_autoStarted) return;
     final url = widget.playbackUrl;
     if (url == null || url.isEmpty) return;
     _autoStarted = true;
 
-    // Starting playback publishes new state synchronously, and this runs from
-    // initState/didUpdateWidget — inside the build phase. Notifying listeners
-    // there throws "setState() called during build", so it waits for the frame.
+    // Starting playback publishes new state synchronously, and this runs
+    // from initState/didUpdateWidget — inside the build phase.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.playback.isActive(_mediaId)) {
@@ -159,11 +151,9 @@ class _VideoHeroState extends State<VideoHero> {
     return VisibilityDetector(
       key: Key('video-hero-$_mediaId'),
       onVisibilityChanged: (info) {
-        // Covered by another route, or gone from the tree: there is no longer a
-        // surface showing this video, so it must not keep playing unseen.
-        //
-        // Fullscreen is the one cover that does not count — it is showing the
-        // very same video, and pausing on the way into it would be absurd.
+        // Covered by another route, or gone from the tree: there is no
+        // longer a surface showing this video, so it must not keep playing
+        // unseen.
         if (!mounted || info.visibleFraction > 0) return;
         if (widget.playback.fullscreen.value) return;
         widget.playback.pauseIfActive(_mediaId);
@@ -188,14 +178,6 @@ class _VideoHeroState extends State<VideoHero> {
                 children: [
                   // The fullscreen route holds the only allowed attachment
                   // while it is up, so the inline frame steps aside.
-                  //
-                  // So does a video that has not produced a frame yet: an
-                  // attached `Video` with nothing decoded paints black,
-                  // and black over a poster is a worse picture than the
-                  // poster. `position == Duration.zero` is the whole test,
-                  // which makes this the *first* start only — once a
-                  // millisecond has played, a later stall keeps the frame
-                  // it stalled on rather than flicking back to artwork.
                   if (active &&
                       !fullscreen &&
                       widget.videoController != null &&
@@ -215,11 +197,7 @@ class _VideoHeroState extends State<VideoHero> {
 
                   // Not `&& !state.playing`: the engine reports `playing`
                   // the moment it is told to play, which is before the
-                  // first frame exists. That gate hid the spinner during
-                  // exactly the wait it was added for — a black rectangle
-                  // under a pause button, indistinguishable from a video
-                  // that will never start. A rebuffer mid-video is the
-                  // same wait and says so too; only the end is silent.
+                  // first frame exists.
                   if (active && state.buffering && !state.completed)
                     const Center(
                       child: CircularProgressIndicator(
@@ -322,11 +300,7 @@ class _Controls extends StatelessWidget {
           if (!compact)
             Positioned(
               left: 12.s,
-              // Just inside the frame's corner. It used to add the status bar
-              // height on top of this, from when the hero ran under the notch;
-              // the screen now keeps the frame clear of system chrome, so
-              // counting that inset here again pushed the arrow down into the
-              // middle of the picture.
+              // Just inside the frame's corner.
               top: 8.s,
               child: GTubeBackButton(onTap: onBack, size: 20, box: 32),
             ),
@@ -374,15 +348,6 @@ class _Controls extends StatelessWidget {
 }
 
 /// The row along the bottom of a player.
-///
-/// **A live broadcast gets no scrubber.** There is nothing to scrub to: the
-/// duration is however much of the stream has been published so far, so it
-/// grows under the thumb, and the far end of the track is the present
-/// moment rather than an ending. Every platform that carries live video
-/// either hides the track or turns it into a DVR window with a "back to
-/// live" control; none of them hands over a plain seek bar that reads
-/// `1:04 / 1:27` and keeps moving. In its place goes the same LIVE badge
-/// the card and the title row carry.
 class _BottomBar extends StatefulWidget {
   const _BottomBar({
     required this.playback,
@@ -505,11 +470,6 @@ class _IconButton extends StatelessWidget {
 }
 
 /// Landscape playback without touching the device orientation.
-///
-/// The app is portrait-locked on purpose, so instead of asking the system to
-/// rotate, the video and its controls are turned a quarter turn inside a
-/// full-bleed black page. The player never stops, so entering and leaving is
-/// seamless.
 class FullscreenVideo extends StatefulWidget {
   const FullscreenVideo({
     super.key,

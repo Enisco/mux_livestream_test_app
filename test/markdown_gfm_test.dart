@@ -6,12 +6,6 @@ import 'package:test_app/shared/components/markdown_body.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// One renderer, for the editor's preview and the reader's article alike.
-///
-/// They used to be two — a 277-line one and a 175-line one covering
-/// different subsets — so the preview's promise, "this is exactly how
-/// readers will see it", was only true of their overlap. The content guide
-/// says bodies are **GFM with raw HTML disabled**, so these pin the parts of
-/// GFM that neither renderer had.
 Future<void> _pump(WidgetTester tester, String source) async {
   tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
   tester.view.devicePixelRatio = 3;

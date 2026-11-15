@@ -9,13 +9,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The three account surfaces the design draws as overlays rather than
 /// screens: choosing topics, and the two irreversible things.
-///
-/// Neither destructive action is wired, deliberately. `GET /v1/auth/sessions`
-/// with `DELETE /v1/auth/sessions/{id}` would end every session, and
-/// `DELETE /v1/user/account` would deactivate — both real, both impossible to
-/// rehearse safely from here, and both far too costly to get wrong on a
-/// guess. They stay behind their confirmations until someone can test them
-/// against an account they are willing to lose.
 
 /// Lets the reader pick which topics feed them, and in what order.
 class TopicsSheet extends StatefulWidget {

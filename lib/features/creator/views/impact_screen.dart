@@ -23,21 +23,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// What the congregation is sending: prayers, testimonies and comments.
-///
-/// Three inboxes behind one screen, each on its own creator-side route. Two
-/// things shape how this is wired:
-///
-/// - **The filters are server-side.** Changing one refetches rather than
-///   narrowing what is already loaded, because each tab's status filter is a
-///   query parameter and the list is paged.
-/// - **A decision can take a row out of its list**, and that is the point
-///   rather than a bug: keeping a comment public removes it from the
-///   moderation queue, and approving a testimony moves it out of Pending.
-///   The card goes immediately and the summary is refetched so the tab
-///   counts cannot disagree with what is on screen. A failed write puts the
-///   row back and says so.
-///
-/// The Comments tab is **not** a comment feed — see [ImpactQueueNote].
 class ImpactScreen extends StatefulWidget {
   const ImpactScreen({
     super.key,
@@ -51,9 +36,6 @@ class ImpactScreen extends StatefulWidget {
   });
 
   /// Which inbox to open on: prayers, testimonies or the comment queue.
-  ///
-  /// The Studio tab's "needs you" rows name one of the three, so sending the
-  /// reader to Impact without saying which would make them find it again.
   final int initialTab;
 
   /// Every studio the reader can work in. The shell owns the list so all
@@ -545,9 +527,7 @@ class _ImpactScreenState extends State<ImpactScreen> {
     final outcome = await showReportSheet(context);
     if (outcome == null || !mounted) return;
     // `POST /v1/engagement/reports` is live and takes `comment` as a target
-    // type. What it cannot do is tell the creator what happened next — there
-    // is no escalation workflow, so the design's "with our team for review"
-    // banner is deliberately not built. See docs/OPEN_ISSUES.md.
+    // type.
     _say(AppStrings.commentReported);
   }
 
@@ -739,9 +719,7 @@ class _ImpactScreenState extends State<ImpactScreen> {
       GestureDetector(
         key: const ValueKey('impact-notifications'),
         behavior: HitTestBehavior.opaque,
-        // The same destination the Studio and Content bells open. This said
-        // it was waiting on the API, which stopped being true when the
-        // notification routes landed.
+        // The same destination the Studio and Content bells open.
         onTap: () async {
           await Navigator.push(
             context,

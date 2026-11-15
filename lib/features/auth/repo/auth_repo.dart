@@ -45,13 +45,6 @@ class AuthRepo {
   }
 
   /// Finishes a reset with the token from the email.
-  ///
-  /// `POST /v1/auth/password/reset` takes `{token, newPassword}` and answers
-  /// **"Invalid or expired reset token."** for a token that has been used,
-  /// has lapsed, or was never issued — one message for all three, so the
-  /// screen cannot tell the reader which it was.
-  ///
-  /// `newPassword` is bounded at 8–128 characters server-side.
   Future<void> completePasswordReset({
     required String token,
     required String newPassword,
@@ -104,8 +97,7 @@ class AuthRepo {
     // `logout` already clears it: a session that simply expired never runs
     // `logout`, so the next person to sign in on this device inherited the
     // previous account's `creatorId` — and with it their studio, which the
-    // studio screens key off entirely. `resolveChannel` asks the server
-    // again when the cache is empty, so dropping it costs one request.
+    // studio screens key off entirely.
     await LocalStorage.clearCreatorData();
     await LocalStorage.setString(
       LocalStorage.cachedUserKey,
@@ -115,12 +107,6 @@ class AuthRepo {
   }
 
   /// Renews the session at launch.
-  ///
-  /// This goes through [ApiService.refreshSession] rather than posting to
-  /// the refresh route itself. Refresh tokens rotate, so a refresh here
-  /// racing one the interceptor started — which is exactly what a cold
-  /// start produces — would spend the same token twice and the loser's 401
-  /// would clear a session that had just been renewed.
   Future<bool> tryRefreshSession() async {
     if (!await _tokenStorage.hasSession) return false;
 

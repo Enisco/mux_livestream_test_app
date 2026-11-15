@@ -1,8 +1,4 @@
 /// The kinds of thing a reader can narrow a search to.
-///
-/// `entityTypes` are the values both `POST /v1/discovery/web-feed` and
-/// `POST /v1/search/public/query` accept; `all` sends none, which is the
-/// mixed default on either route.
 enum SearchFilter {
   all('All', []),
   videos('Videos', ['media']),

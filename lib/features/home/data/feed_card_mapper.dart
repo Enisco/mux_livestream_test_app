@@ -6,12 +6,6 @@ import 'package:test_app/shared/services/viewer_identity.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Turns a web-feed row into card data.
-///
-/// Every `entityType` the discovery API can return has to land on a
-/// [FeedCardKind], and each type keeps its own fields in its own place — events
-/// carry `calendarStartAt` at the top level, creators have no nested `creator`
-/// object, and post/devotional bodies live in different keys again. Kept out of
-/// the screen so the whole table can be tested against real payloads.
 abstract final class FeedCardMapper {
   /// [interactions] is the viewer's own like/save state, keyed by entity id,
   /// as returned by the engagement batch route. Empty for guests.
@@ -46,9 +40,9 @@ abstract final class FeedCardMapper {
           : titleCase(facets.categorySlugs.first),
       eventStart: item.startsAt,
       location: meta.locationLabel,
-      // The whole ladder, in the model so every surface reads the same
-      // one: a resolved URL, a storage key with the CDN host in front, and
-      // — for a media row only — the public asset proxy.
+      // The whole ladder, in the model so every surface reads the same one:
+      // a resolved URL, a storage key with the CDN host in front, and — for
+      // a media row only — the public asset proxy.
       thumbnailUrl: item.stillUrl,
       duration: duration(meta.durationSeconds),
       verified: item.creatorVerified,

@@ -57,8 +57,6 @@ void openCreatorProfile(
 }
 
 /// Creator profile, viewer's point of view (Figma `11117-123441`).
-///
-/// Reachable by id from anywhere a creator is named, or by handle from a link.
 class CreatorProfileScreen extends StatefulWidget {
   const CreatorProfileScreen({
     super.key,
@@ -134,9 +132,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
         _profile = profile;
         _loading = false;
       });
-      // Asked once the ministry is known, not on every build. Nothing waits
-      // on it: the channel renders, and Give Now appears beside Follow if the
-      // answer comes back yes.
+      // Asked once the ministry is known, not on every build.
       unawaited(_askCanGive(profile.id, profile.isOwnedByViewer));
       await _loadTab(_tab);
     } catch (e) {
@@ -150,9 +146,6 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   }
 
   /// Whether to draw Give Now at all.
-  ///
-  /// Skipped for the reader's own channel: giving to yourself is refused by
-  /// the server, and the header offers the studio there instead.
   Future<void> _askCanGive(String creatorId, bool owned) async {
     if (owned) return;
     final can = await _giving.ensure(creatorId);
@@ -241,9 +234,6 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   }
 
   /// The header's own follow button.
-  ///
-  /// The subscriber count is this screen's to keep — the store tracks the flag,
-  /// which is what the cards below and every other surface read.
   Future<void> _toggleFollow() async {
     final profile = _profile;
     if (profile == null || _followBusy) return;
@@ -288,9 +278,6 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   );
 
   /// The `…` on a card: share, hide, mute, block and the rest.
-  ///
-  /// Share needs no account; everything else does, which the sheet gates
-  /// through [_requireAccount] rather than refusing the whole sheet.
   Future<void> _openCardActions(WebFeedItem item, {bool isOwn = false}) =>
       showCardActionsSheet(
         context,
@@ -335,8 +322,8 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
     final loaded = _profile;
     if (_failed || loaded == null) {
       // A ministry whose page cannot be read still has to be leavable: this
-      // branch replaced the whole screen, header and all, so the only way out
-      // of a failed church page was to force-quit the app.
+      // branch replaced the whole screen, header and all, so the only way
+      // out of a failed church page was to force-quit the app.
       return SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

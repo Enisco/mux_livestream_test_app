@@ -20,11 +20,6 @@ class CheckoutAlreadyActive implements Exception {
 }
 
 /// Raised when the ministry cannot take a gift right now.
-///
-/// Shares a **409** with [CheckoutAlreadyActive], which is why the two are
-/// told apart by the session id the body carries rather than by status. The
-/// public capability projection normally keeps the app from getting here, but
-/// it is cached and a rail can be paused between the check and the tap.
 class GivingUnavailable implements Exception {
   const GivingUnavailable();
 
@@ -34,13 +29,6 @@ class GivingUnavailable implements Exception {
 
 /// Raised when the server will not attribute the gift to the content it was
 /// offered from.
-///
-/// `sourceMediaId` is validated when the session is created, and the
-/// permitted set is **narrower than "media the giver can watch"**: probing on
-/// 2026-10-29 found a live session accepted while an ordinary video, a music
-/// row and even the replay of that same livestream were all refused with
-/// `403 "Giving source media is not accessible."`. Attribution is a nicety;
-/// the gift is not, so the caller drops the source and offers it anyway.
 class GivingSourceRejected implements Exception {
   const GivingSourceRejected();
 
@@ -50,10 +38,6 @@ class GivingSourceRejected implements Exception {
 
 /// The mobile→web checkout handoff, for both products that use it:
 /// a creator's platform subscription and a reader's gift to a ministry.
-///
-/// This repo never sees PSP credentials. Plan, amount, currency, provider and
-/// payment all happen on the web surface; the app's share is a durable session
-/// and a short-lived ticket into a browser.
 class MobileCheckoutRepo {
   MobileCheckoutRepo({ApiService? api}) : _injected = api;
 
@@ -82,12 +66,6 @@ class MobileCheckoutRepo {
 
   /// Creates the durable attempt. Replaying [idempotencyKey] returns the same
   /// session with a fresh launch ticket, which is how a resumed attempt works.
-  ///
-  /// [purpose] is fixed for the life of the session and is the only thing that
-  /// distinguishes the two products on the wire. The three optional fields
-  /// belong to giving alone: [preferredFundSlug] preselects a purpose on the
-  /// web surface, and [sourceMediaId] attributes the gift to the content it
-  /// was offered from.
   Future<MobileCheckoutHandoff> createSession({
     required String creatorId,
     required String storefrontCountry,
@@ -125,9 +103,7 @@ class MobileCheckoutRepo {
       if (status != 409) rethrow;
       // Both products refuse with 409, meaning different things: a
       // subscription already has a live attempt (and names it), while a
-      // ministry simply cannot be given to. Reading the giving refusal as a
-      // live attempt would send the giver to resume a session that does not
-      // exist.
+      // ministry simply cannot be given to.
       if (sessionId == null && purpose == givingPurpose) {
         throw const GivingUnavailable();
       }

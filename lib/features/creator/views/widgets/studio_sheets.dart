@@ -50,10 +50,6 @@ class CreateSheet extends StatelessWidget {
   final ValueChanged<CreateKind> onPick;
 
   /// What is left of the plan's upload allowance.
-  ///
-  /// `POST /v1/media` refuses over the limit — *"Monthly upload limit reached
-  /// (5 uploads on current plan)"* — but only after a file has been picked
-  /// and uploaded. Saying it here costs one read and saves that.
   final PlanUsage? usage;
 
   static Future<CreateKind?> show(
@@ -183,16 +179,6 @@ class CreateSheet extends StatelessWidget {
 }
 
 /// What the switcher's two non-studio rows do, in one place.
-///
-/// Three of the four tabs that open this sheet used to handle only
-/// `switchTo` and drop the other two answers on the floor: **Back to
-/// watching** worked from the Studio tab and nowhere else, and **Studio
-/// Settings** worked nowhere at all — on the Studio tab it answered with a
-/// snackbar repeating the sentence already printed under it.
-///
-/// The studio to switch *to* is handed back rather than acted on here,
-/// because what each tab has to throw away first differs: Giving drops its
-/// application and options, Impact drops its assignees.
 String? applyStudiosOutcome(
   BuildContext context,
   StudiosOutcome? choice, {
@@ -204,19 +190,12 @@ String? applyStudiosOutcome(
     return null;
   }
   if (choice.switchTo case final creatorId?) return creatorId;
-  // Settings: one screen showing what the channel already has. Not the
-  // onboarding chain — that asks for the four in turn with every field
-  // empty, which is right the first time and wrong every time after it.
+  // Settings: one screen showing what the channel already has.
   context.go(AppRouter.studioProfile);
   return null;
 }
 
 /// Which studio the switcher should show as the open one.
-///
-/// The dashboard context is the answer when there is one. There is not
-/// always: `dashboard/context` refuses a `streamer` with **403**, and that
-/// reader still belongs to the studio and still needs the way out of it. So
-/// the membership row stands in rather than the pill going dead.
 DashboardContext? openStudio(
   DashboardContext? context,
   List<StudioMembership> studios, {
@@ -244,15 +223,6 @@ class StudiosOutcome {
 }
 
 /// "Your studios" — which studio the reader is in, and the way back out.
-///
-/// Every studio the reader can work in is listed for real since 2026-10-26:
-/// `GET /v1/creator/me/memberships` answers both the one they own and the
-/// organisations they were added to. Before that there was no route at all
-/// and the sheet carried a single "Switch studio" row that reported it was
-/// not implemented.
-///
-/// Owned studios come first, so the sheet opens on the one the reader most
-/// likely means; the current studio is ticked rather than tappable.
 class StudiosSheet extends StatelessWidget {
   const StudiosSheet({
     super.key,
@@ -390,9 +360,7 @@ class _StudioRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // "Personal" belongs to the studio the reader owns. A ministry they were
-    // added to is identified by its handle, because calling someone else's
-    // organisation personal is simply wrong.
+    // "Personal" belongs to the studio the reader owns.
     final subtitle = [
       if (role == 'owner')
         AppStrings.studiosPersonal

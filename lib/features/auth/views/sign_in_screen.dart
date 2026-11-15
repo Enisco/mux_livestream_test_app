@@ -155,13 +155,9 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          // The link in the header is easy to miss above the fold on a short
-          // phone, and someone who has no account has nothing to type into
-          // this form — so the way out of it is a control of its own.
-          //
-          // `go` rather than `push`: signing up is not a detour from signing
-          // in, and replacing the screen leaves the sign-up back button
-          // pointing at the auth landing, where the rest of the ways in are.
+          // The link in the header is easy to miss above the fold on a
+          // short phone, and someone who has no account has nothing to type
+          // into this form — so the way out of it is a control of its own.
           AuthSecondaryButton(
             key: const ValueKey('sign-in-sign-up'),
             label: AppStrings.newHereSignUp,
@@ -229,18 +225,16 @@ class _SocialRow extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // No social sign-in exists to wire: the gateway publishes no OAuth,
-            // Google or Apple route anywhere in its 299 paths, and
-            // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
-            // already-signed-in user, not a sign-in. Disabled until a provider
-            // flow is agreed — see MISSING_FEATURES.md.
+            // No social sign-in exists to wire: the gateway publishes no
+            // OAuth, Google or Apple route anywhere in its 299 paths, and
+            // `/v1/auth/browser-handoffs` is a Stripe-management handoff
+            // for an already-signed-in user, not a sign-in.
             const _SocialIconButton(icon: AppAssets.iconApple),
             const SizedBox(width: 11),
-            // No social sign-in exists to wire: the gateway publishes no OAuth,
-            // Google or Apple route anywhere in its 299 paths, and
-            // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
-            // already-signed-in user, not a sign-in. Disabled until a provider
-            // flow is agreed — see MISSING_FEATURES.md.
+            // No social sign-in exists to wire: the gateway publishes no
+            // OAuth, Google or Apple route anywhere in its 299 paths, and
+            // `/v1/auth/browser-handoffs` is a Stripe-management handoff
+            // for an already-signed-in user, not a sign-in.
             const _SocialIconButton(icon: AppAssets.iconGoogle),
           ],
         ),
@@ -292,8 +286,7 @@ class _SocialIconButton extends StatelessWidget {
         // No social sign-in exists to wire: the gateway publishes no OAuth,
         // Google or Apple route anywhere in its 299 paths, and
         // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
-        // already-signed-in user, not a sign-in. Disabled until a provider
-        // flow is agreed — see MISSING_FEATURES.md.
+        // already-signed-in user, not a sign-in.
         onTap: null,
         child: Padding(
           padding: const EdgeInsets.all(8),

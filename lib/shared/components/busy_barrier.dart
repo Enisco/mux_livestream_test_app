@@ -6,20 +6,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Runs [work] behind a barrier that explains the wait and swallows taps.
-///
-/// Giving is a sequence of sheets that collect a decision, pop, and then let
-/// the screen do the work. That leaves a gap with nothing under the finger
-/// to carry a spinner — the sheet is gone, the result has not arrived, and
-/// on a slow connection the screen simply sits there. Several of those gaps
-/// span three round trips. This fills them.
-///
-/// It is a dialog route rather than a widget in the screen's own tree
-/// because the studio shell paints its nav bar *over* the tab, so an overlay
-/// built inside the tab would appear beneath it.
-///
-/// The barrier is removed in a `finally`, so a thrown error cannot strand it
-/// over the screen — an undismissable spinner is worse than the error it is
-/// hiding.
 Future<T> runBusy<T>(
   BuildContext context,
   Future<T> Function() work, {

@@ -9,18 +9,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// "Who can see it" — the three values `visibility` takes, and no more.
-///
-/// The API refuses anything outside `public`, `unlisted` and `private`, so
-/// this is a closed list rather than a text field. It reads the same as the
-/// go-live sheet because it is the same kind of question: one choice, three
-/// options, each with a line saying what it means.
-///
-/// **Unlisted is the one with a catch.** Making already-published media
-/// unlisted through `PATCH /v1/media/{id}` returns no share token — only
-/// publish mints one, and each publish of unlisted media mints a *new* one
-/// that stops older links working. So the phone can set the value but
-/// cannot hand over the link, and the screen says so afterwards rather
-/// than pretending it has one.
 class VisibilitySheet extends StatefulWidget {
   const VisibilitySheet({
     super.key,

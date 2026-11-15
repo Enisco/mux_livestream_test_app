@@ -17,21 +17,8 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The four optional steps between "your channel exists" and using it.
-///
-/// Photo, banner, bio, links. Each can be skipped, so none of them may block
-/// the reader or lose what the ones before it collected.
-///
-/// Picking and uploading are both real. [CreatorImagePicker] handles the HEIC
-/// an iPhone hands over and the per-asset ceiling; [CreatorAssetRepo] does the
-/// three-step handshake (`upload-url` → presigned S3 POST → save the creator
-/// with the returned `fileId`, which is what promotes the object out of
-/// quarantine). Saving is what attaches it, so each step patches the creator
-/// as it advances rather than holding the ids to the end.
 
 /// Picks, uploads and reports, for the two steps that carry an image.
-///
-/// The fileId is patched onto the creator as soon as it exists: the steps can
-/// each be skipped, so there is no later moment guaranteed to run.
 mixin _AssetStep<T extends StatefulWidget> on State<T> {
   PickedImage? picked;
   bool uploading = false;
@@ -141,11 +128,6 @@ class _PolishScaffold extends StatelessWidget {
   final bool centerContent;
 
   /// Back one step, or out of the chain entirely from the first.
-  ///
-  /// The four steps are reached with `go`, not `push` — they are one chain
-  /// rather than a stack — so there was never anything for the header's
-  /// `context.pop()` to pop and the back arrow did nothing on any of them.
-  /// A real stack underneath is still honoured where there is one.
   static void _back(BuildContext context, int step) {
     switch (step) {
       case 1:
@@ -159,9 +141,7 @@ class _PolishScaffold extends StatelessWidget {
           context.pop();
           return;
         }
-        // Out of the first step is out of the chain. The studio is where
-        // it ends, where skipping lands, and where both of the ways in
-        // from an existing channel live.
+        // Out of the first step is out of the chain.
         context.go(AppRouter.studio);
     }
   }

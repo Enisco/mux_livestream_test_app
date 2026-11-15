@@ -6,14 +6,6 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// Everything a creator has made, gathered from the three services that hold
 /// it.
-///
-/// All three routes are real and were exercised against staging. None
-/// publishes a response schema; each answers the same envelope:
-/// `{data: [...], meta: {total, lastPage, currentPage, perPage, prev, next}}`.
-///
-/// The media filter dialect is worth knowing: operators are `equals`, `in`,
-/// `notEquals`, `notIn` — **not** `eq`, which is refused — and `sort` takes
-/// `[{field, direction}]`.
 class StudioContentRepo {
   StudioContentRepo([ApiService? api]) : _injected = api;
 
@@ -24,11 +16,6 @@ class StudioContentRepo {
   static const _pageSize = 20;
 
   /// One chip's worth of content.
-  ///
-  /// "All" asks all three services at once and interleaves the answers by
-  /// recency, because no single route spans them. Each source fails on its
-  /// own: a creator whose posts service is down should still see their
-  /// videos.
   Future<StudioContentPage> fetch({
     required String creatorId,
     StudioContentKind? kind,

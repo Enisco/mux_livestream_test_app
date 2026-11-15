@@ -1,9 +1,6 @@
 import 'package:test_app/shared/services/viewer_identity.dart';
 
 /// A creator as a viewer sees them (Figma "Creators Profile - Viewers POV").
-///
-/// Served by `GET /v1/creator/{id}` and `GET /v1/creator/handle/{handle}`,
-/// which both wrap the record in `data.creator`.
 class CreatorProfile {
   const CreatorProfile({
     required this.id,

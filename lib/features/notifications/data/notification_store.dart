@@ -7,18 +7,6 @@ import 'package:test_app/features/notifications/repo/notification_repo.dart';
 import 'package:test_app/models/notification_models/notification_models.dart';
 
 /// How many notifications are waiting, for the bell on every surface.
-///
-/// The member profile header and the studio both draw a dot, and a dot that
-/// disagrees with the list behind it is worse than no dot — so both read this
-/// one object and it is updated in the same breath as the list.
-///
-/// **The count is computed on the device.** The service has no unread filter
-/// and no count: `{"filters":{"readAt":{"equals":null}}}` answers with nothing
-/// although unread rows exist, and `{"isNull":true}` answers 500. So [refresh]
-/// counts `readAt == null` over the first page. That is exact while the
-/// viewer has fewer unread than a page, and floors at a page beyond it —
-/// which is why [hasMore] exists and the dot never prints a number it cannot
-/// stand behind.
 class NotificationStore extends ChangeNotifier {
   NotificationStore({NotificationRepo? repo})
     : _repo = repo ?? NotificationRepo();
@@ -39,10 +27,6 @@ class NotificationStore extends ChangeNotifier {
   bool get hasUnread => _unread > 0;
 
   /// Ask the server how many are waiting.
-  ///
-  /// Never throws: a bell that cannot be counted draws no dot, which is the
-  /// honest reading, and is not worth an error state on a screen that is
-  /// about something else.
   Future<void> refresh() async {
     if (_loading) return;
     _loading = true;

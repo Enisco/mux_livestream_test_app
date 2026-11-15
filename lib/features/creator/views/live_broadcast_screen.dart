@@ -23,23 +23,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The broadcast itself.
-///
-/// The camera pushes RTMP straight to Mux with [ApiVideoLiveStreamController],
-/// the same controller the older `StartLivestreamScreen` uses. What is new
-/// here is the order around it, which the contract requires and that screen
-/// never did:
-///
-///  * **arm** the ingest window before pushing — Mux refuses encoder data
-///    while ingest is disabled, and it is disabled by default;
-///  * **start** the session, which sits at `connecting` until the provider
-///    sees the encoder;
-///  * follow the studio room on the `/live` Socket.IO namespace for the
-///    counters, status, encoder and ingest state, with the HTTP snapshot as
-///    the authority on open and after every reconnect;
-///  * **end** with a reason, rather than just stopping the camera.
-///
-/// Leaving without going live cancels the session, so a half-made broadcast
-/// is never left holding the encoder.
 class LiveBroadcastScreen extends StatefulWidget {
   const LiveBroadcastScreen({
     super.key,
@@ -78,21 +61,9 @@ class LiveBroadcastScreen extends StatefulWidget {
   State<LiveBroadcastScreen> createState() => _LiveBroadcastScreenState();
 
   /// How long to wait for the backend to see the encoder before saying so.
-  ///
-  /// The contract gives the provider about fifteen minutes; that is the
-  /// backend's patience, not a reader's. Nothing moved the screen off
-  /// "Connecting…" before this, so a push that silently never arrived —
-  /// which is what an emulator usually does — left a spinner running
-  /// indefinitely.
   static const connectTimeout = Duration(seconds: 45);
 
   /// How long the ending overlay will wait for the backend to acknowledge.
-  ///
-  /// The dio client sets `connectTimeout` but no `receiveTimeout`, so a
-  /// server that accepts the request and never answers would hold `_end`
-  /// for ever — and the overlay cannot be dismissed, so the creator would
-  /// be stuck on it. The push is already stopped by then, so the backend
-  /// closes the broadcast on its own encoder patience either way.
   static const endTimeout = Duration(seconds: 20);
 }
 
@@ -100,32 +71,15 @@ class LiveBroadcastScreen extends StatefulWidget {
 enum LivePhase { preparing, connecting, live, ending, failed }
 
 /// What "Try again" means for the failure on screen.
-///
-/// A failure before the camera is open and the ingest window is armed has
-/// nothing to reconnect to: retrying it is the whole attempt again. One
-/// after that is a reconnect, and the backend is still holding the window
-/// open — so it must not go back through setup.
 enum LiveRetry {
   /// Start over: ask for the camera, open it, arm, push.
   start,
 
   /// Arm and push again over a camera that is already running.
-  ///
-  /// The default, and the safe one: it is chosen by the phase being wrong
-  /// nowhere, only by the two failures that happen before the camera is
-  /// opened saying so outright. Deriving it from [LivePhase] would be
-  /// wrong — `preparing` also covers an arm that failed with the camera
-  /// already running, and starting that over would initialise a live
-  /// controller a second time.
   reconnect,
 }
 
 /// What losing the RTMP push means, given where the broadcast had got to.
-///
-/// This rule did not exist: `onError` and `onDisconnection` only wrote to the
-/// log, so a push that died left the screen on "Connecting…" indefinitely
-/// while the backend waited out its fifteen-minute patience for an encoder
-/// that was never coming back.
 enum LiveLossAction {
   /// Before going live, a lost push is fatal for this attempt.
   fail,
@@ -161,11 +115,8 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
       ApiVideoLiveStreamController(
         initialAudioConfig: AudioConfig(),
         initialVideoConfig: VideoConfig.withDefaultBitrate(),
-        // A creator going live is talking to their own congregation, so
-        // the camera that should already be pointing at them is the front
-        // one. The plugin's own default is `back`. `live-flip` in the
-        // stat bar switches, and the plugin reads the live position rather
-        // than assuming, so it stays correct from either start.
+        // A creator going live is talking to their own congregation, so the
+        // camera that should already be pointing at them is the front one.
         initialCameraPosition: CameraPosition.front,
         onConnectionSuccess: _onRtmpUp,
         onConnectionFailed: _onRtmpFailed,
@@ -180,12 +131,6 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   bool _failureNeedsSettings = false;
 
   /// What "Try again" has to do about the failure on screen.
-  ///
-  /// Not one thing: a lost push happens with a live camera and an armed
-  /// window behind it, so retrying is a reconnect. A refused camera
-  /// happens before any of that exists, and reconnecting would push a
-  /// stream that was never opened — which is what the button did, so it
-  /// could not recover even after the creator fixed the permission.
   LiveRetry _retryAs = LiveRetry.reconnect;
 
   LivestreamStudio _studio = LivestreamStudio.empty;
@@ -214,7 +159,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     unawaited(_wakelock.hold());
     // Nothing stopped the feed when a broadcast started, so a video still
     // playing kept its audio and the microphone put it straight into the
-    // livestream. Going live is as exclusive as playback gets.
+    // livestream.
     unawaited(_playback?.stop());
     // Asked here as well as in `_begin`, as early as the screen exists, so
     // the interface has the longest possible head start to finish rotating
@@ -265,13 +210,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 
   Future<void> _begin() async {
     // The lock went out in `initState`; this waits for the screen to have
-    // finished turning. The native SDK takes the encoder's frame size from
-    // the *interface* orientation at the moment the controller is built,
-    // so a creator holding the phone sideways was recording a genuinely
-    // landscape asset — which is why those replays played landscape on the
-    // web and sat letterboxed in a phone's upright player. Being locked
-    // also stops the SDK swapping the frame size mid-broadcast when the
-    // phone is turned.
+    // finished turning.
     await ScreenOrientation.awaitUpright();
     if (!mounted) return;
 
@@ -292,9 +231,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     try {
       // `initialize()` guards nothing of its own: it invokes the plugin's
       // `create` again, overwrites `_eventSubscription` without cancelling
-      // the old one, and leaves a second native session running. Reaching
-      // it twice became possible when "Try again" started coming back
-      // through here, which it has to for a camera that was refused.
+      // the old one, and leaves a second native session running.
       if (!_controller.isInitialized) await _controller.initialize();
       await _controller.startPreview();
     } catch (e) {
@@ -363,7 +300,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     _connectWatchdog?.cancel();
     // Nothing on the failure screen reads the counters, and the snapshot
     // poll otherwise kept asking every few seconds for as long as the
-    // creator looked at the error. `_retry` starts it again.
+    // creator looked at the error.
     _poll?.cancel();
     _poll = null;
     setState(() {
@@ -377,12 +314,6 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   // ---- what the counters read --------------------------------------------
 
   /// Follows the studio room, and keeps a slow snapshot underneath it.
-  ///
-  /// This used to be a four-second poll. The socket carries the same state as
-  /// it happens, so the poll drops to a safety net: the contract is explicit
-  /// that events are hints and the snapshot is the authority, and a socket
-  /// that silently stops delivering must not leave a broadcast's counters
-  /// frozen.
   Future<void> _startWatching() async {
     await _refresh();
 
@@ -517,9 +448,8 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
     } on LiveException catch (e) {
       logger.w('End refused', error: e);
     } on TimeoutException catch (e) {
-      // Leaving is better than holding someone on a spinner that has no
-      // way out. The broadcast is off the air from the viewer's side
-      // already; the backend reconciles when the encoder stays away.
+      // Leaving is better than holding someone on a spinner that has no way
+      // out.
       logger.w('End not acknowledged in time', error: e);
     }
     if (!mounted) return;
@@ -559,21 +489,12 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 
   /// An error raised *after* the connection opened — a write that failed, a
   /// socket that broke.
-  ///
-  /// This only wrote to the log, which is why a broadcast whose RTMP push
-  /// died sat on "Connecting…" for ever: the error arrived, was noted, and
-  /// nothing moved. The backend waits about fifteen minutes for an encoder
-  /// that is never coming.
   void _onRtmpError(Exception error) {
     logger.e('Live stream error', error: error);
     _handleTransportLoss(AppStrings.goLiveDropped);
   }
 
   /// The push stopped reaching the server.
-  ///
-  /// Before going live that is fatal for this attempt. Once live it is a
-  /// drop, and the backend is already waiting for the encoder to come back —
-  /// so one re-push is tried rather than ending the broadcast outright.
   void _handleTransportLoss(String message) {
     if (!mounted) return;
     switch (LiveLossAction.forPhase(_phase)) {
@@ -589,10 +510,6 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   }
 
   /// Another go at the same session.
-  ///
-  /// The arm window is re-opened first: it lasts about fifteen minutes, and
-  /// a retry after a slow failure could easily fall outside the one taken
-  /// out at the start.
   Future<void> _retry() async {
     if (_retryAs == LiveRetry.start) {
       // Nothing was ever armed or pushed; this is the first attempt again.
@@ -676,11 +593,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
               LivePhase.ending => const SizedBox.shrink(),
             },
           ),
-          // Over the preview, the countdown and the notch alike. Ending
-          // used to keep the whole on-air overlay up — LIVE pill, clock,
-          // chat — with only the End button quietly going inert, so for
-          // the few seconds it takes nothing said the tap had landed and
-          // creators pressed it again.
+          // Over the preview, the countdown and the notch alike.
           if (_phase == LivePhase.ending) _ending(),
         ],
       ),
@@ -809,8 +722,7 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
         ],
         // A failed connection is usually a network blip, and the session is
         // still sitting there waiting — so trying again should not mean
-        // setting the whole broadcast up a second time. It stays on a
-        // blocked permission too: coming back from Settings needs it.
+        // setting the whole broadcast up a second time.
         GestureDetector(
           key: const ValueKey('live-failed-retry'),
           behavior: HitTestBehavior.opaque,
@@ -843,9 +755,6 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
   );
 
   /// The requests themselves, which the socket does not carry.
-  ///
-  /// `livestream.metrics_updated` brings the count in realtime; the bodies
-  /// stay on an authorised request/response rather than a fan-out room.
   Future<void> _openPrayers() =>
       showLivePrayersSheet(context, mediaId: widget.mediaId, repo: _repo);
 
@@ -889,9 +798,9 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
               icon: HugeIcons.strokeRoundedMessage01,
               onTap: () => setState(() => _chatShown = !_chatShown),
             ),
-            // The clock takes the slack and gives it back: on a small
-            // phone a three-hour broadcast plus both controls and End
-            // overran the row by a few pixels.
+            // The clock takes the slack and gives it back: on a small phone
+            // a three-hour broadcast plus both controls and End overran the
+            // row by a few pixels.
             Expanded(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10.s),
@@ -928,16 +837,6 @@ class _LiveBroadcastScreenState extends State<LiveBroadcastScreen>
 }
 
 /// The chat the design runs along the foot of the broadcast.
-///
-/// **PARKED(5.1) — live chat is deferred post-MVP**, confirmed by the backend
-/// on 2026-10-16 (`docs/mobile-api-gap-responses.md` §5.1). There is no chat
-/// channel of any kind: `…/streams/{id}/studio` reports presence and counts
-/// and nothing readable, and `…/streams/{id}/chat` does not exist.
-///
-/// Kept rather than removed, because the design draws it and it is a route
-/// away from working. **Unpark when** a chat route ships: replace this
-/// placeholder with the list and composer, and give it the socket room —
-/// `livestream.metrics_updated` already reaches the studio.
 class _LiveChat extends StatelessWidget {
   const _LiveChat();
 

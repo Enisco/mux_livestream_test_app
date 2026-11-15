@@ -9,23 +9,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Renders a post or devotional body.
-///
-/// **One renderer, used by both sides.** The editor's preview and the
-/// reader's article screen used to have a renderer each — a 277-line one and
-/// a 175-line one, covering different subsets — so the preview's promise,
-/// "this is exactly how readers will see it", was not true of anything
-/// outside their overlap. They are the same code now, which is the only way
-/// that promise holds.
-///
-/// The content guide says bodies are **GFM with raw HTML disabled**, so this
-/// covers what GFM actually offers: headings, bold, italic, strikethrough,
-/// inline code, links, images, bullet/numbered/task lists, block quotes,
-/// fenced code, tables and horizontal rules. Raw HTML is deliberately *not*
-/// interpreted — it renders as the text it is, which is what disabling it
-/// means.
-///
-/// `![alt](file:{id})` is this platform's own extension, which no markdown
-/// package knows about, and is why the renderer is hand-written.
 class MarkdownBody extends StatelessWidget {
   const MarkdownBody({super.key, required this.source, this.embeds = const []});
 

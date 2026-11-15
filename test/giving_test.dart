@@ -26,24 +26,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The creator's side of Giving.
-///
-/// Four rules from `creator-giving-and-recipient-integration-guide.md` carry
-/// real money behind them, and each has a test here that fails if the client
-/// starts guessing instead of reading:
-///
-/// - **Only an active rail may say gifts are being accepted.** Anything
-///   short of it says the opposite, however far along it looks.
-/// - **A balance the provider could not report is not a zero.** It is said
-///   out loud, because a zero reads as "your money is gone".
-/// - **A direct rail has no withdrawal at all**, and a provider-held one
-///   with a request already in flight must not offer a second.
-/// - **Settlement currencies are never added together**, which is why there
-///   is no total across buckets anywhere on these screens.
-///
-/// The shapes below were probed against staging on 2026-10-26, including the
-/// two refusals a new studio actually hits: `{application: null}` before
-/// anything is applied for, and *"Giving application not found"* from every
-/// reporting route until one exists.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.application,
@@ -282,9 +264,9 @@ class _FakeApi implements ApiService {
       throw UnimplementedError(invocation.memberName.toString());
 }
 
-// ---------------------------------------------------------------------------
-// Fixtures, as staging answers them
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Fixtures, as staging answers them ------------------------------------
+// ---------------------------------------
 
 const _defaultOptions = [
   {
@@ -574,9 +556,6 @@ Future<_FakeApi> _pumpFunds(
 }
 
 /// Bring something below the fold into view.
-///
-/// These screens are long lists, so anything past the first screenful is
-/// simply not built until it is scrolled to.
 Future<void> _scrollTo(WidgetTester tester, Finder target) async {
   await tester.scrollUntilVisible(
     target,
@@ -769,7 +748,7 @@ void main() {
       // type and does not narrow once an application fixes a country, so a
       // Nigerian recipient is still handed Stripe US. The rail's country is
       // the legal recipient's real country, so offering it would send them
-      // into a verification they cannot pass. OPEN_ISSUES 38.
+      // into a verification they cannot pass.
       final options = GivingOptions.fromJson({
         'termsVersion': '2026-07-15',
         'items': [
@@ -973,9 +952,7 @@ void main() {
       tester,
     ) async {
       // Reported from the device on 2026-11-02: verifying closed the sheet
-      // and left the page exactly as it was, with no message anywhere. The
-      // screen used to own this call, so a refusal arrived after the sheet
-      // it belonged to had gone.
+      // and left the page exactly as it was, with no message anywhere.
       final api = await _pumpGiving(
         tester,
         application: _draftApplication,
@@ -1007,9 +984,7 @@ void main() {
       tester,
     ) async {
       // Reported from the device on 2026-11-02: the sheet closed on the CTA
-      // and the page simply sat there until it changed. Every write here is
-      // reached from a sheet, so by the time one runs there is no button
-      // left under the finger to carry a spinner.
+      // and the page simply sat there until it changed.
       final hold = Completer<void>();
       await _pumpGiving(tester, holdWrite: hold);
 
@@ -1058,8 +1033,8 @@ void main() {
 
     testWidgets('an expired code is not called a typo', (tester) async {
       // The guide warns against reporting a step-up refusal as a wrong code
-      // without ruling expiry out: a creator who copied it correctly from an
-      // email they opened late would be told they cannot read.
+      // without ruling expiry out: a creator who copied it correctly from
+      // an email they opened late would be told they cannot read.
       await _pumpGiving(
         tester,
         application: _draftApplication,
@@ -1115,9 +1090,7 @@ void main() {
       tester,
     ) async {
       // Probed on 2026-11-02: the resend route refuses inside its cooldown
-      // with `details.resendAvailableAt`. Read as a generic write failure it
-      // says "that did not go through", which sends a creator round again
-      // instead of waiting half a minute.
+      // with `details.resendAvailableAt`.
       await _pumpGiving(
         tester,
         application: _draftApplication,
@@ -1187,9 +1160,7 @@ void main() {
     testWidgets('back to watching leaves from the Giving tab too', (
       tester,
     ) async {
-      // Found on a device on 2026-11-03. Three of the four tabs that open
-      // this sheet handled only `switchTo`, so the row worked from the
-      // Studio tab and nowhere else.
+      // Found on a device on 2026-11-03.
       var left = false;
       await _pumpGiving(
         tester,
@@ -1435,8 +1406,7 @@ void main() {
       tester,
     ) async {
       // Refunds have no route: they are transactions whose refund state has
-      // moved. Stopping at the first page said "nothing here yet" to a
-      // creator who had been refunded a week earlier.
+      // moved.
       await _pumpEarnings(
         tester,
         transactionPages: [
@@ -1663,10 +1633,6 @@ void main() {
     });
 
     /// A case waiting on the two documents the creator has to supply.
-    ///
-    /// This is the shape that produced the bug: both are `creator`-owned, so
-    /// the GospelTube track lists them, and neither could be attached from
-    /// anywhere on this screen.
     const owedByCreator = {
       'applicationId': 'app-1',
       'railId': 'rail-khaime',
@@ -1697,10 +1663,7 @@ void main() {
     testWidgets('a document the creator still owes takes the submit\'s place', (
       tester,
     ) async {
-      // The whole bug in one assertion. The track listed two documents the
-      // creator had to supply and offered only "Submit for review", whose
-      // one possible outcome was a 400 naming those same two documents —
-      // the upload lived behind the *other* track's button.
+      // The whole bug in one assertion.
       await _pumpRail(
         tester,
         rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
@@ -1715,10 +1678,7 @@ void main() {
       tester,
     ) async {
       // `submitted` with a file on it is what an attach leaves behind, and
-      // it is the state the creator sits in waiting for the review. It is
-      // still *uploadable* — a file may be replaced right up until it is
-      // accepted — so reading "the creator can act on this" as "this is
-      // missing" would hold the submit back forever.
+      // it is the state the creator sits in waiting for the review.
       await _pumpRail(
         tester,
         rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
@@ -1786,11 +1746,7 @@ void main() {
       tester,
     ) async {
       // Found on a device on 2026-11-02: "Provider verification ·
-      // Completed" with a live "Continue Setup Khaime" under it. The
-      // action was gated on the *rail* being active, and the rail was not
-      // — GospelTube's half was still outstanding — so a track that had
-      // nothing left to do kept offering to reopen the identity form the
-      // provider had already approved.
+      // Completed" with a live "Continue Setup Khaime" under it.
       await _pumpRail(
         tester,
         rail: {..._activeKhaimeRail, 'status': 'collecting_information'},
@@ -1827,10 +1783,10 @@ void main() {
     testWidgets('a provider still working is still offered its setup', (
       tester,
     ) async {
-      // `kycStatus` comes down with the fixture as `verified`, which is
-      // the opposite of what this case is about: section 2's machine runs
-      // `not_started -> in_progress -> submitted`, and a rail whose form
-      // is half-filled is `in_progress`.
+      // `kycStatus` comes down with the fixture as `verified`, which is the
+      // opposite of what this case is about: section 2's machine runs
+      // `not_started -> in_progress -> submitted`, and a rail whose form is
+      // half-filled is `in_progress`.
       await _pumpRail(
         tester,
         rail: {
@@ -1850,10 +1806,8 @@ void main() {
     testWidgets('continue setup opens the Paystack form, not a snackbar', (
       tester,
     ) async {
-      // Found on a device on 2026-11-02: the button answered with
-      // "finish verification securely on the provider" and went nowhere.
-      // Paystack has no hosted page — section 8 is three ordinary routes —
-      // so that copy was both a dead end and untrue for this provider.
+      // Found on a device on 2026-11-02: the button answered with "finish
+      // verification securely on the provider" and went nowhere.
       await _pumpRail(
         tester,
         rail: _onboardingPaystackRail,
@@ -1883,11 +1837,7 @@ void main() {
     testWidgets('a provider already holding the details stops offering it', (
       tester,
     ) async {
-      // Found on a device on 2026-11-03. The subaccount had been created —
-      // the rail read "Under review" — and the provider card still offered
-      // "Continue Setup Paystack", which reopens the settlement-account
-      // form. Changing the destination once it is recorded is a versioned
-      // recipient change, not a resubmission.
+      // Found on a device on 2026-11-03.
       await _pumpRail(
         tester,
         rail: {
@@ -1935,13 +1885,6 @@ void main() {
 
     /// What the provider track says, for each of the four places the
     /// provider half can be.
-    ///
-    /// Reported from a device on 2026-11-03 against Stripe: the hosted
-    /// onboarding had been completed and the card still offered "Continue
-    /// Setup Stripe". The deeper fault was that the card only ever asked
-    /// one yes/no question, so *waiting on a decision* and *the decision
-    /// came back and said no* were the same answer — and the second one
-    /// left a creator no way to put anything right.
     group('the provider track, state by state', () {
       Map<String, dynamic> stripeRail({
         bool detailsSubmitted = true,
@@ -2114,10 +2057,10 @@ void main() {
         );
       });
 
-      /// The payload from the device on 2026-11-03, trimmed to the
-      /// fields that decide anything: `status: provider_onboarding`,
-      /// `kycStatus: submitted`, a submitted `review`, and a provider
-      /// block whose Stripe mirror had not caught up.
+      /// The payload from the device on 2026-11-03, trimmed to the fields
+      /// that decide anything: `status: provider_onboarding`, `kycStatus:
+      /// submitted`, a submitted `review`, and a provider block whose
+      /// Stripe mirror had not caught up.
       Map<String, dynamic> reportedRail({
         String kycStatus = 'submitted',
         bool detailsSubmitted = false,
@@ -2168,8 +2111,7 @@ void main() {
       ) async {
         // The report: "the screen says that I've not started Stripe
         // provider verification even though I have submitted it and the
-        // data also says so". `kycStatus: submitted` is the data saying
-        // so, and it outranks the provider's asynchronous mirror of it.
+        // data also says so".
         await _pumpRail(
           tester,
           rail: reportedRail(),
@@ -2354,8 +2296,8 @@ void main() {
       tester,
     ) async {
       // `detailsSubmitted` is the provider's own word for "the creator's
-      // details reached us", and it is the half of the answer that does
-      // not depend on GospelTube having recorded a destination yet.
+      // details reached us", and it is the half of the answer that does not
+      // depend on GospelTube having recorded a destination yet.
       await _pumpRail(
         tester,
         rail: {
@@ -2396,11 +2338,7 @@ void main() {
     });
 
     testWidgets('Stripe keeps it even once its account exists', (tester) async {
-      // The clause that separates Stripe from the other two. Stripe can
-      // ask for more after `detailsSubmitted` — a document, an owner —
-      // and those are the creator's to answer on Stripe's own pages. The
-      // Paystack rule, "the provider has the details, so there is nothing
-      // left to send", would close the only door.
+      // The clause that separates Stripe from the other two.
       await _pumpRail(
         tester,
         rail: {
@@ -2730,8 +2668,8 @@ void main() {
 
     test('the web origin is the API host with its first label swapped', () {
       // One setting, not two: `.env` names the API and nothing else, and
-      // the app-link entries in AndroidManifest.xml and
-      // Runner.entitlements verify exactly this host.
+      // the app-link entries in AndroidManifest.xml and Runner.entitlements
+      // verify exactly this host.
       expect(
         webAppOrigin(apiBase: 'https://api.staging.gospeltube.tv'),
         'https://app.staging.gospeltube.tv',
@@ -2802,11 +2740,6 @@ void main() {
 
   group('the Khaime form', () {
     /// A case whose policy names no account ownership at all.
-    ///
-    /// `allowedAccountOwnership` arrives empty rather than absent, so the
-    /// `??` fallback never fired and `_ownership` initialised off
-    /// `[].first`. Being `late`, it threw on first read — which is inside
-    /// submit, after the creator had filled the whole form.
     Map<String, dynamic> caseWithOwnership(List<String> allowed) => {
       'applicationId': 'app-1',
       'railId': 'rail-khaime',
@@ -2981,8 +2914,7 @@ void main() {
 
     testWidgets('the date of birth is chosen, not typed', (tester) async {
       // A free text field had to carry "YYYY-MM-DD" underneath it and still
-      // accepted anything at all. The wheel can only produce the one shape
-      // the route documents.
+      // accepted anything at all.
       final api = await pumpForm(
         tester,
         caseWithOwnership(const ['legal_recipient']),
@@ -3036,8 +2968,7 @@ void main() {
       tester,
     ) async {
       // "09032242379" tells a provider nothing about which country it is
-      // in. The rail settles to NG, so that is the dial code the field
-      // opens on, and the number leaves in E.164.
+      // in.
       final api = await pumpForm(
         tester,
         caseWithOwnership(const ['legal_recipient']),
@@ -3117,8 +3048,7 @@ void main() {
     testWidgets('a tab\'s snackbar clears it', (tester) async {
       // The Giving tab's Scaffold sits *under* the shell's floating nav bar
       // in a Stack, so a snackbar at the default offset is painted behind
-      // it — shown, and never seen. That is how a step-up refusal used to
-      // disappear. This pins the clearance to the bar's real height.
+      // it — shown, and never seen.
       tester.view.physicalSize = const Size(390, 844) * 3;
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
@@ -3177,9 +3107,9 @@ void main() {
     testWidgets('every screen holds at 320pt under long, large data', (
       tester,
     ) async {
-      // A legal recipient can be a very long registered name and a total can
-      // be ten figures, so the narrow case is exercised against both rather
-      // than against the tidy fixtures above.
+      // A legal recipient can be a very long registered name and a total
+      // can be ten figures, so the narrow case is exercised against both
+      // rather than against the tidy fixtures above.
       const longName =
           'The Redeemed Evangelical Pentecostal Assembly of the Living God '
           'International Worldwide Incorporated';

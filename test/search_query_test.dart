@@ -7,12 +7,6 @@ import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/shared/services/api_service.dart';
 
 /// What a search actually asks the server for.
-///
-/// Matching used to happen on the device, against whatever page of the mixed
-/// feed happened to be in hand — so a query only ever found things already
-/// loaded. `POST /v1/search/public/query` does it properly now, which moves
-/// the interesting behaviour from "did this row match" to "did we ask the
-/// right question". These pin the request.
 class _FakeApi implements ApiService {
   final List<(String, Object?)> posts = [];
   final List<(String, Map<String, dynamic>?)> gets = [];
@@ -158,9 +152,7 @@ void main() {
 
   group('browsing a topic', () {
     test('narrows by slug, with no query and no wildcard', () async {
-      // A Browse chip is a category. Searching for the words "Bible study"
-      // would match whatever contains them and miss everything tagged with
-      // the slug but titled otherwise.
+      // A Browse chip is a category.
       await repo.searchPublic(
         categorySlugs: const ['bible-study'],
         sort: 'recent',

@@ -11,12 +11,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The pieces the four Giving screens are assembled from.
-///
-/// Two conventions run through all of them. Status is **text plus a shape**,
-/// never colour alone, because the integration guide asks for that and
-/// because "green pill" means nothing read aloud. And every money figure is
-/// a [Money] rendered through [Money.display] — no screen formats an amount
-/// itself, and none adds two settlement currencies together.
 
 /// How a status pill reads.
 enum GivingTone { neutral, pending, good, bad }
@@ -197,12 +191,6 @@ class GivingCard extends StatelessWidget {
 }
 
 /// A metric's caption and its information icon.
-///
-/// The hint matters more than it looks. "Estimated proceeds" is not earnings
-/// and "Held by provider" is not a balance, and a creator reading a big
-/// number with no caption will take either for money in the bank — so the
-/// icon is a real [Tooltip] that opens on tap, not decoration. A card with
-/// nothing to explain draws no icon at all rather than an empty promise.
 class _MetricLabel extends StatelessWidget {
   const _MetricLabel(this.label, {this.hint});
 
@@ -270,12 +258,6 @@ class GivingMetricCard extends StatelessWidget {
 
   /// Whether the **provider** could not report this, as opposed to there
   /// being nothing to report.
-  ///
-  /// The two must not be confused. A balance a provider failed to return is
-  /// said out loud, because drawing it as a zero reads as "your money is
-  /// gone". But a studio with no rail and no gifts has not suffered a
-  /// failure, and telling it the provider is down would be a lie about the
-  /// provider — so that shows a dash.
   final bool unavailable;
 
   final String? footnote;
@@ -355,10 +337,6 @@ class GivingCountCard extends StatelessWidget {
 }
 
 /// A provider's mark.
-///
-/// The app ships no provider logos, so each is a monogram on its own tint —
-/// recognisable, and honest about being the app's own drawing rather than a
-/// brand asset it does not have.
 class ProviderMark extends StatelessWidget {
   const ProviderMark(this.provider, {super.key, this.size = 26});
 
@@ -542,10 +520,6 @@ class GivingRailCard extends StatelessWidget {
 }
 
 /// A bordered, full-width action that sits inside a card or a form.
-///
-/// Three screens wanted the same one — the rail card's track action, the
-/// checklist row's upload, and the Paystack form's "check account" — so it
-/// is one widget rather than three that drift apart.
 class GivingOutlineButton extends StatelessWidget {
   const GivingOutlineButton({
     super.key,
@@ -901,9 +875,9 @@ class GivingFundRow extends StatelessWidget {
                 AppStrings.givingFundStats(
                   fund.giftCount,
                   fund.donorCount,
-                  // Only ever the first bucket: two settlement currencies are
-                  // never added together, so a fund with gifts in both shows
-                  // the leading one rather than an invented total.
+                  // Only ever the first bucket: two settlement currencies
+                  // are never added together, so a fund with gifts in both
+                  // shows the leading one rather than an invented total.
                   fund.totalsByCurrency.isEmpty
                       ? '—'
                       : fund.totalsByCurrency.first.display,
@@ -978,12 +952,9 @@ String givingDate(DateTime? at) {
   return '${at.day} ${months[at.month - 1]} ${at.year}';
 }
 
-// ---------------------------------------------------------------------------
-// Provider form fields
-//
-// Shared by the Khaime identity form and the Paystack bank form. Both are
-// hosted by the app rather than by the provider, so they have to look like
-// the rest of the setup rather than like two different screens.
+// -------------------------------------------------------------------------
+// -- Provider form fields Shared by the Khaime identity form and the
+// Paystack bank form.
 
 class GivingField extends StatelessWidget {
   const GivingField({

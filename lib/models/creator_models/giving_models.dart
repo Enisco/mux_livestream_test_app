@@ -1,32 +1,13 @@
 /// What the creator's side of Giving is made of.
-///
-/// Shaped against `docs/API_INTEGRATION_GUIDES/creator-giving-and-recipient-integration-guide.md`
-/// and probed against staging on 2026-10-26. Three rules from that guide
-/// decide most of what is here:
-///
-/// - **Money is never recalculated.** Every amount arrives as
-///   `{currency, amountMinor, amount}`; `amount` is the server's major-unit
-///   figure for display and `amountMinor` is the accounting value. The client
-///   formats `amount` and never derives one from the other.
-/// - **Never add two settlement currencies together.** Totals arrive bucketed
-///   by currency precisely so a screen cannot sum them, and nothing here
-///   offers a total across buckets.
-/// - **Readiness is read, never inferred.** A rail's status, its KYC state
-///   and who owns each outstanding requirement all come off the response; an
-///   earlier screen's assumption is not allowed to stand in.
 library;
 
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
-// ---------------------------------------------------------------------------
-// Money
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Money ----------------------------------------------------------------
+// -----------
 
 /// One amount, in one currency.
-///
-/// `amount` is the server-derived major-unit value. The guide is explicit
-/// that a client must apply locale formatting to it and must **not** rebuild
-/// it from `amountMinor` — currency exponents are the server's business.
 class Money {
   const Money({
     required this.currency,
@@ -55,11 +36,6 @@ class Money {
       json is Map<String, dynamic> ? Money.fromJson(json) : null;
 
   /// "₦30,000.00", and "-₦30,000.00" for a reversal.
-  ///
-  /// Symbols for the four currencies the platform settles in; anything else
-  /// prints its ISO code, which is correct rather than guessed at. The minus
-  /// goes in front of the symbol, not between it and the digits: "₦-30.00"
-  /// reads as a typo rather than as money going the other way.
   String get display =>
       '${amount < 0 ? '-' : ''}${_symbol(currency)}${_grouped(amount.abs())}';
 
@@ -86,15 +62,11 @@ class Money {
   }
 }
 
-// ---------------------------------------------------------------------------
-// The application and its rails
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- The application and its rails ----------------------------------------
+// -----------------------------------
 
 /// Who the money legally belongs to.
-///
-/// An individual creator has exactly one option; an organisation must pick
-/// one and the server validates it against the creator's actual type, so the
-/// picker offers only what `application/options` returned.
 enum LegalClassification {
   individual('INDIVIDUAL', AppStrings.givingClassIndividual),
   unregisteredOrganisation(
@@ -123,10 +95,6 @@ enum LegalClassification {
 }
 
 /// Where a rail, or the application aggregating them, has got to.
-///
-/// The aggregate is `active` when any enabled rail is active, and otherwise
-/// the most advanced rail state — so a screen reads this and does not try to
-/// work it out from the rails itself.
 enum RailStatus {
   draft('draft', AppStrings.railDraft),
   collectingInformation('collecting_information', AppStrings.railCollecting),
@@ -170,13 +138,6 @@ enum RailStatus {
       this == RailStatus.draft;
 
   /// The provider's own stage is still open.
-  ///
-  /// Wider than [needsCreator] by the two states that *are* the provider
-  /// stage: a rail sits in `provider_onboarding` both before its form has
-  /// been filled and while the provider decides, so this says only that
-  /// nobody has moved past it — `platform_review` and the terminal states
-  /// have. What was actually handed over is a separate question, which
-  /// [GivingRail.providerHasDetails] answers.
   bool get providerStageOpen =>
       needsCreator ||
       this == RailStatus.providerOnboarding ||
@@ -184,11 +145,6 @@ enum RailStatus {
 }
 
 /// Who holds a gift between the giver paying and the creator being paid.
-///
-/// This is the single most consequential difference between rails: a
-/// `direct` rail is settled by its PSP on the PSP's own schedule and offers
-/// **no withdrawal**, while a `providerHeld` rail accumulates a balance the
-/// creator asks for.
 enum CustodyMode {
   direct('direct'),
   providerHeld('provider_held');
@@ -224,10 +180,6 @@ enum PaymentProvider {
 }
 
 /// How a rail's provider onboarding is completed.
-///
-/// `stripe_embedded` hands off to Stripe's own hosted flow, `paystack_bank`
-/// collects a bank account, and `khaime_kyc_form` is the long identity form
-/// the app renders itself.
 enum RailManagementMode {
   stripeEmbedded('stripe_embedded'),
   paystackBank('paystack_bank'),
@@ -247,11 +199,6 @@ enum RailManagementMode {
 }
 
 /// Who has to act on one outstanding requirement.
-///
-/// The guide asks for this to be said out loud — "Explain who is reviewing a
-/// requirement: creator, GospelTube, or payment provider" — because a
-/// creator staring at a pending row otherwise has no idea whether it is
-/// their move.
 enum RequirementOwner {
   creator('creator', AppStrings.requirementOwnerCreator),
   gospeltube('gospeltube', AppStrings.requirementOwnerGospelTube),
@@ -296,9 +243,6 @@ class RailRequirement {
   final String? rejectionReason;
 
   /// The newest non-rejected file already attached for this requirement.
-  ///
-  /// The Khaime KYC form reuses these rather than asking for the same
-  /// passport twice — the guide is explicit that it should.
   final String? fileId;
 
   bool get isSatisfied => status == 'accepted' || status == 'satisfied';
@@ -395,18 +339,6 @@ class RailRequirements {
 }
 
 /// A rail's KYC, as section 2's own state machine names it.
-///
-/// ```text
-/// not_started -> in_progress -> submitted -> provider_review
-/// provider_review -> platform_review -> verified
-/// any review state -> rejected
-/// verified -> expired -> in_progress
-/// ```
-///
-/// This is the fact the provider track most needed and never read. A rail
-/// reading `submitted` has had the creator's answers taken off it — which
-/// is why a card calling that "Not started" was not merely unhelpful, it
-/// contradicted the payload it was drawn from.
 enum KycState {
   notStarted('not_started'),
   inProgress('in_progress'),
@@ -441,11 +373,6 @@ enum KycState {
 }
 
 /// GospelTube's own verdict on the rail's verification case.
-///
-/// Straight off the wire — `review: {status, submittedAt, reviewedAt,
-/// reason, expiresAt}` — and previously dropped on the floor, which is why
-/// the GospelTube track could only ever say "Under review": it was reading
-/// the requirement list, not the decision.
 class RailReview {
   const RailReview({
     this.status = '',
@@ -458,10 +385,7 @@ class RailReview {
   final DateTime? submittedAt;
   final DateTime? reviewedAt;
 
-  /// Why it was turned down or sent back. Shown verbatim: a reviewer
-  /// writing "the name on the registration does not match" has said the
-  /// whole thing, and a stock sentence in its place sends the creator back
-  /// into the form blind.
+  /// Why it was turned down or sent back.
   final String? reason;
 
   bool get isApproved => status == 'approved' || status == 'accepted';
@@ -491,13 +415,6 @@ class RailReview {
 }
 
 /// Where the provider's half of a rail's verification actually stands.
-///
-/// The screen used to ask one yes/no question — "is there still something
-/// for the creator to do at the provider?" — which cannot tell *waiting on
-/// a decision* apart from *the decision came back and said no*. Both
-/// answered "nothing to do", so a rejected rail offered no way to fix
-/// itself, and a rail the provider was still verifying offered to start
-/// setup again.
 enum ProviderStage {
   /// Nothing has reached the provider yet, or its initial onboarding was
   /// never finished.
@@ -579,22 +496,10 @@ class GivingRail {
   final List<String> providerRequirementsDue;
 
   /// Whether the creator's own details have reached the provider.
-  ///
-  /// The guide is careful about what this does and does not mean:
-  /// *"`detailsSubmitted=true` means the bank details reached GospelTube and
-  /// Paystack; it does not mean the representative or account owner was
-  /// verified."* So it answers "is there anything left for the creator to
-  /// hand over" and nothing about the decision that follows.
   final bool detailsSubmitted;
 
   /// Stripe's own verdict on the connected account, from
   /// `provider.stripeAccountControls.approved`.
-  ///
-  /// Nullable on purpose: only Stripe reports it, so **null is "this
-  /// provider does not say"** and must not be read as a refusal. The guide
-  /// allows exactly one use — *"Clients may show a neutral 'Waiting for
-  /// Stripe account verification' state when `approved=false`; they must
-  /// not override the backend or expose donor checkout."*
   final bool? providerApproved;
 
   /// Why a provider-held rail is not releasing, when it is not.
@@ -625,62 +530,14 @@ class GivingRail {
   bool get offersWithdrawal => custodyMode.isProviderHeld;
 
   /// Whether the provider still has something for the creator to do.
-  ///
-  /// Not "the rail is not active yet", which is what the rail screen used
-  /// to ask. That left a Paystack rail sitting in `platform_review` — its
-  /// subaccount created, its bank details already at the provider — still
-  /// offering to open the settlement-account form, and reopening that form
-  /// after the destination is recorded is a versioned recipient change
-  /// rather than a resubmission.
-  ///
-  /// Each clause is something the guide says outright:
-  ///
-  /// - A refusal or an information request reopens the form whatever the
-  ///   provider already holds. Khaime has a `kyc/resubmit` route for
-  ///   precisely that, and only the creator can answer it.
-  /// - Stripe keeps its action *"while initial onboarding requirements
-  ///   remain"*: its hosted flow can be abandoned halfway and resumed, and
-  ///   Stripe can ask for more after an account already exists.
-  /// - Paystack and Khaime collect everything in one form, hosted here.
-  ///   Once the provider has it, what is left is underwriting — a decision
-  ///   nobody can hurry from this screen. Until then the form stays
-  ///   reachable for as long as the provider stage is open, because a rail
-  ///   whose bank details were never filled in is in `provider_onboarding`
-  ///   too and hiding it there would strand the creator.
   bool get providerNeedsCreator => providerStage.needsCreator;
 
   /// The same question in four answers rather than two.
-  ///
-  /// Read in order, because the earlier clauses are the stronger facts:
-  ///
-  /// - **Done.** The rail is active, or Stripe said so itself through
-  ///   `approved`. Note what is *not* here: `platform_review`. Reaching it
-  ///   does mean the provider half finished — *"When Stripe is ready, a
-  ///   policy with `platformReviewRequired=true` moves the application and
-  ///   verification case to `platform_review`"* — but the provider's own
-  ///   requirement can still be open at that moment, and a card reading
-  ///   "Completed" above its own outstanding row is the contradiction this
-  ///   screen already had once. The requirement list settles that
-  ///   question, and only the screen holds it.
-  /// - **A correction is wanted.** A refusal or an information request
-  ///   reopens the form whatever the provider already holds — Khaime has
-  ///   `kyc/resubmit` for exactly that, Paystack takes a corrected account
-  ///   through the subaccount route, and Stripe mints a fresh link. This
-  ///   is the case that had no UI at all: it read as "nothing to do".
-  /// - **Setup.** Nothing handed over yet. Stripe is its own clause
-  ///   because its hosted flow can be abandoned halfway and because it can
-  ///   ask for more after an account exists: *"While initial onboarding
-  ///   requirements remain, render Continue Stripe setup."*
-  /// - **Waiting**, which is everything else: the details are with the
-  ///   provider and nobody has asked for anything more. `kycStatus` is the
-  ///   first authority on that, because it is the rail's own word rather
-  ///   than a mirror of the PSP's.
   ProviderStage get providerStage {
     if (status.isActive) return ProviderStage.ready;
     // Ahead of every "it is done" clause below: a rail sent back keeps the
     // KYC it had, so a case that was verified once and then reopened still
-    // reads `verified` while its status says otherwise. The status is the
-    // newer fact.
+    // reads `verified` while its status says otherwise.
     if (status == RailStatus.moreInformationRequired ||
         status == RailStatus.rejected ||
         status == RailStatus.reonboardingRequired ||
@@ -693,19 +550,12 @@ class GivingRail {
       return ProviderStage.ready;
     }
     // `currently_due` is Stripe's word for what it wants *now*, from the
-    // account owner; what it is merely verifying is not in it. So a
-    // non-empty list outranks everything below — Stripe is asking today,
-    // whatever was handed over yesterday.
+    // account owner; what it is merely verifying is not in it.
     if (provider == PaymentProvider.stripe &&
         providerRequirementsDue.isNotEmpty) {
       return ProviderStage.setup;
     }
-    // The rail's own KYC outranks the provider's mirror of it. They can
-    // disagree: `provider.detailsSubmitted` is reconciled from the PSP
-    // asynchronously — *"Provider readiness is asynchronous"* — so a rail
-    // reading `submitted` while Stripe's flag has not caught up is a lag,
-    // not an unstarted form, and sending that creator back through
-    // onboarding is the one thing that cannot help them.
+    // The rail's own KYC outranks the provider's mirror of it.
     if (kyc.isHandedOver) return ProviderStage.waiting;
     if (provider == PaymentProvider.stripe) {
       return detailsSubmitted ? ProviderStage.waiting : ProviderStage.setup;
@@ -717,11 +567,6 @@ class GivingRail {
   }
 
   /// Whether the provider already holds the creator's side of its form.
-  ///
-  /// Two independent signals, because only Stripe's `detailsSubmitted` is
-  /// documented for certain: a recorded settlement destination is the other
-  /// half of the same fact, and Paystack's subaccount route is defined as
-  /// storing one.
   bool get providerHasDetails =>
       detailsSubmitted || settlementAccountLast4 != null;
 
@@ -776,10 +621,6 @@ class GivingRail {
 }
 
 /// The legal recipient, and every rail enrolled under it.
-///
-/// `null` from the route means **not requested** — no application row exists
-/// — which is a different thing from one in `draft`, and the Giving tab shows
-/// a different screen for each.
 class GivingApplication {
   const GivingApplication({
     required this.id,
@@ -894,10 +735,6 @@ class RecipientOption {
 }
 
 /// What may be enrolled, and the terms version an application must cite.
-///
-/// `termsVersion` is the server's current one. Hardcoding a version in the
-/// client gets the application rejected, which is the point — a creator has
-/// to accept the terms actually in force.
 class GivingOptions {
   const GivingOptions({this.termsVersion = '', this.items = const []});
 
@@ -928,15 +765,6 @@ class GivingOptions {
 
   /// Everything enrollable under one application, minus the providers
   /// already enrolled — a second rail for the same provider is a `CONFLICT`.
-  ///
-  /// **[countryCode] is the application's, and it matters.** The route
-  /// answers with every combination policy allows the creator *type*, and it
-  /// does not narrow once an application fixes a country: a Nigerian
-  /// recipient is still offered Stripe US, GB and IE. But a rail's country
-  /// is the legal recipient's real country — it decides PSP KYC and bank
-  /// eligibility and "is not a currency-selection workaround" — so offering
-  /// one the recipient does not live in only sends them into a verification
-  /// they cannot pass. See OPEN_ISSUES 38.
   List<RecipientOption> enrollable({
     LegalClassification? classification,
     String? countryCode,
@@ -957,9 +785,9 @@ class GivingOptions {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Step-up
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Step-up --------------------------------------------------------------
+// -------------
 
 /// An emailed one-time code, and when another may be asked for.
 class StepUpChallenge {
@@ -984,15 +812,11 @@ class StepUpChallenge {
       );
 }
 
-// ---------------------------------------------------------------------------
-// Funds
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Funds ----------------------------------------------------------------
+// -----------
 
 /// A purpose a giver can choose between.
-///
-/// The slug never changes once created, so links shared months ago keep
-/// working. `general` is reserved, created idempotently by the list route,
-/// and cannot be deactivated.
 class GivingFund {
   const GivingFund({
     required this.id,
@@ -1044,10 +868,6 @@ class GivingFund {
 }
 
 /// How many funds this creator's plan allows.
-///
-/// Limits count **active** funds, the reserved `general` one included — which
-/// is why a free plan reports `maxFunds: 1` and `canCreate: false` the moment
-/// the general fund exists.
 class FundLimits {
   const FundLimits({
     this.maxFunds,
@@ -1085,9 +905,9 @@ class GivingFundList {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Reporting
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Reporting ------------------------------------------------------------
+// ---------------
 
 /// One settlement currency's totals. Never added to another's.
 class CurrencyTotals {
@@ -1253,9 +1073,6 @@ class EarningsSummary {
   bool get isEmpty => totalsByCurrency.isEmpty && giftCount == 0;
 
   /// Whether any rail is enrolled at all.
-  ///
-  /// Distinguishes "nothing has happened yet" from "a provider failed to
-  /// answer", which the balance cards must not confuse.
   bool get hasRails => fundsByRail.isNotEmpty;
 
   /// The bucket the screen leads with: the active settlement currency's, or
@@ -1292,10 +1109,6 @@ class EarningsSummary {
 }
 
 /// One gift, settlement, payout or refund row.
-///
-/// The four reporting lists differ in which fields they carry but are drawn
-/// as one row, so one shape reads all four and each list says which figure
-/// and which status belongs on it.
 class GivingRecord {
   const GivingRecord({
     required this.id,

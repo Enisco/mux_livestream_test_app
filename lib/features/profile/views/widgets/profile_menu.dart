@@ -7,9 +7,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The menu the You tab is mostly made of.
-///
-/// Three captioned blocks — studio, the reader's own things, the account —
-/// each a stack of rows with an icon, a label and a chevron.
 
 /// A captioned block of rows, ruled off from the next.
 class ProfileMenuSection extends StatelessWidget {

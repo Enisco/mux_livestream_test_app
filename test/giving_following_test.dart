@@ -107,9 +107,7 @@ void main() {
   group('giving', () {
     testWidgets('says plainly that the routes are not there', (tester) async {
       // `GET /v1/payment/giving/me/summary` and `…/me/gifts` are both
-      // documented and both answer `Cannot GET` on staging. The screen is
-      // wired, not stubbed — it loads, fails, and offers a retry rather than
-      // showing gifts nobody gave.
+      // documented and both answer `Cannot GET` on staging.
       await _pump(
         tester,
         GivingScreen(repo: ViewerRecordsRepo(api: _MissingApi())),

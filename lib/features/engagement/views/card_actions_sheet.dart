@@ -23,35 +23,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The `…` on every content card (Figma `10779-89546`).
-///
-/// Six variants of one sheet, which the backend answered on 2026-10-26: share
-/// links, `not_interested`, mute and block all exist now, so the button that
-/// used to do nothing has something to call.
-///
-/// Four rules the sheet has to honour, each of which is invisible if broken:
-///
-/// - **No count beside "Not interested".** It increments nothing, anywhere —
-///   deliberately unlike `share`, which does move a public counter. The
-///   creator who published the item would be the one reading such a number.
-/// - **"Add to playlist" is media only** — `PARKED(1.5)`, playlists hold
-///   `mediaId` and nothing else, and widening them is not planned.
-/// - **Mute keeps the follow; block drops it.** The block response says
-///   whether one was actually dropped, so the confirmation reads off that
-///   rather than assuming.
-/// - **Minting a share link is not a share.** The count moves on the
-///   interaction, when the viewer actually sends it — not when the sheet
-///   opens.
-///
-/// A refused share is final: a link is never minted for something the viewer
-/// cannot already open, so "can't be shared" is the answer rather than a
-/// retry.
-///
-/// [isOwn] drops the rows that only make sense about somebody else. Muting
-/// yourself is nonsense and **reporting your own content is refused by the
-/// route**, which would surface here as "Something went wrong". Only the
-/// channel page knows this for certain (`isOwnedByViewer`); a feed row
-/// carries no ownership flag, so it is passed where it is known rather than
-/// guessed everywhere.
 Future<void> showCardActionsSheet(
   BuildContext context,
   WebFeedItem item, {
@@ -90,9 +61,8 @@ Future<void> showCardActionsSheet(
           fallback: item.isFollowingCreator,
         );
 
-  // Asked before the sheet is built, because a row cannot appear after it is
-  // open. Normally free: the detail screen behind this sheet has already
-  // looked the same ministry up, and the answer is held for the session.
+  // Asked before the sheet is built, because a row cannot appear after it
+  // is open.
   final canGive =
       creatorId != null &&
       (givingCapabilities ?? getIt<GivingCapabilityStore>()).known(creatorId) ==
@@ -313,9 +283,7 @@ Future<void> showCardActionsSheet(
 
     case AppStrings.cardGiveNow:
       // Only drawn when the ministry is known to be able to receive, so the
-      // giver is not sent at a refusal. The gift names no source media: a
-      // card is not necessarily a livestream, and that is the only kind the
-      // server attributes to.
+      // giver is not sent at a refusal.
       if (creatorId == null || !context.mounted) return;
       await startGive(
         context,
@@ -327,8 +295,7 @@ Future<void> showCardActionsSheet(
     default:
       // Add to calendar needs the device calendar and no route; Prayer
       // request and Submit testimony belong to flows that are not built or
-      // are parked. The sheet does not draw a row it cannot honour, so
-      // reaching here means a label was added without a case.
+      // are parked.
       logger.w('Card sheet: unhandled action "$picked"');
   }
 }

@@ -142,9 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   onPressed: _submit,
                 ),
                 // The email carries a code, and nothing in the app could
-                // spend it until now. Offered always rather than only after
-                // sending: a link that opened in a browser, or a second
-                // attempt on a code already in hand, both arrive here.
+                // spend it until now.
                 const SizedBox(height: 14),
                 GestureDetector(
                   key: const ValueKey('have-reset-code'),

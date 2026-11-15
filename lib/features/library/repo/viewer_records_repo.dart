@@ -7,15 +7,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// How a "mine" list is ordered.
-///
-/// `recent` and `oldest` mean **when the viewer acted** on all three lists —
-/// when they RSVP'd, asked or submitted — not when the thing itself happens.
-/// Events add [startSoonest] for "the event itself is next", which is the
-/// only one of the three that has a second axis.
-///
-/// **A cursor belongs to one direction.** The cursor is a row boundary, so
-/// flipping the control mid-list would skip or repeat rows — the two cursor
-/// lists must restart from no cursor when this changes.
 enum RecordsSort {
   recent('recent'),
   oldest('oldest'),
@@ -28,11 +19,6 @@ enum RecordsSort {
 
 /// The reader's own records: events they said they would attend, prayers they
 /// asked for, testimonies they submitted, and what they have given.
-///
-/// Four separate services, so four shapes. Each read is documented on its
-/// method; the things they have in common are that every one of them spans
-/// every ministry the reader has dealt with — so a byline is never optional —
-/// and that none of them is a search, so narrowing happens on the device.
 class ViewerRecordsRepo {
   ViewerRecordsRepo({ApiService? api}) : _injected = api;
 
@@ -43,10 +29,6 @@ class ViewerRecordsRepo {
   // ---- Events -----------------------------------------------------------
 
   /// `GET /v1/content/calendar/events/mine` — page-number, not a cursor.
-  ///
-  /// The list spans every creator the reader has RSVP'd to and **includes
-  /// past events**, so the screen groups them itself rather than asking for
-  /// one half at a time.
   Future<List<MyEvent>> fetchMyEvents({
     int page = 1,
     int limit = 50,
@@ -61,19 +43,12 @@ class ViewerRecordsRepo {
   }
 
   /// `PATCH …/:id/rsvp/reminder`.
-  ///
-  /// `offsetMinutes` takes **60, 120, 1440 or null** and nothing else, which
-  /// is why the UI offers a fixed picker rather than a free-form field. Null
-  /// turns the reminder off. The reader must already have an RSVP.
   Future<void> setReminder(String eventId, int? offsetMinutes) => _api.patch(
     ApiEndpoints.eventRsvpReminder(eventId),
     data: {'offsetMinutes': offsetMinutes},
   );
 
   /// `POST …/:id/rsvp` — `attending`, `maybe` or `not_attending`.
-  ///
-  /// The viewer's own RSVP, not a creator-management action, even though the
-  /// two share a controller.
   Future<void> rsvp(String eventId, {String status = 'attending'}) =>
       _api.post(ApiEndpoints.eventRsvp(eventId), data: {'status': status});
 
@@ -106,9 +81,8 @@ class ViewerRecordsRepo {
       past: at != null && at.isBefore(DateTime.now()),
       going: rsvp['status'] == 'attending',
       reminderMinutes: (rsvp['offsetMinutes'] as num?)?.toInt(),
-      // Assembled rather than kept whole: this is the RSVP list, not a search,
-      // so there is no hit to carry. The event detail screen reads it back by
-      // id, so the identity and the type are what have to be right.
+      // Assembled rather than kept whole: this is the RSVP list, not a
+      // search, so there is no hit to carry.
       source: WebFeedItem(
         entityType: 'event',
         entityId: event['id'] as String? ?? '',
@@ -124,9 +98,6 @@ class ViewerRecordsRepo {
 
   /// `GET /v1/engagement/prayers/mine` — the reader's own, across every
   /// ministry, so the byline always shows.
-  ///
-  /// `assignedToUserId` comes back on these rows and is **internal ministry
-  /// routing**: the requester is shown status, never who is handling it.
   Future<List<PrayerRequest>> fetchMyPrayers({
     String? cursor,
     RecordsSort sort = RecordsSort.recent,
@@ -147,9 +118,7 @@ class ViewerRecordsRepo {
       author: creator?['displayName'] as String? ?? '',
       authorVerified:
           creator?['isVerified'] as bool? ?? creator?['verifiedAt'] != null,
-      // `contentRef: null` means it went straight to the ministry. A ref
-      // whose `title` is null means the content has since been deleted or
-      // made private — said plainly, and not linked.
+      // `contentRef: null` means it went straight to the ministry.
       about: title ?? '',
       aboutKind: ref == null
           ? PrayerAbout.general
@@ -190,11 +159,6 @@ class ViewerRecordsRepo {
   // ---- Testimonies ------------------------------------------------------
 
   /// `GET /v1/engagement/testimonies/mine`.
-  ///
-  /// All three states matter and must read differently: a pending testimony
-  /// that looks approved has the reader asking why their story is not on the
-  /// wall. Submissions cannot be edited, so a rejected one points at sharing
-  /// a new one rather than at an edit that does not exist.
   Future<List<Testimony>> fetchMyTestimonies({
     String? cursor,
     RecordsSort sort = RecordsSort.recent,
@@ -236,9 +200,7 @@ class ViewerRecordsRepo {
       wall: status == TestimonyStatus.approved
           ? (creator?['displayName'] as String? ?? '')
           : '',
-      // Whose wall it is on — what "View on wall" opens. The row names the
-      // ministry by `creatorId` at the top level and repeats its identity in
-      // the nested object; either will do, and one of them may be absent.
+      // Whose wall it is on — what "View on wall" opens.
       creatorId:
           json['creatorId'] as String? ??
           creator?['id'] as String? ??
@@ -275,10 +237,6 @@ class ViewerRecordsRepo {
   }
 
   /// `GET /v1/payment/giving/me/gifts?year=` — newest first.
-  ///
-  /// **Only `succeeded` gifts appear**; a checkout that never completed does
-  /// not. A fully refunded gift stays in this list but is left out of the
-  /// summary's counts, so the two will not add up and should not be made to.
   Future<List<Gift>> fetchGifts(int year, {String? cursor}) async {
     final response = await _api.get(
       ApiEndpoints.myGifts,
@@ -301,9 +259,8 @@ class ViewerRecordsRepo {
           '',
       ministryVerified:
           creator?['isVerified'] as bool? ?? creator?['verifiedAt'] != null,
-      // The guide names the `creator` byline but not which key holds its id,
-      // and the other reads use both spellings. Absent means no tap, rather
-      // than a guessed key.
+      // The guide names the `creator` byline but not which key holds its
+      // id, and the other reads use both spellings.
       creatorId:
           creator?['id'] as String? ?? creator?['creatorId'] as String? ?? '',
       fund: json['fundName'] as String? ?? '',

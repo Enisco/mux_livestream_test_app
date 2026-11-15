@@ -5,21 +5,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:test_app/shared/services/playback_controller.dart' as pb;
 
 /// Puts audio in the system's notification shade and on the lock screen.
-///
-/// media_kit carries no media session of its own, so a track played through
-/// [pb.PlaybackController] was invisible to the OS: nothing in the shade, no
-/// lock-screen transport, no response to a headset button, and Android was free
-/// to kill the process the moment the app went to the background.
-///
-/// Video is deliberately left out. The feed autoplays muted clips as the reader
-/// scrolls, and publishing a session for each would put a notification in the
-/// shade every few seconds and take audio focus from whatever else is playing.
-/// Only [pb.PlaybackKind.audio] — a track the reader deliberately started — is
-/// published.
-///
-/// This owns no player. It is a two-way adapter: controller state out to the
-/// system, system transport commands back in, so the app keeps exactly one
-/// source of truth for what is playing.
 class MediaSessionHandler extends BaseAudioHandler with SeekHandler {
   MediaSessionHandler(this._playback, {this.setSessionActive}) {
     _playback.state.addListener(_publish);
@@ -29,13 +14,6 @@ class MediaSessionHandler extends BaseAudioHandler with SeekHandler {
   final pb.PlaybackHandle _playback;
 
   /// Claims and releases the OS audio session around a track.
-  ///
-  /// iOS will not route audio from a session that was never activated, and
-  /// media_kit activates nothing of its own. Held only while a track is
-  /// playing, so the app does not sit on audio focus — interrupting whatever
-  /// else the phone is playing — every moment it happens to be open.
-  ///
-  /// Null in tests, which have no session to claim.
   final Future<void> Function({required bool active})? setSessionActive;
 
   /// The media currently published, so an unchanged track is not re-announced

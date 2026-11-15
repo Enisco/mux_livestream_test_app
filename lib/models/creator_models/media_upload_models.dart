@@ -1,25 +1,9 @@
 /// Putting a video (or a piece of audio) on the platform.
-///
-/// Three mechanisms carry bytes in this app and they are not interchangeable:
-///
-///  * **Images** — channel photo, banner, thumbnail — go to S3 as a presigned
-///    **POST**. See [CreatorAssetRepo].
-///  * **Video and audio** go straight to Mux as a **PUT**, against a
-///    single-use URL minted by `POST /v1/media/request-upload`.
-///  * **Livestreams** are not uploaded at all: they are provisioned and
-///    broadcast over RTMP. `POST /v1/media` refuses them outright.
-///
-/// Everything here was read off staging; the upload routes publish no
-/// response schema.
 library;
 
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 
 /// What is being uploaded. The `slug` is the API's `mediaType`.
-///
-/// The ceilings are staging's own `constraints.maxSizeBytes`, held here so an
-/// oversized file can be turned away before a ticket is requested. The
-/// server's answer is re-read on every upload in case it tightens.
 enum MediaUploadKind {
   video('video', 5 * 1024 * 1024 * 1024),
   music('music', 1024 * 1024 * 1024);
@@ -37,9 +21,6 @@ enum MediaUploadKind {
 enum MediaUploadTarget { ios, android, web }
 
 /// A file the creator picked, described the way `request-upload` wants it.
-///
-/// The bytes are deliberately *not* held: a sermon can run to gigabytes, so
-/// the file is streamed from [path] rather than read into memory.
 class PickedMediaFile {
   const PickedMediaFile({
     required this.path,
@@ -59,12 +40,6 @@ class PickedMediaFile {
 }
 
 /// The extensions the picker offers, mapped to the MIME type the API names.
-///
-/// Verified against `constraints.allowedMimeTypes`. Video is the one that
-/// differs by platform: iOS answers
-/// `[video/mp4, video/quicktime, video/x-m4v]` and Android adds
-/// `video/webm`, so WebM is offered only where it will be accepted. Audio
-/// answers the same five everywhere.
 Map<String, String> uploadMimeTypes(
   MediaUploadKind kind,
   MediaUploadTarget target,
@@ -120,11 +95,6 @@ class MediaUploadTicket {
   }
 
   /// Mux's id for this upload.
-  ///
-  /// Nothing sends it back any more: on the draft-first flow the ticket is
-  /// already bound to the row, so the row is named by its own id. It is
-  /// kept because it is what the screen holds to know a ticket was minted,
-  /// and because it is the handle in Mux's own logs.
   final String uploadId;
 
   final String uploadUrl;
@@ -221,17 +191,6 @@ enum MediaStatus {
 /// A media row as the creator's own routes answer it: `POST
 /// /v1/media/drafts`, `GET /v1/media/{id}` and `PATCH /v1/media/{id}` all
 /// return the same shape, and every one of them returns the whole row.
-///
-/// It carries two jobs. **An upload** needs the id to work against and the
-/// `updatedAt` the next `request-upload` has to quote back — the row is
-/// created before the bytes go anywhere, so the details have somewhere to
-/// live while the file uploads and an interrupted upload leaves something
-/// the creator can come back to. **An edit** needs the rest: what is
-/// already filed, so the form opens on it rather than on blanks.
-///
-/// One class and one parse for both, because it is one route answering one
-/// shape. It was called `MediaDraft` while only the upload read it; a
-/// published row is not a draft, and the editor reads those too.
 class FiledMedia {
   const FiledMedia({
     required this.id,
@@ -294,13 +253,6 @@ class FiledMedia {
 
   /// Who can see it — or **null when the row did not say**, which is not
   /// the same as private.
-  ///
-  /// Nullable on purpose. Falling back to a value would mean the editor
-  /// showing a definite answer it does not have, and then *sending it*:
-  /// read a public video's visibility wrong and the save that fixed its
-  /// title would take it off the channel. Null means the field shows no
-  /// value and the key is left out of the PATCH, so the row keeps
-  /// whatever it has until a creator chooses.
   final MediaVisibility? visibility;
 
   /// A thumbnail the creator uploaded, as a CDN key. A video left to Mux
@@ -317,10 +269,6 @@ class FiledMedia {
   bool get isUsable => id.isNotEmpty;
 
   /// Whether this row may be opened in the editor at all.
-  ///
-  /// Creator Studio does not open `archived` media for editing, and a row
-  /// under review or blocked is not the creator's to change — the same
-  /// three the `DELETE /source` refusal names.
   bool get isEditable => switch (status) {
     MediaStatus.archived ||
     MediaStatus.blocked ||
@@ -329,25 +277,10 @@ class FiledMedia {
   };
 
   /// Whether `scheduledAt` can still be set.
-  ///
-  /// The route *"answers 400 for a time that has passed, and for media
-  /// that has ever been published, even if it was unpublished since"*. An
-  /// unpublished row keeps its `publishedAt`, which is what makes this
-  /// answerable at all; `status` alone could not tell the difference.
   bool get canBeScheduled =>
       publishedAt == null && status != MediaStatus.published;
 
   /// What to show in the thumbnail well, or null when there is nothing.
-  ///
-  /// Two sources because the API has two: a thumbnail the creator uploaded
-  /// is a CDN key, and a video left to Mux has a generated still behind the
-  /// public asset route instead.
-  ///
-  /// **The proxy route is only asked for when it can answer.** It is
-  /// generated for *public, published* media alone, so pointing an
-  /// unpublished row at it would hand the well a URL that 404s — and the
-  /// well, seeing a URL, would offer "Change thumbnail" over an empty box
-  /// rather than inviting one to be uploaded. Null is the honest answer.
   String? get thumbnailUrl =>
       AssetUrlResolver.resolve(thumbnailKey) ??
       (status == MediaStatus.published && visibility == MediaVisibility.public

@@ -7,9 +7,6 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The wrapping grid of topic pills.
-///
-/// Explore and search both draw it, under headings of their own, so the grid
-/// carries no title — each screen supplies the heading its design asks for.
 class CategoryChipGrid extends StatelessWidget {
   const CategoryChipGrid({
     super.key,

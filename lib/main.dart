@@ -28,16 +28,12 @@ Future<void> main() async {
 
 /// Registers the app with the OS media session, so a playing track appears in
 /// the notification shade and keeps going in the background.
-///
-/// A failure here must not stop the app launching — the worst case is playback
-/// without notification controls, which is where it stood before.
 Future<void> _startMediaSession() async {
   try {
     // iOS defaults every app to the "solo ambient" category, which the ring
-    // switch silences and backgrounding stops — UIBackgroundModes alone does
-    // not change that, and neither media_kit nor audio_service sets a category
-    // of its own. Declaring playback is what actually makes a track survive the
-    // lock screen. Harmless on Android, where it is a no-op.
+    // switch silences and backgrounding stops — UIBackgroundModes alone
+    // does not change that, and neither media_kit nor audio_service sets a
+    // category of its own.
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
@@ -49,9 +45,9 @@ Future<void> _startMediaSession() async {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'tv.gospeltube.audio',
         androidNotificationChannelName: 'Playback',
-        // The notification is the only thing keeping the process alive while
-        // the reader is in another app, so it must not be swipeable away
-        // mid-track; it clears itself when playback stops.
+        // The notification is the only thing keeping the process alive
+        // while the reader is in another app, so it must not be swipeable
+        // away mid-track; it clears itself when playback stops.
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
       ),

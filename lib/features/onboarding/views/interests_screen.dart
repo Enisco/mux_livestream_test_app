@@ -46,10 +46,6 @@ class _InterestsScreenState extends State<InterestsScreen> {
   }
 
   /// The chips are the live taxonomy, ordered the way the API orders it.
-  ///
-  /// A failed lookup leaves the list empty rather than falling back to a
-  /// hardcoded copy: a stale copy is how the labels and the slugs drifted
-  /// apart in the first place, and this step is skippable.
   Future<void> _loadCategories() async {
     try {
       final rows = await getIt<CreatorRepo>().fetchCategories();

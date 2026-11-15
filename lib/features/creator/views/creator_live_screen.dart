@@ -12,9 +12,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The channel exists. Said plainly, before asking for anything else.
-///
-/// This is the hinge of the flow: the plan is settled and the studio is real,
-/// so everything after it is optional polish the reader can walk away from.
 class CreatorLiveScreen extends StatelessWidget {
   const CreatorLiveScreen({super.key});
 

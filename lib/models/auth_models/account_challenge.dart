@@ -1,7 +1,4 @@
 /// The step between asking for a credential change and it happening.
-///
-/// `POST /v1/user/me/email-change` and `POST /v1/user/me/two-factor/enable`
-/// answer the same shape, so the OTP screen behind both decodes one model.
 library;
 
 class AccountChallenge {
@@ -17,10 +14,6 @@ class AccountChallenge {
 
   /// `n•••w@example.com` — so the screen can name where the code went without
   /// echoing back an address typed into a field that has scrolled away.
-  ///
-  /// The email change calls this `maskedNewEmail` (the code goes to the new
-  /// address); enabling 2FA calls it `maskedEmail` (there is no new address).
-  /// Both land here.
   final String maskedDestination;
 
   /// Ten minutes out. A verify after this is a 401, not a wrong code.
@@ -33,10 +26,6 @@ class AccountChallenge {
   final String delivery;
 
   /// Seconds until a resend is allowed, floored at zero.
-  ///
-  /// The OTP view takes a cooldown in seconds; this is where the server's
-  /// instant becomes one. A missing `resendAvailableAt` falls back to the
-  /// 60 seconds the view defaults to rather than enabling the button at once.
   int get resendCooldownSeconds {
     final at = resendAvailableAt;
     if (at == null) return 60;

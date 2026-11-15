@@ -4,20 +4,6 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// The gifts this device has started paying for.
-///
-/// A **list**, where the subscription store holds one attempt, because the two
-/// products are constrained differently: the server allows only one live
-/// subscription session per creator, but gifts may coexist, and a reader who
-/// gives to two ministries in a row has two sessions open at once. Keeping one
-/// slot would make the second gift's return link unrecognisable, and an
-/// unrecognised link is silently ignored — the giver would pay and be told
-/// nothing.
-///
-/// Only session ids are kept. They are not credentials and they prove nothing;
-/// their whole job is to let the return link be matched against an attempt
-/// this device actually started, before an authenticated read decides what
-/// really happened. No amount, ministry, ticket or provider reference is
-/// stored.
 abstract class PendingGivingStore {
   /// Session ids, newest first.
   Future<List<String>> get sessions;
@@ -44,9 +30,6 @@ class SecurePendingGivingStore implements PendingGivingStore {
   static const _key = 'gtube_pending_giving_sessions';
 
   /// Enough for a giver working through several ministries in one sitting.
-  /// Older attempts fall off rather than growing without bound — a session
-  /// expires server-side within a day anyway, and a forgotten id costs only
-  /// the status screen, never the gift.
   static const maxRemembered = 10;
 
   final FlutterSecureStorage _storage;

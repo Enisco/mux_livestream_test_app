@@ -31,8 +31,7 @@ class RoleSelectionScreen extends StatelessWidget {
   Future<void> _choose(BuildContext context, OnboardingIntent intent) async {
     await LocalStorage.setString(LocalStorage.onboardingIntentKey, intent.name);
     // The funnel state is the server's, not just this phone's, so a signup
-    // interrupted here can be resumed elsewhere. Note the wire word for
-    // "ministry" is `creator`; the API refuses anything else.
+    // interrupted here can be resumed elsewhere.
     recordOnboardingState(
       status: OnboardingStatus.inProgress,
       intent: intent == OnboardingIntent.watch

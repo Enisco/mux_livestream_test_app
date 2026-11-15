@@ -343,9 +343,8 @@ class _CreatorRow extends StatelessWidget {
             _ when following => AppColors.cyan400,
             _ => AppColors.purple400,
           },
-          // The face opens the creator; the badge on it is the follow control.
-          // Wiring both to follow left the avatar dead once following, which
-          // is the one state where opening the profile matters most.
+          // The face opens the creator; the badge on it is the follow
+          // control.
           onTap: onCreatorTap,
           onFollow: (following || data.mine) ? null : onFollow,
         ),
@@ -632,9 +631,6 @@ class _MediaBlock extends StatelessWidget {
 }
 
 /// Shows how far into the video the card has got, once it is the one playing.
-///
-/// A card can be playing and still look like a still — some clips render black
-/// on the way in — so the running clock is what tells the reader it is live.
 class _DurationPill extends StatelessWidget {
   const _DurationPill({
     required this.mediaId,
@@ -1092,9 +1088,6 @@ class _AudioStrip extends StatelessWidget {
 }
 
 /// Rebuilds its child on playback ticks without touching the rest of the card.
-///
-/// The list itself must not rebuild as the position advances, so the listener
-/// lives here, at the smallest widget that actually shows the change.
 class _PlaybackScope extends StatelessWidget {
   const _PlaybackScope({
     required this.playback,
@@ -1134,10 +1127,10 @@ class _AudioPlayButton extends StatelessWidget {
       mediaId: mediaId,
       builder: (context, state) {
         final active = state.isActive(mediaId);
-        // Before the first sound only: the spinner takes the icon's
-        // place, and `!playing` never caught the start — the engine
-        // reports playing as soon as it is told to, which is why the
-        // first tap showed a pause icon over silence.
+        // Before the first sound only: the spinner takes the icon's place,
+        // and `!playing` never caught the start — the engine reports
+        // playing as soon as it is told to, which is why the first tap
+        // showed a pause icon over silence.
         final loading =
             active && state.buffering && state.position == Duration.zero;
         return GestureDetector(

@@ -24,22 +24,6 @@ import 'package:test_app/utils/helpers/phone_number.dart';
 
 /// Khaime's identity and bank form — the one provider whose onboarding the
 /// app hosts itself.
-///
-/// Stripe and Paystack hand the creator to the provider; Khaime's
-/// `provider.management.mode` is `khaime_kyc_form`, which means these fields
-/// are ours to collect. Three constraints govern how:
-///
-/// - **Documents are evidence first.** Every file id the KYC payload names
-///   must already be attached to this rail's verification case under the
-///   right evidence type, or the request is refused before it reaches
-///   Khaime. So a picked file goes ticket → S3 → attach, and only the id
-///   that comes back is submitted.
-/// - **Nothing identifying is kept.** The ID number and the full account
-///   number are forwarded to Khaime and never stored by GospelTube, so
-///   nothing here caches them, logs them, or puts them in analytics.
-/// - **Documents already on file are reused.** Each creator-owned
-///   requirement carries the newest non-rejected `fileId`, which is why a
-///   second rail does not ask for the same passport twice.
 class GivingKycScreen extends StatefulWidget {
   const GivingKycScreen({
     super.key,
@@ -122,10 +106,8 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   /// uploads at once is a race nobody asked for.
   String? _uploadingType;
 
-  /// The bank list is fetched while the rest of the form is being filled in.
-  /// Until it lands, an empty list means "not here yet", not "none" — and
-  /// saying the latter sends a creator looking for a problem that is about
-  /// to solve itself.
+  /// The bank list is fetched while the rest of the form is being filled
+  /// in.
   bool _loadingBanks = true;
   String? _problem;
 
@@ -135,11 +117,6 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   /// The ownership the active policy allows. Never inferred from the
   /// classification — the guide says so twice — so the first allowed value
   /// is used and the picker offers only what came back.
-  ///
-  /// An **empty** list falls back too, not just a missing policy: a policy
-  /// that arrived without the field used to leave `_ownership` initialising
-  /// off `[].first`, which threw out of a field initialiser and took the
-  /// whole form down before it drew.
   List<String> get _ownerships {
     final allowed = widget.requirements?.policy?.allowedAccountOwnership;
     return allowed == null || allowed.isEmpty
@@ -203,10 +180,6 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
   }
 
   /// Pick a document, ticket it, send it to S3, attach it to the case.
-  ///
-  /// The same sequence the rail screen runs, and deliberately the same code:
-  /// both verification tracks read the one set of evidence, so a document
-  /// attached from either place satisfies both.
   Future<void> _upload(String evidenceType) async {
     if (_uploadingType != null) return;
     final result = await pickAndAttachEvidence(
@@ -596,12 +569,6 @@ class _GivingKycScreenState extends State<GivingKycScreen> {
 }
 
 /// A dial code beside the number, in the setup form's own field styling.
-///
-/// [GTubePhoneField] exists and does the same job, but it is built out of
-/// the auth screens' field shell — a different border, radius and focus
-/// shadow — so dropping it into this form would put one field from another
-/// screen in the middle of it. The picker sheet and the dial-code formatting
-/// are shared; only the shell is local.
 class _PhoneField extends StatelessWidget {
   const _PhoneField({
     required this.label,
@@ -751,9 +718,7 @@ class _DocumentCard extends StatelessWidget {
                     if (onFile) ...[
                       SizedBox(height: 3.s),
                       Text(
-                        // Only once something is actually on file. Shown
-                        // before that, it describes an upload that never
-                        // happened.
+                        // Only once something is actually on file.
                         AppStrings.givingDocumentOnFileBody,
                         style: AppStyles.label(
                           10,

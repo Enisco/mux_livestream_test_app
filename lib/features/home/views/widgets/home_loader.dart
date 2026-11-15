@@ -7,9 +7,6 @@ import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 
 /// The branded first-load screen (Figma "Pre loader", `10638-86488`).
-///
-/// The mark breathes inside a sweeping arc, so the wait reads as progress
-/// rather than a stalled screen.
 class HomeLoader extends StatefulWidget {
   const HomeLoader({super.key});
 

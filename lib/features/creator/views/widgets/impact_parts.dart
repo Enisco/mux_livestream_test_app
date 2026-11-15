@@ -148,11 +148,6 @@ class ImpactFilterRow extends StatelessWidget {
 }
 
 /// Avatar, name and how long ago — the head of every card on this screen.
-///
-/// [person] is the gateway's resolved identity and the only thing a client
-/// may render as the sender. It already carries the right words for an
-/// anonymous submitter and for a profile that could not be looked up, so it
-/// is shown as-is.
 class ImpactSender extends StatelessWidget {
   const ImpactSender({super.key, this.person, this.at, this.trailing});
 
@@ -324,10 +319,6 @@ class ImpactAction extends StatelessWidget {
 }
 
 /// One prayer, as the design lays it out.
-///
-/// The button on the right is not one button in three states — it is a
-/// different step each time. An open prayer is prayed for, a prayed one is
-/// closed, and a closed one offers nothing but the overflow menu.
 class PrayerRequestCard extends StatelessWidget {
   const PrayerRequestCard({
     super.key,
@@ -411,8 +402,7 @@ class PrayerRequestCard extends StatelessWidget {
     final wall = prayer.fromWall;
     final title = prayer.contentRefTitle;
     // A title the gateway could not resolve is normal, not an error — the
-    // content may be deleted, or belong to another creator. The line names
-    // the kind of thing instead of going blank.
+    // content may be deleted, or belong to another creator.
     final label = wall
         ? AppStrings.prayerFromWall
         : title != null
@@ -446,9 +436,6 @@ class PrayerRequestCard extends StatelessWidget {
 }
 
 /// One testimony: waiting, shared, or turned down.
-///
-/// Pending offers "Approve & Share" and a red ✕; approved offers "Remove";
-/// rejected offers "Restore" and nothing else.
 class TestimonyCard extends StatelessWidget {
   const TestimonyCard({
     super.key,
@@ -544,11 +531,6 @@ class TestimonyCard extends StatelessWidget {
 }
 
 /// One comment waiting on a decision.
-///
-/// The two buttons are the decisions this queue supports, which are not
-/// quite the design's Hide/Flag pair: a flagged comment is kept public or
-/// hidden, and a hidden one is restored. Keeping it public takes the row out
-/// of the queue — that is the queue working, not the row going missing.
 class ImpactCommentCard extends StatelessWidget {
   const ImpactCommentCard({
     super.key,
@@ -579,10 +561,7 @@ class ImpactCommentCard extends StatelessWidget {
                 ? const ImpactPill.amber(AppStrings.commentHiddenPill)
                 : const ImpactPill.red(AppStrings.commentFlaggedPill),
           ),
-          // The design quotes the comment this one answers. The queue sends
-          // `parentCommentId` and nothing else — no author, no excerpt — and
-          // no route fetches one comment by id, so the row says it is a reply
-          // rather than inventing the words it replies to. See OPEN_ISSUES.
+          // The design quotes the comment this one answers.
           if (comment.isReply) ...[
             SizedBox(height: 10.s),
             Row(
@@ -702,9 +681,6 @@ class ImpactCommentCard extends StatelessWidget {
 }
 
 /// A line under the Comments tab saying what this queue is.
-///
-/// Without it, "Comments" reads as every comment on your content, and a busy
-/// ministry seeing an empty queue will think the screen is broken.
 class ImpactQueueNote extends StatelessWidget {
   const ImpactQueueNote({super.key});
 
@@ -741,11 +717,6 @@ class ImpactQueueNote extends StatelessWidget {
 }
 
 /// Nothing has arrived yet.
-///
-/// The design draws praying hands in brand orange, bare — no disc behind
-/// them — over one headline and a line saying what will land here. The glyph
-/// is an icon rather than the 🙏 the frame uses, because no emoji face
-/// renders reliably in this app (see the font notes in `CLAUDE.md`).
 class ImpactEmpty extends StatelessWidget {
   const ImpactEmpty({super.key, required this.title, required this.body});
 

@@ -17,11 +17,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Opens the comments for a target (Figma `10861-117621`).
-///
-/// A sheet, not a page: it takes the height left under the media and leaves the
-/// player itself uncovered, so a video keeps playing while the reader reads.
-/// [topInset] is that media's height — pass the measured hero, so the sheet
-/// lands exactly on its bottom edge whatever the media is.
 Future<void> openComments(
   BuildContext context, {
   required String targetType,
@@ -32,9 +27,9 @@ Future<void> openComments(
   context: context,
   isScrollControlled: true,
   backgroundColor: Colors.transparent,
-  // No scrim at all: the design shows the player at full brightness above the
-  // sheet, and a dim over it would read as "disabled" while it is still
-  // playing. Tapping it closes the sheet.
+  // No scrim at all: the design shows the player at full brightness above
+  // the sheet, and a dim over it would read as "disabled" while it is still
+  // playing.
   barrierColor: Colors.transparent,
   builder: (_) => CommentsSheet(
     targetType: targetType,
@@ -294,9 +289,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     final screen = MediaQuery.sizeOf(context).height;
 
-    // Sit on the media's bottom edge. With no media to clear, leave a strip so
-    // it still reads as a sheet rather than a new screen. Either way it can
-    // never eat the whole screen or collapse to nothing.
+    // Sit on the media's bottom edge.
     final top = (widget.topInset ?? screen * 0.12).clamp(0.0, screen * 0.6);
 
     return Padding(

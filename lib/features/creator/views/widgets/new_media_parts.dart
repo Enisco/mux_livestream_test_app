@@ -144,11 +144,6 @@ class MediaPickCard extends StatelessWidget {
 }
 
 /// A chosen file, with how far its bytes have got.
-///
-/// The design writes this line as "Processing 64% · 1.2 GB". It says
-/// **Uploading** here instead: at this point the bytes are still going to
-/// Mux, and "Processing" already means something else in the studio — the
-/// transcode that happens after, which the Content tab labels.
 class MediaFileCard extends StatelessWidget {
   const MediaFileCard({
     super.key,
@@ -338,9 +333,7 @@ class ThumbnailWell extends StatelessWidget {
   final VoidCallback onPick;
 
   /// A cover that is already saved, for an editor opening something that
-  /// exists. Picking a new one replaces it; until then the well shows what
-  /// the creator chose last time rather than inviting them to add a cover
-  /// they already have.
+  /// exists.
   final String? existingUrl;
 
   /// What the empty well invites. An event calls it cover art rather than

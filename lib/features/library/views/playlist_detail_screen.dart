@@ -39,10 +39,6 @@ class PlaylistOutcome {
 }
 
 /// One playlist: its cover, what is in it, and what to play next.
-///
-/// Empty and filled are the same screen in the design — an empty one simply
-/// greys the play button, says so in the middle, and leans on the
-/// recommendations underneath.
 class PlaylistDetailScreen extends StatefulWidget {
   const PlaylistDetailScreen({
     super.key,
@@ -94,9 +90,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   /// "Recommended for you", anchored on the first item.
-  ///
-  /// An empty playlist has nothing to anchor on, so it gets no rail — a
-  /// generic suggestion list under an empty playlist is just the feed again.
   Future<void> _loadRecommended() async {
     final first = _playlist.items.firstOrNull;
     if (first == null) return;
@@ -196,11 +189,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   /// Pick a cover, upload it, name it on the playlist.
-  ///
-  /// **Visible immediately** — there is no review step and nothing to poll,
-  /// so the playlist is simply re-read once the PATCH lands. An uploaded
-  /// cover overrides the derived one; removing it falls back to the first
-  /// public item again.
   Future<void> _editCover() async {
     final picked = await CreatorImagePicker.pick(maxBytes: _coverMaxBytes);
     if (picked.isCancelled || !mounted) return;
@@ -298,10 +286,6 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   /// Add media, one call each.
-  ///
-  /// A duplicate answers 409 rather than quietly doing nothing, and the
-  /// ceiling is [PlaylistRepo.maxItems] — so a failure is reported instead of
-  /// being folded into a silent partial add.
   Future<void> _add(Set<String> mediaIds) async {
     var added = 0;
     for (final id in mediaIds) {
@@ -354,9 +338,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             _Hero(
               playlist: playlist,
               onBack: _leave,
-              // There is no queue to hand a whole playlist to, so Play opens
-              // the first item — which is what playing one starts with. It
-              // stands down on a playlist whose items have not arrived.
+              // There is no queue to hand a whole playlist to, so Play
+              // opens the first item — which is what playing one starts
+              // with.
               onPlay: playlist.items.isEmpty
                   ? null
                   : () => _open(playlist.items.first),

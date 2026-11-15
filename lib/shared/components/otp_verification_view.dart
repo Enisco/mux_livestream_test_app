@@ -17,11 +17,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// "Check your mail": a code sent somewhere, the slots to type it into, and a
 /// resend that unlocks on a countdown.
-///
-/// Sign-up and the settings email and phone changes all use this same screen,
-/// so it owns the layout, the countdown and the submitting state, and asks the
-/// caller only what it cannot know — where the code went and what to do with
-/// it once it is typed.
 class OtpVerificationView extends StatefulWidget {
   const OtpVerificationView({
     super.key,

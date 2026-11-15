@@ -13,12 +13,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// What the app should speak.
-///
-/// **Null is not English.** It means the viewer has not chosen, which is the
-/// only state from which falling back to the device's own language is honest.
-/// So "Match my device" is a real option that sends an explicit `null`, and
-/// omitting the key — which is what a `?language` would do — would leave
-/// whatever was there.
 class _FakeApi implements ApiService {
   _FakeApi({this.fails = false});
 

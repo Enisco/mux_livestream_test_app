@@ -8,10 +8,6 @@ import 'package:test_app/features/auth/repo/auth_repo.dart';
 import 'package:test_app/shared/components/otp_verification_view.dart';
 
 /// Confirms the address someone signed up with.
-///
-/// The screen itself is [OtpVerificationView], shared with the settings email
-/// and phone changes; this supplies only the two calls that are particular to
-/// signing up.
 class VerifyEmailScreen extends StatelessWidget {
   const VerifyEmailScreen({
     super.key,

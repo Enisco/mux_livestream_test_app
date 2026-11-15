@@ -13,23 +13,6 @@ class EngagementRepo {
   ApiService get _api => _injected ?? GetIt.instance<ApiService>();
 
   /// `POST /v1/engagement/share-links` — a URL to paste.
-  ///
-  /// **Minting a link is not recording a share.** The count still moves only
-  /// on an `interactionType: "share"` interaction, so mint when the sheet
-  /// opens and record the interaction when the viewer actually sends it —
-  /// counting a copied link would inflate every creator's share numbers by
-  /// every abandoned sheet.
-  ///
-  /// Throws when the target cannot be shared. A link is never minted for
-  /// something the viewer cannot already open: a private playlist, an
-  /// unpublished post or a cancelled event answers `404`, and a target that
-  /// exists but is not for this viewer answers `403`. **Treat a refusal as
-  /// final** — it will not change until the creator changes the content's
-  /// visibility.
-  ///
-  /// Share the URL exactly as returned: it carries `?analyticsSource=
-  /// share_link`, and wrapping it in a redirector loses both the Open Graph
-  /// preview and the deep link.
   Future<String?> mintShareLink({
     required String targetType,
     required String targetId,
@@ -45,12 +28,6 @@ class EngagementRepo {
   }
 
   /// `POST /v1/engagement/reports`.
-  ///
-  /// Nothing is stored as a report row and nothing consumes the event yet —
-  /// the audit log is the durable record, and there is no inbox or queue. So
-  /// the screen says "reported" and never promises a review outcome.
-  ///
-  /// **You cannot report your own content**, which the route refuses.
   Future<void> report({
     required String targetType,
     required String targetId,
@@ -76,9 +53,6 @@ class EngagementRepo {
       _api.delete(ApiEndpoints.mutedCreator(creatorId));
 
   /// Block: hide them everywhere and drop the follow.
-  ///
-  /// Returns whether a follow was actually dropped, so the confirmation can
-  /// say "Blocked and unfollowed" or just "Blocked" rather than assuming.
   Future<bool> blockCreator(String creatorId) async {
     final response = await _api.post(
       ApiEndpoints.blockedCreators,
@@ -136,11 +110,6 @@ class EngagementRepo {
   }
 
   /// The viewer's own like/save state for a page of rows, in one call.
-  ///
-  /// Without this every card renders unliked until its detail is opened. The
-  /// route is authenticated — guests have no state to fetch, so callers skip it.
-  ///
-  /// Returns interaction types keyed by target id, e.g. `{id: {'like'}}`.
   Future<Map<String, Set<String>>> fetchMyInteractions({
     required String targetType,
     required List<String> targetIds,

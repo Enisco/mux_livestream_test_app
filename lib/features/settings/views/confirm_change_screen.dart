@@ -7,21 +7,6 @@ import 'package:test_app/shared/components/otp_verification_view.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// The code that completes a credential change.
-///
-/// One screen behind two flows, because the backend answers the same
-/// [AccountChallenge] for both: changing an email address, and turning 2FA on.
-/// The view is [OtpVerificationView], the same one sign-up uses.
-///
-/// Two things it gets from the challenge rather than inventing:
-///
-/// - **Which address the code went to**, masked. For an email change that is
-///   the *new* address, because receiving the code there is the proof; the
-///   screen must not say "we emailed you" without naming which mailbox.
-/// - **How long until a resend is allowed.** `resendAvailableAt` is the
-///   server's own cooldown; a client-side interval would disagree with it and
-///   produce a button that looks live and answers 409.
-///
-/// Popping with `true` means the change went through.
 class ConfirmChangeScreen extends StatefulWidget {
   const ConfirmChangeScreen({
     super.key,

@@ -130,9 +130,6 @@ class CommentsResponse {
 }
 
 /// The interaction kinds the API accepts.
-///
-/// Not `dislike` — the API rejects it, which is why the card's second action is
-/// save rather than a thumbs-down.
 abstract final class InteractionTypes {
   static const like = 'like';
   static const favorite = 'favorite';
@@ -140,16 +137,6 @@ abstract final class InteractionTypes {
   static const share = 'share';
 
   /// "Not interested" — a real suppression, not a stored preference.
-  ///
-  /// It **increments nothing**: no public counter moves, no creator metric
-  /// moves, and nothing on the server will ever say how many viewers hid an
-  /// item. The sheet must render no count beside it. Unlike [share], which is
-  /// action-based and does increment `engagementShareCount`.
-  ///
-  /// Accepted on the five types that can appear as a discovery row —
-  /// `media`, `post`, `devotional`, `devotional_entry`, `event`. A testimony
-  /// or the verse of the day is a `400`: neither is something ranking chose
-  /// to show you.
   static const notInterested = 'not_interested';
 
   static const all = {like, favorite, amen, share, notInterested};
@@ -165,20 +152,6 @@ abstract final class InteractionTypes {
 }
 
 /// Hiding a creator from the surfaces that recommend them.
-///
-/// **Mute and block are not two sizes of the same thing**, and the difference
-/// decides what the confirmation says:
-///
-/// | | Mute | Block |
-/// | --- | --- | --- |
-/// | Feeds, Explore, search | Hidden | Hidden |
-/// | Channel page and library | **Still reachable** | Gone |
-/// | The follow | **Kept** | **Dropped** |
-/// | Their comments | **Still shown** | Hidden |
-///
-/// A viewer who mutes their own church still wants to open that church's page
-/// on Sunday. So a muted creator stays in `following-creators`, which carries
-/// `isMuted` and is the screen a viewer uses to undo it.
 class HiddenCreator {
   const HiddenCreator({
     required this.creatorId,
@@ -223,20 +196,6 @@ abstract final class CreatorHiding {
 }
 
 /// What an interaction can be attached to.
-///
-/// A third naming scheme, distinct from the feed's `entityType` and the
-/// analytics `contentType`. Mixing them up is silent: the API rejects the
-/// unknown value and the viewer's like state never loads.
-///
-/// | feed entityType    | beacon contentType  | interaction targetType |
-/// | ------------------ | ------------------- | ---------------------- |
-/// | `media`            | (uses `mediaId`)    | `media`                |
-/// | `post`             | `post`              | `post`                 |
-/// | `devotional_series`| `devotional_series` | `devotional`           |
-/// | `devotional_entry` | `devotional_entry`  | `devotional_entry`     |
-/// | `event`            | `calendar_event`    | `event`                |
-/// | `creator`          | `creator`           | — none —               |
-/// | `media_series`     | `media_series`      | — none —               |
 abstract final class InteractionTargets {
   static const media = 'media';
   static const post = 'post';

@@ -14,15 +14,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Who the reader follows.
-///
-/// This screen ran on a hardcoded list, two entries of which carried
-/// `isLive: true` for ever — which is why ministries showed as broadcasting
-/// when they were not. The badge had no source at all. It has one now, and
-/// it is a different question from the following list, so it is asked
-/// separately: `web-feed` with `liveOnly: true`.
-///
-/// Shapes below are `GET /v1/discovery/following-creators` and the feed,
-/// as read off staging on 2026-09-26.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.following = const [],

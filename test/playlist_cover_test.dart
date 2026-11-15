@@ -8,16 +8,6 @@ import 'package:test_app/features/library/repo/playlist_repo.dart';
 import 'package:test_app/shared/services/api_service.dart';
 
 /// A viewer-supplied playlist cover: ticket, S3, then `coverFileId`.
-///
-/// Arrived 2026-10-26. Three things it is easy to get wrong, and each one
-/// fails quietly rather than loudly:
-///
-/// - **The PATCH is what confirms the upload.** Without it the key stays in
-///   `quarantine/` and the cover never appears, with no error anywhere.
-/// - **The ceiling is read off the ticket**, not hard-coded, because the
-///   server may tighten it.
-/// - **`coverFileId: null` removes it**, falling back to the derived cover —
-///   omitting the key would leave whatever was there.
 class _FakeApi implements ApiService {
   _FakeApi({this.maxSizeBytes = 5 * 1024 * 1024, this.malformed = false});
 

@@ -197,9 +197,7 @@ void main() {
       await Future<void>.delayed(_afterDwell);
       expect(playback.state.value.playing, isTrue);
 
-      // The card stays put and keeps reporting, as a settled card does. This
-      // used to re-arm the dwell and toggle the video straight back off, so it
-      // sat at 0:00 showing its first frame.
+      // The card stays put and keeps reporting, as a settled card does.
       for (var i = 0; i < 4; i++) {
         autoplay.report(_t('a'), 0.9);
         await Future<void>.delayed(_afterDwell);

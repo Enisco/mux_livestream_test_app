@@ -18,13 +18,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The studio's own settings.
-///
-/// Reported from a device on 2026-11-03: *"I've filled all these Channel
-/// Logo, Cover and About before already. Why is the settings asking me to
-/// fill it again?"* — the switcher opened the **onboarding** chain, four
-/// screens in sequence with every field empty. These tests pin the two
-/// claims that made the difference: what the channel already has comes
-/// back on screen, and nothing is written until Save.
 class _FakeApi implements ApiService {
   _FakeApi({this.channel, this.failRead = false, this.failWrite = false});
 
@@ -274,8 +267,7 @@ void main() {
     tester,
   ) async {
     // The point of a settings screen with a Save button: picking a photo
-    // and backing out must leave the channel as it was. The object stays
-    // in quarantine until a save references its id.
+    // and backing out must leave the channel as it was.
     final assets = _FakeAssets();
     final api = await _pump(tester, assets: assets, picker: _picker(_image));
 

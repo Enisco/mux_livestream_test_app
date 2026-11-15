@@ -23,11 +23,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The account menu: everything about the reader's own account, and the way
 /// into each thing that can be changed.
-///
-/// What it reads is the cached account, refreshed from `GET /v1/user/profile`
-/// on open so a change made on another device shows here. Profile info is the
-/// one row behind it that writes; see `ProfileInfoScreen` for which fields the
-/// account route will take.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -54,9 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Push a settings screen and rebuild from the cache it may have replaced.
-  ///
-  /// Every credential route answers with the updated `User`, which the repo
-  /// caches — so the menu behind only needs to re-read it.
   Future<void> _open(Widget screen) async {
     await Navigator.push(
       context,

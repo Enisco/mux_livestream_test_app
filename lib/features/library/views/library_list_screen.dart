@@ -20,9 +20,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Liked and Saved are the same screen with a different word on the row's
 /// trailing button, so they are one widget configured twice.
-///
-/// Both narrow by typing, both group by day, both clear behind a confirmation,
-/// and Saved additionally filters by kind.
 class LibraryListScreen extends StatefulWidget {
   const LibraryListScreen({
     super.key,

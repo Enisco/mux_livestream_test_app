@@ -21,11 +21,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// What the broadcast will be called, before any camera is touched.
-///
-/// Everything here goes on the session; nothing is uploaded except the
-/// cover art, which uses the media thumbnail ticket the video and audio
-/// screens use. The camera is not opened until the next screen, so a
-/// creator who is only filling in a title is never asked for permission.
 class GoLiveSetupScreen extends StatefulWidget {
   const GoLiveSetupScreen({
     super.key,
@@ -143,9 +138,7 @@ class _GoLiveSetupScreenState extends State<GoLiveSetupScreen> {
   ].join(', ');
 
   /// Provisions, uploads the cover and files the session — then hands over
-  /// to the camera. Arming and starting belong to the broadcast screen,
-  /// because the ingest window is only fifteen minutes and should not open
-  /// until something is about to push into it.
+  /// to the camera.
   Future<void> _goLive() async {
     final creatorId = _creatorId;
     if (creatorId == null) return _say(AppStrings.goLiveRejected);

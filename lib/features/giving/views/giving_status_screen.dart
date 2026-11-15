@@ -18,21 +18,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Watches a gift to its conclusion.
-///
-/// The giver pays in a system browser, so this screen cannot observe the
-/// payment. It polls the canonical session and believes nothing else — not the
-/// return link, not a provider's query parameters, not the fact that the
-/// browser closed.
-///
-/// Two things it says carefully:
-///
-/// - **"Your gift has gone through" is not "the ministry has the money."**
-///   `succeeded` is the payment; settlement to the ministry follows on its own
-///   schedule and, on a provider-held rail, after a hold window. The giver is
-///   thanked for the gift, and no transfer is claimed.
-/// - **An unfinished gift is not a failed one.** A session the giver walked
-///   away from can still be paid, so it offers the browser back rather than
-///   reporting a failure that has not happened.
 class GivingStatusScreen extends StatefulWidget {
   const GivingStatusScreen({super.key, this.sessionId, this.repo, this.store});
 
@@ -142,9 +127,7 @@ class _GivingStatusScreenState extends State<GivingStatusScreen>
   Future<void> _dismiss() async {
     final id = _sessionId;
     final settled = _session?.isSettled ?? false;
-    // Leaving an unfinished gift abandons the attempt. A session whose
-    // payment already started stays processing on the server regardless, so
-    // this cannot turn a real payment into a cancellation.
+    // Leaving an unfinished gift abandons the attempt.
     if (id != null && !settled && !(_session?.isTerminal ?? false)) {
       // Cancelling is a round trip too, and the barrier also keeps a second
       // tap from firing a second cancel and a second pop.

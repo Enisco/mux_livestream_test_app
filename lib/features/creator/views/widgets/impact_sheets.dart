@@ -141,11 +141,6 @@ Future<PrayerFilter?> showPrayerStateSheet(
 );
 
 /// The "…" on a prayer card.
-///
-/// Which rows appear depends on where the prayer already is: an open one
-/// cannot be re-opened, a resolved one cannot be resolved again, and a
-/// resolved one shows Assign greyed rather than hiding it, as the design
-/// draws it.
 Future<PrayerAction?> showPrayerActionsSheet(
   BuildContext context, {
   required PrayerRequest prayer,
@@ -237,13 +232,6 @@ Future<PrayerAction?> showPrayerActionsSheet(
 }
 
 /// "Assign prayer to:" — who on the team is carrying this one.
-///
-/// [members] is `GET …/prayers/assignees`, which is **not** the general
-/// member list: only owners, admins and editors can be assigned, so asking
-/// the team route instead would offer people the write would refuse.
-///
-/// Returning an [ImpactPerson] whose `userId` is null means "unassign", which
-/// the caller must send as an explicit `null` rather than omitting the field.
 Future<ImpactPerson?> showAssignPrayerSheet(
   BuildContext context, {
   required List<ImpactPerson> members,
@@ -377,11 +365,6 @@ class _AssignRow extends StatelessWidget {
 }
 
 /// Pending, approved or turned down.
-///
-/// These three are the whole state machine: there is no separate "unpublish",
-/// so taking an approved story off the wall moves it to rejected, and
-/// restoring puts it back in the pending queue rather than straight back on
-/// the wall.
 Future<TestimonyFilter?> showTestimonyStateSheet(
   BuildContext context, {
   required TestimonyFilter selected,
@@ -408,9 +391,6 @@ Future<TestimonyFilter?> showTestimonyStateSheet(
 );
 
 /// Which part of the moderation queue to show.
-///
-/// "All" means both moderation states, not every comment — the queue has no
-/// `visible` rows to offer and the gateway rejects a request for them.
 Future<CommentFilter?> showCommentStateSheet(
   BuildContext context, {
   required CommentFilter selected,
@@ -437,12 +417,6 @@ Future<CommentFilter?> showCommentStateSheet(
 );
 
 /// What a creator is reporting, and anything they want to add.
-///
-/// The eight rows are the design's. Seven map onto a value
-/// `POST /v1/engagement/reports` accepts; **"Copyright or impersonation" does
-/// not** — the API has no such reason, so it travels as `other` and whoever
-/// reviews it loses the distinction. Worth raising rather than quietly
-/// dropping the row.
 const reportChoices = <(ReportReason, String)>[
   (ReportReason.spam, AppStrings.reportSpam),
   (ReportReason.hate, AppStrings.reportHate),

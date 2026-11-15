@@ -17,14 +17,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Where the getting-started rows actually go.
-///
-/// Every one of them used to answer "not built yet", which was wrong twice
-/// over: the destinations all exist, and a checklist whose steps cannot be
-/// started is worse than no checklist at all. Reported from the app against
-/// "Upload your first sermon", which should open content creation.
-///
-/// Step keys are `GET /v1/creator/{id}/dashboard/getting-started` on staging,
-/// 2026-09-26.
 class _FakeApi implements ApiService {
   _FakeApi({required this.steps, this.attention = const []});
 
@@ -104,8 +96,6 @@ Future<GoRouter> _pumpStudio(
     _FakeApi(steps: steps, attention: attention),
   );
   // Both bells read one store; the screens listen to it from `initState`.
-  // Its first read fails without an ApiService and is swallowed, which is the
-  // behaviour under test here — a bell that cannot be counted draws no dot.
   GetIt.instance.registerLazySingleton<NotificationStore>(
     NotificationStore.new,
   );
@@ -313,11 +303,8 @@ void main() {
     testWidgets('a key this release does not know guesses no inbox', (
       tester,
     ) async {
-      // This used to land on prayers, on the reasoning that the first
-      // inbox beats doing nothing. `failed_content` proved the premise
-      // wrong: the feed is not only Impact's inboxes, and sending a
-      // creator to the prayer queue over a failed transcode is worse than
-      // telling them where it is handled.
+      // This used to land on prayers, on the reasoning that the first inbox
+      // beats doing nothing.
       final jump = _TabJump();
       await _pumpStudio(
         tester,

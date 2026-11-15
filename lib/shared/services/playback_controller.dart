@@ -13,11 +13,6 @@ enum PlaybackKind { audio, video }
 typedef MediaUrlLookup = Future<String?> Function(String mediaId);
 
 /// What is playing, and what analytics needs to know about it.
-///
-/// Surfaces supply this rather than a bare id so every beacon carries the
-/// creator and the surface it was started from — the controller is the only
-/// place that sees the whole playback session, so it is the only place that can
-/// report it honestly.
 @immutable
 class PlaybackTarget {
   const PlaybackTarget({
@@ -49,10 +44,6 @@ class PlaybackTarget {
 
 /// Bookkeeping for the media now playing: what has already been reported, and
 /// when the next heartbeat is due.
-///
-/// Beacons carry *deltas* that the server sums, so getting this wrong inflates
-/// or loses watch time. Kept separate from the controller so the arithmetic can
-/// be tested without a decoder.
 class PlaybackSession {
   PlaybackSession({
     required this.target,
@@ -107,9 +98,6 @@ class PlaybackSession {
 }
 
 /// Receives the playback session as it happens, for analytics beacons.
-///
-/// Kept as an interface so the controller stays free of the analytics stack and
-/// can be tested without one.
 abstract class PlaybackReporter {
   void viewStarted(PlaybackTarget target, Duration at);
   void progress(PlaybackTarget target, Duration at, Duration delta);
@@ -144,11 +132,6 @@ class PlaybackState {
   final bool buffering;
 
   /// Played to the end and stopped there.
-  ///
-  /// Separate from `!playing` because the engine reports both a pause and
-  /// an ending the same way, and a surface that draws a spinner while it
-  /// waits has to stop drawing one at the end — where the wait is over and
-  /// nothing more is coming.
   final bool completed;
   final Duration position;
   final Duration duration;
@@ -184,11 +167,6 @@ class PlaybackState {
 }
 
 /// What a surface needs from playback, minus the decoder.
-///
-/// Cards and detail heroes talk to this rather than to [PlaybackController]
-/// directly, so their behaviour can be tested without a real media engine.
-/// Widgets that actually render video still need the concrete controller for
-/// its `videoController`.
 abstract class PlaybackHandle {
   ValueListenable<PlaybackState> get state;
 
@@ -196,9 +174,6 @@ abstract class PlaybackHandle {
   ValueListenable<bool> get muted;
 
   /// Whether the fullscreen surface currently owns the video.
-  ///
-  /// Only one `Video` widget may be attached to a controller at a time, so the
-  /// inline hero stands down while this is set rather than both rendering.
   ValueListenable<bool> get fullscreen;
 
   void setFullscreen(bool value);
@@ -207,18 +182,12 @@ abstract class PlaybackHandle {
   bool isPlaying(String mediaId);
 
   /// Plays by id, looking the stream URL up on the way.
-  ///
-  /// Asking for the media already loaded **toggles** it, so this is for taps.
-  /// Autoplay must use [ensurePlaying].
   Future<void> playMedia({
     required PlaybackTarget target,
     required PlaybackKind kind,
   });
 
   /// Starts [target], or resumes it if it is already the loaded media.
-  ///
-  /// Never pauses. Autoplay re-evaluates constantly while a card is on screen,
-  /// and a toggle there would switch off the very video it just started.
   Future<void> ensurePlaying({
     required PlaybackTarget target,
     required PlaybackKind kind,
@@ -248,10 +217,6 @@ abstract class PlaybackHandle {
   Future<void> setRate(double value);
 
   /// The video qualities this stream offers, "Auto" first.
-  ///
-  /// Empty until a stream is open and its renditions are known — a
-  /// progressive file usually offers exactly one, so the control hides
-  /// itself rather than showing a menu with nothing to choose.
   ValueListenable<List<String>> get qualities;
 
   ValueListenable<String> get quality;
@@ -260,15 +225,6 @@ abstract class PlaybackHandle {
 }
 
 /// The app's single media pipeline.
-///
-/// Everything that plays — feed cards, detail heroes, the fullscreen view —
-/// shares this one `Player`, which is what makes the guarantees hold: only one
-/// stream is ever audible, audio survives scrolling and navigation, and opening
-/// a detail continues from wherever the card had reached rather than starting
-/// over.
-///
-/// Widgets must never build their own `Player`. Two players means two audio
-/// sessions, and the second one silently steals focus from the first.
 class PlaybackController implements PlaybackHandle {
   PlaybackController({
     Player? player,
@@ -342,13 +298,6 @@ class PlaybackController implements PlaybackHandle {
   String? _openingId;
 
   /// Gives up on a stream that never opens at all.
-  ///
-  /// An unusable URL does not raise — the player just sits there — so without
-  /// this the surface could show a dead frame forever.
-  ///
-  /// It must be slow and hard to trigger: a cold HLS start on a weak device can
-  /// take well over 20s to produce its first position tick, and stopping such a
-  /// stream restarts it in a loop that never reaches the first frame.
   Timer? _startWatchdog;
   static const _startTimeout = Duration(seconds: 45);
 
@@ -384,10 +333,6 @@ class PlaybackController implements PlaybackHandle {
   }
 
   /// What the open stream can offer.
-  ///
-  /// HLS renditions are not video tracks, so for an HLS stream this reports
-  /// nothing and [setQuality] drives `hls-bitrate` instead. For everything
-  /// else the tracks are the qualities.
   void _onTracks(Tracks tracks) {
     if (_isHls) return;
     _tracks
@@ -470,9 +415,6 @@ class PlaybackController implements PlaybackHandle {
   final _offeredHls = HlsQualityOffers();
 
   /// Offers the renditions an HLS manifest advertises, for [forUrl].
-  ///
-  /// The controller does not fetch the manifest itself, because a slow or
-  /// missing one must never sit between a reader and their video.
   void offerHlsQualities(Map<String, int> byLabel, {required String forUrl}) {
     final ready = _offeredHls.offer(
       forUrl,
@@ -501,9 +443,8 @@ class PlaybackController implements PlaybackHandle {
       _startWatchdog = null;
       final state = this.state.value;
       if (state.mediaId != mediaId) return;
-      // A reported duration means the stream opened and parsed — it is alive,
-      // just slow. Only something that produced neither position nor duration
-      // is actually dead.
+      // A reported duration means the stream opened and parsed — it is
+      // alive, just slow.
       if (state.position > Duration.zero || state.duration > Duration.zero) {
         return;
       }
@@ -550,9 +491,6 @@ class PlaybackController implements PlaybackHandle {
   bool isPlaying(String mediaId) => state.value.isPlaying(mediaId);
 
   /// Starts [mediaId], replacing whatever was playing.
-  ///
-  /// Re-requesting the media that is already loaded resumes it in place rather
-  /// than reopening, which is what lets a detail screen pick up mid-stream.
   @override
   Future<void> play({
     required PlaybackTarget target,
@@ -589,8 +527,7 @@ class PlaybackController implements PlaybackHandle {
     if (rate.value != 1.0) unawaited(setRate(1.0));
 
     // The manifest is read off the network in parallel with opening the
-    // stream, so the renditions can arrive either side of this point. An
-    // offer that got here first is applied now rather than lost.
+    // stream, so the renditions can arrive either side of this point.
     if (_isHls) {
       final offered = _offeredHls.forUrl(url);
       if (offered != null) _applyHlsQualities(offered);
@@ -690,9 +627,6 @@ class PlaybackController implements PlaybackHandle {
   }
 
   /// Plays by id, resolving the stream URL on the way.
-  ///
-  /// Feed cards only know an id, so this is the entry point they use. Already
-  /// playing that id? It just resumes, so a second tap never restarts a track.
   @override
   Future<void> playMedia({
     required PlaybackTarget target,
@@ -770,15 +704,6 @@ class PlaybackController implements PlaybackHandle {
 }
 
 /// Remembers which renditions belong to which stream.
-///
-/// The manifest is read over the network while the stream is opening, so the
-/// two race in both directions: on a fast CDN the renditions can arrive
-/// before the player has opened anything, and `play` clears the quality list
-/// as it starts — so an offer that landed first used to be silently thrown
-/// away and the quality menu simply never appeared.
-///
-/// Keyed by URL rather than applied blind, because applying one video's
-/// renditions to another would offer qualities that do not exist on it.
 class HlsQualityOffers {
   final Map<String, Map<String, int>> _byUrl = {};
 

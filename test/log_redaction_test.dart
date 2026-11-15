@@ -3,11 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_app/shared/services/log_redaction.dart';
 
 /// Keeping credentials out of the logs.
-///
-/// Found on the device on 2026-10-29: tapping Give printed the whole checkout
-/// response to logcat, launch ticket included. The ticket is single-use and
-/// short-lived, which lowers the stakes without changing them — logcat is
-/// readable, and a debug log is what ends up in a bug report.
 void main() {
   group('a checkout response', () {
     test('the launch url is masked, and the session is not', () {

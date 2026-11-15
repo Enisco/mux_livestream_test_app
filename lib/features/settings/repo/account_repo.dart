@@ -13,11 +13,6 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Why a credential change was refused, in terms a screen can act on.
-///
-/// The backend is deliberate about these: a `401` on any password-proving
-/// route is uninformative and slow by design, because an authenticated route
-/// that takes a password is a password oracle for anyone holding a stolen
-/// access token. **Never retry one.**
 enum AccountFailure {
   /// Wrong password, or wrong code. The server's own wording comes with it.
   rejected,
@@ -59,27 +54,6 @@ class AccountException implements Exception {
 }
 
 /// The reader's own account record.
-///
-/// Shapes probed on 2026-10-07 and widened on 2026-10-26 after the backend
-/// answered `MOBILE_API_REQUESTS.md` — see `docs/mobile-api-gap-responses.md`.
-///
-/// - **`PATCH /v1/user/{id}`** takes `firstName`, `lastName`, `phone`,
-///   `gender`, `countryCode` and — since 2026-10-26 — `language`. It still
-///   refuses `email`, `password` and `avatarFileId`; those have routes of
-///   their own below.
-/// - **The photo is a separate pair.** `POST /v1/user/avatar/upload-url` mints
-///   a presigned S3 **POST** under `quarantine/`, and
-///   `POST /v1/user/avatar/confirm` with the `fileId` promotes it to
-///   `public/` and sets `avatarKey`. Unlike the creator's photo, this one
-///   *is* confirmed separately — saving the user does not do it.
-/// - **Email, password and 2FA are `/v1/user/me/...` routes.** The email
-///   change and the 2FA enrolment both answer an [AccountChallenge]; the
-///   password change and the 2FA disable both prove the current password and
-///   share one lockout.
-///
-/// Every write answers with the updated `User`, which is cached wholesale so
-/// the account menu and the profile header agree with the server without a
-/// second read.
 class AccountRepo {
   AccountRepo({ApiService? api, S3Send? send, TokenStorageService? tokens})
     : _injected = api,
@@ -110,9 +84,6 @@ class AccountRepo {
   }
 
   /// `PATCH /v1/user/{id}` with only the fields the route accepts.
-  ///
-  /// Returns the updated account. The caller is expected to let a failure
-  /// surface: a name that silently did not save is worse than an error.
   Future<Map<String, dynamic>> updateAccount({
     String? firstName,
     String? lastName,
@@ -128,9 +99,7 @@ class AccountRepo {
         'firstName': ?firstName,
         'lastName': ?lastName,
         'phone': ?phone,
-        // BCP 47. **Null is not English** — it means the viewer has not
-        // chosen, which is the only state a client can honestly fall back to
-        // the device language from.
+        // BCP 47.
         if (clearLanguage) 'language': null else 'language': ?language,
       },
     );
@@ -140,11 +109,6 @@ class AccountRepo {
   }
 
   /// Put a photo on the account: ticket, S3, confirm.
-  ///
-  /// The declared `size` must be the exact byte length — the presigned policy
-  /// carries `content-length-range: N,N`. The ticket route answers **500**,
-  /// not 400, when `size` is over the ceiling, which is why the ceiling is
-  /// checked before the bytes are sent as well as after the ticket comes back.
   Future<AssetUploadResult> uploadAvatar(PickedImage image) async {
     try {
       if (image.size > avatarMaxBytes) {
@@ -209,11 +173,6 @@ class AccountRepo {
   // ---- Credentials ------------------------------------------------------
 
   /// `POST /v1/user/me/email-change` — asks for a code.
-  ///
-  /// The code goes to **[newEmail]**, not the address on file: receiving it is
-  /// what proves control of the new mailbox, which is the whole point of the
-  /// step. The current address gets a no-code notice, which the client neither
-  /// triggers nor can suppress.
   Future<AccountChallenge> requestEmailChange({
     required String newEmail,
     required String password,
@@ -232,12 +191,6 @@ class AccountRepo {
   }) => _userWrite(ApiEndpoints.emailChangeVerify(challengeId), {'code': code});
 
   /// `POST /v1/user/me/password`.
-  ///
-  /// The refresh token goes in the body so the backend can tell this session
-  /// from the others and spare it — the access token carries no session id.
-  /// Omit it and every session dies, which comes back as
-  /// `currentSessionRetained: false`; the caller must check that rather than
-  /// assume it survived.
   Future<PasswordChangeResult> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -263,10 +216,6 @@ class AccountRepo {
   // ---- Two-factor -------------------------------------------------------
 
   /// `POST /v1/user/me/two-factor/enable` — **takes no password.**
-  ///
-  /// The emailed code is the proof, and it doubles as a check that codes
-  /// actually arrive at that address, so nobody can switch 2FA on against a
-  /// mailbox they cannot read and lock themselves out.
   Future<AccountChallenge> enableTwoFactor() =>
       _challenge(ApiEndpoints.twoFactorEnable, const {});
 
@@ -281,10 +230,6 @@ class AccountRepo {
   });
 
   /// `POST /v1/user/me/two-factor/disable` — **takes the current password.**
-  ///
-  /// Turning the protection off is the direction an attacker on a stolen
-  /// session wants, so it is re-authenticated rather than confirmed by email:
-  /// a code sent to the mailbox would be the same factor being removed.
   Future<Map<String, dynamic>> disableTwoFactor(String password) =>
       _userWrite(ApiEndpoints.twoFactorDisable, {'password': password});
 
@@ -332,9 +277,8 @@ class AccountRepo {
         : null;
 
     return switch (e.response?.statusCode) {
-      // Wrong password, wrong code — or an enrolment that aged out, which the
-      // backend also answers 401. `retryAt` tells the two apart: an expiry
-      // carries none.
+      // Wrong password, wrong code — or an enrolment that aged out, which
+      // the backend also answers 401.
       401 => AccountException(
         details['expired'] == true
             ? AccountFailure.expired

@@ -23,9 +23,6 @@ enum CreatorTab {
   about;
 
   /// The tab a link asked for, or null for whatever a fresh profile opens on.
-  ///
-  /// A name that is not a tab is treated as no name at all rather than
-  /// throwing: it arrives from a URL, which anything can write.
   static CreatorTab? byName(String? name) =>
       values.where((t) => t.name == name).firstOrNull;
 
@@ -100,11 +97,6 @@ class CreatorProfileHeader extends StatelessWidget {
   final bool busy;
 
   /// Whether this ministry can actually receive a gift.
-  ///
-  /// The guide is explicit that the action is **withheld**, not disabled, when
-  /// it is false: a greyed Give Now invites a tap that can only ever be
-  /// refused, and the refusal carries no reason the giver could act on. Follow
-  /// takes the whole width in its place.
   final bool canGive;
   final VoidCallback? onBack;
   final VoidCallback? onFollow;
@@ -277,9 +269,7 @@ class _Actions extends StatelessWidget {
     return Row(
       children: [
         if (owned)
-          // Looking at your own channel as a reader would see it. Follow and
-          // Give Now have nobody to point at, so the one useful action takes
-          // their place.
+          // Looking at your own channel as a reader would see it.
           Expanded(
             child: _OutlineButton(
               key: const ValueKey('profile-open-own-studio'),

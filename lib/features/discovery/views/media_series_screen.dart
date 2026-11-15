@@ -21,17 +21,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// A media series — a run of videos and tracks the creator put in order.
-///
-/// Tapping one of these used to open [MediaDetailScreen], which asks the
-/// media aggregate for the series id. A series is not a media, so
-/// `/v1/discovery/media/{id}/detail` answers **404** and the reader got an
-/// error page instead of the series.
-///
-/// `GET /v1/public/media/series/{id}` is the route that knows about them. It
-/// gives the title, description, cover key and `orderedMediaIds` — the
-/// running order — but nothing about the items themselves, so each row's
-/// title and still come from that media's own detail. Series are short, so
-/// they are fetched together rather than one screen at a time.
 class MediaSeriesScreen extends StatefulWidget {
   const MediaSeriesScreen({
     super.key,

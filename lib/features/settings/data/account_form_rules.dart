@@ -2,10 +2,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// What each account form will accept, kept away from the widgets so the rules
 /// can be read and tested on their own.
-///
-/// These are the client's half of the bargain only. Nothing here proves a
-/// password is right or an address is free — that is the server's answer, and
-/// none of these forms can ask for it yet.
 abstract final class AccountFormRules {
   /// Deliberately loose: something, an @, something with a dot in it. Anything
   /// stricter rejects addresses that are perfectly valid.

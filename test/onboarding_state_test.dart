@@ -6,14 +6,6 @@ import 'package:test_app/models/onboarding_models/onboarding_state.dart';
 import 'package:test_app/shared/services/api_service.dart';
 
 /// The funnel state the server keeps for a signup in progress.
-///
-/// `PATCH /v1/user/me/onboarding-state` types every field as a bare
-/// `{"type": "object"}`, so nothing in the contract says what may be sent.
-/// The validator does, on refusal, and these are the four lists it named on
-/// staging (2026-09-26) — every one of them was then replayed against the
-/// live route and accepted. If the backend ever narrows a list, the probe in
-/// the integration suite is what will catch it; this holds the app to the
-/// spellings it agreed to.
 class _RecordingApi implements ApiService {
   final List<({String path, Map<String, dynamic> body})> calls = [];
   bool fail = false;

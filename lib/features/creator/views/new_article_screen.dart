@@ -29,21 +29,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Writing an article.
-///
-/// Markdown in, markdown out: the body is stored as GFM and the Preview tab
-/// renders it with [MarkdownBody]. Nothing is uploaded to Mux — the cover
-/// and every inline picture go through the content service's own image
-/// ticket, and the picture only resolves once a saved post names it, which
-/// is why an unsaved draft previews inline images as placeholders.
-///
-/// Unlike an event, an article **can** be scheduled, so the go-live sheet
-/// is offered here exactly as the design shows.
-///
-/// The same screen **edits** an article that already exists: pass
-/// [editPostId] and it opens what is filed, saves with
-/// `PATCH /v1/content/posts/{id}`, and leaves the publishing state alone —
-/// a creator fixing a typo in a published post expects it to stay
-/// published, and one tidying a draft expects it to stay a draft.
 class NewArticleScreen extends StatefulWidget {
   const NewArticleScreen({
     super.key,
@@ -85,11 +70,6 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
   Timer? _resolveDebounce;
 
   /// The article as it is filed, when this screen is editing one.
-  ///
-  /// Kept whole rather than torn into controllers because the editor shows
-  /// a headline, a body and a cover — not the excerpt, the categories or
-  /// the visibility. A PATCH built from the controllers alone would send
-  /// those back empty and quietly wipe them.
   PostDraft? _filed;
 
   /// Where the already-saved cover is, so the well shows it.
@@ -177,10 +157,6 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
   }
 
   /// What the editor has, over what is already filed.
-  ///
-  /// `copyWith` over [_filed] rather than a fresh [PostDraft]: the excerpt,
-  /// the categories and the visibility are not on this screen, and a PATCH
-  /// built without them would clear all three.
   PostDraft get _draft => (_filed ?? const PostDraft(title: '')).copyWith(
     title: _titleController.text.trim(),
     body: _bodyController.text.trim(),
@@ -285,9 +261,8 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
     final postId = widget.editPostId;
     final creatorId = _creatorId;
     if (postId == null) return;
-    // A new cover has to be uploaded before it can be named, and that
-    // needs a creator. Going ahead without one would save every other
-    // change and drop the picture without saying so.
+    // A new cover has to be uploaded before it can be named, and that needs
+    // a creator.
     if (_cover != null && creatorId == null) {
       return _say(AppStrings.newMediaRejected);
     }
@@ -485,17 +460,6 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
   );
 
   /// What a reader would get.
-  ///
-  /// Every figure here is the true one for a post being written. The design's
-  /// meta line reads "12.9K Opens · 2 min read · 6 hours ago"; two of those
-  /// three belong to a post that already exists, and a draft has neither an
-  /// audience nor a publication date. Putting a fabricated number in front of
-  /// the creator would be worse than saying so, so the line says what is
-  /// actually true and the read time — words over two hundred, image tokens
-  /// excluded — is real and updates as they type.
-  ///
-  /// The byline **is** real and available, so it is shown: the channel's
-  /// avatar, name and tick, exactly as a reader would see them.
   Widget _preview() => ListView(
     padding: EdgeInsets.fromLTRB(20.s, 16.s, 20.s, 20.s),
     children: [

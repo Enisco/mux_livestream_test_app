@@ -17,18 +17,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// How much came in over a window, what it was given towards, and the last
 /// gifts to arrive.
-///
-/// Every figure on this screen is provider-reported and bucketed by
-/// settlement currency. The screen leads with one bucket — the active
-/// settlement currency's — and never adds two together, which is why there
-/// is no single "total raised" anywhere on it.
-///
-/// The wording is load-bearing. **Gross gifts** is what givers sent;
-/// **estimated proceeds** is what should arrive and is explicitly not
-/// earnings, because provider adjustments can still move it; **held by
-/// provider** is settled money still inside its hold window. Collapsing any
-/// of the three into "earnings" would tell a creator they have money they
-/// cannot yet touch.
 class GivingFundsScreen extends StatefulWidget {
   const GivingFundsScreen({super.key, required this.creatorId, this.repo});
 
@@ -123,11 +111,6 @@ class _GivingFundsScreenState extends State<GivingFundsScreen> {
   }
 
   /// Make a fund, or change one.
-  ///
-  /// The plan ceiling is checked before the dialog opens so a creator is not
-  /// asked to write a description for a fund that cannot be created — but
-  /// the refusal is still handled, because a slot can go between the read
-  /// and the write.
   Future<void> _editFund([GivingFund? fund]) async {
     if (fund == null && !_funds.limits.canCreate) {
       _say(AppStrings.givingFundLimitReached);

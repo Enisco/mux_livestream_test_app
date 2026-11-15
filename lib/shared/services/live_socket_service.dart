@@ -8,26 +8,6 @@ import 'package:test_app/core/logger.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 
 /// The `/live` Socket.IO namespace.
-///
-/// The livestream contract publishes viewer counts, status, encoder and
-/// ingest state, metrics and replay status over Socket.IO. The app had no
-/// socket client, so the broadcast screen polled the studio snapshot every
-/// four seconds — which is both wasteful and slow to notice the thing that
-/// matters most, a stream ending.
-///
-/// Three things the contract is specific about, and all three are honoured
-/// here:
-///
-///  * the namespace is `/live` on the API origin, **not** `/v1/live`;
-///  * mobile authenticates with `auth.token`, not a query parameter, so the
-///    JWT stays out of logs;
-///  * `viewer_count` and `status_changed` each carry their own monotonic
-///    `revision`, tracked **separately** — a stale payload must be dropped
-///    rather than applied, and comparing one stream's revision against the
-///    other's would drop good ones.
-///
-/// Events are hints, not the source of truth: the caller still refetches the
-/// HTTP snapshot after a reconnect, as the contract asks.
 class LiveSocketService {
   LiveSocketService({required TokenStorageService tokenStorage, String? origin})
     : _tokenStorage = tokenStorage,
@@ -70,12 +50,6 @@ class LiveSocketService {
   }
 
   /// Held while a connection is being set up.
-  ///
-  /// There is an `await` between the null check and the assignment — the
-  /// access token is read from storage — so two callers arriving together
-  /// would both get past the check and build a socket each, and the second
-  /// would quietly orphan the first. Both screens that use this can call it
-  /// more than once (a retry, a reload), so this is reachable.
   Future<void>? _connecting;
 
   Future<void> connect() {

@@ -133,11 +133,6 @@ class AppStyles {
   );
 
   /// What to reach for when the brand face has no glyph.
-  ///
-  /// Satoshi carries no emoji and no currency signs beyond the common few —
-  /// a naira amount renders as a box without this. Inter ships with the app
-  /// and covers both, and naming the system emoji faces is what makes those
-  /// resolve on Android and physical iOS devices.
   static const List<String> emojiFallback = [
     featureFont,
     'Apple Color Emoji',

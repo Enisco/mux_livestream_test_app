@@ -32,10 +32,6 @@ enum SessionAction {
 }
 
 /// The whole policy for a 401, in one place.
-///
-/// Two mistakes live here if it is spread across the interceptor: signing a
-/// user out because the network dropped mid-refresh, and dragging a signed-out
-/// browser to the sign-in screen over a stale token they never asked for.
 SessionAction sessionActionFor({
   required bool hasRefreshToken,
   RefreshOutcome? outcome,
@@ -53,14 +49,6 @@ class ApiService {
   bool _isHandlingExpiry = false;
 
   /// The refresh currently in flight, if any.
-  ///
-  /// The server **rotates** refresh tokens: every successful refresh returns
-  /// a new one and invalidates the one that was spent. So a burst of 401s —
-  /// which is exactly what a cold start produces, when several requests go
-  /// out together on an access token that has just expired — must not each
-  /// start its own refresh. The first would succeed and the rest would send
-  /// a token the server had already retired, get 401, and tear down a
-  /// session that had in fact just been renewed.
   Future<RefreshOutcome>? _refreshInFlight;
 
   final TokenStorageService _tokenStorage;
@@ -95,17 +83,6 @@ class ApiService {
   static const _replayed = 'gtube_replayed_after_refresh';
 
   /// Routes whose 401 is an answer, not an expired session.
-  ///
-  /// The auth guide names this and says what happens if you skip it:
-  /// *"Never attempt refresh-on-401 for the auth routes themselves (login,
-  /// logout, refresh, the 2FA routes). Exclude them explicitly or you will
-  /// loop."*
-  ///
-  /// Step-up is the one that bit. `POST .../step-up/challenges/:id/verify`
-  /// answers **401** for a code it will not take — *"Maximum OTP attempts
-  /// exceeded"* — which has nothing to do with the session. Refreshing and
-  /// replaying it re-submits the same rejected code forever, which is what
-  /// a creator sees as a button that spins and never stops.
   static bool _isAuthRoute(String path) =>
       path.contains(ApiEndpoints.refresh) ||
       path.contains(ApiEndpoints.login) ||
@@ -113,10 +90,7 @@ class ApiService {
       path.contains(ApiEndpoints.beaconsAuth) ||
       // The login-time 2FA exchange: there is no session to refresh yet.
       path.contains('/2fa/challenges') ||
-      // Only the verify step. Creating or resending a challenge still 401s
-      // for a genuinely expired access token, and a step-up sheet can sit
-      // open long enough for that to happen — those should refresh as
-      // usual, which the replay guard above keeps to one attempt.
+      // Only the verify step.
       (path.endsWith('/verify') &&
           (path.contains(ApiEndpoints.stepUpChallenges) ||
               path.contains('/two-factor/')));
@@ -158,13 +132,9 @@ class ApiService {
 
         if (statusCode == 401 &&
             !_isAuthRoute(path) &&
-            // "Refresh once and replay. On a second failure, log out."
-            // Without this the replay goes back through this interceptor,
-            // 401s again, refreshes again, and never stops.
+            // "Refresh once and replay.
             error.requestOptions.extra[_replayed] != true) {
-          // A guest has no session to expire. Without this, a stale access
-          // token that outlived its refresh token drags anyone browsing
-          // signed-out onto the sign-in screen.
+          // A guest has no session to expire.
           final refresh = await _tokenStorage.refreshToken;
           if (refresh == null || refresh.isEmpty) {
             final stale = await _tokenStorage.accessToken;
@@ -192,9 +162,7 @@ class ApiService {
               return handler.next(error);
             }
           }
-          // Only a refusal ends the session. If the refresh could not reach the
-          // server the tokens are probably still valid, and signing the user
-          // out over a dropped connection loses their session for good.
+          // Only a refusal ends the session.
           if (action == SessionAction.endSession) {
             await _handleSessionExpiry();
           }
@@ -207,11 +175,6 @@ class ApiService {
 
   /// Renews the session, joining a refresh already under way rather than
   /// starting a competing one.
-  ///
-  /// Everything that renews goes through here — the interceptor on a 401
-  /// and the splash screen on launch alike. Two paths refreshing at once
-  /// would spend the same rotating token twice, and the loser's 401 would
-  /// tear down the session the winner had just renewed.
   Future<RefreshOutcome> refreshSession() => _tryRefreshToken();
 
   /// Refreshes once, however many callers ask at the same time.

@@ -9,25 +9,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The studio's getting-started checklist.
-///
-/// Two things it has to get right, and it got one of them wrong: every row
-/// answered "not built yet" when tapped, even though the destinations all
-/// exist. A checklist whose steps cannot be started is worse than no
-/// checklist.
-///
-/// The other is the state of each row. `complete` is the server's answer,
-/// per step — a brand-new studio on staging (2026-09-26) reports:
-///
-/// ```
-/// complete_profile        complete=false  applicable=true
-/// publish_first_content   complete=false  applicable=true
-/// invite_team             complete=true   applicable=false
-/// ```
-///
-/// So "done" is never inferred from anything the app knows, and a step that
-/// does not apply to this studio is not shown at all — note `invite_team`
-/// arrives *complete* but inapplicable, which would read as a finished step
-/// for a solo creator who never had a team.
 List<GettingStartedStep> _steps(List<Map<String, dynamic>> rows) =>
     rows.map(GettingStartedStep.fromJson).toList();
 

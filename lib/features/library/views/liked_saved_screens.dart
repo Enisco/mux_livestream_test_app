@@ -10,11 +10,6 @@ import 'package:test_app/models/history_models/history_models.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// Take a row back out of a library.
-///
-/// `POST /v1/engagement/interactions` is a toggle, so posting the same
-/// interaction again is the removal. The row's own `targetType` is what goes
-/// on the call — the guide is explicit that mapping it from the entity type
-/// on the client is wrong.
 Future<void> _untoggle(HistoryEntry entry, String interactionType) =>
     GetIt.instance<EngagementRepo>().toggleInteraction(
       targetType: entry.targetType,

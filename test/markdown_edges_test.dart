@@ -3,10 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:test_app/shared/components/markdown_body.dart';
 
 /// The awkward shapes a hand-written parser gets wrong.
-///
-/// Tables and fences both consume lines beyond the one being looked at, which
-/// is where an index walks off the end or eats the paragraph after it. These
-/// pin the boundaries.
 void main() {
   group('a table at the edges of a body', () {
     test('one that ends the body does not run off the end', () {

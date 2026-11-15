@@ -92,9 +92,7 @@ void main() {
     });
 
     test('a stream that reported a duration counts as alive', () {
-      // The start watchdog stops a session that never opened. A duration means
-      // it opened and parsed, so it is slow, not dead — killing it there
-      // restarts it in a loop that never reaches the first frame.
+      // The start watchdog stops a session that never opened.
       const opened = PlaybackState(
         mediaId: 'm1',
         kind: PlaybackKind.video,

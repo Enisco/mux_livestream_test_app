@@ -18,15 +18,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// What the reader has given, a year at a time.
-///
-/// A summary card over a worship backdrop, then the year's gifts grouped by
-/// What the reader has given, a year at a time.
-///
-/// **Neither route exists on staging.** `GET /v1/payment/giving/me/summary`
-/// and `…/me/gifts` are both documented in the giving guide and both answer
-/// `Cannot GET`, so this screen loads, fails, and says so — see
-/// `docs/OPEN_ISSUES.md`. It is wired, not stubbed: the day the routes land
-/// it works without further change.
 class GivingScreen extends StatefulWidget {
   const GivingScreen({super.key, this.repo});
 
@@ -351,9 +342,7 @@ class _GiftRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // A ministry named anywhere opens that ministry. The id is
-                    // absent when only the legal name on the charge survived,
-                    // and then there is nothing to open.
+                    // A ministry named anywhere opens that ministry.
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: gift.creatorId.isEmpty

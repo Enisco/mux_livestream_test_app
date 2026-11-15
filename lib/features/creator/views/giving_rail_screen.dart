@@ -23,18 +23,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// One rail: how far it has got, what it is settling to, and what is still
 /// outstanding.
-///
-/// The screen's shape follows the one rule the integration guide repeats
-/// most insistently: **GospelTube's review and the provider's run
-/// independently.** Either can be started first and neither is hidden behind
-/// the other, so both tracks are shown side by side with their own actions.
-/// Collapsing them into one progress bar would make a creator wait on a
-/// reviewer when the thing actually blocking them is a form at the provider.
-///
-/// Everything here is read, not remembered. A rail's requirements can change
-/// when a re-verification or a configuration change selects a newer policy,
-/// so this screen re-reads them each time it opens rather than trusting the
-/// rail it was handed.
 class GivingRailScreen extends StatefulWidget {
   const GivingRailScreen({
     super.key,
@@ -123,10 +111,6 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
   }
 
   /// Hand GospelTube's half over for review.
-  ///
-  /// This marks only that track as submitted. If the provider is already
-  /// ready the backend moves the whole application on; if it is not, the
-  /// rail stays gated, and nothing here pretends otherwise.
   Future<void> _submit() async {
     setState(() => _busy = true);
     try {
@@ -152,13 +136,6 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
   }
 
   /// Supply one of the documents GospelTube's review is waiting on.
-  ///
-  /// This belongs on *this* track, not on the provider's. Both draw on the
-  /// same evidence, but the only upload affordance used to live inside the
-  /// Khaime form — which is reached from the other card — so a creator who
-  /// read the GospelTube track, saw two documents listed and tapped the one
-  /// button under them got a 400 naming the very documents they had no way
-  /// to attach.
   Future<void> _uploadEvidence(RailRequirement requirement) async {
     final evidenceType = requirement.evidenceType;
     if (evidenceType == null || _uploadingType != null) return;
@@ -185,17 +162,6 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
   }
 
   /// Continue at the provider.
-  ///
-  /// Two of the three providers have no page to send anyone to. Khaime's
-  /// `khaime_kyc_form` is an identity form and Paystack's `paystack_bank`
-  /// is a settlement account, both hosted here; only Stripe's
-  /// `stripe_embedded` is a real handoff, and that one opens a system
-  /// browser on a one-time onboarding link. Telling a Paystack creator to
-  /// "finish on the provider" sent them looking for a website that does
-  /// not exist.
-  ///
-  /// The snackbar is what is left for a provider none of those three
-  /// matches — Flutterwave, or one added server-side after this build.
   Future<void> _continueProvider() async {
     final (Widget, String?)? next = switch (_rail) {
       final rail
@@ -309,9 +275,7 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
                         _ownedBy(RequirementOwner.gospeltube) +
                         _ownedBy(RequirementOwner.creator),
                     // The rail carries `review` — the reviewer's actual
-                    // decision, with its reason. Reading the requirement
-                    // list instead meant this track could only ever say
-                    // "Under review", including after it had been refused.
+                    // decision, with its reason.
                     pill: _reviewPill,
                     complete: _rail.review.isApproved ? true : null,
                     note: _reviewNote,
@@ -347,11 +311,7 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
                       ProviderStage.update => AppStrings.givingProviderUpdate,
                       _ => null,
                     },
-                    // With nothing left for the creator to do, say so. An
-                    // outstanding provider row above a card that offers no
-                    // way on otherwise reads as something they have missed.
-                    // Only once something was actually sent, though: a rail
-                    // the provider never heard from has nothing to wait on.
+                    // With nothing left for the creator to do, say so.
                     note: _providerNote(provider),
                     onAction: _continueProvider,
                   ),
@@ -388,13 +348,6 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
           .toList();
 
   /// Whether this rail is still the creator's move.
-  ///
-  /// Read off the rail's **status**, not off the requirement list. Gating on
-  /// "the creator has something outstanding" looked right and was backwards
-  /// in two ways: it hid the button at the one moment it is wanted — when
-  /// everything has been supplied — and a rail whose case lists no
-  /// requirements at all could never be submitted. An unknown status parses
-  /// as `collecting_information`, so the button fails towards being offered.
   bool get _canSubmit => _rail.status.needsCreator;
 
   /// Documents the creator could still act on: nothing uploaded yet, one
@@ -403,16 +356,6 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
       _requirements?.mine ?? const <RailRequirement>[];
 
   /// The ones that will stop a submit, which is a narrower thing.
-  ///
-  /// Not simply [_mine]: an attach leaves the requirement `submitted` with
-  /// a file on it, and that is the normal state between uploading and the
-  /// review deciding. Treating "the creator may still replace this" as
-  /// "this is missing" would leave the track offering Upload documents
-  /// after both were uploaded and never offer the submit they are for.
-  ///
-  /// So: required, and carrying no usable file — never uploaded, or
-  /// rejected and awaiting a replacement. An optional one is still given a
-  /// button in the checklist; it just does not take the card's action over.
   List<RailRequirement> get _blocking => _mine
       .where(
         (requirement) =>
@@ -451,13 +394,6 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
   }
 
   /// Whether the provider's half is finished.
-  ///
-  /// The requirement list has the final say when the case publishes one: a
-  /// provider-owned requirement *"becomes `satisfied` only when the
-  /// canonical account is fully Giving-ready"*, so it is the narrowest
-  /// true answer, and reading it keeps the card from printing "Completed"
-  /// above one of its own outstanding rows. Without a list, the rail's own
-  /// stage answers.
   bool get _providerDone {
     if (_rail.providerStage == ProviderStage.ready) return true;
     final owned = _ownedBy(RequirementOwner.provider);
@@ -475,10 +411,9 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
       AppStrings.givingTrackWaiting,
       GivingTone.pending,
     ),
-    // "Not started" is a claim, and the payload often disproves it: a
-    // rail reading `in_progress` or carrying a submitted case has started,
-    // whatever is still outstanding. Only an untouched one gets called
-    // untouched.
+    // "Not started" is a claim, and the payload often disproves it: a rail
+    // reading `in_progress` or carrying a submitted case has started,
+    // whatever is still outstanding.
     ProviderStage.setup when _rail.kyc.isStarted => (
       AppStrings.givingTrackActionNeeded,
       GivingTone.pending,
@@ -491,18 +426,12 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
 
   /// The line under a card with no button on it, or above one that is
   /// asking for a correction.
-  ///
-  /// A refusal carries its own reason often enough to be worth preferring:
-  /// "the name on the account does not match" is the whole answer, and a
-  /// generic sentence in its place would send the creator back into the
-  /// form blind.
   String? _providerNote(String provider) => switch (_rail.providerStage) {
     ProviderStage.update =>
       _providerRejection ?? AppStrings.givingProviderUpdateNote(provider),
     // The two reasons a Stripe rail is still the creator's move look
-    // identical on screen and are not the same thing at all: one needs
-    // the flow finishing, the other needs something new. Saying which
-    // saves a creator reopening a form that will only tell them again.
+    // identical on screen and are not the same thing at all: one needs the
+    // flow finishing, the other needs something new.
     ProviderStage.setup when _rail.providerRequirementsDue.isNotEmpty =>
       AppStrings.givingProviderWants(provider),
     ProviderStage.setup when _rail.kyc.isStarted =>
@@ -613,14 +542,7 @@ class _GivingRailScreenState extends State<GivingRailScreen> {
               ),
           ],
           // A finished track has nothing left to do, whatever the rail as a
-          // whole is still waiting on. Gating this on the *rail* status
-          // left a provider track reading "Completed" above a live
-          // "Continue setup" button, which reopens an identity form the
-          // provider has already approved — a change after that point is a
-          // versioned recipient change, not a resubmission.
-          // A reason belongs *above* the button it explains: a creator
-          // sent back to a form deserves to know what for before they
-          // open it, not after.
+          // whole is still waiting on.
           if (note case final text? when !done) ...[
             SizedBox(height: 10.s),
             Text(

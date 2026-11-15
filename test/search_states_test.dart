@@ -325,9 +325,9 @@ void main() {
     });
   });
 
-  // Completions used to come from a canned vocabulary; they are rows from the
-  // search index now, so what is worth pinning moved to the request itself —
-  // see search_query_test.dart. What stays here is the screen's own handling.
+  // Completions used to come from a canned vocabulary; they are rows from
+  // the search index now, so what is worth pinning moved to the request
+  // itself — see search_query_test.dart.
 
   group('the type tabs', () {
     testWidgets('offer the seven kinds the design draws', (tester) async {
@@ -467,8 +467,6 @@ void main() {
       tester,
     ) async {
       // Reported from a device: every row under VIDEOS was an empty box.
-      // The row took `meta.thumbnailUrl` raw, which a `mux_auto` video does
-      // not have — it has neither that nor a key, only the public proxy.
       dotenv.testLoad(fileInput: 'BASE_URL=https://api.test');
       addTearDown(dotenv.clean);
 
@@ -491,8 +489,7 @@ void main() {
       tester,
     ) async {
       // The index sends a channel's picture as a storage key, the way the
-      // home feed already maps it. The row read `thumbnailUrl` only, so
-      // every ministry showed the fallback silhouette.
+      // home feed already maps it.
       dotenv.testLoad(fileInput: 'CDN_BASE_URL=https://cdn.test');
       addTearDown(dotenv.clean);
 

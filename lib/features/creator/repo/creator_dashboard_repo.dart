@@ -5,14 +5,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// Everything the Studio tab shows.
-///
-/// The four routes are real and were read off staging; none publishes a
-/// response schema, so the shapes in [DashboardContext] and friends are what
-/// the server actually answered rather than what the spec claims.
-///
-/// Each section loads on its own and fails on its own: a studio with no
-/// payment setup makes the giving figure 500, and that must not take the rest
-/// of the dashboard down with it.
 class CreatorDashboardRepo {
   CreatorDashboardRepo([ApiService? api]) : _injected = api;
 
@@ -39,9 +31,6 @@ class CreatorDashboardRepo {
   }
 
   /// `GET /v1/creator/me/memberships` — every studio the reader can work in.
-  ///
-  /// Owned first, so a switcher opens on the one the reader most likely
-  /// means. Deleted creators are left out even when the member row survives.
   Future<List<StudioMembership>> fetchMemberships() async {
     final response = await _api.get(ApiEndpoints.creatorMemberships);
     final data = response.data['data'];
@@ -54,10 +43,6 @@ class CreatorDashboardRepo {
 
   /// `GET /v1/creator/{creatorId}/settings/plan` — the plan and what has been
   /// used of it.
-  ///
-  /// Not worth an error state: a studio that cannot read its quota shows no
-  /// quota rather than refusing to open, and the upload itself still refuses
-  /// when the guard says so.
   Future<PlanUsage?> fetchPlanUsage(String creatorId) async {
     try {
       final response = await _api.get(ApiEndpoints.creatorPlan(creatorId));
@@ -121,9 +106,6 @@ class CreatorDashboardRepo {
   }
 
   /// Views and subscribers over the plan's analytics window.
-  ///
-  /// The window is sent as an explicit `from`/`to` pair — the route rejects a
-  /// named window like "today".
   Future<DashboardPerformance> fetchPerformance(
     String creatorId, {
     int windowDays = 1,

@@ -9,11 +9,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 
 /// Explore, which is a composition rather than an endpoint.
-///
-/// Every rail is built from reads that already existed, so most of what can go
-/// wrong here is in the joining: a creator lookup that has to be batched, a
-/// watch order that search will not preserve, a rail that fails without taking
-/// the page down with it.
 class _FakeApi implements ApiService {
   _FakeApi({
     this.media = const [],
@@ -379,8 +374,7 @@ void main() {
   group('what the page does not have', () {
     test('no topics rail, so no boost is ever requested', () async {
       // `user-app` has a "topics you follow" rail built on
-      // `preferenceBoostCategorySlugs`. This app's design ends at Browse, so
-      // asking for the boost would be a read nothing draws.
+      // `preferenceBoostCategorySlugs`.
       final api = _FakeApi(media: [_mediaHit()], creators: [_creatorHit()]);
       await (await _repo(api)).load();
 

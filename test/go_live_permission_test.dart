@@ -9,14 +9,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// What the creator is offered when the camera is refused.
-///
-/// Reported from an iPhone on 2026-11-11. The build cause — every iOS
-/// permission compiled out of the binary — is pinned in
-/// `ios_permission_config_test.dart`; these are the screen's half of it.
-///
-/// The camera is never opened on this path, so the controller is only
-/// there to be disposed: anything else touched on it throws, which is the
-/// point.
 class _FakeController implements ApiVideoLiveStreamController {
   @override
   bool get isInitialized => false;
@@ -29,12 +21,6 @@ class _FakeController implements ApiVideoLiveStreamController {
 }
 
 /// A camera that opens and then will not preview.
-///
-/// `ApiVideoLiveStreamController.initialize()` guards nothing: it invokes
-/// the plugin's `create` again, overwrites its event subscription without
-/// cancelling the old one, and leaves a second native session running. It
-/// reports `isInitialized` once it has finished, which is the only thing
-/// the screen can go on.
 class _OpenedThenFailingController implements ApiVideoLiveStreamController {
   int initializes = 0;
   int previews = 0;
@@ -55,10 +41,7 @@ class _OpenedThenFailingController implements ApiVideoLiveStreamController {
   Future<void> dispose() async {}
 
   // Reporting itself initialised means the screen mounts the real
-  // `ApiVideoCameraPreview` over it. An uninitialised texture id makes
-  // that widget render an empty box, which keeps the native orientation
-  // reader and the texture out of a widget test; everything below is what
-  // it touches on the way there and back out.
+  // `ApiVideoCameraPreview` over it.
   @override
   int get textureId => ApiVideoLiveStreamController.kUninitializedTextureId;
 
@@ -165,8 +148,7 @@ void main() {
   ) async {
     // The bug under this one: `_retry` armed the ingest window and pushed,
     // which is right for a lost connection and useless here — the camera
-    // was never opened and no window was ever armed. A creator who fixed
-    // the permission could not get back on air without leaving the screen.
+    // was never opened and no window was ever armed.
     final asked = await _pump(tester, status: PermissionStatus.denied);
     expect(asked, hasLength(2));
 
@@ -183,10 +165,8 @@ void main() {
   testWidgets('a camera already open is not opened a second time', (
     tester,
   ) async {
-    // Only reachable since "Try again" started going back through the
-    // whole attempt, which a refused camera needs. Here the camera opened
-    // and the preview is what failed, so the retry must not create a
-    // second native session behind the first.
+    // Only reachable since "Try again" started going back through the whole
+    // attempt, which a refused camera needs.
     final controller = _OpenedThenFailingController();
     await _pump(
       tester,

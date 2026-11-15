@@ -6,15 +6,6 @@ import 'package:test_app/shared/services/live_socket_service.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 
 /// The `/live` Socket.IO contract.
-///
-/// Two rules in it are easy to get wrong and expensive when you do:
-///
-///  * the namespace is `/live` on the API origin, **not** `/v1/live`;
-///  * `viewer_count` and `status_changed` carry their own monotonic
-///    `revision` and must be tracked **separately**. Sharing one counter
-///    silently drops good payloads; ignoring them entirely lets a late
-///    `live` arrive after an `ended` and resurrect a finished broadcast —
-///    which is exactly the "still showing as live" complaint.
 class _NoTokens extends TokenStorageService {
   @override
   Future<String?> get accessToken async => null;
@@ -255,8 +246,7 @@ void main() {
     test('two callers connecting at once build one socket, not two', () async {
       // There is an await between the null check and the assignment — the
       // access token is read from storage — and both screens that use this
-      // can call connect more than once (a retry, a reload). Two sockets
-      // would mean duplicated events and an orphaned connection.
+      // can call connect more than once (a retry, a reload).
       final service = LiveSocketService(
         tokenStorage: _NoTokens(),
         origin: 'https://api.example.test',

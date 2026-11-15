@@ -7,10 +7,6 @@ import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 
 /// What one surface knows about a viewer's relationship to one thing.
-///
-/// The `owns*` flags mark a field the viewer changed here. A feed payload
-/// fetched afterwards can be older than that change — it was assembled before
-/// the tap reached the server — so seeding must not undo it.
 @immutable
 class EngagementState {
   const EngagementState({
@@ -39,9 +35,6 @@ class EngagementState {
   static int _floor(int n) => n < 0 ? 0 : n;
 
   /// This state with the like turned [on], moving the count with it.
-  ///
-  /// Setting it to what it already is only claims ownership — re-applying a
-  /// like the viewer already holds must not add a second one to the count.
   EngagementState withLike(bool on) => EngagementState(
     liked: on,
     saved: saved,
@@ -89,14 +82,6 @@ typedef SetFollowing =
 
 /// The one place the app agrees on "does the viewer like this, and how many
 /// others do".
-///
-/// Every surface used to keep its own copy. A like made on a detail screen left
-/// the card it was opened from showing the old count, and the feed's own
-/// buttons called an auth guard that returned true and did nothing else — so
-/// for a signed-in viewer they were inert. Screens now read and write here, so
-/// a change made anywhere is the change every surface shows, without a refetch.
-///
-/// Keyed by `targetType:targetId`, because ids are only unique within a type.
 class EngagementStore extends ChangeNotifier {
   /// The two calls it makes are injected rather than the whole repos, so the
   /// arithmetic below can be tested without a locator or a network.
@@ -127,9 +112,6 @@ class EngagementStore extends ChangeNotifier {
       _entries[keyFor(targetType, targetId)];
 
   /// What is known, falling back to the counts the caller already has.
-  ///
-  /// Callers hold a payload of their own — a feed row, a detail aggregate — so
-  /// an unvisited target reads from that rather than showing zeroes.
   EngagementState resolve(
     String? targetType,
     String targetId,
@@ -140,20 +122,12 @@ class EngagementStore extends ChangeNotifier {
   }
 
   /// Whether the store has been told anything about this creator at all.
-  ///
-  /// [isFollowing] cannot answer this: it returns `fallback` both for a
-  /// creator the viewer does not follow and for one nobody has asked about,
-  /// and a surface that has to fetch the real state needs to tell those two
-  /// apart or it refetches the same creator on every rebuild.
   bool knowsFollowing(String creatorId) => _following.containsKey(creatorId);
 
   bool isFollowing(String creatorId, {bool fallback = false}) =>
       _following[creatorId] ?? fallback;
 
   /// Records what a payload says, without discarding what the viewer just did.
-  ///
-  /// Called after a fetch. Fields the viewer has changed on this target keep
-  /// their local value; everything else takes the server's.
   void seed({
     required String? targetType,
     required String targetId,
@@ -193,12 +167,6 @@ class EngagementStore extends ChangeNotifier {
   }
 
   /// Record a follow this viewer has just changed on another surface.
-  ///
-  /// Unlike [seedFollowing], this wins over whatever the store holds —
-  /// including an id the viewer changed here earlier, which [seedFollowing]
-  /// deliberately refuses to overwrite. Without it, unfollowing from the
-  /// Manage-following list left every other surface showing "Following",
-  /// and no later refetch could correct it.
   void adoptFollowing(String creatorId, bool following) {
     if (creatorId.isEmpty) return;
     _followOwned.add(creatorId);
@@ -208,10 +176,7 @@ class EngagementStore extends ChangeNotifier {
   }
 
   // ---- Hiding -----------------------------------------------------------
-  //
-  // Three states the card sheet writes and every surface reads. They are held
-  // here for the same reason likes are: a creator muted on one screen has to
-  // be muted on every other without a reload.
+  // Three states the card sheet writes and every surface reads.
 
   final _notInterested = <String>{};
   final _muted = <String>{};
@@ -244,10 +209,6 @@ class EngagementStore extends ChangeNotifier {
   void seedBlocked(Iterable<String> creatorIds) => _seed(_blocked, creatorIds);
 
   /// Add every id, then notify once.
-  ///
-  /// Written as a loop deliberately: `ids.where(set.add).isNotEmpty` reads
-  /// like it adds them all and does not — `where` is lazy, so it stops at the
-  /// first id that is new and the rest of the list is never seeded.
   void _seed(Set<String> into, Iterable<String> ids) {
     var added = false;
     for (final id in ids) {
@@ -326,10 +287,6 @@ class EngagementStore extends ChangeNotifier {
   );
 
   /// Flips the interaction locally, then tells the server.
-  ///
-  /// Optimistic because the count is decoration and the round trip is not
-  /// instant; the local value is rolled back if the server refuses, and
-  /// corrected if the server lands the other way from what was assumed.
   Future<void> _toggle({
     required String targetType,
     required String targetId,

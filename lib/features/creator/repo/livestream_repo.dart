@@ -10,11 +10,6 @@ import 'package:test_app/utils/app_constants/api_endpoints.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Running a broadcast.
-///
-/// See [LiveSessionDraft] for the sequence and why each step exists. Every
-/// mutating call here carries an `idempotencyKey`: the backend dedupes on
-/// it, which matters when a flaky connection makes the app retry a start or
-/// an end it has already sent.
 class LivestreamRepo {
   LivestreamRepo([ApiService? api]) : _injected = api;
 
@@ -101,16 +96,6 @@ class LivestreamRepo {
   }
 
   /// `GET /v1/media/live/streams/{id}/prayers` — newest first, keyset.
-  ///
-  /// The sort is fixed; an oldest-first toggle would invalidate every cursor
-  /// mid-run. `limit` defaults to 25 and caps at 100.
-  ///
-  /// **There is no `isAnonymous`.** A prayer request is private between the
-  /// viewer and the ministry, and the reason a broadcaster wants the list is
-  /// to pray for a *named* person — anonymity exists on testimonies, where an
-  /// approved one is published to a public wall. `requester` is best-effort,
-  /// so it can be absent; the card keeps a neutral fallback rather than
-  /// treating that as anonymous.
   Future<LivePrayerPage> prayers(String mediaId, {String? cursor}) async {
     final response = await _api.get(
       ApiEndpoints.livePrayers(mediaId),

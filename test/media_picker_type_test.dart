@@ -5,19 +5,6 @@ import 'package:test_app/features/creator/services/creator_media_picker.dart';
 import 'package:test_app/models/creator_models/media_upload_models.dart';
 
 /// How the picker asks the platform for a file.
-///
-/// Reported from the app: "Select video" opened a sheet with **nothing in it**,
-/// while "Upload thumbnail" showed the gallery properly. The two asked
-/// differently — the thumbnail used `FileType.image`, the video used
-/// `FileType.custom` with `allowedExtensions: [mp4, mov, m4v, webm]`.
-///
-/// Android turns a custom list into a SAF intent built from whatever MIME
-/// types it can derive from those extensions. `mov` and `m4v` have no
-/// dependable mapping, so the intent filtered down to nothing and the browser
-/// opened empty.
-///
-/// The picker is wide now and the *acceptance* stays narrow — which is the
-/// distinction worth keeping, and what these cover.
 void main() {
   group('the picker asks the way the image picker does', () {
     test('video asks for video, not a list of extensions', () {
@@ -133,8 +120,7 @@ void main() {
 
     test('something the picker now allows through is still refused', () {
       // `.mkv` and `.3gp` are videos the gallery will happily offer and the
-      // API will not take. They resolve to no MIME type, which is what the
-      // caller turns into "Choose an MP4 or MOV".
+      // API will not take.
       final types = uploadMimeTypes(
         MediaUploadKind.video,
         MediaUploadTarget.android,

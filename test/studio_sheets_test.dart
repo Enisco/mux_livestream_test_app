@@ -149,9 +149,7 @@ void main() {
   group('what every tab does with the answer', () {
     // Found on a device on 2026-11-03: "Back to watching" worked from the
     // Studio tab and nowhere else, and "Studio Settings" worked nowhere at
-    // all. Three of the four tabs handled only `switchTo` and dropped the
-    // other two answers on the floor, so the handling lives in one place
-    // now and these are its tests.
+    // all.
     Future<BuildContext> pump(WidgetTester tester) async {
       late BuildContext captured;
       final router = GoRouter(

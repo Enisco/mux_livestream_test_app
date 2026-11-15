@@ -2,19 +2,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The values the account menu reads out.
-///
-/// `GET /v1/user/profile` is now read on open, so most of this is real: the
-/// name, the email, the phone and the chosen topics all come off the account
-/// the server holds.
-///
-/// Since 2026-10-26 the profile also carries `passwordChangedAt`,
-/// `twoFactorEnabled` and `language`, so the only thing still read out of a
-/// constant here is the Account row's reminder summary — and the reminders
-/// screen behind it reads the real preference.
-///
-/// To retire the last of it: have the Account row read
-/// `/v1/notification/preferences` too, or accept one extra request on a menu
-/// that already makes two.
 abstract final class SettingsDummyData {
   /// Real: the cached account carries it.
   static String get email =>

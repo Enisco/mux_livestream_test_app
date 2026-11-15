@@ -7,14 +7,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Nobody gets stuck on a failure.
-///
-/// Reported from the app: opening a ministry's page whose data would not load
-/// showed the error state *instead of the whole screen*, back arrow included.
-/// Retry does not help when the content is simply gone, so the only way out
-/// was to force-quit. The same shape existed on content detail.
-///
-/// The way out is decided here rather than screen by screen, so a screen
-/// added later cannot reintroduce the trap by forgetting to pass anything.
 Future<void> _pump(
   WidgetTester tester, {
   required bool pushed,

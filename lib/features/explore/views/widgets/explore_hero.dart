@@ -12,9 +12,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The billboard at the top of Explore: one ministry, its pitch, and the two
 /// things a reader can do about it.
-///
-/// The top inset is passed in rather than read here so the screen can keep the
-/// artwork clear of the status bar and the search field that floats over it.
 class ExploreHeroPanel extends StatelessWidget {
   const ExploreHeroPanel({
     super.key,

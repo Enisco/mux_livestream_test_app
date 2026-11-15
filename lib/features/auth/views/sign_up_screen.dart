@@ -231,10 +231,6 @@ class _Header extends StatelessWidget {
   const _Header();
 
   /// Back out of creating an account.
-  ///
-  /// `pop` alone is dead whenever this screen was navigated to rather than
-  /// pushed — which is how sign-in reaches it — so it falls through to the
-  /// auth landing, where every way in is listed.
   static void _back(BuildContext context) {
     if (context.canPop()) {
       context.pop();

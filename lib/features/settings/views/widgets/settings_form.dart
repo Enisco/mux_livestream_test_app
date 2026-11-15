@@ -12,9 +12,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The shape every account form takes: a title, a column of labelled fields,
 /// and one action pinned above the home indicator.
-///
-/// All four screens behind the account menu are this with different fields, so
-/// the chrome lives here and each screen supplies only its own content.
 class SettingsFormScaffold extends StatelessWidget {
   const SettingsFormScaffold({
     super.key,

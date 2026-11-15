@@ -42,11 +42,6 @@ import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// The You tab: who the reader is, what they were watching, and everything
 /// filed under their account.
-///
-/// Most of it is real — the name and handle come from the cached account, the
-/// studio row from the reader's own creator profile if they have one. What is
-/// still invented is listed in [ProfileDummyData]; the destinations that do not
-/// exist yet are marked below.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.library, this.records});
 
@@ -65,11 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   CreatorProfile? _channel;
 
   /// The card under CONTINUE WATCHING, and the pill on "My events".
-  ///
-  /// Both are read from lists the reader's own library already loads — the
-  /// first part-watched row of their history, and their own RSVPs — rather
-  /// than from anything this screen owns. Null and zero both mean "do not
-  /// draw it", which is what a reader with no history should see.
   HistoryEntry? _lastWatched;
   int _upcomingEvents = 0;
 
@@ -306,9 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Nothing is offered until the server has answered: inviting a reader
     // who already has a channel walks them into a 409, and hiding the
-    // studio from one who does is just as wrong. A lookup that failed says
-    // neither, so the whole block stands down rather than leaving its
-    // heading over an empty space.
+    // studio from one who does is just as wrong.
     if (lookup == null || (!lookup.canStartOne && !lookup.hasChannel)) {
       return const SizedBox.shrink();
     }

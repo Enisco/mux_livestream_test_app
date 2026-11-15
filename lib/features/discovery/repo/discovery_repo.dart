@@ -41,24 +41,6 @@ class DiscoveryRepo {
 
   /// `POST /v1/search/public/query` — global discovery across every indexed
   /// entity, unauthenticated.
-  ///
-  /// Two things to know before calling it:
-  ///
-  /// - **Omit [q] for a browse.** An empty query with a `sort` is the
-  ///   supported way to build a catalogue rail; a `"*"` wildcard is not and
-  ///   will not behave.
-  /// - **`sort: "trending"` is media-only** by contract — the gateway
-  ///   rejects other entity types for it.
-  ///
-  /// [entityIds] narrows to exactly those rows, which is how a rail of bare
-  /// references is hydrated in one round trip. Search ranks by relevance, so
-  /// the caller must restore its own order afterwards.
-  ///
-  /// The route also takes `preferenceBoostCategorySlugs`, a soft relevance
-  /// boost towards the viewer's own topics. Nothing in this app's design asks
-  /// for it — `user-app` uses it for a "topics you follow" rail we do not
-  /// have — so it is not plumbed through; add it here when a surface wants
-  /// it.
   Future<WebFeedResponse> searchPublic({
     String? q,
     List<String>? entityTypes,
@@ -96,13 +78,6 @@ class DiscoveryRepo {
   }
 
   /// Type-ahead over the same index.
-  ///
-  /// Returns real entities — `{entityType, entityId, title, subtitle}` — not
-  /// query strings, so a suggestion can open the thing itself rather than
-  /// running a search for its name. `size` is 1–20; anything outside that is
-  /// refused by the gateway.
-  ///
-  /// **Undocumented**; see [ApiEndpoints.publicSearchAutocomplete].
   Future<List<WebFeedItem>> autocomplete(
     String q, {
     List<String>? entityTypes,
@@ -126,9 +101,6 @@ class DiscoveryRepo {
   /// `GET /v1/analytics/viewer/continue-watching` — **bare references**, with
   /// no title and no thumbnail. Hydrate them with [searchPublic] and
   /// `entityIds`, then put them back in this order.
-  ///
-  /// Signed-in only; a rail built from it is hidden for anonymous readers
-  /// rather than rendered empty.
   Future<List<ContinueWatchingRef>> fetchContinueWatching({
     int limit = 10,
   }) async {
@@ -249,9 +221,6 @@ class DiscoveryRepo {
   }
 
   /// Records a devotional day as read.
-  ///
-  /// The series detail carries `viewerProgress` but nothing wrote to it, so a
-  /// reader's place was lost the moment they left the screen.
   Future<void> setDevotionalEntryProgress(
     String entryId, {
     String status = 'completed',

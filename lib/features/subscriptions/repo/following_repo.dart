@@ -5,19 +5,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// Who the reader follows, and how loudly each may speak.
-///
-/// The Manage following screen ran on a hardcoded list for want of these
-/// routes. It has them now:
-///
-///  * `GET /v1/discovery/following-creators` — the list, with `followedAt`,
-///    `latestContentAt` and the four `notifyOn*` flags.
-///  * `POST /v1/creator/{id}/subscribe` — **upserts**. Called with no body it
-///    follows; called with the flags it rewrites them, which is the only way
-///    to change a notification level (there is no PATCH).
-///  * `DELETE /v1/creator/{id}/subscribe` — unfollows.
-///
-/// Live status is deliberately absent from the following payload, so it is
-/// not guessed here — see [FollowingRepo.fetchLiveCreatorIds].
 class FollowingRepo {
   FollowingRepo({ApiService? api}) : _injected = api;
 
@@ -41,11 +28,6 @@ class FollowingRepo {
   }
 
   /// The creators who are broadcasting right now.
-  ///
-  /// Nothing on the following payload says whether a ministry is live, and
-  /// inventing it is how the screen ended up showing two ministries as
-  /// permanently "Live now". This asks the feed the question it can actually
-  /// answer — `liveOnly: true` — and takes the creator ids off the result.
   Future<Set<String>> fetchLiveCreatorIds() async {
     final response = await _api.post(
       ApiEndpoints.webFeed,

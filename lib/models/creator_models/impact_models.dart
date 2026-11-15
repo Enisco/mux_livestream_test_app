@@ -1,26 +1,7 @@
 /// What a congregation sends a creator: prayers, testimonies and comments.
-///
-/// The three sit behind one Impact screen with a tab each. Every shape here
-/// is the one in `docs/API_INTEGRATION_GUIDES/
-/// client-creator-and-dashboard-integration.md` — the creator-side inboxes,
-/// which are a different family from the viewer-side engagement routes.
-///
-/// Two things worth knowing before reading on:
-///
-/// - **The three tabs do not page the same way.** Prayers are keyset
-///   (`cursor` + `nextCursor`); testimonies and comments are page-number
-///   (`page` + `meta.next`). The envelopes differ too.
-/// - **Identity is resolved by the gateway.** `requester`, `author` and
-///   `assignee` are the only fields a client may render as a person. An
-///   anonymous testimony comes back masked, and reconstructing a name from
-///   `submitterUserId` would undo a choice the viewer made.
 library;
 
 /// Who a row came from, as the gateway resolves them.
-///
-/// `displayName` falls back to "GospelTube user" when user-service is briefly
-/// unavailable, and to "Anonymous user" when the submitter asked to stay
-/// anonymous — so it is always safe to render as-is.
 class ImpactPerson {
   const ImpactPerson({
     required this.displayName,
@@ -55,10 +36,6 @@ ImpactPerson? _person(Object? json) =>
     json is Map<String, dynamic> ? ImpactPerson.fromJson(json) : null;
 
 /// Where a prayer is in its life.
-///
-/// Three states, and the card's button is a different step at each: an open
-/// prayer is prayed for, a prayed one is closed, a closed one has only the
-/// overflow menu.
 enum PrayerFilter {
   open('open'),
   prayedFor('prayed_for'),
@@ -76,13 +53,7 @@ enum PrayerFilter {
   }
 }
 
-/// What the "…" on a prayer card offers, which depends on where it already is:
-///
-/// | State | Menu |
-/// | --- | --- |
-/// | open | Assign, Resolved |
-/// | prayed for | Assign, Re-open, Resolved |
-/// | closed | Assign (disabled), Re-open |
+/// What the "…" on a prayer card offers.
 enum PrayerAction { assign, reopen, resolve }
 
 /// What a prayer was raised from.
@@ -141,11 +112,6 @@ class PrayerRequest {
   final PrayerSource? contentRef;
 
   /// The title behind [contentRef], for `On "Walking by Faith"`.
-  ///
-  /// **Best effort — absence is normal, not an error.** It goes missing when
-  /// the content was deleted, belongs to another creator, or has no title at
-  /// all. The card falls back to a label for the type rather than blanking
-  /// the line. Never show it to a viewer; it is unpublished-aware on purpose.
   final String? contentRefTitle;
 
   final DateTime? createdAt;
@@ -209,11 +175,6 @@ class PrayerSummary {
 }
 
 /// Which testimonies the creator is looking at.
-///
-/// These three are the whole state machine, so every inbox action is one
-/// `status` write. There is no separate "unpublish": taking an approved
-/// story off the wall moves it to `rejected`, and restoring puts it back in
-/// the pending queue rather than straight back on the wall.
 enum TestimonyFilter {
   pending('pending'),
   approved('approved'),
@@ -225,9 +186,6 @@ enum TestimonyFilter {
 }
 
 /// A story a member sent in.
-///
-/// **Private until approved.** Nothing a viewer submits reaches the public
-/// wall without a moderation write.
 class CreatorTestimony {
   const CreatorTestimony({
     required this.id,
@@ -289,9 +247,6 @@ class CreatorTestimony {
 }
 
 /// The ten impact tags the platform ships (`TESTIMONY_IMPACT_TAGS`).
-///
-/// A tag added to the platform before this app's next release must still
-/// render, so anything unrecognised is humanised rather than dropped.
 const _impactTagLabels = <String, String>{
   'healing': 'Healing',
   'salvation': 'Salvation',
@@ -339,11 +294,6 @@ class TestimonySummary {
 }
 
 /// Which part of the moderation queue the creator is looking at.
-///
-/// **This is a queue, not a comment stream.** It holds only comments that
-/// need a decision. [both] omits the `status` parameter, which means "both
-/// moderation states" — never "everything". `status=visible` is rejected by
-/// the gateway and no path here sends it.
 enum CommentFilter {
   both(null),
   flagged('flagged'),
@@ -439,11 +389,6 @@ class ImpactComment {
 }
 
 /// Why a comment is being reported to the platform.
-///
-/// `POST /v1/engagement/reports` takes exactly these eight, read off the
-/// validator. The design offers eight options too, but they are not the same
-/// eight: **"Copyright or impersonation" has no value of its own** and is
-/// carried as `other`, which loses the distinction for whoever reviews it.
 enum ReportReason {
   spam('spam'),
   hate('hate'),

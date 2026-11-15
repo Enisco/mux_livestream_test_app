@@ -7,18 +7,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Playback speed and video quality.
-///
-/// The legacy player carried both and the redesigned one lost them — a video
-/// could only be played at 1x, at whatever rendition the network happened to
-/// pick. Quality is offered only when the stream actually has more than one
-/// rendition to choose between, so a progressive file shows speed alone
-/// rather than a menu with a single entry.
-///
-/// **A live broadcast is offered no speed.** It plays at the rate it is
-/// being published; 1.5x would run the viewer into the present and 0.5x
-/// would leave them further behind every second. Quality still applies —
-/// a live stream usually carries several renditions — so [isLive] drops
-/// the speed block and keeps the rest.
 Future<void> showPlaybackSettings(
   BuildContext context, {
   required PlaybackHandle playback,
@@ -101,9 +89,7 @@ class PlaybackSettingsSheet extends StatelessWidget {
                 valueListenable: playback.qualities,
                 builder: (context, qualities, _) {
                   // Nothing to choose between: one rendition, or a stream
-                  // whose renditions are not known. On a live broadcast
-                  // that would leave the sheet with nothing in it at all,
-                  // so it says why instead.
+                  // whose renditions are not known.
                   if (qualities.isEmpty) {
                     if (!isLive) return const SizedBox.shrink();
                     return Text(

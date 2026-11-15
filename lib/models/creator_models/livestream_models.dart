@@ -1,23 +1,4 @@
 /// Going live.
-///
-/// A livestream is neither an upload nor a post: nothing is sent over HTTP
-/// but the session's own details, and the video goes to Mux over **RTMP**
-/// from the device's camera. `POST /v1/media` refuses to create one at all.
-///
-/// The sequence, all of it verified against staging:
-///
-///  1. `POST /v1/media/live/creator/{id}/provision` — the RTMP URL and the
-///     stream key. Ingest starts **disabled**.
-///  2. `POST /v1/media/live/creator/{id}/sessions` — the session, with its
-///     title, description, categories and replay policy.
-///  3. `POST /v1/media/live/streams/{id}/ingest/arm` — opens a bounded
-///     window (about fifteen minutes) in which Mux will accept the
-///     encoder. Without it the push is refused, because a durable Mux
-///     livestream bills for ingest whenever it accepts data.
-///  4. The device pushes RTMP.
-///  5. `POST /v1/media/live/streams/{id}/start` — `connecting` until the
-///     provider sees the encoder, then `live`.
-///  6. `POST /v1/media/live/streams/{id}/end` — `{idempotencyKey, reason}`.
 library;
 
 /// Where a session is in its life, from `livestreamRuntimeStatus`.
@@ -95,9 +76,6 @@ class LiveSessionDraft {
   final bool notifyFollowers;
 
   /// What `POST /v1/media/live/creator/{id}/sessions` takes.
-  ///
-  /// `publish` is left alone: a session is published by starting it, not by
-  /// asking at creation.
   Map<String, dynamic> toJson() => {
     'title': title,
     if (description.isNotEmpty) 'description': description,
@@ -112,9 +90,6 @@ class LiveSessionDraft {
 }
 
 /// One currency's worth of giving during a broadcast.
-///
-/// Money is grouped by the settlement currency each payment was quoted in.
-/// Totals in different currencies are never added together.
 class GivingTotal {
   const GivingTotal({required this.currency, required this.grossMinor});
 
@@ -130,15 +105,6 @@ class GivingTotal {
 }
 
 /// A prayer request sent during a broadcast.
-///
-/// **No `isAnonymous`, and there never will be.** There is no way to submit a
-/// prayer request anonymously — not in the model, the route or any client —
-/// and shipping `isAnonymous: false` for ever would be a field promising a
-/// feature the platform does not have. Anonymity exists on *testimonies*,
-/// where it earns its place because an approved one is published publicly.
-///
-/// [requesterName] is best-effort: hydration can fail, so it is **absent**
-/// rather than false, and the card keeps a neutral fallback.
 class LivePrayer {
   const LivePrayer({
     required this.id,
@@ -176,11 +142,6 @@ class LivePrayerPage {
 }
 
 /// `GET /v1/media/live/streams/{id}/studio` — the authoritative snapshot.
-///
-/// It is what the broadcast screen's counters read. The contract also
-/// carries these over a Socket.IO `/live` namespace; the app has no socket
-/// client. `LiveSocketService` follows the studio room now, and this stays
-/// the authority behind it — read on open and after every reconnect.
 class LivestreamStudio {
   const LivestreamStudio({
     required this.runtime,
@@ -253,10 +214,6 @@ class LivestreamStudio {
   static const empty = LivestreamStudio(runtime: LiveRuntime.idle);
 
   /// Folds a socket event into the last snapshot.
-  ///
-  /// Events carry a slice of the state, not all of it, so anything the event
-  /// does not mention has to survive — a viewer-count tick must not blank the
-  /// giving totals it knows nothing about.
   LivestreamStudio copyWith({
     LiveRuntime? runtime,
     bool? isLiveNow,

@@ -14,11 +14,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The rows search results are built from.
-///
-/// Results are grouped by kind rather than mixed, so each row can be as small
-/// as its kind allows — a ministry needs a follow button, a video needs a
-/// still, an event needs a date. That is why these are compact rows rather
-/// than the feed's full cards.
 
 /// A group's caption: MINISTRIES, VIDEOS, EVENTS.
 class SearchGroupHeader extends StatelessWidget {
@@ -147,9 +142,6 @@ class SearchMinistryRow extends StatelessWidget {
 }
 
 /// A media, devotional or blog result.
-///
-/// The row itself is [ContentListRow], shared with history — the design draws
-/// them identically, so they are one widget.
 class SearchContentRow extends StatelessWidget {
   const SearchContentRow({
     super.key,
@@ -180,8 +172,7 @@ class SearchContentRow extends StatelessWidget {
         creatorVerified: item.creatorVerified,
         // The whole ladder, not just the first rung: a video published
         // without a cover carries neither a URL nor a key, and only the
-        // public asset proxy can answer for it. Taking `meta.thumbnailUrl`
-        // raw is what left these rows as empty boxes.
+        // public asset proxy can answer for it.
         thumbnailUrl: item.stillUrl,
         meta: [
           kindLabel,

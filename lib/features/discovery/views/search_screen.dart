@@ -35,18 +35,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Search: browse the catalogue by topic, or narrow it by typing.
-///
-/// Three states, as the design has them. An empty field offers what the reader
-/// searched before and the topics they can browse. Typing offers completions
-/// over a preview of what already matches. Committing a query swaps in the type
-/// filter and the full grouped results.
-///
-/// Nothing on this screen is narrowed on the device. A committed query runs
-/// `POST /v1/search/public/query`, which does the text matching, the type
-/// filter and the video/audio split; an empty field falls back to the mixed
-/// feed, because there is nothing to search for. The completions come from
-/// the same index via its autocomplete route, so every row offered is the
-/// title of something that exists.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
@@ -56,24 +44,12 @@ class SearchScreen extends StatefulWidget {
   });
 
   /// Opens straight to results for this term rather than to an empty field.
-  ///
-  /// This is how a Browse chip on Explore arrives: the reader has already said
-  /// what they want, so asking them to type it again would be busywork.
   final String? initialQuery;
 
   /// Opens on a topic rather than a phrase.
-  ///
-  /// This is how a Browse chip arrives. A chip is a category, so it narrows
-  /// by `categorySlugs` — searching for the words "Bible study" would match
-  /// whatever happens to contain them and miss everything tagged with the
-  /// slug but titled otherwise.
   final ExploreCategory? initialCategory;
 
   /// Opens on a type tab rather than All.
-  ///
-  /// This is how "See all" on an Explore rail arrives. A rail is a kind of
-  /// thing, not a phrase — searching for the words "Live now" would return
-  /// whatever happens to contain them.
   final SearchFilter? initialFilter;
 
   @override
@@ -110,9 +86,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   _Phase get _phase {
     // Arriving on a topic or a type tab is a committed browse: there is no
-    // term, but the reader has still said what they want, so the results are
-    // the right state rather than the recent-searches list they did not ask
-    // for.
+    // term, but the reader has still said what they want, so the results
+    // are the right state rather than the recent-searches list they did not
+    // ask for.
     if (_query.isEmpty) {
       return _browsingATopic ? _Phase.results : _Phase.browsing;
     }
@@ -220,9 +196,7 @@ class _SearchScreenState extends State<SearchScreen> {
           _category = null;
           _browsingATopic = false;
         }
-        // Any edit puts the reader back among the completions. Without this a
-        // committed query stayed on the results list while they typed, and the
-        // suggestions never came back until the field was cleared entirely.
+        // Any edit puts the reader back among the completions.
         _committed = false;
       });
       unawaited(_suggest(_query));
@@ -230,10 +204,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   /// Completions for what is half-typed.
-  ///
-  /// These are real rows from the search index — titles of things that exist —
-  /// rather than a canned vocabulary. A reply that arrives after the reader
-  /// has typed on is dropped, or the list would flicker backwards.
   Future<void> _suggest(String query) async {
     if (query.isEmpty) {
       if (mounted) setState(() => _suggestions = const []);
@@ -306,11 +276,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   /// A committed query is a real search; an empty one is a browse.
-  ///
-  /// `POST /v1/search/public/query` does the text matching, the type filter
-  /// and the video/audio split, so nothing is narrowed on the device. With no
-  /// query there is nothing to search for, and the mixed feed is what the
-  /// design shows under the recent-searches list.
   Future<WebFeedResponse> _fetch({String? cursor}) {
     final query = _query.trim();
     final topic = _category;
@@ -410,9 +375,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   /// The `…` on a card: share, hide, mute, block and the rest.
-  ///
-  /// Share needs no account; everything else does, which the sheet gates
-  /// through [_requireAccount] rather than refusing the whole sheet.
   Future<void> _openCardActions(WebFeedItem item) =>
       showCardActionsSheet(context, item, requireAccount: _requireAccount);
 

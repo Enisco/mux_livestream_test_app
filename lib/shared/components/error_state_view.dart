@@ -12,10 +12,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// A load failure, in the same shape the app uses for empty states — tinted
 /// disc, headline, a line of explanation, then the action.
-///
-/// It distinguishes "you're offline" from "our side broke", because the two
-/// need different things from the reader: one is theirs to fix, the other is
-/// only worth retrying.
 class ErrorStateView extends StatelessWidget {
   const ErrorStateView({
     super.key,
@@ -38,17 +34,6 @@ class ErrorStateView extends StatelessWidget {
   final VoidCallback? onBack;
 
   /// Whether to offer a way out at all.
-  ///
-  /// Left null this answers itself: a pushed route can be left, a tab body
-  /// cannot (and has the nav bar anyway). Screens that replace their whole
-  /// body with this — a creator's page, a content detail — used to keep their
-  /// back arrow only in the success branch, so a page whose data failed to
-  /// load left the reader with a Retry button and nothing else. Retry does
-  /// not help when the content is simply gone, and force-quitting the app was
-  /// the only way out.
-  ///
-  /// Deciding it here rather than per screen means a screen added later
-  /// cannot reintroduce the trap by forgetting.
   final bool? showBack;
 
   bool get _offline {

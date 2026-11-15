@@ -2,25 +2,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Turns a storage key from the discovery feed into something an
 /// `Image.network` can load.
-///
-/// Only **media** rows arrive with a ready `thumbnailUrl`
-/// (`/v1/public/media/{id}/assets/thumbnail`). Everything else — posts,
-/// events, devotional series, media series and creator avatars — carries a
-/// bare storage key instead:
-///
-/// ```
-/// public/thumbnail/{creatorId}/{uuid}-cropped.jpg
-/// ```
-///
-/// Those keys are the path of an object on the public CloudFront
-/// distribution, which is how the content service's own `bodyEmbeds`
-/// resolver hands them back (`{cdn}/public/attachment/...`). So the key is
-/// already the URL path and nothing has to be signed or looked up — it just
-/// needs the host in front of it.
-///
-/// The host is environment-specific, so it comes from `CDN_BASE_URL` rather
-/// than being compiled in; a build that forgets to set it degrades to no
-/// artwork rather than pointing production at staging's bucket.
 abstract final class AssetUrlResolver {
   /// Rows say which target holds their asset. `origin` means the API serves
   /// it and a full URL came with the row; `cloudfront` means the key is a
@@ -42,9 +23,6 @@ abstract final class AssetUrlResolver {
   static bool get isConfigured => base.isNotEmpty;
 
   /// The URL for [key], or null when there is nothing to show.
-  ///
-  /// A key that is already absolute is passed through: the feed is free to
-  /// start sending resolved URLs, and that should not break here.
   static String? resolve(String? key) {
     final trimmed = key?.trim();
     if (trimmed == null || trimmed.isEmpty) return null;
@@ -65,21 +43,9 @@ abstract final class AssetUrlResolver {
     return resolve(key);
   }
 
-  /// The whole ladder for a media row's still, in the order
-  /// `client-media-integration.md` gives it: a URL the API already
-  /// resolved, then a storage key with the CDN host in front, then the
-  /// public asset proxy.
-  ///
-  /// The third rung is the one that is easy to leave off, and the only one
-  /// that can answer for a video published without a cover: those rows
-  /// carry neither a `thumbnailUrl` nor a `thumbnailKey`, so a surface that
-  /// stops at [imageFor] shows them as blank boxes for good.
-  ///
-  /// [source] is the row's `thumbnailSource`. The proxy is minted only for
-  /// a **public, published, Mux-generated** still, so a row that says it is
-  /// `manual` has a key or has nothing. A row that says nothing is tried:
-  /// a refusal costs one request and lands on the same placeholder the
-  /// caller would have drawn anyway.
+  /// The whole ladder for a media row's still, in the order `client-media-
+  /// integration.md` gives it: a URL the API already resolved, then a
+  /// storage key with the CDN host in front, then the public asset proxy.
   static String? mediaImage({
     String? url,
     String? key,
@@ -97,12 +63,6 @@ abstract final class AssetUrlResolver {
   static const muxAutoThumbnail = 'mux_auto';
 
   /// A media's own still, served by the API rather than the CDN.
-  ///
-  /// `GET /v1/public/media/{id}/assets/thumbnail` is public and answers a
-  /// 302 to a signed Mux image — which for a video with no uploaded cover is
-  /// the generated first frame. It is the only way to show a still for
-  /// anything whose `thumbnailSource` is `mux_auto`, because those rows carry
-  /// no `thumbnailKey` at all.
   static String? mediaThumbnail(String? mediaId) {
     final id = mediaId?.trim();
     if (id == null || id.isEmpty) return null;

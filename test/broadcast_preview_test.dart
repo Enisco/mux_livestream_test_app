@@ -1,7 +1,6 @@
 // ignore_for_file: invalid_use_of_internal_member
-//
 // The widget under test reaches the plugin's texture hooks; so must its
-// double. See the note at the top of broadcast_preview.dart.
+// double.
 
 import 'dart:io';
 

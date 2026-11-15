@@ -4,14 +4,6 @@ import 'package:test_app/models/discovery_models/content_detail.dart';
 import 'package:test_app/shared/services/maps_launcher.dart';
 
 /// Getting to an event.
-///
-/// The design draws a map preview with a pin. An event carries only text —
-/// `label`, `addressLine`, `city` — and no coordinates, and the app has no
-/// maps SDK or key, so there is nothing to place a pin at. Handing the
-/// address to the reader's own map app costs nothing and does more.
-///
-/// The payload shape below is `GET /v1/public/content/events/{id}` on
-/// staging, 2026-09-26.
 EventDetail _event(
   Map<String, dynamic> location, {
   String venue = 'physical',

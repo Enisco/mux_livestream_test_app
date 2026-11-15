@@ -17,15 +17,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// The dialogs the Giving section opens.
-///
-/// All of them are centred cards rather than bottom sheets, which is what
-/// the design draws and what suits a form whose footer must stay in view
-/// while the keyboard is up.
-///
-/// None of them writes anything. Each collects what it needs, validates what
-/// it can on the device, and hands a value back — the screen owns the call,
-/// so a refusal is reported in one place and the dialog cannot be left
-/// half-committed.
 
 /// A centred modal with a title, a scrolling body and a pinned footer.
 class _GivingDialog extends StatelessWidget {
@@ -115,10 +106,6 @@ class _GivingDialog extends StatelessWidget {
 }
 
 /// A field's caption, in the dialogs' smaller type.
-///
-/// The caption is [Flexible] because these dialogs put two fields side by
-/// side: "Settlement country *" overran half of a 320pt dialog by about four
-/// pixels, which is a red stripe on every small phone. It wraps instead.
 class _Label extends StatelessWidget {
   const _Label(this.text, {this.required = false});
 
@@ -139,9 +126,6 @@ class _Label extends StatelessWidget {
 }
 
 /// "NG" as "Nigeria".
-///
-/// The routes speak ISO codes and the design speaks country names. An
-/// unknown code prints itself rather than a blank — it is still true.
 String givingCountryName(String? code) =>
     Countries.byIsoCode(code)?.name ?? code ?? '';
 
@@ -166,9 +150,9 @@ class _Problem extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Picker
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Picker ---------------------------------------------------------------
+// ------------
 
 /// One choice out of a list, for every dropdown in this section.
 class GivingPickerSheet<T> extends StatelessWidget {
@@ -274,9 +258,9 @@ class GivingPickerSheet<T> extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Turn on Giving
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Turn on Giving -------------------------------------------------------
+// --------------------
 
 /// What the application needs: who is being paid, and under what law.
 class RecipientDetails {
@@ -292,10 +276,6 @@ class RecipientDetails {
 }
 
 /// "Turn on Giving" — the legal recipient and the terms.
-///
-/// The country and structure lists are the server's `options`, not a
-/// hardcoded set: policy decides what may be enrolled, and offering a
-/// combination it does not allow only produces a refusal later.
 class TurnOnGivingSheet extends StatefulWidget {
   const TurnOnGivingSheet({
     super.key,
@@ -529,15 +509,11 @@ class _TurnOnGivingSheetState extends State<TurnOnGivingSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Rail setup
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Rail setup -----------------------------------------------------------
+// ----------------
 
 /// "khaime payment setup" — which of a provider's routes to enrol.
-///
-/// A provider may be offered in more than one country and currency, so the
-/// pair is chosen here and the enrolment that follows is for exactly one
-/// combination the server returned.
 class RailSetupSheet extends StatefulWidget {
   const RailSetupSheet({
     super.key,
@@ -699,15 +675,11 @@ class _RailSetupSheetState extends State<RailSetupSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Step-up
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Step-up --------------------------------------------------------------
+// -------------
 
 /// The emailed code that unlocks an enrolment or a configuration change.
-///
-/// The code goes to the account email and never comes back on the challenge
-/// response, so there is nothing here to prefill and nothing to log. The
-/// grant it mints lives five minutes and is spent on the next call.
 class StepUpCodeSheet extends StatefulWidget {
   const StepUpCodeSheet({
     super.key,
@@ -723,18 +695,9 @@ class StepUpCodeSheet extends StatefulWidget {
 
   /// Asking for another code. The dialog stays open — a creator who waited
   /// for a second email should not have to find their way back here.
-  ///
-  /// Returns the refreshed challenge, whose new expiry replaces the one this
-  /// sheet was opened with.
   final Future<StepUpChallenge> Function() onResend;
 
   /// Exchanges a code for a grant, or throws.
-  ///
-  /// **The sheet owns this call, not its caller.** It used to pop on the tap
-  /// and leave the screen behind it to verify, which meant a refused code
-  /// closed the sheet and said nothing — the creator was returned to an
-  /// unchanged page with no idea whether anything had happened. A refusal
-  /// belongs where the field is.
   final Future<String> Function(String code) onVerify;
 
   /// When the code stops working, so a refusal after that moment is not
@@ -780,10 +743,6 @@ class _StepUpCodeSheetState extends State<StepUpCodeSheet> {
   bool _spent = false;
 
   /// Whether the code this sheet was given has run out.
-  ///
-  /// Checked on the client because the refusal does not say which it was,
-  /// and the guide is explicit that a step-up failure must not be reported
-  /// as a wrong code without ruling expiry out first.
   bool get _expired {
     final at = _expiresAt;
     return at != null && DateTime.now().isAfter(at);
@@ -923,10 +882,6 @@ class _StepUpCodeSheetState extends State<StepUpCodeSheet> {
 }
 
 /// "Update Khaime settlement account" — the versioned change.
-///
-/// What this cannot do is switch providers, which is why that is said on the
-/// dialog rather than discovered through a refusal: another provider is
-/// another rail.
 class UpdateSettlementSheet extends StatefulWidget {
   const UpdateSettlementSheet({
     super.key,
@@ -1017,9 +972,6 @@ class _UpdateSettlementSheetState extends State<UpdateSettlementSheet> {
   }
 
   /// Which of the four operations this is.
-  ///
-  /// The order matters: country implies currency, and a rename alone is the
-  /// weakest claim, so the strongest change that actually happened wins.
   String? get _operation {
     if (_country != widget.rail.countryCode) return 'change_country';
     if (_currency != widget.rail.settlementCurrency) return 'change_currency';
@@ -1154,9 +1106,9 @@ class _UpdateSettlementSheetState extends State<UpdateSettlementSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Funds
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Funds ----------------------------------------------------------------
+// -----------
 
 /// A fund's name and purpose.
 class FundDraft {
@@ -1167,10 +1119,6 @@ class FundDraft {
 }
 
 /// "New giving fund" — and the same dialog for editing one.
-///
-/// A fund's slug is immutable, so editing changes only what givers read.
-/// That is why there is no slug field here to mislead anyone into thinking
-/// an old shared link could be repointed.
 class FundSheet extends StatefulWidget {
   const FundSheet({super.key, this.fund});
 
@@ -1270,15 +1218,11 @@ class _FundSheetState extends State<FundSheet> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Payout
-// ---------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// -- Payout ---------------------------------------------------------------
+// ------------
 
 /// Withdrawing part of a provider-held balance.
-///
-/// Only ever opened for a rail whose `availability` is `withdrawable` and
-/// which has nothing in flight — the server refuses a second request, so the
-/// caller disables the action rather than letting this dialog fail.
 class PayoutSheet extends StatefulWidget {
   const PayoutSheet({super.key, required this.available});
 
@@ -1315,9 +1259,7 @@ class _PayoutSheetState extends State<PayoutSheet> {
       return;
     }
     // Compared in major units against the server's own figure, then handed
-    // over in minor ones. The ratio between the two is taken from the
-    // balance itself rather than from a currency-exponent table the client
-    // has no business keeping.
+    // over in minor ones.
     if (typed > widget.available.amount) {
       setState(
         () => _problem = AppStrings.earningsPayoutTooMuch(

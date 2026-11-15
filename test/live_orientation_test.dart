@@ -18,37 +18,6 @@ import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Which way up a broadcast records.
-///
-/// Reported on 2026-11-13: a livestream recorded from the phone played
-/// back landscape on the web, and upright-but-letterboxed in the phone's
-/// own player. The asset really was landscape — the app asks for
-/// `Resolution.RESOLUTION_720`, 1280x720, and the native SDK decides which
-/// way round to use it from the **interface** orientation:
-///
-///   * iOS (`ApiVideoLiveStream.swift`) reads
-///     `UIApplication.shared.statusBarOrientation` when the controller is
-///     constructed, and `prepareVideo` then picks
-///     `max(w, h) x min(w, h)` for a landscape interface and the swap of
-///     that otherwise. `orientationDidChange` repeats it on every
-///     `UIDevice.orientationDidChangeNotification`, reassigning
-///     `videoSettings.videoSize` *during* a broadcast.
-///   * Android's StreamPack takes its target rotation from the activity
-///     and the plugin never overrides it.
-///
-/// `main.dart` allows all four orientations and neither broadcast screen
-/// pinned one, so the frame size was whatever way the creator happened to
-/// be holding the phone — and could change mid-sermon.
-///
-/// These tests watch the real platform channel, because
-/// `SystemChrome.setPreferredOrientations` is the whole fix and a screen
-/// that stops calling it is the regression.
-///
-/// One part is *not* pinned: both screens ask once in `initState` and then
-/// `await` the same lock before building the camera. Only the awaited one
-/// waits for the platform to accept the preference, which is what matters
-/// on a device — but a mock channel accepts instantly, so a test cannot
-/// tell the two apart. Deleting the awaited call alone leaves every test
-/// here green. It is unpinned defence, kept deliberately.
 const _liveChannel = MethodChannel('video.api.livestream/controller');
 
 /// Everything the screens send down `SystemChannels.platform`, in order,
@@ -221,8 +190,7 @@ void main() {
       tester,
     ) async {
       // Past the deadline the SDK's own rotation observer is the safety
-      // net. A livestream that will not start is worse than one framed
-      // the wrong way.
+      // net.
       tester.view.physicalSize = const Size(844 * 3, 390 * 3);
       addTearDown(tester.view.reset);
 
@@ -244,8 +212,7 @@ void main() {
     // and it is where the second half of this bug lived: one
     // `_restorePortrait` served both leaving fullscreen *and* leaving the
     // screen, so watching one video left the whole app unable to rotate
-    // until it was restarted. These read the source instead, which is the
-    // same thing `ios_permission_config_test` does for a build setting.
+    // until it was restarted.
     final dart = Directory('lib')
         .listSync(recursive: true)
         .whereType<File>()
@@ -275,10 +242,9 @@ void main() {
     });
 
     test('and does not keep its own copy of that list', () {
-      // Naming all four across two *different* narrowed calls is fine —
-      // the player has a landscape pair for fullscreen and a portrait pair
-      // for leaving it. What must not come back is a second spelling of
-      // the whole set in one call, because that is the copy that drifts.
+      // Naming all four across two *different* narrowed calls is fine — the
+      // player has a landscape pair for fullscreen and a portrait pair for
+      // leaving it.
       final literal = RegExp(
         r'setPreferredOrientations\(\s*\[(.*?)\]',
         dotAll: true,
@@ -347,8 +313,7 @@ void main() {
       tester,
     ) async {
       // The native controller reads the interface orientation as it is
-      // constructed. Locking afterwards is locking too late: the encoder
-      // already has its frame size.
+      // constructed.
       final controller = await pump(tester);
       expect(controller.initializes, 1);
 
@@ -362,10 +327,7 @@ void main() {
     testWidgets('holds the camera back until the screen has turned', (
       tester,
     ) async {
-      // Opening go-live while holding the phone sideways. The lock goes
-      // out in `initState`, but UIKit takes its time, and the encoder
-      // reads the orientation as the native controller is built — so the
-      // camera has to wait for the turn, not merely for the preference.
+      // Opening go-live while holding the phone sideways.
       tester.view.devicePixelRatio = 3;
       tester.view.physicalSize = const Size(844 * 3, 390 * 3);
       addTearDown(tester.view.reset);

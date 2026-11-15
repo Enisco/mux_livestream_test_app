@@ -23,9 +23,6 @@ import 'helpers/load_app_fonts.dart';
 /// getting it wrong is costly in both directions: a reader who already has
 /// a channel must not be invited to start another (the API refuses with a
 /// 409), and a reader who has one must not be hidden from their own studio.
-///
-/// These drive the block through every answer, including the one a live
-/// server will not produce on demand — a lookup that simply failed.
 class _FakeApi implements ApiService {
   _FakeApi({required this.onGet});
 
@@ -91,8 +88,6 @@ Future<void> _pumpProfile(
   GetIt.instance.registerLazySingleton<DiscoveryRepo>(DiscoveryRepo.new);
   GetIt.instance.registerLazySingleton<AuthRepo>(AuthRepo.new);
   // Both bells read one store; the screens listen to it from `initState`.
-  // Its first read fails without an ApiService and is swallowed, which is the
-  // behaviour under test here — a bell that cannot be counted draws no dot.
   GetIt.instance.registerLazySingleton<NotificationStore>(
     NotificationStore.new,
   );

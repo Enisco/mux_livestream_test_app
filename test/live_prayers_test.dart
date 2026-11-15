@@ -13,15 +13,6 @@ import 'helpers/load_app_fonts.dart';
 
 /// The prayer requests sent during a broadcast, so the broadcaster can pray
 /// for them on air.
-///
-/// Until 2026-10-26 the studio reported `metrics.prayers.count` and nothing
-/// readable. Two things shape the sheet:
-///
-/// - **There is no `isAnonymous`.** The whole point is to pray for a *named*
-///   person; a missing name is failed hydration, not a choice, so it falls
-///   back neutrally rather than being labelled anonymous.
-/// - **The count arrives by socket, the bodies do not** — so the panel is a
-///   request of its own, and it is keyset, newest first.
 class _FakeApi implements ApiService {
   _FakeApi({this.fails = false});
 

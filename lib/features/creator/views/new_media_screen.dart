@@ -27,40 +27,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Uploading a video, or a piece of audio.
-///
-/// The two designs are the same screen: the copy, the ceiling and the tile
-/// on the file card differ, and nothing else does. Both take the same four
-/// calls, which is why they share one [MediaUploadRepo].
-///
-/// Neither is Go Live. These are files that go to Mux over HTTP and are
-/// transcoded; a livestream is provisioned and broadcast over RTMP, and the
-/// API refuses to let one be created as the other.
-///
-/// The bytes start moving the moment a file is chosen, so the form is filled
-/// in while the upload runs — which is what the design shows. Publishing
-/// waits for the bytes to land: the API would accept the row sooner, but
-/// leaving the screen mid-upload would then strand it with nothing coming.
-///
-/// The same screen **edits** a row that already exists: pass [editMediaId]
-/// and it opens what is filed and saves with `PATCH /v1/media/{id}`, the
-/// way the article and event editors do. Three things are different in
-/// that mode, and each is a deliberate answer to what the route allows:
-///
-///  * **No file.** The row already holds one. Replacing it means
-///    `DELETE /v1/media/{id}/source` — refused outright for anything
-///    published — then a fresh upload, which is a different job from
-///    correcting a title. The form says where that is done.
-///  * **Visibility is on the form.** On an upload it is decided by the
-///    go-live sheet (a draft is private, anything going out is public);
-///    on an edit it is a field of its own, because changing who can see
-///    something is most of why a creator opens this screen.
-///  * **The schedule is editable, while it still can be.** `scheduledAt`
-///    is refused for anything that has ever been published, so the field
-///    is only drawn when [FiledMedia.canBeScheduled] says so.
-///
-/// Publishing state is never touched by an edit: no publish call, no
-/// unpublish. Someone fixing a typo in a published video expects it to
-/// stay published, and someone tidying a draft expects it to stay a draft.
 class NewMediaScreen extends StatefulWidget {
   const NewMediaScreen({
     super.key,
@@ -73,9 +39,6 @@ class NewMediaScreen extends StatefulWidget {
 
   /// Video or audio. `music` is the API's word for what the design and the
   /// studio both call Audio.
-  ///
-  /// On an edit this comes from the row the studio opened, which already
-  /// knows: it decides the copy, not the behaviour.
   final MediaUploadKind kind;
 
   /// Defaults to the signed-in creator.
@@ -107,10 +70,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   MediaUploadTicket? _ticket;
   CancelToken? _cancel;
 
-  /// The row, made before the first byte moves. One per visit: swapping
-  /// the file reuses it rather than leaving the first one orphaned, and
-  /// the upload route's own "already processing" refusal is what clears
-  /// the old source out of the way.
+  /// The row, made before the first byte moves.
   FiledMedia? _draft;
 
   /// Bytes on the wire, and the future that finishes when they all are.
@@ -129,17 +89,10 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   // ---- edit mode only ----------------------------------------------------
 
   /// The row as it is filed, when this screen is editing one.
-  ///
-  /// Kept whole rather than torn into controllers because the save needs
-  /// what the form does not show: whether a file is in yet, whether the row
-  /// has ever been published, and what schedule it already carries.
   FiledMedia? _filed;
 
   /// Who can see it. Only on the form when editing; an upload's visibility
   /// is decided by the go-live sheet.
-  ///
-  /// Null until the row says, and null is sent as nothing: see
-  /// [FiledMedia.visibility] for why a guess here is dangerous.
   MediaVisibility? _visibility;
 
   /// The moment it publishes itself, as the form currently has it. Null
@@ -249,27 +202,12 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       _descriptionController.text.trim().isNotEmpty;
 
   /// What an **edit** needs, which is only a title.
-  ///
-  /// The thumbnail is already up and picking a new one is optional. So is
-  /// the description, and that is the point: an old row filed without one
-  /// would otherwise have its Save greyed out for no stated reason, so a
-  /// creator could not correct its title without first writing a
-  /// description they were never asked for. The API requires neither.
   bool get _canSaveEdit =>
       _filed != null &&
       _titleController.text.trim().isNotEmpty &&
       !_schedulePast;
 
   /// A moment the creator has just moved into the past.
-  ///
-  /// [pickMoment] puts a floor under the *date* wheel only, so choosing an
-  /// earlier hour on today's date is the easy way to land here — which is
-  /// why the go-live sheet marks the same mistake inline rather than
-  /// waiting for the tap on Save.
-  ///
-  /// A schedule that merely *arrived* stale is not flagged: it is not
-  /// resent, so it cannot fail, and painting it red would accuse the
-  /// creator of something they did not do.
   bool get _schedulePast {
     final at = _scheduledAt;
     return at != null &&
@@ -374,9 +312,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       _upload = null;
       _sent = 0;
       _uploadFailed = false;
-      // `_draft` deliberately survives. The row is already filed, so the
-      // next pick fills the same one instead of leaving this one behind
-      // with nothing in it.
+      // `_draft` deliberately survives.
     });
   }
 
@@ -480,8 +416,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     final creatorId = _creatorId;
     if (mediaId == null || filed == null) return;
     // A new thumbnail has to be uploaded before it can be named, and that
-    // needs a creator. Going ahead without one would save every other
-    // change and drop the picture without saying so.
+    // needs a creator.
     if (_thumbnail != null && _thumbnailFileId == null && creatorId == null) {
       return _say(AppStrings.newMediaRejected);
     }
@@ -496,9 +431,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       return _say(AppStrings.newMediaCategoryMax);
     }
 
-    // Only a schedule the creator actually moved is sent. Resending the
-    // one already filed would be refused the moment it fell into the past,
-    // taking an otherwise valid edit down with it.
+    // Only a schedule the creator actually moved is sent.
     final scheduleMoved = _scheduledAt != filed.scheduledAt;
     final clearSchedule = scheduleMoved && _scheduledAt == null;
     final scheduledAt = scheduleMoved ? _scheduledAt : null;
@@ -521,8 +454,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
         mediaId: mediaId,
         title: title,
         // Left out only when it was empty and still is: sending `''` there
-        // would risk a validator refusal to no purpose. Anything the
-        // creator actually changed goes, an emptied field included.
+        // would risk a validator refusal to no purpose.
         description: description.isEmpty && filed.description.isEmpty
             ? null
             : description,
@@ -570,9 +502,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
 
     setState(() => _working = true);
     try {
-      // Wait for the bytes. The API would publish the row now and hold it
-      // until Mux is ready, but a half-sent file with nobody on the screen
-      // to finish it helps no one.
+      // Wait for the bytes.
       await _upload;
       final draft = _draft;
       if (_uploadFailed || _ticket == null || draft == null) {
@@ -664,10 +594,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     MediaUploadFailure.ticketExpired => AppStrings.newMediaExpired,
     MediaUploadFailure.scheduleInPast => AppStrings.newMediaSchedulePast,
     // Both 409s are the upload route's flow control and the repo answers
-    // them itself. Reaching here means the second attempt was refused too,
-    // which a creator can only meet by trying again. The quota message is
-    // the server's own and names the plan's number, so it is shown
-    // verbatim when there is one.
+    // them itself.
     MediaUploadFailure.notFound => AppStrings.editMediaGone,
     MediaUploadFailure.notAllowed => AppStrings.editMediaNotYours,
     MediaUploadFailure.draftChanged ||
@@ -761,10 +688,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     return ListView(
       padding: EdgeInsets.fromLTRB(20.s, 18.s, 20.s, 20.s),
       children: [
-        // The file card belongs to an upload. On an edit the row already
-        // holds its file, and swapping it is a different operation the
-        // phone does not offer — so the form says where that is done
-        // instead of showing a control that cannot do it.
+        // The file card belongs to an upload.
         if (_editing) ...[
           if (_sourceNote case final note?) ...[
             FieldNote(note),
@@ -854,11 +778,6 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   }
 
   /// What the row's own status means for the edit in front of the creator.
-  ///
-  /// The first three say something about the file that is specific to the
-  /// state it is in; every other state shares the one caveat that applies
-  /// to a row with a file in it — the file can be changed, but not here.
-  /// Nothing at all before the row has loaded.
   String? get _sourceNote => switch (_filed?.status) {
     MediaStatus.draft => AppStrings.editMediaNoFile,
     MediaStatus.processing => AppStrings.editMediaProcessing,
@@ -868,10 +787,6 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   };
 
   /// The schedule, when the route will still take one.
-  ///
-  /// `scheduledAt` is refused for anything that has ever been published,
-  /// even if it was unpublished since — so rather than offering a field
-  /// that can only fail, a row past that point is told why it has none.
   Widget? _schedule(FiledMedia? filed) {
     if (filed == null) return null;
     if (!filed.canBeScheduled) {
@@ -950,9 +865,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // An edit has one button and no second thought. "Save as draft"
-        // is a publishing decision, and an edit makes none: the row keeps
-        // whatever state it was already in.
+        // An edit has one button and no second thought.
         if (_editing)
           PrimaryButton(
             key: const ValueKey('media-save-edit'),

@@ -6,24 +6,6 @@ import 'package:test_app/shared/services/device_info_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// The notification service, probed against staging on 2026-10-14.
-///
-/// Four things the spec does not say, each of which changes the client:
-///
-/// - **Paging is on the query string.** `page` and `limit` in the body are
-///   refused outright (*"property page should not exist"*); they belong on
-///   `?page=&limit=`. The default `perPage` is **6**, which is small enough
-///   to look like a bug if it is not overridden.
-/// - **There is no unread filter and no unread count.**
-///   `{"filters":{"readAt":{"equals":null}}}` returns nothing at all although
-///   unread rows exist, and `{"isNull":true}` answers 500. So unread is
-///   counted on the device from `readAt`, over as many rows as have been
-///   fetched — see [NotificationStore].
-/// - **`status` is delivery state, not read state.** Every row sits at
-///   `pending` whether or not it has been read; `readAt` is the only signal.
-///   Filtering on `status: "read"` answers 500.
-/// - **`platform` takes `android`, `ios` or `web`.** The validator's refusal
-///   prints its enum empty — *"platform must be one of the following values:
-///   "* — which reads as "nothing is allowed". All three are accepted.
 class NotificationRepo {
   NotificationRepo({ApiService? api, DeviceInfoService? device})
     : _injected = api,
@@ -110,9 +92,6 @@ class NotificationRepo {
   }
 
   /// `POST /v1/notification/device-token` — where this install's pushes go.
-  ///
-  /// Keyed on `deviceId`, so re-registering a rotated token replaces the old
-  /// one rather than adding a second.
   Future<void> registerDevice(String token) => _api.post(
     ApiEndpoints.notificationDeviceToken,
     data: {

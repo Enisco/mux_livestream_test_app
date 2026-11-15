@@ -14,12 +14,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The interests step, drawn from the live taxonomy.
-///
-/// What this is really guarding: a chip's label and the slug it sends are the
-/// same row of `GET /v1/user/categories`, so they cannot disagree. The old
-/// screen hardcoded the design's eleven labels and kept a hand-written
-/// label→slug table; four chips mapped to nothing and sent nothing when
-/// picked, and four real categories had no chip at all.
 class _FakeApi implements ApiService {
   _FakeApi({required this.rows, this.failCategories = false});
 

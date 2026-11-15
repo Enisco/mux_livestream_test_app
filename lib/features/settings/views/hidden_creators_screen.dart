@@ -17,16 +17,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Who this viewer has muted or blocked, and the only way to undo either.
-///
-/// **The blocked list is not optional.** A blocked creator is hidden from
-/// every surface a viewer could rediscover them on — feeds, Explore, search,
-/// even their own channel page — so without this screen the `DELETE` is
-/// unreachable and a block can never be lifted. The backend flagged it as a
-/// route the app had not asked for and needed.
-///
-/// Muted is the softer half and has another way back: a muted creator stays
-/// in `following-creators`, which carries `isMuted`. This screen is still the
-/// one that lists them together.
 class HiddenCreatorsScreen extends StatefulWidget {
   const HiddenCreatorsScreen({super.key, this.repo, this.store});
 
@@ -61,11 +51,6 @@ class _HiddenCreatorsScreenState extends State<HiddenCreatorsScreen> {
     try {
       // Both at once: the tabs switch without a second wait, and the counts
       // beside them are right from the first frame.
-      //
-      // `Future.wait` rather than two bare awaits: awaiting them in sequence
-      // leaves the second read's failure unobserved when the first one is
-      // the one that threw, which surfaces as an unhandled async error well
-      // away from here.
       final rows = await Future.wait([
         _repo.fetchHiddenCreators(blocked: false),
         _repo.fetchHiddenCreators(blocked: true),
@@ -91,9 +76,6 @@ class _HiddenCreatorsScreenState extends State<HiddenCreatorsScreen> {
   }
 
   /// Optimistic, and put back if the write is refused.
-  ///
-  /// **Unblocking does not re-follow.** It makes the creator visible and
-  /// stops there; the viewer never asked to follow them twice.
   Future<void> _restore(HiddenCreator creator) async {
     final blocked = _blockedTab;
     // Where it was, so putting it back after a refusal does not silently

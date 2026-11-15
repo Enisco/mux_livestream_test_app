@@ -9,16 +9,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// "What is this gift for?" — Figma `11117-116520`.
-///
-/// The app's whole share of the giving journey. The next frame in the design
-/// (`11117-116521`, the amount and the fee breakdown) is deliberately **not**
-/// built: amount, currency, the platform fee and the exact charge are all
-/// server-computed and the giver meets them on the web surface, so drawing
-/// them here would mean the app quoting figures it cannot be the source of.
-///
-/// The sheet is skipped entirely when a ministry has one fund, which is the
-/// common case — the reserved `general` fund always exists, so "choose a
-/// purpose" with a single row is a question with one answer.
 class GiveFundSheet extends StatefulWidget {
   const GiveFundSheet({
     super.key,
@@ -203,8 +193,7 @@ class _FundRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The design captions the general fund with the ministry's name and the
-    // rest with their own description. A fund whose description was left
-    // blank falls back to the same caption rather than drawing an empty line.
+    // rest with their own description.
     final caption = fund.description?.trim().isNotEmpty ?? false
         ? fund.description!.trim()
         : AppStrings.giveFundFor(ministry);

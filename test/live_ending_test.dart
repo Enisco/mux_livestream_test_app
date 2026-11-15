@@ -15,11 +15,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Ending a broadcast, from the creator's side.
-///
-/// Reported from the app: after tapping End the screen went on looking
-/// live for a few seconds, so creators tapped it again thinking the first
-/// one had not registered. The whole on-air overlay stayed up — LIVE pill,
-/// clock, chat control — with only the End button quietly going inert.
 class _LiveController implements ApiVideoLiveStreamController {
   int stops = 0;
   bool _up = false;
@@ -49,8 +44,7 @@ class _LiveController implements ApiVideoLiveStreamController {
   Future<void> dispose() async {}
 
   // The screen mounts the real `ApiVideoCameraPreview` over an initialised
-  // controller. An uninitialised texture id makes it render an empty box,
-  // which keeps the native orientation reader out of a widget test.
+  // controller.
   @override
   int get textureId => ApiVideoLiveStreamController.kUninitializedTextureId;
 
@@ -177,9 +171,6 @@ Future<void> _tapEnd(WidgetTester tester) async {
 }
 
 /// Lets the bounded wait elapse and the screen leave.
-///
-/// A test that walks away mid-`end` leaves the timeout timer pending, and
-/// the binding asserts on that after the tree is disposed.
 Future<void> _letGo(WidgetTester tester) async {
   await tester.pump(LiveBroadcastScreen.endTimeout);
   await tester.pump(const Duration(seconds: 1));
@@ -250,9 +241,7 @@ void main() {
   testWidgets('the screen cannot lock while the broadcast is up', (
     tester,
   ) async {
-    // Reported from the app: the phone locked itself mid-livestream. The
-    // idle timer has nothing to go on — the creator is talking, not
-    // tapping — so it has to be held off for as long as the screen is up.
+    // Reported from the app: the phone locked itself mid-livestream.
     final asked = <bool>[];
     final wakelock = ScreenWakelock(set: (on) async => asked.add(on));
 

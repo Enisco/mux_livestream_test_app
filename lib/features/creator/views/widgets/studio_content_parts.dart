@@ -235,8 +235,7 @@ class _MetaLine extends StatelessWidget {
             style: AppStyles.label(
               12,
               // A row still being processed says so in the brand colour: it
-              // is the one state the creator is waiting on. One that went
-              // wrong says so in red.
+              // is the one state the creator is waiting on.
               color: wrong
                   ? AppColors.destructive
                   : processing

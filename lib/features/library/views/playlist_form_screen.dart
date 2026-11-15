@@ -17,9 +17,6 @@ class PlaylistDraft {
 }
 
 /// Naming a playlist, whether it is being made or renamed.
-///
-/// The design gives New playlist and Edit playlist the same screen with a
-/// different title and button, so they are the same widget.
 class PlaylistFormScreen extends StatefulWidget {
   const PlaylistFormScreen({super.key, this.existing});
 

@@ -14,14 +14,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// What the app should speak.
-///
-/// `PATCH /v1/user/{id}` takes `language` as **BCP 47** — `en` and `en-NG`
-/// both validate — and `GET /v1/user/profile` returns it.
-///
-/// **Null is not English.** It means the viewer has not chosen, which is the
-/// only state from which falling back to the device's own language is
-/// honest. So "Match my device" is a real option here rather than a synonym
-/// for English, and choosing it sends `null`.
 class LanguageScreen extends StatefulWidget {
   const LanguageScreen({super.key, this.repo});
 
@@ -32,15 +24,9 @@ class LanguageScreen extends StatefulWidget {
 }
 
 /// What the app ships strings for today.
-///
-/// Deliberately short: offering a language the app has no copy in would be a
-/// setting that changes nothing a reader can see.
 const _languages = <(String, String)>[('en', 'English')];
 
 /// The label for a stored tag, for the Account row.
-///
-/// An unknown tag — one chosen on another client, or a region this build does
-/// not name — prints as itself rather than being silently shown as English.
 String languageLabel(String? tag) {
   if (tag == null || tag.trim().isEmpty) return AppStrings.languageDevice;
   for (final (code, label) in _languages) {

@@ -14,11 +14,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Watches a checkout attempt to its conclusion.
-///
-/// The creator pays in a system browser, so this screen has no way to observe
-/// the payment itself. It polls the canonical session instead, and treats
-/// nothing as complete until the server reports both `succeeded` and
-/// entitlements in place.
 class CheckoutStatusScreen extends StatefulWidget {
   const CheckoutStatusScreen({super.key, this.sessionId});
 

@@ -9,26 +9,6 @@ import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
 
 /// Filing an article.
-///
-/// Four calls, all exercised against staging:
-///
-///  1. `POST /v1/content/assets/upload-url` — the cover, and every inline
-///     image. See [ContentAssetRepo].
-///  2. `POST /v1/content/posts` → the post, at `status: draft`.
-///  3. `PATCH /v1/content/posts/{id}` — the only place `scheduledAt` is
-///     taken, which flips the status to `scheduled`.
-///  4. `POST /v1/content/posts/{id}/publish` (no body) → `published`.
-///
-/// What staging taught that the guide does not say:
-///
-///  * **`title` is required to create at all**, 1–500 characters. The
-///    design calls the headline optional; the API does not.
-///  * `body` may be empty on a draft, but publishing refuses it: *"Add
-///    post content before publishing this post"*.
-///  * `scheduledAt` is **refused on create** and accepted only on PATCH,
-///    and must be in the future — the same guard media has.
-///  * An inline image resolves to `available: false, reason: not_uploaded`
-///    until a saved post names it. That is an unsaved draft, not an error.
 class PostRepo {
   PostRepo([ApiService? api]) : _injected = api;
 
@@ -80,12 +60,6 @@ class PostRepo {
   }
 
   /// What is already filed, so the editor can open it.
-  ///
-  /// `GET /v1/content/posts/{id}` answers the full `ContentPost`. The
-  /// cover arrives as a *pair*: `coverThumbnailFileId` is what a write
-  /// takes, `coverThumbnailKey` is where the picture is. [PostDraft] holds
-  /// the id; the key comes back beside it here so the screen can show what
-  /// the creator already chose instead of an empty cover slot.
   Future<EditablePost> load(String postId) async {
     try {
       final response = await _api.get(ApiEndpoints.contentPostById(postId));
@@ -104,10 +78,6 @@ class PostRepo {
   }
 
   /// Save an edit. `PATCH /v1/content/posts/{id}`.
-  ///
-  /// Publishing state is left alone: a creator correcting a typo in a
-  /// published post expects it to stay published, and one fixing a draft
-  /// expects it to stay a draft.
   Future<void> update({
     required String postId,
     required PostDraft draft,

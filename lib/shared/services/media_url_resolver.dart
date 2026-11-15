@@ -3,10 +3,6 @@ import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/shared/services/playback_info_cache.dart';
 
 /// Turns a media id into a playable URL, cache first.
-///
-/// Feed cards only carry an id — the signed stream URL comes from the playback
-/// endpoint. Those URLs expire, which is why the cache holds them briefly and
-/// the API is asked again once it does.
 class MediaUrlResolver {
   MediaUrlResolver({required this.cache, required this.fetch});
 

@@ -30,14 +30,6 @@ class OnboardingRepo {
   }
 
   /// Records where the reader has got to in the funnel.
-  ///
-  /// Only what is passed is sent — the route merges rather than replaces, so
-  /// a step can be recorded without restating the intent that led to it.
-  ///
-  /// Failures are swallowed on purpose. This is bookkeeping the server uses
-  /// to resume an interrupted signup; losing a write means the funnel state
-  /// is stale, which is a far smaller problem than blocking someone from
-  /// finishing the step they just completed.
   Future<void> updateOnboardingState({
     OnboardingStatus? status,
     OnboardingIntentState? intent,
@@ -62,12 +54,6 @@ class OnboardingRepo {
 }
 
 /// Records funnel state without ever getting in the way.
-///
-/// The screens call this on the way past a step, so it must not be able to
-/// stop them: resolving the repo can throw when the locator has not been set
-/// up (a widget test, or a screen reached before `setupLocator`), and the
-/// request itself can fail. Neither is a reason a reader cannot finish the
-/// step they just completed.
 void recordOnboardingState({
   OnboardingStatus? status,
   OnboardingIntentState? intent,

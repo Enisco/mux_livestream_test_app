@@ -16,17 +16,6 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// The `…` on a content card (Figma `10779-89546`).
-///
-/// Every row here had nothing to call until the backend answered on
-/// 2026-10-26. Four of its rules are easy to break invisibly, so each is
-/// pinned:
-///
-/// - **No count beside "Not interested"** — it increments nothing anywhere.
-/// - **"Add to playlist" is media only** (`PARKED(1.5)`).
-/// - **Mute keeps the follow; block drops it**, and the wording reads off the
-///   route's own `unfollowed` rather than assuming.
-/// - **Minting a share link is not a share** — the counter moves on the
-///   interaction, not on opening the sheet.
 class _FakeApi implements ApiService {
   _FakeApi({this.unfollowed = true, this.shareFails = false});
 
@@ -123,8 +112,7 @@ Future<_FakeApi> _open(
     ..registerSingleton<ApiService>(api)
     ..registerSingleton<EngagementStore>(used)
     // The sheet asks whether this ministry can take a gift before it draws
-    // its rows. Left empty here, so "Give now" is absent — which is what
-    // every case below expects.
+    // its rows.
     ..registerSingleton<GivingCapabilityStore>(
       giving ?? GivingCapabilityStore(repo: DonorGivingRepo(api: api)),
     );

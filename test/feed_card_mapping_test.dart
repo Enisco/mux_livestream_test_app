@@ -263,9 +263,8 @@ void main() {
 
 void _libraryShapeTests() {
   group('creator library search shape', () {
-    // The library route answers with data.hits + data.total, not data.items.
-    // Reading only `items` silently produced an empty Library for creators who
-    // clearly had content.
+    // The library route answers with data.hits + data.total, not
+    // data.items.
     const libraryResponse = {
       'success': true,
       'data': {
@@ -317,10 +316,6 @@ void _libraryShapeTests() {
 }
 
 /// The devotional card's cover overlay and its action word.
-///
-/// The frame writes "14-day devotional plan" across the cover and offers
-/// "Start Devotion"; the feed reports both the entry count and whether this
-/// reader has already begun, so neither has to be guessed.
 void _devotionalGroup() {
   group('devotional plan card', () {
     test('the overlay counts the days in the plan', () {

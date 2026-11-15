@@ -6,14 +6,6 @@ import 'package:test_app/models/discovery_models/web_feed_item.dart';
 typedef HugeIconData = List<List<dynamic>>;
 
 /// View models for the Explore tab.
-///
-/// Deliberately flat and presentation-shaped rather than mirrors of a payload:
-/// every rail here is composed from several reads, so no single response has
-/// this shape. `ExploreRepo` does the mapping.
-///
-/// Each one keeps the row it came from in `source`, because opening a card
-/// means handing the real `WebFeedItem` to the detail screens — the flat
-/// fields are for drawing, not for navigating.
 class ExploreCreatorRef {
   const ExploreCreatorRef({
     required this.id,
@@ -50,10 +42,6 @@ class ExploreCreatorRef {
 }
 
 /// One thumbnail card in a horizontal rail.
-///
-/// Every rail on Explore draws the same three things — artwork, a title, and a
-/// creator line — so they share one model and differ only in the geometry the
-/// rail asks for and the badge the card carries.
 class ExploreCard {
   const ExploreCard({
     required this.id,

@@ -25,12 +25,6 @@ import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Everything the creator has made, in one list.
-///
-/// Three services hold it — media, posts and calendar events — and the chips
-/// pick between them. "All" asks all three and interleaves by recency, which
-/// is the only way to span them: no single route does.
-///
-/// Rows are real; see [StudioContentRepo] for the filter dialect.
 class StudioContentScreen extends StatefulWidget {
   const StudioContentScreen({
     super.key,
@@ -42,10 +36,6 @@ class StudioContentScreen extends StatefulWidget {
   });
 
   /// Open with the search field already up.
-  ///
-  /// The Studio tab carries a search icon of its own, and what it searches is
-  /// this screen's list — so it sends the reader here rather than owning a
-  /// second search of its own.
   final bool openSearch;
 
   /// Every studio the reader can work in. The shell owns the list so all
@@ -200,12 +190,6 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
   }
 
   /// The trailing control on a row.
-  ///
-  /// The row draws a pencil for a draft and a share icon for anything
-  /// else, so only the pencil may open the editor — wiring the share icon
-  /// to it would do something other than what it shows. Which kinds have
-  /// an editor at all is [StudioContentItem.isEditableHere]; a livestream
-  /// draft has none, and still only says what the control would do.
   Future<void> _rowAction(StudioContentItem item) async {
     final editable = item.isDraft && item.isEditableHere;
     if (editable) {
@@ -234,8 +218,8 @@ class _StudioContentScreenState extends State<StudioContentScreen> {
     if (creatorId == null) return;
     await widget.onSwitchStudio?.call(creatorId);
     // The shell re-points `creatorId` and re-reads its own context, but
-    // this list is state of its own — without a reload it keeps showing
-    // the studio the reader just switched away from.
+    // this list is state of its own — without a reload it keeps showing the
+    // studio the reader just switched away from.
     if (mounted) await _load();
   }
 
