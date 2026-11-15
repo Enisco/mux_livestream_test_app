@@ -24,7 +24,11 @@ WebFeedItem _item(String entityType, Map<String, dynamic> meta) =>
 
 void main() {
   group('with a CDN configured', () {
-    setUp(() => dotenv.testLoad(fileInput: 'CDN_BASE_URL=$_cdn'));
+    setUp(
+      () => dotenv.testLoad(
+        fileInput: 'CDN_BASE_URL=$_cdn\nBASE_URL=https://api.example.test',
+      ),
+    );
 
     test('a storage key becomes a URL on the CDN', () {
       expect(
@@ -93,6 +97,90 @@ void main() {
         FeedCardMapper.toCardData(item).avatarUrl,
         '$_cdn/public/avatar/c1/me.png',
       );
+    });
+
+    test('a video published without a cover still gets a still', () {
+      // The rung that was missing everywhere on the viewer side. A
+      // `mux_auto` row carries neither a URL nor a key — only the public
+      // asset proxy can answer for it, and a surface that stops at
+      // `imageFor` draws an empty box for good.
+      expect(
+        AssetUrlResolver.mediaImage(
+          mediaId: 'm1',
+          source: AssetUrlResolver.muxAutoThumbnail,
+        ),
+        'https://api.example.test/v1/public/media/m1/assets/thumbnail',
+      );
+    });
+
+    test('a row that says its thumbnail is manual is not asked twice', () {
+      // The proxy is minted only for a public, published, Mux-generated
+      // still. A manual row either has its key or has nothing, so asking
+      // would be one 404 per row.
+      expect(
+        AssetUrlResolver.mediaImage(mediaId: 'm1', source: 'manual'),
+        isNull,
+      );
+    });
+
+    test('a row that says nothing is tried', () {
+      expect(AssetUrlResolver.mediaImage(mediaId: 'm1'), isNotNull);
+    });
+
+    test('the proxy is the last rung, never the first', () {
+      expect(
+        AssetUrlResolver.mediaImage(
+          url: 'https://signed.test/a.jpg',
+          mediaId: 'm1',
+        ),
+        'https://signed.test/a.jpg',
+      );
+      expect(
+        AssetUrlResolver.mediaImage(
+          key: 'public/thumbnail/c1/a.jpg',
+          mediaId: 'm1',
+        ),
+        '$_cdn/public/thumbnail/c1/a.jpg',
+      );
+    });
+
+    test('a media card reaches for the proxy; a blog card does not', () {
+      // The proxy is a media route. Asking it about a blog would be a 404
+      // per card, so only media rows climb that far.
+      final video = FeedCardMapper.toCardData(
+        _item('media', {'mediaType': 'video', 'thumbnailSource': 'mux_auto'}),
+      );
+      expect(video.thumbnailUrl, contains('/v1/public/media/e1/assets/'));
+
+      final blog = FeedCardMapper.toCardData(_item('blog', const {}));
+      expect(blog.thumbnailUrl, isNull);
+    });
+
+    test('a media row climbs to the proxy; everything else stops short', () {
+      // One getter so every surface reads the same ladder: the detail
+      // hero's poster, the search row, the feed card, the discover grid,
+      // a creator's profile grid and the playlist screens all took
+      // `meta.thumbnailUrl` raw at some point, and each one drew an empty
+      // box for a video published without a cover.
+      final video = _item('media', {
+        'mediaType': 'video',
+        'thumbnailSource': 'mux_auto',
+      });
+      expect(video.isMediaRow, isTrue);
+      expect(video.stillUrl, contains('/v1/public/media/e1/assets/thumbnail'));
+
+      // The proxy is a media route; asking it about a blog is a 404 a row.
+      final blog = _item('blog', const {});
+      expect(blog.isMediaRow, isFalse);
+      expect(blog.stillUrl, isNull);
+    });
+
+    test('a row artwork and the face beside it are different pictures', () {
+      // `stillUrl` deliberately does not answer with an avatar: a card can
+      // want both, and a channel's avatar in a 16:9 slot is not artwork.
+      final channel = _item('creator', {'avatarKey': 'public/avatar/c1/a.png'});
+      expect(channel.avatarUrl, '$_cdn/public/avatar/c1/a.png');
+      expect(channel.stillUrl, isNull);
     });
 
     test('media keeps the URL the API gave it', () {

@@ -121,7 +121,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 creatorName: item.creator?.displayName ?? '',
                 creatorVerified: item.creator?.isVerified ?? false,
                 age: '',
-                thumbnailUrl: item.meta.thumbnailUrl,
+                thumbnailUrl: item.stillUrl,
                 targetType: 'media',
               ),
         ];

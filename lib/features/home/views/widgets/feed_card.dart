@@ -1134,7 +1134,12 @@ class _AudioPlayButton extends StatelessWidget {
       mediaId: mediaId,
       builder: (context, state) {
         final active = state.isActive(mediaId);
-        final loading = active && state.buffering && !state.playing;
+        // Before the first sound only: the spinner takes the icon's
+        // place, and `!playing` never caught the start — the engine
+        // reports playing as soon as it is told to, which is why the
+        // first tap showed a pause icon over silence.
+        final loading =
+            active && state.buffering && state.position == Duration.zero;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: playback == null

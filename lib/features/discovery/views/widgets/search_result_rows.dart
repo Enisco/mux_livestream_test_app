@@ -74,7 +74,9 @@ class SearchMinistryRow extends StatelessWidget {
         child: Row(
           children: [
             _Avatar(
-              url: item.meta.thumbnailUrl,
+              // A channel row's picture is its avatar, and the index sends
+              // that as a bare key — the feed maps it the same way.
+              url: item.avatarUrl,
               size: 32.s,
               ring: AppColors.cyan400,
             ),
@@ -176,7 +178,11 @@ class SearchContentRow extends StatelessWidget {
         title: item.title,
         creatorName: item.creatorDisplayName,
         creatorVerified: item.creatorVerified,
-        thumbnailUrl: item.meta.thumbnailUrl,
+        // The whole ladder, not just the first rung: a video published
+        // without a cover carries neither a URL nor a key, and only the
+        // public asset proxy can answer for it. Taking `meta.thumbnailUrl`
+        // raw is what left these rows as empty boxes.
+        thumbnailUrl: item.stillUrl,
         meta: [
           kindLabel,
           if (views > 0)

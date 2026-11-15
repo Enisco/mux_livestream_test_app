@@ -147,6 +147,44 @@ void main() {
       expect(playback.played, isEmpty);
     });
 
+    testWidgets('the first tap says it is loading, not that it is playing', (
+      tester,
+    ) async {
+      // The engine reports `playing` as soon as it is told to play, so a
+      // control gated on `!playing` showed a pause icon over silence.
+      final playback = FakePlayback();
+      await _pump(tester, hero(playback));
+
+      playback.emit(
+        mediaId: 'm-audio-1',
+        buffering: true,
+        duration: Duration.zero,
+      );
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.pause_rounded), findsNothing);
+    });
+
+    testWidgets('a stall part-way keeps the icon rather than flickering', (
+      tester,
+    ) async {
+      // Here the spinner takes the icon's place, so it is held to the one
+      // wait the icon cannot describe. Mid-track the icon is still true.
+      final playback = FakePlayback();
+      await _pump(tester, hero(playback));
+
+      playback.emit(
+        mediaId: 'm-audio-1',
+        buffering: true,
+        position: const Duration(seconds: 65),
+      );
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+    });
+
     testWidgets('pause stops the running track', (tester) async {
       final playback = FakePlayback()..emit(mediaId: 'm-audio-1');
       await _pump(tester, hero(playback));

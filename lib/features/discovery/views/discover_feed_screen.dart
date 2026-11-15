@@ -292,7 +292,7 @@ class _FeedItemCard extends StatelessWidget {
   }
 
   Widget _buildThumbnail() {
-    final url = item.meta.thumbnailUrl;
+    final url = item.stillUrl;
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Stack(

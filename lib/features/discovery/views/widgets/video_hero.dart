@@ -188,7 +188,18 @@ class _VideoHeroState extends State<VideoHero> {
                 children: [
                   // The fullscreen route holds the only allowed attachment
                   // while it is up, so the inline frame steps aside.
-                  if (active && !fullscreen && widget.videoController != null)
+                  //
+                  // So does a video that has not produced a frame yet: an
+                  // attached `Video` with nothing decoded paints black,
+                  // and black over a poster is a worse picture than the
+                  // poster. `position == Duration.zero` is the whole test,
+                  // which makes this the *first* start only — once a
+                  // millisecond has played, a later stall keeps the frame
+                  // it stalled on rather than flicking back to artwork.
+                  if (active &&
+                      !fullscreen &&
+                      widget.videoController != null &&
+                      state.position > Duration.zero)
                     Video(
                       controller: widget.videoController!,
                       controls: null,
@@ -202,7 +213,14 @@ class _VideoHeroState extends State<VideoHero> {
                     onTap: _toggleControls,
                   ),
 
-                  if (active && state.buffering && !state.playing)
+                  // Not `&& !state.playing`: the engine reports `playing`
+                  // the moment it is told to play, which is before the
+                  // first frame exists. That gate hid the spinner during
+                  // exactly the wait it was added for — a black rectangle
+                  // under a pause button, indistinguishable from a video
+                  // that will never start. A rebuffer mid-video is the
+                  // same wait and says so too; only the end is silent.
+                  if (active && state.buffering && !state.completed)
                     const Center(
                       child: CircularProgressIndicator(
                         color: AppColors.brandPrimary,
@@ -554,6 +572,16 @@ class _FullscreenVideoState extends State<FullscreenVideo> {
                   )
                 else
                   const ColoredBox(color: Colors.black),
+
+                // Fullscreen is where a stall is least explicable: there
+                // is nothing else on the screen to look at.
+                if (active && state.buffering && !state.completed)
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+
                 _Controls(
                   isLive: widget.isLive,
                   playback: playback,

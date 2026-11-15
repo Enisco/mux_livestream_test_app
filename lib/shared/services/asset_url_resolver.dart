@@ -65,6 +65,37 @@ abstract final class AssetUrlResolver {
     return resolve(key);
   }
 
+  /// The whole ladder for a media row's still, in the order
+  /// `client-media-integration.md` gives it: a URL the API already
+  /// resolved, then a storage key with the CDN host in front, then the
+  /// public asset proxy.
+  ///
+  /// The third rung is the one that is easy to leave off, and the only one
+  /// that can answer for a video published without a cover: those rows
+  /// carry neither a `thumbnailUrl` nor a `thumbnailKey`, so a surface that
+  /// stops at [imageFor] shows them as blank boxes for good.
+  ///
+  /// [source] is the row's `thumbnailSource`. The proxy is minted only for
+  /// a **public, published, Mux-generated** still, so a row that says it is
+  /// `manual` has a key or has nothing. A row that says nothing is tried:
+  /// a refusal costs one request and lands on the same placeholder the
+  /// caller would have drawn anyway.
+  static String? mediaImage({
+    String? url,
+    String? key,
+    String? mediaId,
+    String? source,
+  }) {
+    final direct = imageFor(url: url, key: key);
+    if (direct != null) return direct;
+    if (source != null && source != muxAutoThumbnail) return null;
+    return mediaThumbnail(mediaId);
+  }
+
+  /// What `thumbnailSource` says when the still is Mux's own first frame
+  /// rather than something a creator uploaded.
+  static const muxAutoThumbnail = 'mux_auto';
+
   /// A media's own still, served by the API rather than the CDN.
   ///
   /// `GET /v1/public/media/{id}/assets/thumbnail` is public and answers a

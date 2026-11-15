@@ -2,7 +2,6 @@ import 'package:test_app/features/home/views/widgets/feed_card.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
-import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/viewer_identity.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
@@ -47,21 +46,14 @@ abstract final class FeedCardMapper {
           : titleCase(facets.categorySlugs.first),
       eventStart: item.startsAt,
       location: meta.locationLabel,
-      // Media arrives with a resolved URL; every other type carries a bare
-      // storage key that only needs the CDN host in front of it.
-      thumbnailUrl: AssetUrlResolver.imageFor(
-        url: meta.thumbnailUrl,
-        key: meta.thumbnailKey,
-      ),
+      // The whole ladder, in the model so every surface reads the same
+      // one: a resolved URL, a storage key with the CDN host in front, and
+      // — for a media row only — the public asset proxy.
+      thumbnailUrl: item.stillUrl,
       duration: duration(meta.durationSeconds),
       verified: item.creatorVerified,
       // A creator row IS its own avatar; other rows show the poster's.
-      avatarUrl: isChannel
-          ? AssetUrlResolver.imageFor(
-              url: meta.thumbnailUrl,
-              key: meta.avatarKey,
-            )
-          : AssetUrlResolver.resolve(creator?.avatarKey),
+      avatarUrl: item.avatarUrl,
       sponsored: item.isPromoted,
       likes: facets.likes,
       saves: facets.favorites,

@@ -46,6 +46,7 @@ class FakePlayback implements PlaybackHandle {
     PlaybackKind kind = PlaybackKind.audio,
     bool playing = true,
     bool buffering = false,
+    bool completed = false,
     Duration position = Duration.zero,
     Duration duration = const Duration(minutes: 4),
     PlaybackTarget? target,
@@ -56,6 +57,7 @@ class FakePlayback implements PlaybackHandle {
       target: target,
       playing: playing,
       buffering: buffering,
+      completed: completed,
       position: position,
       duration: duration,
     );

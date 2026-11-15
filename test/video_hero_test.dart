@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
@@ -55,11 +57,13 @@ Future<void> _pumpUnderNotch(
   await tester.pump();
 }
 
-VideoHero _hero(FakePlayback playback, {String? url = _url}) => VideoHero(
-  playback: playback,
-  target: const PlaybackTarget(mediaId: 'm-video-1', creatorId: 'c1'),
-  playbackUrl: url,
-);
+VideoHero _hero(FakePlayback playback, {String? url = _url, String? thumb}) =>
+    VideoHero(
+      playback: playback,
+      target: const PlaybackTarget(mediaId: 'm-video-1', creatorId: 'c1'),
+      playbackUrl: url,
+      thumbnailUrl: thumb,
+    );
 
 void main() {
   setUpAll(() {
@@ -244,6 +248,162 @@ void main() {
             .first,
       );
       expect(rotated.quarterTurns, 1);
+    });
+  });
+
+  group('waiting for the first frame', () {
+    // Reported from a device: tapping a video left a black rectangle under
+    // a pause button and a 0:00 / 0:00 scrubber, with nothing to say the
+    // app was still fetching rather than broken.
+
+    Finder spinner() => find.byType(CircularProgressIndicator);
+
+    testWidgets('a video told to play but not yet playing says it is loading', (
+      tester,
+    ) async {
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback));
+
+      // `playing` is what the engine was *told*, and it is set the moment
+      // play is called — well before a frame exists. The spinner used to
+      // be gated on `!playing`, so this exact state drew nothing.
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        buffering: true,
+        duration: Duration.zero,
+      );
+      await tester.pump();
+
+      expect(spinner(), findsOneWidget);
+    });
+
+    testWidgets('the first frame takes it away', (tester) async {
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback));
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        buffering: true,
+      );
+      await tester.pump();
+      expect(spinner(), findsOneWidget);
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        position: const Duration(seconds: 2),
+      );
+      await tester.pump();
+
+      expect(spinner(), findsNothing);
+    });
+
+    testWidgets('a stall part-way through is the same wait', (tester) async {
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback));
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        buffering: true,
+        position: const Duration(minutes: 2),
+      );
+      await tester.pump();
+
+      expect(spinner(), findsOneWidget);
+    });
+
+    testWidgets('a video that has finished waits for nothing', (tester) async {
+      // The engine can report buffering as it settles at the end. A spinner
+      // there would sit on a finished video for good.
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback));
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        playing: false,
+        buffering: true,
+        completed: true,
+        position: const Duration(minutes: 4),
+      );
+      await tester.pump();
+
+      expect(spinner(), findsNothing);
+    });
+
+    testWidgets('another video buffering is not this one', (tester) async {
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback));
+
+      playback.emit(
+        mediaId: 'm-something-else',
+        kind: PlaybackKind.video,
+        buffering: true,
+      );
+      await tester.pump();
+
+      expect(spinner(), findsNothing);
+    });
+
+    testWidgets('a poster is drawn while nothing has played', (tester) async {
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback, thumb: 'https://cdn/still.jpg'));
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        buffering: true,
+        duration: Duration.zero,
+      );
+      await tester.pump();
+
+      expect(find.byType(Image), findsWidgets);
+    });
+
+    test('the frame is not handed over until something has played', () {
+      // `Video` needs a real `VideoController`, which needs libmpv, so the
+      // swap itself cannot be mounted here — the same reason the player
+      // screen is read rather than pumped. What matters is the gate: an
+      // attached `Video` with nothing decoded paints black, and black over
+      // a poster is a worse picture than the poster.
+      final hero = File(
+        'lib/features/discovery/views/widgets/video_hero.dart',
+      ).readAsStringSync();
+
+      expect(hero, contains('state.position > Duration.zero'));
+      // `position`, not `buffering`: this is the *first* start only. Once a
+      // millisecond has played, a later stall keeps the frame it stalled
+      // on rather than flicking back to artwork mid-video.
+      expect(
+        hero,
+        isNot(contains('!state.buffering)\n                    Video')),
+      );
+    });
+
+    testWidgets('fullscreen says it too, where nothing else is on screen', (
+      tester,
+    ) async {
+      final playback = FakePlayback();
+      await _pump(tester, _hero(playback));
+
+      await tester.tap(find.byIcon(Icons.fullscreen_rounded));
+      await tester.pumpAndSettle();
+      expect(find.byType(FullscreenVideo), findsOneWidget);
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        buffering: true,
+      );
+      await tester.pump();
+
+      expect(
+        find.descendant(of: find.byType(FullscreenVideo), matching: spinner()),
+        findsOneWidget,
+      );
     });
   });
 }

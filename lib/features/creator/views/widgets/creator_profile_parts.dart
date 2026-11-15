@@ -945,7 +945,7 @@ class _Thumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = item.meta.thumbnailUrl;
+    final url = item.stillUrl;
     final glyph = switch (item.entityType) {
       'post' => AppAssets.iconBookOpen,
       'event' => AppAssets.iconCatGlobe,

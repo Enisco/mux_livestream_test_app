@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizing/sizing.dart';
@@ -32,6 +33,10 @@ WebFeedItem _row({
   String creator = 'Grace Community',
   String? location,
   String? startsAt,
+  String? thumbnailUrl,
+  String? thumbnailKey,
+  String? thumbnailSource,
+  String? avatarKey,
 }) => WebFeedItem.fromJson({
   'entityType': entityType,
   'entityId': id,
@@ -52,6 +57,10 @@ WebFeedItem _row({
     'handle': 'grace',
     'isVerified': true,
     'locationLabel': ?location,
+    'thumbnailUrl': ?thumbnailUrl,
+    'thumbnailKey': ?thumbnailKey,
+    'thumbnailSource': ?thumbnailSource,
+    'avatarKey': ?avatarKey,
   },
   'calendarStartAt': ?startsAt,
 });
@@ -452,6 +461,57 @@ void main() {
         SearchContentRow(item: _row(views: 0), kindLabel: 'Video'),
       );
       expect(find.textContaining('0 views'), findsNothing);
+    });
+
+    testWidgets('a video with no uploaded cover still gets a still', (
+      tester,
+    ) async {
+      // Reported from a device: every row under VIDEOS was an empty box.
+      // The row took `meta.thumbnailUrl` raw, which a `mux_auto` video does
+      // not have — it has neither that nor a key, only the public proxy.
+      dotenv.testLoad(fileInput: 'BASE_URL=https://api.test');
+      addTearDown(dotenv.clean);
+
+      await _pump(
+        tester,
+        SearchContentRow(
+          item: _row(id: 'm-9', thumbnailSource: 'mux_auto'),
+          kindLabel: 'Video',
+        ),
+      );
+
+      final image = tester.widget<Image>(find.byType(Image).first);
+      expect(
+        (image.image as NetworkImage).url,
+        'https://api.test/v1/public/media/m-9/assets/thumbnail',
+      );
+    });
+
+    testWidgets('a ministry row resolves its avatar from a bare key', (
+      tester,
+    ) async {
+      // The index sends a channel's picture as a storage key, the way the
+      // home feed already maps it. The row read `thumbnailUrl` only, so
+      // every ministry showed the fallback silhouette.
+      dotenv.testLoad(fileInput: 'CDN_BASE_URL=https://cdn.test');
+      addTearDown(dotenv.clean);
+
+      await _pump(
+        tester,
+        SearchMinistryRow(
+          item: _row(
+            entityType: 'creator',
+            avatarKey: 'public/avatar/c-1/a.jpg',
+          ),
+          following: false,
+        ),
+      );
+
+      final image = tester.widget<Image>(find.byType(Image).first);
+      expect(
+        (image.image as NetworkImage).url,
+        'https://cdn.test/public/avatar/c-1/a.jpg',
+      );
     });
 
     testWidgets('an event row prints its date tile and venue', (tester) async {

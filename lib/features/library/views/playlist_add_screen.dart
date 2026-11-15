@@ -99,7 +99,7 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
                 creatorName: item.creator?.displayName ?? '',
                 creatorVerified: item.creator?.isVerified ?? false,
                 age: '',
-                thumbnailUrl: item.meta.thumbnailUrl,
+                thumbnailUrl: item.stillUrl,
                 targetType: 'media',
               ),
         ];

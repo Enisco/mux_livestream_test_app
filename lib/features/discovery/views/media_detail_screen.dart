@@ -9,6 +9,7 @@ import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/audio_hero.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/discovery/views/widgets/video_hero.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/hls_manifest.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/logger.dart';
@@ -270,8 +271,20 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
         ? _detail!.media.title
         : widget.item.title,
     artist: _detail?.creator?.displayName ?? widget.item.creatorDisplayName,
-    artworkUrl:
-        _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
+    artworkUrl: _stillUrl,
+  );
+
+  /// The still for this media, down the whole ladder.
+  ///
+  /// The aggregate's signed URL first, then whatever the row that opened
+  /// this screen was already carrying, then the public asset proxy — which
+  /// is the only one of the three a video published without a cover has,
+  /// and the reason this screen used to sit black until the first frame.
+  String? get _stillUrl => AssetUrlResolver.mediaImage(
+    url: _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
+    key: widget.item.meta.thumbnailKey,
+    mediaId: _mediaId,
+    source: widget.item.meta.thumbnailSource,
   );
 
   /// Mints a share link and puts it on the clipboard.
@@ -428,8 +441,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             : widget.item.title,
         creatorName:
             _detail?.creator?.displayName ?? widget.item.creatorDisplayName,
-        artworkUrl:
-            _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
+        artworkUrl: _stillUrl,
         playbackUrl: _detail?.playback?.playbackUrl,
       );
     }
@@ -442,8 +454,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       isLive: _detail?.media.isLiveNow ?? widget.item.isLiveNow,
       videoController: _playback.videoController,
       playbackUrl: _detail?.playback?.playbackUrl,
-      thumbnailUrl:
-          _detail?.playback?.thumbnailUrl ?? widget.item.meta.thumbnailUrl,
+      thumbnailUrl: _stillUrl,
       onBack: () => Navigator.of(context).maybePop(),
     );
   }

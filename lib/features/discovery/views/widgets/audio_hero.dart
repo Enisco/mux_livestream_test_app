@@ -117,8 +117,18 @@ class AudioHero extends StatelessWidget {
                         SizedBox(height: 12.s),
                         _Transport(
                           playing: state.isPlaying(mediaId),
+                          // A spinner *replaces* the icon here, so it is
+                          // held to the one wait where the icon has
+                          // nothing true to say: before the first sound.
+                          // `!playing` was the wrong test — the engine
+                          // reports playing the moment it is told to, so
+                          // the first tap drew a pause icon over silence.
+                          // A stall later keeps the icon, which stays
+                          // honest and does not flicker.
                           buffering:
-                              active && state.buffering && !state.playing,
+                              active &&
+                              state.buffering &&
+                              state.position == Duration.zero,
                           enabled: playbackUrl?.isNotEmpty == true,
                           onPlayPause: _togglePlay,
                           onSkip: active

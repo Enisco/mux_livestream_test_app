@@ -308,6 +308,28 @@ void main() {
       );
     });
 
+    test('the poster the hero is given is the whole ladder', () {
+      // media_kit keeps this screen off the harness, and the bug it had
+      // was in what it *passed*: the hero was handed
+      // `playback.thumbnailUrl ?? meta.thumbnailUrl`, neither of which a
+      // video published without a cover has, so the frame sat black until
+      // the first one decoded.
+      final detail = File(
+        'lib/features/discovery/views/media_detail_screen.dart',
+      ).readAsStringSync();
+
+      expect(detail, contains('AssetUrlResolver.mediaImage('));
+      expect(detail, contains('thumbnailUrl: _stillUrl,'));
+      // The media session's artwork comes off the same ladder, so the
+      // lock screen shows what the screen shows.
+      expect(detail, contains('artworkUrl: _stillUrl,'));
+      expect(
+        detail,
+        isNot(contains('_detail?.playback?.thumbnailUrl ??\n')),
+        reason: 'the raw two-rung fallback is what left the frame black',
+      );
+    });
+
     test('both livestream screens open the player as live', () {
       for (final path in [
         'lib/features/livestream/views/join_livestream_screen.dart',

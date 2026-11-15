@@ -129,6 +129,7 @@ class PlaybackState {
     this.target,
     this.playing = false,
     this.buffering = false,
+    this.completed = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
   });
@@ -141,6 +142,14 @@ class PlaybackState {
   final PlaybackTarget? target;
   final bool playing;
   final bool buffering;
+
+  /// Played to the end and stopped there.
+  ///
+  /// Separate from `!playing` because the engine reports both a pause and
+  /// an ending the same way, and a surface that draws a spinner while it
+  /// waits has to stop drawing one at the end — where the wait is over and
+  /// nothing more is coming.
+  final bool completed;
   final Duration position;
   final Duration duration;
 
@@ -159,6 +168,7 @@ class PlaybackState {
     PlaybackTarget? target,
     bool? playing,
     bool? buffering,
+    bool? completed,
     Duration? position,
     Duration? duration,
   }) => PlaybackState(
@@ -167,6 +177,7 @@ class PlaybackState {
     target: target ?? this.target,
     playing: playing ?? this.playing,
     buffering: buffering ?? this.buffering,
+    completed: completed ?? this.completed,
     position: position ?? this.position,
     duration: duration ?? this.duration,
   );
@@ -360,6 +371,10 @@ class PlaybackController implements PlaybackHandle {
         (v) => state.value = state.value.copyWith(duration: v),
       ),
       _player.stream.completed.listen((done) {
+        // Mirrored rather than latched: the engine clears it itself when a
+        // replay or a new item starts, so nothing here has to guess when
+        // the end stopped being the end.
+        state.value = state.value.copyWith(completed: done);
         if (done) _reportCompleted();
       }),
       _player.stream.error.listen((e) => logger.w('Playback error: $e')),

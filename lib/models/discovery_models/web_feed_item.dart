@@ -1,4 +1,5 @@
 import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 
 class WebFeedItem {
   final String entityType;
@@ -46,6 +47,56 @@ class WebFeedItem {
   /// A `creator` row has no nested `creator` object — its identity is in `meta`
   /// and `title`/`subtitle`. Everything else has the nested object.
   bool get isCreatorRow => entityType == 'creator' || entityType == 'user';
+
+  /// Whether this row is a video or a track, as opposed to a channel, an
+  /// event, a post, a blog, a devotional or a series.
+  ///
+  /// The named types are the exhaustive list the discovery API sends;
+  /// anything else is media, which is also how `FeedCardMapper.kindOf`
+  /// reads it. It matters for artwork: only a media row has a still behind
+  /// the public asset proxy.
+  bool get isMediaRow => switch (entityType) {
+    'creator' ||
+    'user' ||
+    'event' ||
+    'post' ||
+    'blog' ||
+    'devotional_entry' ||
+    'devotional_series' ||
+    'media_series' => false,
+    _ => true,
+  };
+
+  /// This row's artwork, down the whole ladder.
+  ///
+  /// A URL the API resolved, then a storage key with the CDN host in front
+  /// of it, then — for a media row only — the public asset proxy. That
+  /// last rung is the only one a video published without a cover has, and
+  /// every surface that stopped short of it drew an empty box.
+  ///
+  /// Deliberately *not* a channel's avatar: a row's artwork and the face
+  /// beside it are two different pictures, and a card can want both. See
+  /// [avatarUrl].
+  String? get stillUrl => isMediaRow
+      ? AssetUrlResolver.mediaImage(
+          url: meta.thumbnailUrl,
+          key: meta.thumbnailKey,
+          mediaId: entityId,
+          source: meta.thumbnailSource,
+        )
+      : AssetUrlResolver.imageFor(
+          url: meta.thumbnailUrl,
+          key: meta.thumbnailKey,
+        );
+
+  /// The face beside this row: the channel's own on a creator row, the
+  /// poster's on everything else.
+  ///
+  /// A creator row has no nested `creator` object — it *is* the creator —
+  /// so its avatar arrives on `meta` under its own key.
+  String? get avatarUrl => isCreatorRow
+      ? AssetUrlResolver.imageFor(url: meta.thumbnailUrl, key: meta.avatarKey)
+      : AssetUrlResolver.resolve(creator?.avatarKey);
 
   String get creatorDisplayName =>
       isCreatorRow ? title : creator?.displayName ?? '';
