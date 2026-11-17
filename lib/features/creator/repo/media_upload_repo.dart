@@ -65,6 +65,17 @@ class MediaUploadRepo {
     }
   }
 
+  /// Removes the row and the Mux asset with it, or cancels an upload still
+  /// processing. **Owners and admins only** — an editor who may create and
+  /// edit media is refused here, which reaches a screen as `notAllowed`.
+  Future<void> deleteMedia(String mediaId) async {
+    try {
+      await _api.delete(ApiEndpoints.mediaById(mediaId));
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
   /// Drops the uploaded file and keeps the details, putting the row back
   /// to `draft`. How a file is replaced; **409** for anything published.
   Future<void> removeSource(String mediaId) async {

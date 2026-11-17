@@ -320,18 +320,14 @@ void main() {
       );
     });
 
-    test('both livestream screens open the player as live', () {
-      for (final path in [
-        'lib/features/livestream/views/join_livestream_screen.dart',
-        'lib/features/livestream/views/start_livestream_screen.dart',
-      ]) {
-        final source = File(path).readAsStringSync();
-        expect(
-          source,
-          contains('isLive: true'),
-          reason: '$path opens a broadcast; the player has to know',
-        );
-      }
+    test('joining a livestream opens the player as live', () {
+      const path = 'lib/features/livestream/views/join_livestream_screen.dart';
+
+      expect(
+        File(path).readAsStringSync(),
+        contains('isLive: true'),
+        reason: '$path opens a broadcast; the player has to know',
+      );
     });
   });
 }

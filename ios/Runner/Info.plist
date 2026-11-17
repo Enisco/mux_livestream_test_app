@@ -12,11 +12,6 @@
 	<string>Required to preview and stream your camera when going live.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Required to capture audio when going live.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

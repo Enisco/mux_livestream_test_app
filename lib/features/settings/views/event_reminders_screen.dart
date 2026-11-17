@@ -10,16 +10,20 @@ import 'package:test_app/features/notifications/repo/notification_repo.dart';
 import 'package:test_app/models/notification_models/notification_models.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
 import 'package:test_app/shared/components/app_icons.dart';
+import 'package:test_app/shared/services/media_permissions.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Whether to be reminded about events, and how long beforehand.
 class EventRemindersScreen extends StatefulWidget {
-  const EventRemindersScreen({super.key, this.repo});
+  const EventRemindersScreen({super.key, this.repo, this.ask});
 
   /// Defaults to the real thing; a test supplies its own.
   final NotificationRepo? repo;
+
+  /// How the notification permission is asked for. A test supplies its own.
+  final PermissionAsk? ask;
 
   @override
   State<EventRemindersScreen> createState() => _EventRemindersScreenState();
@@ -69,6 +73,18 @@ class _EventRemindersScreenState extends State<EventRemindersScreen> {
   /// Optimistic, and put back if the write is refused — a switch that springs
   /// back is clearer than one that lies.
   Future<void> _save({bool? on, int? lead, bool organiser = false}) async {
+    // Switching reminders on is the one moment a notification prompt makes
+    // sense: the reader has just asked to be notified. Android 13 will not
+    // post anything without it, so a preference saved here would otherwise
+    // be honoured by a server and swallowed by the phone.
+    if (on ?? false) {
+      final allowed = await NotificationPermission.ensure(ask: widget.ask);
+      if (!mounted) return;
+      if (!allowed) {
+        _say(AppStrings.remindersNeedNotifications);
+        return;
+      }
+    }
     final beforeOn = _on;
     final beforeLead = _lead;
     setState(() {
@@ -96,10 +112,12 @@ class _EventRemindersScreenState extends State<EventRemindersScreen> {
     }
   }
 
-  void _report() {
+  void _report() => _say(AppStrings.settingsSaveFailed);
+
+  void _say(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(AppStrings.settingsSaveFailed, style: AppStyles.body(13)),
+        content: Text(message, style: AppStyles.body(13)),
         backgroundColor: AppColors.neutral800,
         behavior: SnackBarBehavior.floating,
       ),

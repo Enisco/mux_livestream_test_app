@@ -115,7 +115,9 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
     if (picked.failure case final why?) {
       _say(switch (why) {
         PickFailure.tooLarge => AppStrings.settingsPhotoTooLarge,
-        _ => AppStrings.settingsPhotoUnreadable,
+        PickFailure.unreadable ||
+        PickFailure.unsupported => AppStrings.settingsPhotoUnreadable,
+        final refusal => refusal.accessProblem,
       });
       return;
     }

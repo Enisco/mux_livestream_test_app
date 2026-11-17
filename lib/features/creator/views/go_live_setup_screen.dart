@@ -115,6 +115,10 @@ class _GoLiveSetupScreenState extends State<GoLiveSetupScreen> {
       case PickFailure.unreadable:
       case PickFailure.unsupported:
         _say(AppStrings.newMediaThumbUnreadable);
+      // A shut library or a picker that would not open: nothing about the
+      // picture, and the same sentence wherever it happens.
+      case final refusal?:
+        _say(refusal.accessProblem);
       case null:
         setState(() => _cover = result.image);
     }

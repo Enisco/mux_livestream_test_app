@@ -104,6 +104,15 @@ class PostRepo {
     }
   }
 
+  /// `DELETE /v1/content/posts/{id}`. Any cover image goes with it.
+  Future<void> delete(String postId) async {
+    try {
+      await _api.delete(ApiEndpoints.contentPostById(postId));
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
   /// Step 4.
   Future<void> publish(String postId) async {
     try {
@@ -160,7 +169,11 @@ class PostRepo {
     if (lower.contains('scheduledat must be in the future')) {
       return const PostException(PostFailure.scheduleInPast);
     }
-    return PostException(PostFailure.rejected, said);
+    return switch (e.response?.statusCode) {
+      404 => const PostException(PostFailure.notFound),
+      401 || 403 => const PostException(PostFailure.notAllowed),
+      _ => PostException(PostFailure.rejected, said),
+    };
   }
 
   static String? _sentence(dynamic payload) {
@@ -190,7 +203,21 @@ class EditablePost {
 }
 
 /// Why an article could not be filed, in terms the screen can explain.
-enum PostFailure { needsTitle, needsBody, scheduleInPast, network, rejected }
+enum PostFailure {
+  needsTitle,
+  needsBody,
+  scheduleInPast,
+
+  /// 404. Already gone — removed from the web studio, or by someone else.
+  notFound,
+
+  /// 401 or 403. The member's role does not reach this route, or the
+  /// session has expired.
+  notAllowed,
+
+  network,
+  rejected,
+}
 
 class PostException implements Exception {
   const PostException(this.failure, [this.message]);

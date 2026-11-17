@@ -328,6 +328,10 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
       case PickFailure.unreadable:
       case PickFailure.unsupported:
         _say(AppStrings.newMediaThumbUnreadable);
+      // A shut library or a picker that would not open: nothing about the
+      // picture, and the same sentence wherever it happens.
+      case final refusal?:
+        _say(refusal.accessProblem);
       case null:
         setState(() {
           _thumbnail = result.image;
@@ -595,6 +599,9 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     MediaUploadFailure.scheduleInPast => AppStrings.newMediaSchedulePast,
     // Both 409s are the upload route's flow control and the repo answers
     // them itself.
+    // Not the API: the system picker would not open or would not hand the
+    // file back.
+    MediaUploadFailure.pickerFailed => AppStrings.pickerUnavailable,
     MediaUploadFailure.notFound => AppStrings.editMediaGone,
     MediaUploadFailure.notAllowed => AppStrings.editMediaNotYours,
     MediaUploadFailure.draftChanged ||

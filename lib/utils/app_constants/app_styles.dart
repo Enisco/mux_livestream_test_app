@@ -297,17 +297,6 @@ class AppStyles {
     color: AppColors.textTertiary,
   );
 
-  static const landingCardDesc = TextStyle(
-    fontSize: 13,
-    color: AppColors.textSecondary,
-  );
-
-  static const landingCardTitle = TextStyle(
-    fontSize: 17,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textPrimary,
-  );
-
   static const loadingLabel = TextStyle(color: AppColors.textSecondary);
 
   static const playerTitle = TextStyle(

@@ -488,14 +488,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_isFullscreen) {
       _tookChrome = true;
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
+      // Only a sideways video wants a sideways screen. A phone livestream
+      // replay is 9:16, and turning the device for it left the picture a
+      // strip down the middle of a screen held the wrong way up.
+      if (_videoIsLandscape) unawaited(ScreenOrientation.lockLandscape());
     } else {
       _uprightChrome();
     }
     _resetHide();
+  }
+
+  /// Whether the open stream is wider than it is tall. Unknown counts as
+  /// upright: the screen it is already on is never the wrong answer.
+  bool get _videoIsLandscape {
+    final width = _player.state.width ?? 0;
+    final height = _player.state.height ?? 0;
+    return width > 0 && height > 0 && width > height;
   }
 
   /// Whether this screen has changed the device chrome, which it only does
@@ -505,16 +513,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// Leaving fullscreen: back to an upright player page.
   void _uprightChrome() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    unawaited(ScreenOrientation.restore());
   }
 
   /// Leaving the player: hand the app's own set back.
   void _releaseChrome() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations(ScreenOrientation.all);
+    unawaited(ScreenOrientation.restore());
   }
 
   bool get _analyticsEnabled =>

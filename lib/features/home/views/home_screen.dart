@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/home/views/widgets/empty_state_view.dart';
 import 'package:test_app/features/home/views/widgets/permission_request_view.dart';
 import 'package:test_app/features/home/views/widgets/video_card.dart';
@@ -61,17 +62,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _requestPermission() async {
     setState(() => _phase = _Phase.loading);
-    final result = await _scanner.requestPermission();
-    if (result == ScanPermission.granted) {
-      await _runScan();
-    } else {
-      setState(() => _phase = _Phase.permissionDenied);
+    switch (await _scanner.requestPermission()) {
+      case ScanPermission.granted:
+        await _runScan();
+      // Refused once is not refused for good: the system will ask again, so
+      // the view keeps its "Grant access" button rather than sending the
+      // reader to Settings over a question they can still be asked.
+      case ScanPermission.denied:
+        if (mounted) setState(() => _phase = _Phase.permissionNeeded);
+      case ScanPermission.permanentlyDenied:
+        if (mounted) setState(() => _phase = _Phase.permissionDenied);
     }
   }
 
   Future<void> _runScan() async {
     setState(() => _phase = _Phase.loading);
-    final found = await _scanner.scan();
+    List<String> found;
+    try {
+      found = await _scanner.scan();
+    } catch (e) {
+      // A library the platform will not enumerate — access revoked while the
+      // screen was up, a provider that failed. An empty list is the honest
+      // answer; an exception here would take the whole screen down.
+      logger.w('Could not scan for videos', error: e);
+      found = const [];
+    }
+    if (!mounted) return;
     final merged = <String>{..._videos, ...found}.toList()..sort();
     setState(() {
       _videos
@@ -82,13 +98,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _pickVideos() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.video,
-      allowMultiple: true,
-    );
-    if (result == null) return;
+    final FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.video,
+        allowMultiple: true,
+      );
+    } catch (e) {
+      // `pickFiles` rethrows whatever the platform raised; unhandled, that
+      // is a crash where a sentence will do.
+      logger.w('Video picker failed', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.pickerUnavailable)),
+        );
+      }
+      return;
+    }
+    if (result == null || !mounted) return;
     setState(() {
-      for (final f in result.files) {
+      for (final f in result!.files) {
         if (f.path != null && !_videos.contains(f.path)) {
           _videos.add(f.path!);
         }

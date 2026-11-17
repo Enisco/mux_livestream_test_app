@@ -7,12 +7,26 @@ import 'package:flutter/widgets.dart';
 abstract final class ScreenOrientation {
   /// Every orientation the app runs in. `main.dart` asks for these at
   /// startup and anything that narrows them restores exactly these.
-  static const all = <DeviceOrientation>[
+  ///
+  /// Upright only: every screen is drawn against a 390x844 portrait frame,
+  /// and the one surface that wants the long edge — a landscape video filling
+  /// the screen — asks for [landscape] while it is up. Letting the whole app
+  /// turn meant a fullscreen video could be rotated twice: once by the
+  /// device, once by the route.
+  static const app = <DeviceOrientation>[
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+  ];
+
+  /// Sideways, for a video whose own shape is sideways.
+  static const landscape = <DeviceOrientation>[
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ];
+
+  /// Turns the interface sideways.
+  static Future<void> lockLandscape() =>
+      SystemChrome.setPreferredOrientations(landscape);
 
   /// Upright, and only upright — a requirement of broadcasting, not a
   /// preference.
@@ -43,5 +57,5 @@ abstract final class ScreenOrientation {
   }
 
   /// Hands the app's own set back.
-  static Future<void> restore() => SystemChrome.setPreferredOrientations(all);
+  static Future<void> restore() => SystemChrome.setPreferredOrientations(app);
 }

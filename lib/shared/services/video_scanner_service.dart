@@ -36,7 +36,11 @@ class VideoScannerService {
     final state = await PhotoManager.getPermissionState(
       requestOption: _permOption,
     );
-    if (state.isAuth) return ScanPermission.granted;
+    // `hasAccess`, not `isAuth`: a reader who chose "Select videos" granted
+    // partial access, and the assets they chose are the ones the scan reads.
+    // Treating that as a refusal told them they had said no when they had
+    // said yes.
+    if (state.hasAccess) return ScanPermission.granted;
     if (Platform.isAndroid) {
       return ScanPermission.denied;
     }
@@ -49,8 +53,13 @@ class VideoScannerService {
     final state = await PhotoManager.requestPermissionExtend(
       requestOption: _permOption,
     );
-    if (state.isAuth) return ScanPermission.granted;
-    return ScanPermission.permanentlyDenied;
+    if (state.hasAccess) return ScanPermission.granted;
+    // Android asks again; iOS asks once and sends the rest to Settings.
+    // Offering Settings for a refusal the system would re-ask is a longer
+    // road than the one the reader is already on.
+    return Platform.isAndroid && state == PermissionState.denied
+        ? ScanPermission.denied
+        : ScanPermission.permanentlyDenied;
   }
 
   Future<void> openSettings() async {

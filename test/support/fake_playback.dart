@@ -50,6 +50,8 @@ class FakePlayback implements PlaybackHandle {
     Duration position = Duration.zero,
     Duration duration = const Duration(minutes: 4),
     PlaybackTarget? target,
+    int videoWidth = 0,
+    int videoHeight = 0,
   }) {
     state.value = PlaybackState(
       mediaId: mediaId,
@@ -60,6 +62,8 @@ class FakePlayback implements PlaybackHandle {
       completed: completed,
       position: position,
       duration: duration,
+      videoWidth: videoWidth,
+      videoHeight: videoHeight,
     );
   }
 

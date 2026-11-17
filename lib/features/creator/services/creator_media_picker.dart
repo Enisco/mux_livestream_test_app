@@ -16,22 +16,46 @@ abstract final class CreatorMediaPicker {
     _ => MediaUploadTarget.web,
   };
 
-  /// How to ask the platform. See [pick] for why this is not
-  /// [FileType.custom].
+  /// How to ask the platform.
+  ///
+  /// `FileType.video` and `FileType.audio` on Android, never
+  /// `FileType.custom`: custom resolves to `*/*` and the extension filter has
+  /// to survive a round trip through `MimeTypeMap`, which drops whatever that
+  /// device has not heard of. Format is still held to [uploadMimeTypes]: the
+  /// picker is wide, the acceptance is not.
+  ///
+  /// **Audio on iOS is the exception.** `FileType.audio` there opens
+  /// `MPMediaPickerController`, which reads the *Apple Music* library: it
+  /// needs `NSAppleMusicUsageDescription` — without it iOS kills the app the
+  /// moment the picker is presented — and the tracks it returns are mostly
+  /// DRM-protected with no file to upload. The document picker is both safe
+  /// and where a sermon recording actually lives.
   static FileType fileTypeFor(MediaUploadKind kind) => switch (kind) {
     MediaUploadKind.video => FileType.video,
-    MediaUploadKind.music => FileType.audio,
+    MediaUploadKind.music =>
+      target == MediaUploadTarget.ios ? FileType.custom : FileType.audio,
   };
 
   static Future<MediaPickResult> pick({required MediaUploadKind kind}) async {
     final types = uploadMimeTypes(kind, target);
+    final fileType = fileTypeFor(kind);
 
-    // `FileType.video` / `FileType.audio`, never `FileType.custom`:
-    // custom resolves to `*/*` and hands the extensions to Android's
-    // `EXTRA_MIME_TYPES` verbatim, so the picker filters on `mp4` and
-    // friends — not MIME types — and opens empty. Format is still held
-    // to [uploadMimeTypes]: the picker is wide, the acceptance is not.
-    final result = await FilePicker.platform.pickFiles(type: fileTypeFor(kind));
+    final FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: fileType,
+        allowedExtensions: fileType == FileType.custom
+            ? types.keys.toList(growable: false)
+            : null,
+      );
+    } catch (e) {
+      // `pickFiles` rethrows whatever the platform raised: a picker already
+      // open, a provider that will not give the bytes up, a host activity
+      // the system reclaimed while the picker was up. Unhandled, each of
+      // those is a crash where a sentence will do.
+      logger.w('Media picker failed', error: e);
+      return const MediaPickResult.failed(MediaUploadFailure.pickerFailed);
+    }
     final file = result?.files.singleOrNull;
     if (file == null) return const MediaPickResult.cancelled();
 

@@ -280,6 +280,10 @@ class _NewEventScreenState extends State<NewEventScreen> {
       case PickFailure.unreadable:
       case PickFailure.unsupported:
         _say(AppStrings.newMediaThumbUnreadable);
+      // A shut library or a picker that would not open: nothing about the
+      // picture, and the same sentence wherever it happens.
+      case final refusal?:
+        _say(refusal.accessProblem);
       case null:
         setState(() {
           _cover = result.image;
@@ -469,6 +473,8 @@ class _NewEventScreenState extends State<NewEventScreen> {
     EventFailure.needsAddress => AppStrings.newEventNeedsAddress,
     EventFailure.needsMeetingUrl => AppStrings.newEventNeedsMeetingUrl,
     EventFailure.badSchedule => AppStrings.newEventBadSchedule,
+    EventFailure.notFound => AppStrings.editMediaGone,
+    EventFailure.notAllowed => AppStrings.editMediaNotYours,
     EventFailure.network => AppStrings.newMediaNetwork,
     EventFailure.rejected => e.message ?? AppStrings.newMediaRejected,
   };

@@ -1,7 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:test_app/shared/services/screen_orientation.dart';
@@ -16,7 +15,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations(ScreenOrientation.all);
+  await ScreenOrientation.restore();
 
   await dotenv.load(fileName: '.env');
   await setupLocator();

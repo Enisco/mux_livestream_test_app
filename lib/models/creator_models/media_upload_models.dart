@@ -319,6 +319,10 @@ enum MediaUploadFailure {
   /// The creator backed out mid-upload.
   cancelled,
 
+  /// The system picker would not open, or would not hand the file back.
+  /// Nothing to do with the API; see [CreatorMediaPicker].
+  pickerFailed,
+
   /// 404. The row is gone — deleted from the web studio, or by another
   /// member of the channel, while this screen held it.
   notFound,

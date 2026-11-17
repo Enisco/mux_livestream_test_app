@@ -6,6 +6,7 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/features/creator/views/new_article_screen.dart';
 import 'package:test_app/features/creator/views/new_event_screen.dart';
 import 'package:test_app/features/creator/views/new_media_screen.dart';
+import 'package:test_app/features/creator/services/content_delete.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
@@ -46,12 +47,31 @@ Future<bool> openContentEditor(
   return saved ?? false;
 }
 
-/// One piece of content: how it is doing, and the three things a creator can
+/// How a row is removed. A test supplies its own.
+typedef ContentDeleter =
+    Future<ContentDeleteOutcome> Function(StudioContentItem item);
+
+/// One piece of content: how it is doing, and the four things a creator can
 /// do with it from a phone.
-class StudioContentDetailScreen extends StatelessWidget {
-  const StudioContentDetailScreen({super.key, required this.item});
+class StudioContentDetailScreen extends StatefulWidget {
+  const StudioContentDetailScreen({super.key, required this.item, this.delete});
 
   final StudioContentItem item;
+
+  /// Defaults to the real routes.
+  final ContentDeleter? delete;
+
+  @override
+  State<StudioContentDetailScreen> createState() =>
+      _StudioContentDetailScreenState();
+}
+
+class _StudioContentDetailScreenState extends State<StudioContentDetailScreen> {
+  StudioContentItem get item => widget.item;
+
+  /// A delete in flight. Every control is held while it is, because the one
+  /// thing worse than a slow delete is two of them.
+  bool _deleting = false;
 
   bool get _isEvent => item.kind == StudioContentKind.event;
 
@@ -73,14 +93,81 @@ class StudioContentDetailScreen extends StatelessWidget {
     };
   }
 
-  Future<void> _edit(BuildContext context) async {
+  Future<void> _edit() async {
     final saved = await openContentEditor(context, item);
     // Carry the "something changed" back to the list that pushed this, so
     // it reloads rather than showing the old title.
-    if (saved && context.mounted) Navigator.pop(context, true);
+    if (saved && mounted) Navigator.pop(context, true);
   }
 
-  void _report(BuildContext context, String message) {
+  /// Asks first, then removes. A delete that succeeds leaves the screen,
+  /// because what it was showing no longer exists.
+  Future<void> _confirmDelete() async {
+    if (_deleting) return;
+    if (!item.canDeleteHere) {
+      _report(AppStrings.contentDeleteLive);
+      return;
+    }
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.base2,
+        title: Text(
+          AppStrings.contentDeleteTitle,
+          style: AppStyles.heading(18, letterSpacing: -0.4),
+        ),
+        content: Text(
+          AppStrings.contentDeleteBody(item.title),
+          style: AppStyles.body(13, color: AppColors.neutral300),
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('delete-cancel'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              AppStrings.contentDeleteCancel,
+              style: AppStyles.button(14, color: AppColors.neutral300),
+            ),
+          ),
+          TextButton(
+            key: const ValueKey('delete-confirm'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              AppStrings.contentDeleteConfirm,
+              style: AppStyles.button(14, color: AppColors.destructive),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    final outcome = await (widget.delete ?? ContentDelete.run)(item);
+    if (!mounted) return;
+    setState(() => _deleting = false);
+
+    switch (outcome) {
+      // Already gone counts as done: the row the creator wanted rid of is
+      // not there, and the list behind this should stop showing it.
+      case ContentDeleteOutcome.done:
+      case ContentDeleteOutcome.gone:
+        _report(
+          outcome == ContentDeleteOutcome.done
+              ? AppStrings.contentDeleted
+              : AppStrings.contentDeleteGone,
+        );
+        Navigator.pop(context, true);
+      case ContentDeleteOutcome.notAllowed:
+        _report(AppStrings.contentDeleteNotAllowed);
+      case ContentDeleteOutcome.network:
+        _report(AppStrings.contentDeleteNetwork);
+      case ContentDeleteOutcome.refused:
+        _report(AppStrings.contentDeleteRefused);
+    }
+  }
+
+  void _report(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: AppStyles.body(13)),
@@ -93,9 +180,9 @@ class StudioContentDetailScreen extends StatelessWidget {
   /// Nothing in the API returns a public URL for a piece of content — only
   /// the creator's handle — so there is no link to put on the clipboard yet.
   /// See OPEN_ISSUES.
-  void _copyLink(BuildContext context) {
+  void _copyLink() {
     Clipboard.setData(const ClipboardData(text: ''));
-    _report(context, AppStrings.contentNoPublicLink);
+    _report(AppStrings.contentNoPublicLink);
   }
 
   @override
@@ -156,8 +243,7 @@ class StudioContentDetailScreen extends StatelessWidget {
                     child: GestureDetector(
                       key: const ValueKey('detail-full-analytics'),
                       behavior: HitTestBehavior.opaque,
-                      onTap: () =>
-                          _report(context, AppStrings.contentAnalyticsPro),
+                      onTap: () => _report(AppStrings.contentAnalyticsPro),
                       child: Text(
                         AppStrings.studioFullAnalytics,
                         style: AppStyles.label(
@@ -171,15 +257,14 @@ class StudioContentDetailScreen extends StatelessWidget {
                   SizedBox(height: 22.s),
                   _PrimaryAction(
                     label: AppStrings.contentShare,
-                    onTap: () =>
-                        _report(context, AppStrings.contentNoPublicLink),
+                    onTap: () => _report(AppStrings.contentNoPublicLink),
                   ),
                   SizedBox(height: 12.s),
                   _OutlinedAction(
                     actionKey: const ValueKey('detail-copy-link'),
                     icon: HugeIcons.strokeRoundedLink02,
                     label: AppStrings.contentCopyLink,
-                    onTap: () => _copyLink(context),
+                    onTap: () => _copyLink(),
                   ),
                   SizedBox(height: 12.s),
                   if (_isEditable)
@@ -187,16 +272,26 @@ class StudioContentDetailScreen extends StatelessWidget {
                       actionKey: const ValueKey('detail-edit'),
                       icon: HugeIcons.strokeRoundedEdit02,
                       label: AppStrings.contentEdit,
-                      onTap: () => _edit(context),
+                      onTap: _edit,
                     )
                   else
                     _OutlinedAction(
                       actionKey: const ValueKey('detail-manage-web'),
                       icon: HugeIcons.strokeRoundedLinkSquare01,
                       label: AppStrings.contentManageOnWeb,
-                      onTap: () =>
-                          _report(context, AppStrings.contentWebOnlyAction),
+                      onTap: () => _report(AppStrings.contentWebOnlyAction),
                     ),
+                  // Last, and the only one drawn in the destructive colour:
+                  // it is the one action on this screen that cannot be
+                  // taken back.
+                  SizedBox(height: 12.s),
+                  _DestructiveAction(
+                    actionKey: const ValueKey('detail-delete'),
+                    label: AppStrings.contentDelete,
+                    busy: _deleting,
+                    enabled: item.canDeleteHere,
+                    onTap: _confirmDelete,
+                  ),
                   if (_footnote case final note?) ...[
                     SizedBox(height: 16.s),
                     Container(
@@ -636,6 +731,72 @@ class _PrimaryAction extends StatelessWidget {
         borderRadius: BorderRadius.circular(999.s),
       ),
       child: Text(label, style: AppStyles.button(14)),
+    ),
+  );
+}
+
+/// The one control on the screen that cannot be undone.
+class _DestructiveAction extends StatelessWidget {
+  const _DestructiveAction({
+    required this.actionKey,
+    required this.label,
+    required this.onTap,
+    this.busy = false,
+    this.enabled = true,
+  });
+
+  final Key actionKey;
+  final String label;
+  final VoidCallback onTap;
+  final bool busy;
+
+  /// False while a broadcast is on air. The control stays on screen and
+  /// says why when tapped, rather than vanishing without explanation.
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    key: actionKey,
+    behavior: HitTestBehavior.opaque,
+    onTap: busy ? null : onTap,
+    child: Container(
+      height: 50.s,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10.s),
+        border: Border.all(
+          color: enabled ? AppColors.destructive : AppColors.neutral800,
+        ),
+      ),
+      child: busy
+          ? SizedBox(
+              width: 18.s,
+              height: 18.s,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.s,
+                color: AppColors.destructive,
+              ),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HugeIcon(
+                  icon: HugeIcons.strokeRoundedDelete02,
+                  color: enabled ? AppColors.destructive : AppColors.neutral500,
+                  size: 17.s,
+                ),
+                SizedBox(width: 10.s),
+                Text(
+                  label,
+                  style: AppStyles.button(
+                    14,
+                    color: enabled
+                        ? AppColors.destructive
+                        : AppColors.neutral500,
+                  ),
+                ),
+              ],
+            ),
     ),
   );
 }

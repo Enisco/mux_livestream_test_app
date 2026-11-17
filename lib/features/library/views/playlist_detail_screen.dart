@@ -193,11 +193,12 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final picked = await CreatorImagePicker.pick(maxBytes: _coverMaxBytes);
     if (picked.isCancelled || !mounted) return;
     if (picked.failure case final why?) {
-      _report(
-        why == PickFailure.tooLarge
-            ? AppStrings.playlistCoverTooLarge
-            : AppStrings.settingsPhotoUnreadable,
-      );
+      _report(switch (why) {
+        PickFailure.tooLarge => AppStrings.playlistCoverTooLarge,
+        PickFailure.unreadable ||
+        PickFailure.unsupported => AppStrings.settingsPhotoUnreadable,
+        final refusal => refusal.accessProblem,
+      });
       return;
     }
 

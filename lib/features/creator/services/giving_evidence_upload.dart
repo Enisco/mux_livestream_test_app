@@ -30,9 +30,12 @@ Future<EvidenceUpload> pickAndAttachEvidence({
     return (
       attached: false,
       fileId: null,
-      problem: failure == PickFailure.tooLarge
-          ? AppStrings.givingEvidenceFailed
-          : AppStrings.settingsPhotoUnreadable,
+      problem: switch (failure) {
+        PickFailure.tooLarge => AppStrings.givingEvidenceFailed,
+        PickFailure.unreadable ||
+        PickFailure.unsupported => AppStrings.settingsPhotoUnreadable,
+        final refusal => refusal.accessProblem,
+      },
     );
   }
   final image = picked.image!;

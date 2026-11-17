@@ -17,7 +17,17 @@ void main() {
       'NSSpeechRecognitionUsageDescription',
     ),
     'calendar': ('PERMISSION_EVENTS', 'NSCalendarsUsageDescription'),
+    // `Permission.storage` is `READ_EXTERNAL_STORAGE` on Android 12 and
+    // below; on iOS the plugin folds it into the photo library.
+    'storage': ('PERMISSION_PHOTOS', 'NSPhotoLibraryUsageDescription'),
   };
+
+  /// Named in Dart, asked only on Android. The Podfile macro would compile a
+  /// framework and an App Store privacy entry into the iOS binary for a
+  /// prompt that is never shown — iOS picks through `PHPicker`, which hands
+  /// one file over without the app holding library access, and posts
+  /// notifications without asking. The guard is checked below, not trusted.
+  const androidOnly = {'photos', 'storage', 'notification'};
 
   late final String podfile = File('ios/Podfile').readAsStringSync();
   late final String plist = File('ios/Runner/Info.plist').readAsStringSync();
@@ -36,15 +46,18 @@ void main() {
     return found..removeWhere((name) => !needs.containsKey(name));
   }
 
+  /// The ones iOS itself has to be built for.
+  Set<String> askedOnIos() => asked().difference(androidOnly);
+
   test('the app asks for the camera and the microphone, and no more', () {
-    // If this changes, the two below cover the new one automatically — but
+    // If this changes, the three below cover the new one automatically — but
     // only if it is in `needs`, so a permission added without its build
     // settings stops here rather than shipping silently broken.
-    expect(asked(), {'camera', 'microphone'});
+    expect(askedOnIos(), {'camera', 'microphone'});
   });
 
   test('every permission it asks for is compiled into the iOS binary', () {
-    for (final name in asked()) {
+    for (final name in askedOnIos()) {
       expect(
         podfile,
         contains('${needs[name]!.$1}=1'),
@@ -57,7 +70,7 @@ void main() {
   });
 
   test('and has the usage string iOS refuses a build without', () {
-    for (final name in asked()) {
+    for (final name in askedOnIos()) {
       final key = needs[name]!.$2;
       if (key.isEmpty) continue;
       expect(plist, contains('<key>$key</key>'), reason: 'Permission.$name');
@@ -67,10 +80,31 @@ void main() {
   test('nothing is compiled in that the app never asks for', () {
     // Each one carries its framework and its API usage into the binary,
     // and onto the App Store privacy report.
-    final wanted = {for (final name in asked()) needs[name]!.$1};
+    final wanted = {for (final name in askedOnIos()) needs[name]!.$1};
     for (final (macro, _) in needs.values) {
       if (wanted.contains(macro)) continue;
       expect(podfile, isNot(contains('$macro=1')), reason: macro);
+    }
+  });
+
+  test('and an Android-only one is never asked for on iOS', () {
+    // Without its Podfile macro the plugin answers permanentlyDenied without
+    // a prompt, so an ask that reached iOS would be a dead end rather than a
+    // dialog. Every file that names one has to rule iOS out first.
+    for (final file in Directory('lib').listSync(recursive: true)) {
+      if (file is! File || !file.path.endsWith('.dart')) continue;
+      final source = file.readAsStringSync();
+      for (final name in androidOnly) {
+        if (!source.contains('Permission.$name')) continue;
+        expect(
+          source.contains('Platform.isAndroid') ||
+              source.contains('TargetPlatform.android'),
+          isTrue,
+          reason:
+              'Permission.$name is asked for in ${file.path} without an '
+              'Android guard',
+        );
+      }
     }
   });
 

@@ -273,6 +273,14 @@ class StudioContentItem {
     return kindAllows && stateAllows;
   }
 
+  /// Whether this row can be removed from the phone.
+  ///
+  /// Everything the studio lists has a delete route — media, posts and
+  /// events alike. A broadcast that is **on air** is the one exception: the
+  /// route would take the stream out from under whoever is watching it, and
+  /// ending it is the thing to do first.
+  bool get canDeleteHere => state != StudioContentState.live;
+
   /// Broadcast, not uploaded. The two are created through entirely separate
   /// routes and the studio should never present one as the other.
   bool get isLivestream => kind == StudioContentKind.livestream;

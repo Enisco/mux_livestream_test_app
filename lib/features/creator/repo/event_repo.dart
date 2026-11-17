@@ -93,6 +93,15 @@ class EventRepo {
     }
   }
 
+  /// `DELETE /v1/content/calendar/events/{id}`. RSVPs go with it.
+  Future<void> delete(String eventId) async {
+    try {
+      await _api.delete(ApiEndpoints.calendarEventById(eventId));
+    } on DioException catch (e) {
+      throw _translate(e);
+    }
+  }
+
   /// Step 3. Publish now, or schedule the listing for later.
   Future<void> publish(String eventId, {DateTime? scheduledAt}) async {
     try {
@@ -130,7 +139,11 @@ class EventRepo {
     if (lower.contains('invalid schedule')) {
       return const EventException(EventFailure.badSchedule);
     }
-    return EventException(EventFailure.rejected, said);
+    return switch (e.response?.statusCode) {
+      404 => const EventException(EventFailure.notFound),
+      401 || 403 => const EventException(EventFailure.notAllowed),
+      _ => EventException(EventFailure.rejected, said),
+    };
   }
 
   static String? _sentence(dynamic payload) {
@@ -167,6 +180,13 @@ enum EventFailure {
   /// "Invalid schedule" — an end before a start, or a timezone the API
   /// does not know.
   badSchedule,
+
+  /// 404. Already gone — removed from the web studio, or by someone else.
+  notFound,
+
+  /// 401 or 403. The member's role does not reach this route, or the
+  /// session has expired.
+  notAllowed,
 
   network,
   rejected,

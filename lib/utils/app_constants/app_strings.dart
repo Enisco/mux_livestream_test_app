@@ -187,6 +187,23 @@ abstract final class AppStrings {
   static const creatorImageUnreadable = 'That image could not be opened.';
   static const creatorImageUnsupported =
       'That image format is not supported. Try a JPG or PNG.';
+
+  /// Refused, and the system will ask again: tapping once more re-asks.
+  static const libraryNoAccess =
+      'GospelTube needs access to your photos to pick a picture. Tap again to '
+      'allow it.';
+
+  /// Refused for good. Nothing in the app can re-ask.
+  static const libraryBlocked =
+      'Photo access is turned off for GospelTube. Turn it on in Settings to '
+      'pick a picture.';
+
+  static const remindersNeedNotifications =
+      'Reminders need notifications turned on for GospelTube. Allow them in '
+      'Settings, then switch reminders on again.';
+
+  static const pickerUnavailable =
+      'Your gallery could not be opened just now. Try again.';
   static const creatorImageChange = 'Change';
   static const creatorImageUploading = 'Uploading...';
   static const creatorImageUploadFailed =
@@ -1337,6 +1354,28 @@ abstract final class AppStrings {
       'Open the web studio to edit this content.';
   static const contentNoPublicLink = 'A shareable link is not available yet.';
 
+  // ---- Removing a piece of content ---------------------------------------
+
+  static const contentDelete = 'Delete';
+  static const contentDeleteTitle = 'Delete this content?';
+  static String contentDeleteBody(String title) =>
+      '"$title" and everything on it — views, likes and comments — are '
+      'removed for good. This cannot be undone.';
+  static const contentDeleteConfirm = 'Delete';
+  static const contentDeleteCancel = 'Keep it';
+  static const contentDeleted = 'Deleted.';
+
+  /// On air. Ending the broadcast is the thing to do first.
+  static const contentDeleteLive = 'End the broadcast before deleting it.';
+
+  static const contentDeleteNotAllowed =
+      'Only the channel\'s owner can delete this.';
+  static const contentDeleteGone = 'This was already deleted somewhere else.';
+  static const contentDeleteNetwork =
+      'No connection. Nothing was deleted — try again.';
+  static const contentDeleteRefused =
+      'That could not be deleted just now. Try again.';
+
   // ---- editing what is already filed --------------------------------------
 
   static const editSaveChanges = 'Save changes';
@@ -1843,12 +1882,6 @@ abstract final class AppStrings {
   static const tooltipFullscreen = 'Fullscreen (F)';
   static const tooltipExitFullscreen = 'Exit fullscreen (F)';
 
-  static const landingSubtitle = 'Choose how to watch';
-  static const featureGallery = 'My Videos';
-  static const featureGalleryDesc = 'Browse videos stored on your device';
-  static const featureStartLiveDesc = 'Stream your camera live via Mux';
-  static const featureJoinLiveDesc = 'Watch an ongoing Mux livestream';
-
   static const signIn = 'Sign In';
   static const createAccount = 'Create Account';
   static const email = 'Email';
@@ -1865,7 +1898,6 @@ abstract final class AppStrings {
   static const cameraPermAskAgainBody =
       'GospelTube needs the camera and microphone\nto stream live video.';
   static const creatingStream = 'Creating stream…';
-  static const goLive = 'Go Live';
   static const rtmpUrl = 'RTMP URL';
   static const streamKey = 'Stream Key';
   static const streamId = 'Stream ID';
@@ -1890,7 +1922,6 @@ abstract final class AppStrings {
   static const noMediaIdError = 'Stream not ready — playback token unavailable';
 
   static const discover = 'Discover';
-  static const featureDiscoverDesc = 'Browse videos, music and live content';
   static const watchNow = 'Watch Now';
 
   static const shortVideos = 'Short Videos';

@@ -120,6 +120,8 @@ class PlaybackState {
     this.completed = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
+    this.videoWidth = 0,
+    this.videoHeight = 0,
   });
 
   final String? mediaId;
@@ -135,6 +137,16 @@ class PlaybackState {
   final bool completed;
   final Duration position;
   final Duration duration;
+
+  /// The picture's own size, as the decoder reports it. Zero until the first
+  /// frame has been parsed, and zero for audio.
+  final int videoWidth;
+  final int videoHeight;
+
+  /// Wider than it is tall. Unknown counts as upright, because the screen a
+  /// reader is already holding is never the wrong answer.
+  bool get isLandscapeVideo =>
+      videoWidth > 0 && videoHeight > 0 && videoWidth > videoHeight;
 
   bool isActive(String id) => mediaId == id;
 
@@ -154,6 +166,8 @@ class PlaybackState {
     bool? completed,
     Duration? position,
     Duration? duration,
+    int? videoWidth,
+    int? videoHeight,
   }) => PlaybackState(
     mediaId: mediaId ?? this.mediaId,
     kind: kind ?? this.kind,
@@ -163,6 +177,8 @@ class PlaybackState {
     completed: completed ?? this.completed,
     position: position ?? this.position,
     duration: duration ?? this.duration,
+    videoWidth: videoWidth ?? this.videoWidth,
+    videoHeight: videoHeight ?? this.videoHeight,
   );
 }
 
@@ -326,6 +342,16 @@ class PlaybackController implements PlaybackHandle {
         state.value = state.value.copyWith(completed: done);
         if (done) _reportCompleted();
       }),
+      // The decoder reports these once it has parsed a frame, so a surface
+      // that wants to know the picture's shape has to wait for them rather
+      // than assume one. A new item resets them to 0 with the rest of the
+      // state, so a sermon's shape is never read off the last clip.
+      _player.stream.width.listen(
+        (v) => state.value = state.value.copyWith(videoWidth: v ?? 0),
+      ),
+      _player.stream.height.listen(
+        (v) => state.value = state.value.copyWith(videoHeight: v ?? 0),
+      ),
       _player.stream.error.listen((e) => logger.w('Playback error: $e')),
       _player.stream.tracks.listen(_onTracks),
       _player.stream.track.listen(_onTrack),

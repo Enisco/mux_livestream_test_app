@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sizing/sizing.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -64,6 +65,26 @@ VideoHero _hero(FakePlayback playback, {String? url = _url, String? thumb}) =>
       playbackUrl: url,
       thumbnailUrl: thumb,
     );
+
+/// Every `setPreferredOrientations` the screens send, in order.
+List<String> _watchOrientations(WidgetTester tester) {
+  final log = <String>[];
+  final messenger = tester.binding.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    if (call.method == 'SystemChrome.setPreferredOrientations') {
+      log.add(
+        (call.arguments as List)
+            .map((e) => '$e'.replaceFirst('DeviceOrientation.', ''))
+            .join(','),
+      );
+    }
+    return null;
+  });
+  addTearDown(
+    () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+  );
+  return log;
+}
 
 void main() {
   setUpAll(() {
@@ -193,7 +214,6 @@ void main() {
       // Only one surface may hold the video at a time.
       expect(playback.fullscreen.value, isTrue);
       expect(find.byType(FullscreenVideo), findsOneWidget);
-      expect(find.byType(RotatedBox), findsWidgets);
       // Playback is untouched by the handover.
       expect(playback.played, ['m-video-1']);
 
@@ -232,22 +252,127 @@ void main() {
       expect(playback.state.value.playing, isFalse);
     });
 
-    testWidgets('fullscreen turns the picture, not the phone', (tester) async {
+    testWidgets('fullscreen turns the phone, not the picture', (tester) async {
+      // It used to be the other way round. A `RotatedBox` turned the widget
+      // tree while the device stayed upright, so tilting the phone rotated
+      // the picture a second time — which is what the report showed.
       final playback = FakePlayback();
       await _pump(tester, _hero(playback));
 
       await tester.tap(find.byIcon(Icons.fullscreen_rounded));
       await tester.pumpAndSettle();
 
-      final rotated = tester.widget<RotatedBox>(
-        find
-            .descendant(
-              of: find.byType(FullscreenVideo),
-              matching: find.byType(RotatedBox),
-            )
-            .first,
+      expect(
+        find.descendant(
+          of: find.byType(FullscreenVideo),
+          matching: find.byType(RotatedBox),
+        ),
+        findsNothing,
       );
-      expect(rotated.quarterTurns, 1);
+    });
+
+    testWidgets('a sideways video asks the phone to turn', (tester) async {
+      final playback = FakePlayback();
+      final turns = _watchOrientations(tester);
+      await _pump(tester, _hero(playback));
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        videoWidth: 1280,
+        videoHeight: 720,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.fullscreen_rounded));
+      await tester.pumpAndSettle();
+
+      expect(turns, contains('landscapeLeft,landscapeRight'));
+    });
+
+    testWidgets('an upright one is left on the screen it already fills', (
+      tester,
+    ) async {
+      // A phone livestream replay is 9:16. Turning the device for it put the
+      // picture in a strip down the middle of a screen held the wrong way up.
+      final playback = FakePlayback();
+      final turns = _watchOrientations(tester);
+      await _pump(tester, _hero(playback));
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        videoWidth: 720,
+        videoHeight: 1280,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.fullscreen_rounded));
+      await tester.pumpAndSettle();
+
+      expect(turns, isNot(contains('landscapeLeft,landscapeRight')));
+    });
+
+    testWidgets('and a shape nobody has reported yet turns nothing', (
+      tester,
+    ) async {
+      // The decoder reports the size a beat after the route opens. Guessing
+      // landscape in the meantime is the old bug on a timer.
+      final playback = FakePlayback();
+      final turns = _watchOrientations(tester);
+      await _pump(tester, _hero(playback));
+
+      await tester.tap(find.byIcon(Icons.fullscreen_rounded));
+      await tester.pumpAndSettle();
+
+      expect(turns, isNot(contains('landscapeLeft,landscapeRight')));
+    });
+
+    testWidgets('and turns when the decoder reports the shape afterwards', (
+      tester,
+    ) async {
+      // The real ordering: the route opens, then the first frame is parsed.
+      // Deciding on the empty state and never looking again left a sermon
+      // upright in a letterbox.
+      final playback = FakePlayback();
+      final turns = _watchOrientations(tester);
+      await _pump(tester, _hero(playback));
+
+      await tester.tap(find.byIcon(Icons.fullscreen_rounded));
+      await tester.pumpAndSettle();
+      expect(turns, isNot(contains('landscapeLeft,landscapeRight')));
+
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        videoWidth: 1280,
+        videoHeight: 720,
+      );
+      await tester.pump();
+
+      expect(turns, contains('landscapeLeft,landscapeRight'));
+    });
+
+    testWidgets('leaving fullscreen puts the app orientations back', (
+      tester,
+    ) async {
+      final playback = FakePlayback();
+      final turns = _watchOrientations(tester);
+      await _pump(tester, _hero(playback));
+      playback.emit(
+        mediaId: 'm-video-1',
+        kind: PlaybackKind.video,
+        videoWidth: 1280,
+        videoHeight: 720,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.fullscreen_rounded));
+      await tester.pumpAndSettle();
+      turns.clear();
+
+      await tester.tap(find.byIcon(Icons.fullscreen_exit_rounded));
+      await tester.pumpAndSettle();
+
+      expect(turns, contains('portraitUp,portraitDown'));
     });
   });
 

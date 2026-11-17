@@ -10,7 +10,6 @@ import 'package:sizing/sizing.dart';
 
 import 'package:test_app/features/creator/repo/livestream_repo.dart';
 import 'package:test_app/features/creator/views/live_broadcast_screen.dart';
-import 'package:test_app/features/livestream/views/start_livestream_screen.dart';
 import 'package:test_app/models/creator_models/livestream_models.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/shared/services/screen_orientation.dart';
@@ -18,7 +17,6 @@ import 'package:test_app/shared/services/screen_wakelock.dart';
 import 'helpers/load_app_fonts.dart';
 
 /// Which way up a broadcast records.
-const _liveChannel = MethodChannel('video.api.livestream/controller');
 
 /// Everything the screens send down `SystemChannels.platform`, in order,
 /// with the broadcast controller's own milestones interleaved — the order
@@ -134,13 +132,20 @@ void main() {
   setUp(() => _log = <String>[]);
 
   group('the orientation set the app runs in', () {
-    test('is every orientation, in one place', () {
+    test('is upright, in one place', () {
       // `main.dart` and everything that restores after narrowing read the
       // same list, so a screen can hand back what it found instead of
-      // guessing.
-      expect(ScreenOrientation.all, [
+      // guessing. Upright because every screen is a 390x844 portrait design:
+      // letting the whole app turn left a fullscreen video rotated twice,
+      // once by the device and once by the route.
+      expect(ScreenOrientation.app, [
         DeviceOrientation.portraitUp,
         DeviceOrientation.portraitDown,
+      ]);
+    });
+
+    test('and the only sideways set belongs to a sideways video', () {
+      expect(ScreenOrientation.landscape, [
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
@@ -218,19 +223,24 @@ void main() {
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'))
         .toList();
-    final callers = {
+
+    /// Every file that turns the screen, by whatever route.
+    final turners = {
       for (final f in dart)
-        if (f.readAsStringSync().contains('setPreferredOrientations('))
+        if (f.readAsStringSync().contains('setPreferredOrientations(') ||
+            f.readAsStringSync().contains('ScreenOrientation.'))
           f.path: f.readAsStringSync(),
-    }..removeWhere((path, _) => path.endsWith('screen_orientation.dart'));
+    };
 
     test('has somewhere to narrow from', () {
       // If this empties out, the two below stop being able to fail.
-      expect(callers, isNotEmpty);
+      expect(turners.keys, contains(endsWith('screen_orientation.dart')));
+      expect(turners, hasLength(greaterThan(1)));
     });
 
-    test('puts the app orientations back, not a set of its own', () {
-      for (final entry in callers.entries) {
+    test('goes through the one list that says what the app runs in', () {
+      for (final entry in turners.entries) {
+        if (entry.key.endsWith('screen_orientation.dart')) continue;
         expect(
           entry.value,
           contains('ScreenOrientation.'),
@@ -241,32 +251,17 @@ void main() {
       }
     });
 
-    test('and does not keep its own copy of that list', () {
-      // Naming all four across two *different* narrowed calls is fine — the
-      // player has a landscape pair for fullscreen and a portrait pair for
-      // leaving it.
-      final literal = RegExp(
-        r'setPreferredOrientations\(\s*\[(.*?)\]',
-        dotAll: true,
-      );
-      for (final entry in callers.entries) {
-        for (final call in literal.allMatches(entry.value)) {
-          final list = call.group(1)!;
-          final names = [
-            'portraitUp',
-            'portraitDown',
-            'landscapeLeft',
-            'landscapeRight',
-          ].where(list.contains).length;
-          expect(
-            names,
-            lessThan(4),
-            reason:
-                '${entry.key} writes the app\'s whole orientation set out '
-                'in place of ScreenOrientation.all; a second copy is a '
-                'second thing to forget to change',
-          );
-        }
+    test('and never writes an orientation list of its own', () {
+      // A second copy is a second thing to forget to change — and a screen
+      // that forces landscape for a video that is not landscape is exactly
+      // the bug the fullscreen route had.
+      for (final entry in turners.entries) {
+        if (entry.key.endsWith('screen_orientation.dart')) continue;
+        expect(
+          entry.value,
+          isNot(contains('setPreferredOrientations(')),
+          reason: '${entry.key} asks the platform directly',
+        );
       }
     });
   });
@@ -379,69 +374,8 @@ void main() {
 
       expect(
         _log,
-        contains(
-          'orientations:portraitUp,portraitDown,landscapeLeft,landscapeRight',
-        ),
-        reason: 'leaving a broadcast must not leave the app upright-only',
-      );
-    });
-  });
-
-  group('StartLivestreamScreen', () {
-    Future<void> pump(WidgetTester tester) async {
-      tester.view.physicalSize = const Size(390 * 3, 844 * 3);
-      tester.view.devicePixelRatio = 3;
-      addTearDown(tester.view.reset);
-      _watchPlatform(tester);
-
-      // Its controller is built in `initState` and is not injectable, so
-      // the plugin is stubbed: `initialize` is recorded off the channel
-      // instead of off a fake.
-      ApiVideoMobileLiveStreamPlatform.registerWith();
-      final messenger = tester.binding.defaultBinaryMessenger;
-      messenger.setMockMethodCallHandler(_liveChannel, (call) async {
-        _log.add('live:${call.method}');
-        return null;
-      });
-      addTearDown(() => messenger.setMockMethodCallHandler(_liveChannel, null));
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: StartLivestreamScreen(
-            ask: (_) async => PermissionStatus.granted,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-    }
-
-    testWidgets('pins the interface upright before creating the session', (
-      tester,
-    ) async {
-      await pump(tester);
-
-      expect(_log, contains('orientations:portraitUp'));
-      expect(
-        _log.indexOf('orientations:portraitUp'),
-        lessThan(_log.indexOf('live:create')),
-        reason: 'the lock has to land before the native session — $_log',
-      );
-    });
-
-    testWidgets('and restores the app orientations on the way out', (
-      tester,
-    ) async {
-      await pump(tester);
-      _log.clear();
-
-      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
-      await tester.pumpAndSettle();
-
-      expect(
-        _log,
-        contains(
-          'orientations:portraitUp,portraitDown,landscapeLeft,landscapeRight',
-        ),
+        contains('orientations:portraitUp,portraitDown'),
+        reason: 'leaving a broadcast must not leave the app portraitUp-only',
       );
     });
   });

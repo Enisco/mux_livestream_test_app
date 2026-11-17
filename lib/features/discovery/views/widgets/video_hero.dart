@@ -11,6 +11,7 @@ import 'package:test_app/features/discovery/views/widgets/playback_settings_shee
 import 'package:test_app/shared/components/live_badge.dart';
 import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
+import 'package:test_app/shared/services/screen_orientation.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/utils/helpers/duration_format.dart';
@@ -469,7 +470,14 @@ class _IconButton extends StatelessWidget {
   );
 }
 
-/// Landscape playback without touching the device orientation.
+/// A video with the whole screen to itself.
+///
+/// It used to get there with a `RotatedBox`, which turned the picture without
+/// turning the device. That had two faults and the screenshot showed both: a
+/// reader who then tilted the phone was rotated twice — once by the system,
+/// once by the box — and an upright 9:16 clip was turned sideways into a
+/// strip down the middle of a screen that was already the right shape for it.
+/// The device turns now, and only for a video whose own shape asks.
 class FullscreenVideo extends StatefulWidget {
   const FullscreenVideo({
     super.key,
@@ -491,20 +499,43 @@ class FullscreenVideo extends StatefulWidget {
 }
 
 class _FullscreenVideoState extends State<FullscreenVideo> {
+  /// Whether the picture's shape has been read yet. The decoder reports it a
+  /// beat after the route opens, and it is only ever read once: turning the
+  /// screen under a reader who has since turned the phone themselves would
+  /// be the old bug wearing a different hat.
+  bool _oriented = false;
+
   @override
   void initState() {
     super.initState();
     // Nothing but the picture — the status and navigation bars would otherwise
-    // sit across the rotated frame.
+    // sit across it.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    widget.playback.state.addListener(_followTheVideo);
+    _followTheVideo();
+  }
+
+  /// A sideways video gets a sideways screen; an upright one keeps the screen
+  /// it is already on.
+  void _followTheVideo() {
+    if (_oriented) return;
+    final state = widget.playback.state.value;
+    if (state.videoWidth <= 0 || state.videoHeight <= 0) return;
+    _oriented = true;
+    if (state.isLandscapeVideo) unawaited(ScreenOrientation.lockLandscape());
   }
 
   @override
   void dispose() {
+    widget.playback.state.removeListener(_followTheVideo);
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.edgeToEdge,
       overlays: SystemUiOverlay.values,
     );
+    // Back to the app's own set whether or not this route took it: the cost
+    // of an extra call is nothing against leaving the phone sideways on a
+    // page drawn for upright.
+    unawaited(ScreenOrientation.restore());
     super.dispose();
   }
 
@@ -515,34 +546,35 @@ class _FullscreenVideoState extends State<FullscreenVideo> {
     final videoController = widget.videoController;
     return Scaffold(
       backgroundColor: Colors.black,
-      body: RotatedBox(
-        quarterTurns: 1,
-        child: ValueListenableBuilder<PlaybackState>(
-          valueListenable: playback.state,
-          builder: (context, state, _) {
-            final active = state.isActive(mediaId);
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                if (active && videoController != null)
-                  Video(
-                    controller: videoController,
-                    controls: null,
-                    fit: VideoFit.fullBleed,
-                  )
-                else
-                  const ColoredBox(color: Colors.black),
+      body: ValueListenableBuilder<PlaybackState>(
+        valueListenable: playback.state,
+        builder: (context, state, _) {
+          final active = state.isActive(mediaId);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // The picture takes the whole screen, notch included; only the
+              // controls step around it.
+              if (active && videoController != null)
+                Video(
+                  controller: videoController,
+                  controls: null,
+                  fit: VideoFit.fullBleed,
+                )
+              else
+                const ColoredBox(color: Colors.black),
 
-                // Fullscreen is where a stall is least explicable: there
-                // is nothing else on the screen to look at.
-                if (active && state.buffering && !state.completed)
-                  const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.brandPrimary,
-                    ),
+              // Fullscreen is where a stall is least explicable: there
+              // is nothing else on the screen to look at.
+              if (active && state.buffering && !state.completed)
+                const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
                   ),
+                ),
 
-                _Controls(
+              SafeArea(
+                child: _Controls(
                   isLive: widget.isLive,
                   playback: playback,
                   state: state,
@@ -551,10 +583,10 @@ class _FullscreenVideoState extends State<FullscreenVideo> {
                   onPlayPause: playback.togglePlayPause,
                   onFullscreen: () => Navigator.of(context).maybePop(),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

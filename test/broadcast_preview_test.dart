@@ -171,17 +171,41 @@ void main() {
       );
     });
 
-    test('the broadcast screen uses the preview that honours it', () {
+    test('every screen that shows the camera uses that preview', () {
+      // One screen does now. There were two until the dead landing-page
+      // route that reached the other was deleted — so this walks whatever
+      // shows a camera rather than naming a file, and a second one added
+      // later is covered without anybody remembering to add it here.
+      for (final file in Directory('lib').listSync(recursive: true)) {
+        if (file is! File || !file.path.endsWith('.dart')) continue;
+        final screen = file.readAsStringSync();
+        if (!screen.contains('ApiVideoLiveStreamController')) continue;
+        if (file.path.endsWith('broadcast_preview.dart')) continue;
+
+        expect(
+          screen,
+          isNot(contains('ApiVideoCameraPreview(')),
+          reason:
+              "${file.path} uses the plugin's own preview, which turns the "
+              'picture to the orientation sensor while the app is pinned '
+              'upright, and stops the shared preview on dispose',
+        );
+        expect(
+          RegExp(r'aspectRatio:\s*16\s*/\s*9').hasMatch(screen),
+          isFalse,
+          reason: '${file.path} wrote its own copy of the shape',
+        );
+      }
+    });
+
+    test('and the broadcast screen is one of them', () {
+      // The loop above passes vacuously if nothing matches it.
       final screen = File(
         'lib/features/creator/views/live_broadcast_screen.dart',
       ).readAsStringSync();
 
+      expect(screen, contains('ApiVideoLiveStreamController'));
       expect(screen, contains('BroadcastPreview(controller: _controller)'));
-      expect(
-        screen,
-        isNot(contains('ApiVideoCameraPreview(')),
-        reason: "the plugin's own preview stretches the picture",
-      );
     });
   });
 }

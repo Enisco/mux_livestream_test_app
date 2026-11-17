@@ -1,8 +1,8 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -12,9 +12,15 @@ import 'package:test_app/features/creator/services/creator_image_picker.dart';
 /// Stands in for the platform picker, so the decisions the service makes about
 /// what came back can be exercised without a gallery.
 class _FakePicker extends FilePicker with MockPlatformInterfaceMixin {
-  _FakePicker(this.result);
+  _FakePicker(this.result, {this.throws});
 
   final FilePickerResult? result;
+
+  /// What the platform channel raises instead of answering. `file_picker`
+  /// rethrows `PlatformException` for `already_active`, an activity the
+  /// system reclaimed, and a provider that will not give the bytes up.
+  final Object? throws;
+
   FileType? askedFor;
 
   @override
@@ -34,6 +40,7 @@ class _FakePicker extends FilePicker with MockPlatformInterfaceMixin {
     bool Function(String)? onFileFilter,
   }) async {
     askedFor = type;
+    if (throws case final error?) throw error;
     return result;
   }
 }
@@ -196,5 +203,71 @@ void main() {
     } else {
       expect(result.failure, PickFailure.tooLarge);
     }
+  });
+
+  group('what the picker itself does', () {
+    test('a picker that throws is a failure, not a crash', () async {
+      // This is the crash readers reported: the plugin rethrows and nothing
+      // above it was catching.
+      FilePicker.platform = _FakePicker(
+        null,
+        throws: PlatformException(code: 'already_active'),
+      );
+
+      final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(result.failure, PickFailure.unavailable);
+      expect(result.image, isNull);
+    });
+
+    test('and anything else it raises is too', () async {
+      FilePicker.platform = _FakePicker(null, throws: StateError('no host'));
+
+      final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(result.failure, PickFailure.unavailable);
+    });
+
+    test('backing out of it is not a failure at all', () async {
+      FilePicker.platform = _FakePicker(null);
+
+      final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(result.failure, isNull);
+      expect(result.image, isNull);
+    });
+  });
+
+  group('the sentence a refusal is reported with', () {
+    test('every failure has one', () {
+      for (final failure in PickFailure.values) {
+        expect(failure.accessProblem, isNotEmpty, reason: failure.name);
+      }
+    });
+
+    test('a shut library and a shut picker do not say the same thing', () {
+      // One is fixed in Settings and one by trying again. Telling a reader
+      // to open Settings over a picker that was merely busy sends them
+      // looking for a switch that is already on.
+      expect(
+        PickFailure.blocked.accessProblem,
+        isNot(PickFailure.unavailable.accessProblem),
+      );
+      expect(
+        PickFailure.blocked.accessProblem,
+        isNot(PickFailure.noAccess.accessProblem),
+      );
+    });
+
+    test('and a refusal that can be asked again does not mention Settings', () {
+      expect(
+        PickFailure.noAccess.accessProblem.toLowerCase(),
+        isNot(contains('settings')),
+      );
+      expect(
+        PickFailure.blocked.accessProblem.toLowerCase(),
+        contains('settings'),
+      );
+    });
   });
 }

@@ -96,6 +96,7 @@ void _reportPickFailure(BuildContext context, PickFailure failure) {
     PickFailure.tooLarge => AppStrings.creatorImageTooLarge,
     PickFailure.unreadable => AppStrings.creatorImageUnreadable,
     PickFailure.unsupported => AppStrings.creatorImageUnsupported,
+    final refusal => refusal.accessProblem,
   };
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(

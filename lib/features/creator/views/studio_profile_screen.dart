@@ -216,6 +216,7 @@ class _StudioProfileScreenState extends State<StudioProfileScreen> {
     PickFailure.tooLarge => AppStrings.creatorImageTooLarge,
     PickFailure.unreadable => AppStrings.creatorImageUnreadable,
     PickFailure.unsupported => AppStrings.creatorImageUnsupported,
+    final refusal => refusal.accessProblem,
   };
 
   static String _uploadProblem(AssetUploadFailure failure) => switch (failure) {

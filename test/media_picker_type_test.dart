@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:test_app/features/creator/services/creator_media_picker.dart';
@@ -7,21 +10,32 @@ import 'package:test_app/models/creator_models/media_upload_models.dart';
 /// How the picker asks the platform for a file.
 void main() {
   group('the picker asks the way the image picker does', () {
+    void on(TargetPlatform platform) {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    }
+
     test('video asks for video, not a list of extensions', () {
-      expect(
-        CreatorMediaPicker.fileTypeFor(MediaUploadKind.video),
-        FileType.video,
-      );
+      for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+        on(platform);
+        expect(
+          CreatorMediaPicker.fileTypeFor(MediaUploadKind.video),
+          FileType.video,
+          reason: '$platform',
+        );
+      }
     });
 
-    test('audio asks for audio', () {
+    test('and on Android audio asks for audio', () {
+      on(TargetPlatform.android);
       expect(
         CreatorMediaPicker.fileTypeFor(MediaUploadKind.music),
         FileType.audio,
       );
     });
 
-    test('neither asks for custom, which is what emptied the sheet', () {
+    test('neither asks for custom there, which is what emptied the sheet', () {
+      on(TargetPlatform.android);
       for (final kind in MediaUploadKind.values) {
         expect(
           CreatorMediaPicker.fileTypeFor(kind),
@@ -29,6 +43,39 @@ void main() {
           reason: kind.slug,
         );
       }
+    });
+
+    test('audio on iOS goes to the document picker instead', () {
+      // `FileType.audio` opens `MPMediaPickerController` there, which reads
+      // the Apple Music library: without `NSAppleMusicUsageDescription` iOS
+      // kills the app the moment it is presented, and the tracks it returns
+      // are mostly DRM-protected with no file to upload.
+      on(TargetPlatform.iOS);
+      expect(
+        CreatorMediaPicker.fileTypeFor(MediaUploadKind.music),
+        FileType.custom,
+      );
+    });
+
+    test('and the extensions it offers there are ones iOS can resolve', () {
+      // `FileType.custom` turns each extension into a UTI and drops the ones
+      // it cannot. All of them dropped would leave the picker with nothing
+      // to show.
+      on(TargetPlatform.iOS);
+      final offered = uploadMimeTypes(
+        MediaUploadKind.music,
+        MediaUploadTarget.ios,
+      ).keys;
+      expect(offered, containsAll(['mp3', 'm4a', 'wav']));
+    });
+
+    test('the iOS binary is never asked for the music library', () {
+      // The usage string is the thing that stops the crash, and the point of
+      // the document picker is that it is not needed. If the picker ever goes
+      // back, this says so before a creator finds out.
+      final plist = File('ios/Runner/Info.plist').readAsStringSync();
+      expect(plist, isNot(contains('NSAppleMusicUsageDescription')));
+      expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
     });
   });
 

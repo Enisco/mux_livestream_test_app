@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/shared/services/media_permissions.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// An image the reader chose, in a form the API will accept.
 class PickedImage {
@@ -27,7 +29,31 @@ class PickedImage {
 }
 
 /// Why a pick could not be used.
-enum PickFailure { tooLarge, unreadable, unsupported }
+enum PickFailure {
+  tooLarge,
+  unreadable,
+  unsupported,
+
+  /// The library was refused, and the system will ask again next time.
+  noAccess,
+
+  /// The library was refused for good. Only Settings can change it.
+  blocked,
+
+  /// The picker itself would not open, or would not hand the file back.
+  unavailable,
+}
+
+/// The three refusals that say nothing about the picture: the library is
+/// shut, or the picker would not open. Every screen says the same thing
+/// about them, because there is only one thing to say.
+extension PickFailureAccess on PickFailure {
+  String get accessProblem => switch (this) {
+    PickFailure.blocked => AppStrings.libraryBlocked,
+    PickFailure.unavailable => AppStrings.pickerUnavailable,
+    _ => AppStrings.libraryNoAccess,
+  };
+}
 
 class PickResult {
   const PickResult._({this.image, this.failure});
@@ -53,7 +79,24 @@ abstract final class CreatorImagePicker {
   static const _passThrough = {'jpg': _jpeg, 'jpeg': _jpeg, 'png': _png};
 
   static Future<PickResult> pick({required int maxBytes}) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final access = await LibraryPermissions.ensure(LibraryMedia.images);
+    if (!access.allowsPicking) {
+      return PickResult.failed(
+        access.needsSettings ? PickFailure.blocked : PickFailure.noAccess,
+      );
+    }
+
+    final FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(type: FileType.image);
+    } catch (e) {
+      // `pickFiles` rethrows whatever the platform raised: a picker already
+      // open, a gallery provider that will not give the bytes up, a host
+      // activity the system reclaimed while the picker was up. Unhandled,
+      // each of those is a crash where a sentence will do.
+      logger.w('Image picker failed', error: e);
+      return const PickResult.failed(PickFailure.unavailable);
+    }
     final file = result?.files.singleOrNull;
     if (file == null) return const PickResult.cancelled();
 
