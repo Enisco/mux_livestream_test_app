@@ -38,6 +38,25 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<!-- Google Sign-In redirects back to the app through the reversed form
+	     of the iOS OAuth client id. The value comes from Social.xcconfig so
+	     that one file holds the whole of this build's social-sign-in
+	     configuration; see ios/Flutter/Social.xcconfig. Until it is set,
+	     SocialSignIn.isOffered answers false for Google on iOS and the
+	     button is not drawn, so the placeholder scheme is never reached. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.google.SignIn</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_IOS_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>

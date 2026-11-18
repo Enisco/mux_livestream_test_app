@@ -1,2 +1,11 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+#include "Social.xcconfig"
+
+// The entitlements file was in the repo but referenced nowhere — not in the
+// project file, not in any xcconfig — so nothing in it had ever reached a
+// build: neither the applinks: associated domains nor, once it was added,
+// Sign in with Apple. Set here rather than in the project file because
+// these two xcconfigs are the base configuration of all three Runner
+// configurations (Debug, Release, Profile) and of nothing else.
+CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements

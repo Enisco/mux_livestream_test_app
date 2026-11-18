@@ -52,6 +52,9 @@ final List<RouteBase> authRoutes = [
         VerifyEmailScreen(
           email: params['email'] ?? '',
           challengeId: params['challengeId'] ?? '',
+          // Set only by a sign-in that created the account, so finishing
+          // the challenge starts onboarding rather than opening the feed.
+          isNewUser: params['newUser'] == '1',
         ),
       );
     },

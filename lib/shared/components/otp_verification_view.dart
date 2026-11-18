@@ -111,6 +111,11 @@ class _OtpVerificationViewState extends State<OtpVerificationView> {
     final problem = await widget.onResend();
     if (!mounted) return;
     if (problem == null) {
+      // Resending rotates the code at the server, so whatever is typed in
+      // is already dead. Leaving it in place invites a Verify tap that can
+      // only be refused, and the refusal would read as the new code being
+      // wrong too.
+      _code.clear();
       _startCountdown();
     } else {
       setState(() => _error = problem);

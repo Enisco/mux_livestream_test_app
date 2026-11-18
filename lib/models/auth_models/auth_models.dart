@@ -42,8 +42,13 @@ class GtubeUser {
   factory GtubeUser.fromJson(Map<String, dynamic> json) => GtubeUser(
     id: json['id'] as String,
     email: json['email'] as String,
-    firstName: json['firstName'] as String,
-    lastName: json['lastName'] as String,
+    // Nullable on purpose, though registration requires both: an account
+    // created by Apple sign-in has whatever name the person chose to share,
+    // and they may share none — Apple puts no name in the token and hands
+    // one to the client on the first authorization only. `as String` threw
+    // a TypeError on that account, at sign-in, with nothing to read.
+    firstName: json['firstName'] as String? ?? '',
+    lastName: json['lastName'] as String? ?? '',
     phone: json['phone'] as String?,
     gender: json['gender'] as String?,
     countryCode: json['countryCode'] as String?,
@@ -141,6 +146,102 @@ class GtubeSession {
   );
 }
 
+/// Thrown when a 200 carries something no client can act on.
+///
+/// The gateway's own contract makes this reachable rather than theoretical:
+/// a `LOGGED_IN` body omits `accessToken` and `refreshToken` for
+/// `clientType: "web"`, so a build that stopped sending `"native"` would
+/// parse a perfectly valid response into a session with no tokens in it.
+/// Better a sentence the screen can show than a `TypeError` on a device.
+class AuthContractException implements Exception {
+  const AuthContractException(this.detail);
+
+  final String detail;
+
+  @override
+  String toString() => 'AuthContractException($detail)';
+}
+
+/// What login, two-factor verification and provider sign-in all answer.
+///
+/// `data` is a **union discriminated on `type`**, and the integration guide
+/// is blunt about it: *"Always branch on it; never assume login succeeded
+/// because the HTTP status was 200."* Reading the tokens straight out of
+/// `data` threw on every account with the second factor on — which is the
+/// platform default.
+sealed class AuthOutcome {
+  const AuthOutcome();
+
+  /// The one `type` that is not a session.
+  static const challengeType = '2FA_REQUIRED';
+
+  /// Reads the whole `{success, data}` envelope.
+  factory AuthOutcome.fromEnvelope(Map<String, dynamic> json) {
+    final data = json['data'] is Map<String, dynamic>
+        ? json['data'] as Map<String, dynamic>
+        : <String, dynamic>{};
+
+    if (data['type'] == challengeType) {
+      // The challenge sits one level deeper than everything else in the
+      // union: `data.data.challengeId`, not `data.challengeId`.
+      final inner = data['data'] is Map<String, dynamic>
+          ? data['data'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+      final challengeId = inner['challengeId'] as String?;
+      if (challengeId == null || challengeId.isEmpty) {
+        throw const AuthContractException(
+          '2FA_REQUIRED carried no challengeId',
+        );
+      }
+      return AuthChallengeRequired(
+        challengeId: challengeId,
+        expiresInMinutes: (inner['expiresInMinutes'] as num?)?.toInt() ?? 10,
+        // Only the provider routes document an address here; a password
+        // login already knows the one that was typed.
+        email: (data['email'] ?? inner['email']) as String?,
+        isNewUser: data['isNewUser'] == true,
+      );
+    }
+
+    return AuthSignedIn(LoginResponse.fromData(data));
+  }
+}
+
+/// A session exists. The tokens are already stored by the time a screen
+/// sees this.
+final class AuthSignedIn extends AuthOutcome {
+  const AuthSignedIn(this.session);
+
+  final LoginResponse session;
+}
+
+/// No session yet: the account wants the code it was just emailed.
+final class AuthChallengeRequired extends AuthOutcome {
+  const AuthChallengeRequired({
+    required this.challengeId,
+    required this.expiresInMinutes,
+    this.email,
+    this.isNewUser = false,
+  });
+
+  final String challengeId;
+
+  /// How long the code lasts, in minutes. **Nothing displays it**: the
+  /// screen's own countdown is the 60-second resend cooldown, which is a
+  /// different thing, and the 2FA routes publish no `resendAvailableAt`
+  /// like the account-change ones do. Kept because it is the field the
+  /// route sends and the only thing it says about expiry.
+  final int expiresInMinutes;
+
+  /// Where the code went, for the screen to name. An Apple private relay
+  /// address is possible.
+  final String? email;
+
+  /// Carried through the challenge so the screen past it knows whether to
+  /// start onboarding or go home.
+  final bool isNewUser;
+}
+
 class LoginResponse {
   final String type;
   final GtubeUser user;
@@ -148,24 +249,47 @@ class LoginResponse {
   final String accessToken;
   final String refreshToken;
 
+  /// Set by the provider routes when that call **created** the account, so
+  /// the app knows to start onboarding rather than open the feed. Always
+  /// false for a password login, which cannot create anything.
+  final bool isNewUser;
+
   const LoginResponse({
     required this.type,
     required this.user,
     required this.session,
     required this.accessToken,
     required this.refreshToken,
+    this.isNewUser = false,
   });
 
-  factory LoginResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] is Map<String, dynamic>
-        ? json['data'] as Map<String, dynamic>
-        : <String, dynamic>{};
+  /// Reads the `LOGGED_IN` arm of the union — the contents of `data`, not
+  /// the envelope. Use [AuthOutcome.fromEnvelope] unless the shape is
+  /// already known to be a session.
+  factory LoginResponse.fromData(Map<String, dynamic> data) {
+    final accessToken = data['accessToken'] as String?;
+    final refreshToken = data['refreshToken'] as String?;
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      throw AuthContractException(
+        'a ${data['type'] ?? 'LOGGED_IN'} answer carried no session tokens',
+      );
+    }
+    if (data['user'] is! Map<String, dynamic> ||
+        data['session'] is! Map<String, dynamic>) {
+      throw const AuthContractException(
+        'a signed-in answer carried no user or session',
+      );
+    }
     return LoginResponse(
       type: data['type'] as String? ?? 'LOGGED_IN',
       user: GtubeUser.fromJson(data['user'] as Map<String, dynamic>),
       session: GtubeSession.fromJson(data['session'] as Map<String, dynamic>),
-      accessToken: data['accessToken'] as String,
-      refreshToken: data['refreshToken'] as String,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      isNewUser: data['isNewUser'] == true,
     );
   }
 }

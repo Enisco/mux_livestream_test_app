@@ -6,11 +6,13 @@ import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
+import 'package:test_app/features/auth/views/widgets/auth_flow.dart';
 import 'package:test_app/features/auth/views/widgets/auth_widgets.dart';
 import 'package:test_app/shared/components/gtube_logo_mark.dart';
 import 'package:test_app/shared/components/gtube_text_field.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
+import 'package:test_app/shared/services/social_sign_in.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -50,10 +52,11 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthSuccess) context.go(AppRouter.home);
-        },
+      // A failure is already drawn as a banner above the form, so this only
+      // navigates: to the feed, to onboarding for an account a provider
+      // just created, or to the code screen when the account carries a
+      // second factor.
+      child: AuthFlowListener(
         child: OnboardingScaffold(
           gradient: AppStyles.splashBackground,
           backgroundAsset: AppAssets.onboardingBg,
@@ -136,6 +139,10 @@ class _SignInScreenState extends State<SignInScreen> {
             builder: (context, state) => PrimaryButton(
               label: AppStrings.logIn,
               loading: state is AuthLoading,
+              // A provider sheet is open behind this screen while
+              // AuthSocialLoading is the state, and a password login
+              // started on top of it would race it to the same bloc.
+              enabled: state is! AuthSocialLoading,
               onPressed: _submit,
             ),
           ),
@@ -220,45 +227,67 @@ class _SocialRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+    final bloc = context.read<AuthBloc>();
+    // Apple first, then Google: the design draws the two icons in that
+    // order here, and the opposite one on the welcome page's full-width
+    // buttons. Iterating `SocialProvider.values` would quietly reorder this
+    // row.
+    const order = [SocialProvider.apple, SocialProvider.google];
+    final offered = order.where(bloc.offers).toList();
+
+    // No providers on this build means no divider either: an "Or" over an
+    // empty row says there was another way in and it is missing.
+    if (offered.isEmpty) return const SizedBox.shrink();
+
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        final busy = state is AuthSocialLoading ? state.provider : null;
+        final working = state is AuthSocialLoading || state is AuthLoading;
+
+        return Column(
           children: [
-            // No social sign-in exists to wire: the gateway publishes no
-            // OAuth, Google or Apple route anywhere in its 299 paths, and
-            // `/v1/auth/browser-handoffs` is a Stripe-management handoff
-            // for an already-signed-in user, not a sign-in.
-            const _SocialIconButton(icon: AppAssets.iconApple),
-            const SizedBox(width: 11),
-            // No social sign-in exists to wire: the gateway publishes no
-            // OAuth, Google or Apple route anywhere in its 299 paths, and
-            // `/v1/auth/browser-handoffs` is a Stripe-management handoff
-            // for an already-signed-in user, not a sign-in.
-            const _SocialIconButton(icon: AppAssets.iconGoogle),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: 237,
-          child: Row(
-            children: [
-              const Expanded(child: _DividerLine()),
-              const SizedBox(width: 10),
-              Text(
-                AppStrings.orDivider,
-                style: AppStyles.caption(
-                  12,
-                  weight: AppStyles.medium,
-                  lineHeight: 16 / 12,
-                ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final provider in offered) ...[
+                  if (provider != offered.first) const SizedBox(width: 11),
+                  _SocialIconButton(
+                    key: ValueKey('sign-in-with-${provider.slug}'),
+                    icon: switch (provider) {
+                      SocialProvider.google => AppAssets.iconGoogle,
+                      SocialProvider.apple => AppAssets.iconApple,
+                    },
+                    busy: busy == provider,
+                    onPressed: working
+                        ? null
+                        : () => bloc.add(AuthSocialSignInRequested(provider)),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: 237,
+              child: Row(
+                children: [
+                  const Expanded(child: _DividerLine()),
+                  const SizedBox(width: 10),
+                  Text(
+                    AppStrings.orDivider,
+                    style: AppStyles.caption(
+                      12,
+                      weight: AppStyles.medium,
+                      lineHeight: 16 / 12,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(child: _DividerLine()),
+                ],
               ),
-              const SizedBox(width: 10),
-              const Expanded(child: _DividerLine()),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -272,9 +301,18 @@ class _DividerLine extends StatelessWidget {
 }
 
 class _SocialIconButton extends StatelessWidget {
-  const _SocialIconButton({required this.icon});
+  const _SocialIconButton({
+    super.key,
+    required this.icon,
+    required this.onPressed,
+    this.busy = false,
+  });
 
   final String icon;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  static const _size = 16.667;
 
   @override
   Widget build(BuildContext context) {
@@ -283,14 +321,19 @@ class _SocialIconButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        // No social sign-in exists to wire: the gateway publishes no OAuth,
-        // Google or Apple route anywhere in its 299 paths, and
-        // `/v1/auth/browser-handoffs` is a Stripe-management handoff for an
-        // already-signed-in user, not a sign-in.
-        onTap: null,
+        onTap: busy ? null : onPressed,
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: SvgPicture.asset(icon, width: 16.667, height: 16.667),
+          child: SizedBox(
+            width: _size,
+            height: _size,
+            child: busy
+                ? const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.neutral300,
+                  )
+                : SvgPicture.asset(icon, width: _size, height: _size),
+          ),
         ),
       ),
     );

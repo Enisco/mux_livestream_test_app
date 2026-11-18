@@ -30,4 +30,11 @@ class AuthSignUpRequested extends AuthEvent {
   });
 }
 
+/// A tap on "Continue with Google" or "Continue with Apple".
+class AuthSocialSignInRequested extends AuthEvent {
+  AuthSocialSignInRequested(this.provider);
+
+  final SocialProvider provider;
+}
+
 class AuthLogoutRequested extends AuthEvent {}

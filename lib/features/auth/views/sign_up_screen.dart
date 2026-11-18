@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
+import 'package:test_app/features/auth/views/widgets/auth_flow.dart';
 import 'package:test_app/features/auth/views/widgets/auth_widgets.dart';
 import 'package:test_app/features/auth/views/widgets/gender_picker_sheet.dart';
 import 'package:test_app/shared/components/gtube_phone_field.dart';
@@ -77,13 +78,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
-      child: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthSuccess) {
-            final name = Uri.encodeComponent(_firstNameCtrl.text.trim());
-            context.go('${AppRouter.welcomeNote}?name=$name');
-          }
-        },
+      // Registering does not sign anybody in: the bloc logs in behind
+      // this, and that login is challenged like any other when the account
+      // carries the platform's default second factor. Which is why the
+      // route out of here is shared rather than a straight `go` to the
+      // welcome note — that stranded a new account on a spinning button.
+      child: AuthFlowListener(
         child: OnboardingScaffold(
           gradient: AppStyles.splashBackground,
           backgroundAsset: AppAssets.onboardingBg,

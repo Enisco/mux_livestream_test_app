@@ -1,0 +1,32 @@
+// Sign-in-with-Google configuration for the iOS build.
+//
+// WHAT THIS IS FOR
+// Google's iOS SDK finishes its flow by opening a custom URL scheme back
+// into this app. The scheme is the iOS OAuth client id written backwards,
+// and it has to be registered in Info.plist, which cannot read .env — so
+// it reads this variable instead. Everything else social sign-in needs
+// lives in .env (GOOGLE_SERVER_CLIENT_ID, GOOGLE_IOS_CLIENT_ID).
+//
+// HOW TO SET IT
+// Take the iOS OAuth client id from the Google Cloud console — it looks
+// like 539827848864-abc123def456.apps.googleusercontent.com — and reverse
+// the two halves:
+//
+//     client id:  <digits>-<hash>.apps.googleusercontent.com
+//     scheme:     com.googleusercontent.apps.<digits>-<hash>
+//
+// It must be the id of an **iOS** client whose bundle id is this app's
+// (com.gtubeapp.gtubeMobile), not the web client. The web client id is the
+// one that goes in .env as GOOGLE_SERVER_CLIENT_ID; the two are different
+// and swapping them fails verification at the gateway.
+//
+// SET 2026-11-18, from the iOS client in Google Cloud project
+// 539827848864 — the same project as GOOGLE_SERVER_CLIENT_ID, which is
+// required: the SDK asks Google for a token audienced to the web client,
+// and Google will not issue one across unrelated projects.
+//
+//     client id:  539827848864-96e9oc4aefoh412ru6a3tdhuv5pqhuhd.apps.googleusercontent.com
+//
+// A test in test/social_sign_in_test.dart fails if this falls out of step
+// with .env's GOOGLE_IOS_CLIENT_ID.
+GOOGLE_IOS_REVERSED_CLIENT_ID = com.googleusercontent.apps.539827848864-96e9oc4aefoh412ru6a3tdhuv5pqhuhd

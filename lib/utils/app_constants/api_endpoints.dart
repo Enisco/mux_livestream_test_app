@@ -15,6 +15,12 @@ abstract final class ApiEndpoints {
   static const verify2faChallenge = '$_auth/2fa/challenges/verify';
   static const resend2faOtp = '$_auth/2fa/challenges/resend-otp';
 
+  /// Google and Apple. One route covers sign-up, sign-in and linking an
+  /// identity to an account that already exists; `provider` is `google` or
+  /// `apple` and the route refuses anything else.
+  static String providerSignIn(String provider) =>
+      '$_auth/providers/$provider/sign-in';
+
   static const onboardCreator = '$_creator/onboard';
   static const creatorProfile = '$_creator/profile';
 

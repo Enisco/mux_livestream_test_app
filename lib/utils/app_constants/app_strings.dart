@@ -10,6 +10,36 @@ abstract final class AppStrings {
   static const continueWithGoogle = 'Continue with Google';
   static const continueWithApple = 'Continue with Apple';
   static const continueWithEmail = 'Continue with Email';
+
+  // ---- Signing in with Google or Apple -----------------------------------
+  /// Shown when the platform's own sheet failed for a reason the person can
+  /// do something about by trying again. A cancellation says nothing at
+  /// all: backing out of a sheet is not an error.
+  static const socialFailed = 'That sign-in did not finish. Please try again.';
+
+  /// This build carries no OAuth client for the provider, or the provider's
+  /// SDK reported the app as misconfigured. Nothing the person can fix, so
+  /// it points at the other ways in rather than inviting a retry.
+  static const socialUnavailable =
+      'That sign-in is unavailable right now. You can continue with your '
+      'email instead.';
+
+  /// Apple on a platform Apple does not sign people in on.
+  static const socialUnsupported =
+      "This device can't use that sign-in. Please continue with your email.";
+
+  /// A 200 that carried no session — a client/gateway contract mismatch
+  /// rather than anything about the account.
+  static const authContractBroken =
+      "We couldn't finish signing you in. Please try again.";
+
+  static const somethingWentWrong = 'Something went wrong. Please try again.';
+  static const authTimedOut = 'Connection timed out. Please try again.';
+  static const authNoConnection = 'No internet connection.';
+  static const authRequestFailed = 'Request failed. Please try again.';
+
+  /// A code the server would not take, when it said nothing better.
+  static const otpCodeRejected = 'That code did not work. Please try again.';
   static const alreadyHere = 'Already here?';
   static const justBrowse = 'Just browse for now';
 

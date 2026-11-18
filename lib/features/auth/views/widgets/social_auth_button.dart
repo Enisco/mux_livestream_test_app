@@ -10,11 +10,18 @@ class SocialAuthButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.busy = false,
   });
 
   final String icon;
   final String label;
   final VoidCallback? onPressed;
+
+  /// The provider's own sheet is open, or its answer is being exchanged at
+  /// the gateway. The glyph becomes a spinner in place rather than beside
+  /// the label, so the row keeps its height and its centring, and the
+  /// button stops taking taps — a second one would open a second sheet.
+  final bool busy;
 
   static const _radius = 10.0;
   static const _padding = 16.0;
@@ -28,13 +35,26 @@ class SocialAuthButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(_radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onPressed,
+        onTap: busy ? null : onPressed,
         child: Padding(
           padding: const EdgeInsets.all(_padding),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SvgPicture.asset(icon, width: _iconSize, height: _iconSize),
+              SizedBox(
+                width: _iconSize,
+                height: _iconSize,
+                child: busy
+                    ? const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.neutral300,
+                      )
+                    : SvgPicture.asset(
+                        icon,
+                        width: _iconSize,
+                        height: _iconSize,
+                      ),
+              ),
               const SizedBox(width: _gap),
               Text(
                 label,

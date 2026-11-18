@@ -174,6 +174,29 @@ void main() {
       expect(find.textContaining('1:00', findRichText: true), findsNothing);
     });
 
+    testWidgets('clears the field, because the old code is already dead', (
+      tester,
+    ) async {
+      // A resend rotates the code at the server. Leaving the typed one in
+      // place invites a Verify tap that can only be refused, and that
+      // refusal reads as the *new* code being wrong too.
+      await _pump(tester, _view());
+      await _enterCode(tester, '123456');
+      expect(find.text(AppStrings.verify), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 60));
+      await tester.tapOnText(find.textRange.ofSubstring(AppStrings.sendAgain));
+      await tester.pump();
+
+      final field = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byType(OtpCodeField),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(field.controller.text, isEmpty);
+    });
+
     testWidgets('the timer stops when the screen goes away', (tester) async {
       await _pump(tester, _view());
       await tester.pumpWidget(const SizedBox.shrink());

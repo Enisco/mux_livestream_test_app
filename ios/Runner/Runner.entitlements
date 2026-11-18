@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Sign in with Apple. This entitlement is only honoured if the
+	     capability is also enabled on the App ID in the Apple Developer
+	     portal; without that, code signing fails rather than the feature
+	     silently not working. Apple requires the option on any app that
+	     offers another social sign-in, which this one does (Google). -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:app.gospeltube.tv</string>
