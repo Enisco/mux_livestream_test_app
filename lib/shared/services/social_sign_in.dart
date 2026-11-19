@@ -152,6 +152,21 @@ class SocialSignIn implements SocialSignInService {
   /// two taps in a row share one setup.
   static Future<void>? _googleReady;
 
+  /// The nonce Google's token will carry, which the gateway insists on
+  /// seeing: *"If the token has a nonce, you must send it."*
+  ///
+  /// Supplying one is the only way to **know** it. Google's iOS SDK mints a
+  /// nonce of its own when none is given, puts it in the token and never
+  /// tells the client — so the gateway saw a nonce in the token, got none
+  /// in the request, and answered 401 on every iOS Google sign-in.
+  ///
+  /// It lasts as long as the process, not the attempt, because the plugin
+  /// only takes a nonce at `initialize` and re-initializing subscribes a
+  /// second time to the SDK's event stream. A per-run random value still
+  /// does the job a nonce is for: a token minted for some other request
+  /// cannot be presented here.
+  static String? _googleNonce;
+
   /// Apple's native flow exists on Apple's own platforms. On Android and
   /// the web `sign_in_with_apple` falls back to a Chrome Custom Tab against
   /// the **Services ID**, which needs a redirect endpoint that hands the
@@ -221,6 +236,7 @@ class SocialSignIn implements SocialSignInService {
       return SocialCredential(
         provider: SocialProvider.google,
         idToken: idToken,
+        nonce: _googleNonce,
       );
     } on GoogleSignInException catch (e) {
       throw SocialSignInException(switch (e.code) {
@@ -246,10 +262,14 @@ class SocialSignIn implements SocialSignInService {
         // naming the wrong client.
         clientId: _onApplePlatform ? SocialAuthConfig.googleIosClientId : null,
         serverClientId: SocialAuthConfig.googleServerClientId,
+        // `generateNonce` is Apple's package, but it is a plain
+        // secure-random string and there is no reason to grow a second one.
+        nonce: _googleNonce ??= generateNonce(),
       ));
     } catch (e) {
       // A failed setup must not be cached, or every later tap replays it.
       _googleReady = null;
+      _googleNonce = null;
       throw SocialSignInException(SocialSignInFailure.failed, '$e');
     }
   }

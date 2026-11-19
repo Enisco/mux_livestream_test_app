@@ -186,6 +186,9 @@ Map<String, dynamic> _challenge({String? email}) => {
 const _google = SocialCredential(
   provider: SocialProvider.google,
   idToken: 'google-jwt',
+  // Google's tokens carry a nonce too — the iOS SDK mints one whether or
+  // not the app asks — and the gateway insists on seeing it.
+  nonce: 'google-nonce',
 );
 
 const _apple = SocialCredential(
@@ -221,6 +224,7 @@ void main() {
       expect(api.paths.single, '/v1/auth/providers/google/sign-in');
       expect(api.bodies.single, {
         'idToken': 'google-jwt',
+        'nonce': 'google-nonce',
         'clientType': 'native',
         'rememberDevice': true,
       });
@@ -228,22 +232,31 @@ void main() {
 
     test('and nothing Google would refuse', () async {
       // An `idToken` sent with a `redirectUri` is refused outright, and the
-      // other three keys belong to Apple. Verified against staging: a body
-      // with both credentials answers "Send an idToken (with Apple's
-      // authorizationCode on native), or an authorizationCode with its
-      // redirectUri and nonce."
+      // browser-redirect keys belong to that flow. Verified against
+      // staging: a body with both credentials answers "Send an idToken
+      // (with Apple's authorizationCode on native), or an
+      // authorizationCode with its redirectUri and nonce."
       final api = await _wire(_loggedIn());
 
       await AuthRepo().signInWithProvider(_google);
 
       expect(
         api.bodies.single.keys,
-        isNot(
-          contains(
-            anyOf('redirectUri', 'codeVerifier', 'authorizationCode', 'nonce'),
-          ),
-        ),
+        isNot(contains(anyOf('redirectUri', 'codeVerifier'))),
       );
+    });
+
+    test('but it does send the nonce, which the token carries', () async {
+      // This cost a 401 on every iOS Google sign-in. Google's iOS SDK mints
+      // a nonce of its own when the app supplies none, puts it in the token
+      // and never says what it was — and the guide is flat about the
+      // consequence: "If the token has a nonce, you must send it." The app
+      // supplies its own now, which is the only way to know it.
+      final api = await _wire(_loggedIn());
+
+      await AuthRepo().signInWithProvider(_google);
+
+      expect(api.bodies.single['nonce'], 'google-nonce');
     });
 
     test(

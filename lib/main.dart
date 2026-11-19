@@ -3,13 +3,13 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:test_app/shared/services/screen_orientation.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/core/router.dart';
 import 'package:test_app/gtube_app.dart';
 import 'package:test_app/shared/services/media_session_handler.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
+import 'package:test_app/shared/services/screen_orientation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
