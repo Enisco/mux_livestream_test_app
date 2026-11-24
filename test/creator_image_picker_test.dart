@@ -1,8 +1,10 @@
 import 'dart:ui' as ui;
 
-import 'package:file_picker/file_picker.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -11,52 +13,81 @@ import 'package:test_app/features/creator/services/creator_image_picker.dart';
 
 /// Stands in for the platform picker, so the decisions the service makes about
 /// what came back can be exercised without a gallery.
-class _FakePicker extends FilePicker with MockPlatformInterfaceMixin {
+class _FakePicker extends FilePickerPlatform with MockPlatformInterfaceMixin {
   _FakePicker(this.result, {this.throws});
 
-  final FilePickerResult? result;
+  final PlatformFile? result;
 
-  /// What the platform channel raises instead of answering. `file_picker`
+  /// What the platform channel raises instead of answering. The picker
   /// rethrows `PlatformException` for `already_active`, an activity the
   /// system reclaimed, and a provider that will not give the bytes up.
   final Object? throws;
 
   FileType? askedFor;
+  DarwinOptions? darwinAskedWith;
 
   @override
-  Future<FilePickerResult?> pickFiles({
+  Future<PlatformFile?> pickFile({
     String? dialogTitle,
     String? initialDirectory,
     FileType type = FileType.any,
     List<String>? allowedExtensions,
     Function(FilePickerStatus)? onFileLoading,
-    bool allowCompression = true,
-    int compressionQuality = 30,
-    bool allowMultiple = false,
-    bool withData = false,
-    bool withReadStream = false,
-    bool lockParentWindow = false,
-    bool readSequential = false,
-    bool Function(String)? onFileFilter,
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
   }) async {
     askedFor = type;
+    darwinAskedWith = darwinOptions;
     if (throws case final error?) throw error;
     return result;
   }
 }
 
-FilePickerResult _oneFile({
+/// A picked file with no file on disk behind it, so the service has to read
+/// it through the picker's own reader rather than by path.
+final class _FakeFile extends PlatformFile {
+  _FakeFile({required this.name, required this.bytes, this.unreadable = false});
+
+  @override
+  final String name;
+
+  final Uint8List bytes;
+
+  /// Whether reading it throws, as a file the provider will not hand over
+  /// does.
+  final bool unreadable;
+
+  @override
+  Uri get uri => Uri.dataFromBytes(bytes);
+
+  @override
+  XFile get xFile => XFile.fromData(bytes, name: name);
+
+  @override
+  int? lengthSync() => bytes.lengthInBytes;
+
+  @override
+  Future<int?> length() async => bytes.lengthInBytes;
+
+  @override
+  Future<Uint8List> readAsBytes() async {
+    if (unreadable) throw StateError('the provider would not hand it over');
+    return bytes;
+  }
+
+  @override
+  Stream<Uint8List> readAsByteStream() => Stream.value(bytes);
+}
+
+_FakeFile _oneFile({
   required String name,
   required String extension,
   required Uint8List bytes,
-}) => FilePickerResult([
-  PlatformFile(
-    name: name,
-    size: bytes.lengthInBytes,
-    bytes: bytes,
-    // No path: the service must fall back to the in-memory bytes.
-  ),
-]);
+}) => _FakeFile(name: name, bytes: bytes);
 
 /// A real, decodable PNG, so the transcode path has something to work on.
 Future<Uint8List> _png(int side) async {
@@ -84,7 +115,7 @@ void main() {
   });
 
   test('backing out of the picker is not a failure', () async {
-    FilePicker.platform = _FakePicker(null);
+    FilePickerPlatform.instance = _FakePicker(null);
 
     final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
 
@@ -95,7 +126,7 @@ void main() {
 
   test('it asks the platform for images, not for any file', () async {
     final fake = _FakePicker(null);
-    FilePicker.platform = fake;
+    FilePickerPlatform.instance = fake;
 
     await CreatorImagePicker.pick(maxBytes: _avatarMax);
 
@@ -103,7 +134,7 @@ void main() {
   });
 
   test('a PNG passes through untouched', () async {
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(name: 'logo.png', extension: 'png', bytes: png),
     );
 
@@ -115,7 +146,7 @@ void main() {
   });
 
   test('a JPG is named as a JPEG for the API', () async {
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(name: 'photo.JPG', extension: 'JPG', bytes: png),
     );
 
@@ -126,7 +157,7 @@ void main() {
 
   test('anything else is re-encoded to PNG and renamed to match', () async {
     // An iPhone hands over HEIC, which the upload endpoints do not accept.
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(name: 'IMG_0042.heic', extension: 'heic', bytes: png),
     );
 
@@ -141,7 +172,7 @@ void main() {
   });
 
   test('an undecodable file is reported, not thrown', () async {
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(
         name: 'broken.heic',
         extension: 'heic',
@@ -156,7 +187,7 @@ void main() {
   });
 
   test('an empty file is reported as unreadable', () async {
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(name: 'empty.png', extension: 'png', bytes: Uint8List(0)),
     );
 
@@ -168,7 +199,7 @@ void main() {
 
   test('anything over the ceiling is turned away', () async {
     final huge = Uint8List(_avatarMax + 1);
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(name: 'huge.png', extension: 'png', bytes: huge),
     );
 
@@ -193,7 +224,7 @@ void main() {
       reason: 'the source itself is within the ceiling',
     );
 
-    FilePicker.platform = _FakePicker(
+    FilePickerPlatform.instance = _FakePicker(
       _oneFile(name: 'shot.heic', extension: 'heic', bytes: wide),
     );
 
@@ -205,11 +236,119 @@ void main() {
     }
   });
 
+  group('the representation iOS is asked for', () {
+    test('it asks for a compatible one, so images arrive as JPEG', () async {
+      // Left on `automatic` the photo picker lists the asset's own format
+      // first and hands over HEIC, which is what every iPhone shoots. The
+      // endpoints do not read HEIC, so it had to be re-encoded, and PNG is
+      // all `dart:ui` writes: a 12 megapixel frame came back between 3.7 MB
+      // and 35 MB against a 2 MB avatar ceiling. It could never succeed.
+      final fake = _FakePicker(null);
+      FilePickerPlatform.instance = fake;
+
+      await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(
+        fake.darwinAskedWith?.assetRepresentationMode,
+        DarwinAssetRepresentationMode.compatible,
+      );
+    });
+
+    test('and compressionQuality stays at 0, which that mode requires', () {
+      // `DarwinOptions.validate` throws if the two are combined: a specific
+      // representation asked for and then recompressed is a contradiction.
+      const options = DarwinOptions(
+        assetRepresentationMode: DarwinAssetRepresentationMode.compatible,
+      );
+      expect(() => options.validate(0), returnsNormally);
+      expect(() => options.validate(70), throwsArgumentError);
+    });
+  });
+
+  group('a picture too big for the ceiling it is going to', () {
+    test('is shrunk to fit rather than refused', () async {
+      // The old path re-encoded at full size and then measured, so a photo
+      // over the cap was simply turned away. Nothing a reader could do about
+      // it: every picture their phone takes is over a 2 MB cap once PNG has
+      // had it.
+      final source = await _png(400);
+      // A flat colour compresses to very little, so the ceiling has to sit
+      // under that for the shrink to be the thing under test.
+      const ceiling = 800;
+      expect(source.lengthInBytes, greaterThan(ceiling));
+
+      FilePickerPlatform.instance = _FakePicker(
+        _oneFile(name: 'shot.png', extension: 'png', bytes: source),
+      );
+
+      final result = await CreatorImagePicker.pick(maxBytes: ceiling);
+      final image = result.image;
+      expect(image, isNotNull, reason: 'it should fit, not fail');
+      expect(image!.bytes.lengthInBytes, lessThanOrEqualTo(ceiling));
+      expect(image.mimeType, 'image/png');
+
+      // And it is still a real picture, just a smaller one.
+      final codec = await ui.instantiateImageCodec(image.bytes);
+      final decoded = (await codec.getNextFrame()).image;
+      expect(decoded.width, lessThan(400));
+      expect(decoded.width, greaterThan(0));
+      decoded.dispose();
+    });
+
+    test(
+      'and one that cannot be made to fit is reported as too large',
+      () async {
+        // A ceiling no picture can meet still has to answer, not hang.
+        final source = await _png(400);
+        FilePickerPlatform.instance = _FakePicker(
+          _oneFile(name: 'shot.png', extension: 'png', bytes: source),
+        );
+
+        final result = await CreatorImagePicker.pick(maxBytes: 8);
+
+        expect(result.failure, PickFailure.tooLarge);
+        expect(result.image, isNull);
+      },
+    );
+  });
+
+  test('a truncated file is unsupported, not too large', () async {
+    // The header parses, so its size is known, and then the pixels run out.
+    // Calling that "too large" would send a reader off to resize a file
+    // that resizing cannot fix.
+    final whole = await _png(200);
+    final cut = Uint8List.sublistView(whole, 0, whole.lengthInBytes ~/ 2);
+
+    FilePickerPlatform.instance = _FakePicker(
+      _oneFile(name: 'cut.png', extension: 'png', bytes: cut),
+    );
+
+    final result = await CreatorImagePicker.pick(maxBytes: 64);
+
+    expect(result.failure, PickFailure.unsupported);
+    expect(result.image, isNull);
+  });
+
+  group('camera raw', () {
+    test('is refused by name rather than attempted', () async {
+      // ProRAW and Pixel RAW decode to tens of megabytes and are never what
+      // a reader meant as an avatar. Refusing on format says why; letting it
+      // through to be refused on size does not.
+      for (final name in ['IMG_1.dng', 'DSC_1.nef', 'P1.arw', 'x.CR3']) {
+        FilePickerPlatform.instance = _FakePicker(
+          _oneFile(name: name, extension: '', bytes: png),
+        );
+        final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+        expect(result.failure, PickFailure.unsupported, reason: name);
+      }
+    });
+  });
+
   group('what the picker itself does', () {
     test('a picker that throws is a failure, not a crash', () async {
       // This is the crash readers reported: the plugin rethrows and nothing
       // above it was catching.
-      FilePicker.platform = _FakePicker(
+      FilePickerPlatform.instance = _FakePicker(
         null,
         throws: PlatformException(code: 'already_active'),
       );
@@ -221,15 +360,65 @@ void main() {
     });
 
     test('and anything else it raises is too', () async {
-      FilePicker.platform = _FakePicker(null, throws: StateError('no host'));
+      FilePickerPlatform.instance = _FakePicker(
+        null,
+        throws: StateError('no host'),
+      );
 
       final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
 
       expect(result.failure, PickFailure.unavailable);
     });
 
+    test('but a picture it could not read is reported as that', () async {
+      // `file_picker_error` is a picture that *was* chosen and then could
+      // not be loaded. Calling that "the gallery would not open" sent the
+      // creator to look for a permission problem that was never there —
+      // picking holds no permission on either platform.
+      FilePickerPlatform.instance = _FakePicker(
+        null,
+        throws: PlatformException(
+          code: 'file_picker_error',
+          message: 'Failed to process any images',
+        ),
+      );
+
+      final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(result.failure, PickFailure.unreadable);
+    });
+
+    test('and so is the newer plugin\'s name for the same case', () {
+      expect(
+        CreatorImagePicker.readFailure('load_failed'),
+        PickFailure.unreadable,
+      );
+      // Everything else is the picker itself, with nothing to suggest.
+      for (final code in ['already_active', 'no_activity', 'whatever']) {
+        expect(
+          CreatorImagePicker.readFailure(code),
+          PickFailure.unavailable,
+          reason: code,
+        );
+      }
+    });
+
+    test('a picture the provider will not hand over is unreadable', () async {
+      // `readAsBytes` is the picker's own reader and it throws rather than
+      // answering empty. Unhandled that is a crash on a screen whose only
+      // honest report is one sentence.
+      FilePickerPlatform.instance = _FakePicker(
+        _FakeFile(name: 'a.png', bytes: Uint8List(0), unreadable: true),
+      );
+
+      final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(result.failure, PickFailure.unreadable);
+      expect(result.image, isNull);
+    });
+
     test('backing out of it is not a failure at all', () async {
-      FilePicker.platform = _FakePicker(null);
+      FilePickerPlatform.instance = _FakePicker(null);
 
       final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
 
@@ -245,29 +434,30 @@ void main() {
       }
     });
 
-    test('a shut library and a shut picker do not say the same thing', () {
-      // One is fixed in Settings and one by trying again. Telling a reader
-      // to open Settings over a picker that was merely busy sends them
-      // looking for a switch that is already on.
-      expect(
-        PickFailure.blocked.accessProblem,
-        isNot(PickFailure.unavailable.accessProblem),
-      );
-      expect(
-        PickFailure.blocked.accessProblem,
-        isNot(PickFailure.noAccess.accessProblem),
-      );
+    test('and none of them sends the reader to Settings', () {
+      // There is no switch to find: neither picker holds a permission, so
+      // a sentence pointing at Settings would be pointing at nothing.
+      for (final failure in PickFailure.values) {
+        expect(
+          failure.accessProblem.toLowerCase(),
+          isNot(contains('settings')),
+          reason: failure.name,
+        );
+      }
     });
 
-    test('and a refusal that can be asked again does not mention Settings', () {
-      expect(
-        PickFailure.noAccess.accessProblem.toLowerCase(),
-        isNot(contains('settings')),
-      );
-      expect(
-        PickFailure.blocked.accessProblem.toLowerCase(),
-        contains('settings'),
-      );
+    test('and the remedy it names is one every platform has', () {
+      // The old wording said "open it in Photos", which on Android is an
+      // app that is not installed for a service the phone is not on. The
+      // cause that actually mattered was an iPhone HEVC recording, and
+      // that is fixed in the plugin rather than worded around here.
+      for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+        debugDefaultTargetPlatformOverride = platform;
+        final sentence = PickFailure.unreadable.accessProblem.toLowerCase();
+        expect(sentence, isNot(contains('icloud')), reason: '$platform');
+        expect(sentence, isNot(contains('photos')), reason: '$platform');
+      }
+      debugDefaultTargetPlatformOverride = null;
     });
   });
 }

@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'package:test_app/core/logger.dart';
+import 'package:test_app/utils/helpers/keyboard.dart';
 
 /// Which identity provider a credential came from.
 ///
@@ -196,6 +197,14 @@ class SocialSignIn implements SocialSignInService {
 
   @override
   Future<SocialCredential> start(SocialProvider provider) {
+    // Both providers present a **native** sheet over Flutter's view, which
+    // does not take the keyboard with it. Tapping the button from a form
+    // that still had focus left the keyboard up behind Google's chooser and
+    // still up on the feed afterwards, with nothing left to type into.
+    // Here rather than on each button, because this is the moment the sheet
+    // is about to appear and every caller passes through it.
+    dismissKeyboard();
+
     if (!isOffered(provider)) {
       throw SocialSignInException(
         provider == SocialProvider.apple

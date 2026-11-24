@@ -17,6 +17,7 @@ import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/keyboard.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -40,6 +41,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    // After validating, as `forgot_password_screen` and
+    // `reset_password_screen` both do: a failed validation puts its message
+    // under the field being corrected, and dropping the keyboard first
+    // would make the reader tap back into it to fix anything.
+    dismissKeyboard();
     context.read<AuthBloc>().add(
       AuthSignInRequested(
         email: _emailCtrl.text.trim().toLowerCase(),

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -197,5 +197,119 @@ void main() {
         expect(types['MOV'.toLowerCase()], 'video/quicktime');
       },
     );
+  });
+
+  group('what the platform refused, and whether there is anything to say', () {
+    test(
+      'a file that was picked and then could not be read is its own case',
+      () {
+        // iOS answers `file_picker_error` — its own message is "Failed to
+        // process any images", whatever was picked — when it could load
+        // none of the chosen items. In this app it meant one thing almost
+        // every time: an iPhone HEVC recording that `file_picker` 8.3.7
+        // could not hand over. See `CreatorMediaPicker.readFailure` for the
+        // four faults behind it. Reporting it as "the gallery would not
+        // open" sent creators looking for a permission that was never the
+        // problem.
+        expect(
+          CreatorMediaPicker.readFailure('file_picker_error'),
+          MediaUploadFailure.sourceUnreadable,
+        );
+        expect(
+          CreatorMediaPicker.readFailure('load_failed'),
+          MediaUploadFailure.sourceUnreadable,
+        );
+      },
+    );
+
+    test('while the picker refusing to open at all stays what it was', () {
+      for (final code in [
+        'already_active',
+        'no_activity',
+        'Unsupported picker type',
+      ]) {
+        expect(
+          CreatorMediaPicker.readFailure(code),
+          MediaUploadFailure.pickerFailed,
+          reason: code,
+        );
+      }
+    });
+  });
+
+  group('what a phone can actually hand over', () {
+    test('an iPhone recording resolves whatever case it arrives in', () {
+      // The camera writes IMG_1234.MOV, upper case, and the picker hands
+      // the name through unchanged. A lookup that did not fold case would
+      // reject every iPhone video as an unknown format after the pick had
+      // already succeeded.
+      final types = uploadMimeTypes(
+        MediaUploadKind.video,
+        MediaUploadTarget.ios,
+      );
+      expect(types['MOV'.toLowerCase()], 'video/quicktime');
+    });
+
+    test('and the map says no more than the API does', () {
+      // The server answers `constraints.allowedMimeTypes` with exactly
+      // these. Widening the client alone turns a clear refusal before the
+      // upload into a failure after one.
+      const fromStaging = {
+        'video/mp4',
+        'video/quicktime',
+        'video/x-m4v',
+        'video/webm',
+      };
+      final android = uploadMimeTypes(
+        MediaUploadKind.video,
+        MediaUploadTarget.android,
+      );
+      expect(android.values.toSet().difference(fromStaging), isEmpty);
+    });
+  });
+
+  group('the packages the pick goes through', () {
+    late final String pubspec = File('pubspec.yaml').readAsStringSync();
+
+    test('the platform implementations are depended on directly', () {
+      // `file_picker` 13 is federated, and its umbrella pulls
+      // `windows_file_picker` -> `win32 ^6`, which this app cannot take:
+      // `flutter_secure_storage` 9 pins `win32 ^5` through its own Windows
+      // implementation, so the umbrella forces a 9 -> 11 jump on the
+      // package that holds the session tokens. That release rewrote the
+      // Android keystore layer and ships `checkUpgradeStatus()` to report
+      // what a direct major upgrade lost — a signed-out fleet in exchange
+      // for a Windows picker this app does not ship.
+      //
+      // Depending on the two implementations instead keeps `win32` at 5
+      // and every stored token where it is. Both declare
+      // `implements: file_picker`, so Flutter still registers them:
+      // `FilePickerAndroid.registerWith()` and
+      // `FilePickerDarwin.registerWith()` are in the generated Dart plugin
+      // registrant, which is what sets `FilePickerPlatform.instance`.
+      expect(pubspec, contains('file_picker_darwin:'));
+      expect(pubspec, contains('android_file_picker:'));
+      expect(pubspec, contains('file_picker_platform_interface:'));
+    });
+
+    test('and the umbrella is not, which is what keeps win32 at 5', () {
+      // `flutter pub add file_picker` would undo all of the above without
+      // saying so. The pick would still work; the sign-ins would not.
+      expect(
+        RegExp(r'^  file_picker:', multiLine: true).hasMatch(pubspec),
+        isFalse,
+        reason:
+            'the file_picker umbrella is back, which drags win32 ^6 and '
+            'forces flutter_secure_storage to 11',
+      );
+      expect(
+        RegExp(
+          r'^  flutter_secure_storage: \^9\.',
+          multiLine: true,
+        ).hasMatch(pubspec),
+        isTrue,
+        reason: 'the token store moved major versions',
+      );
+    });
   });
 }

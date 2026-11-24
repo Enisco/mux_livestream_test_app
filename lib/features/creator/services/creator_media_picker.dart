@@ -1,10 +1,12 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/models/creator_models/media_upload_models.dart';
+import 'package:test_app/utils/helpers/keyboard.dart';
 
 /// Picks a video or a piece of audio to upload.
 abstract final class CreatorMediaPicker {
@@ -37,26 +39,41 @@ abstract final class CreatorMediaPicker {
   };
 
   static Future<MediaPickResult> pick({required MediaUploadKind kind}) async {
+    // The system picker is presented over Flutter's view and does not take
+    // the keyboard with it, so a tap from the focused title field left one
+    // standing in front of the picker.
+    dismissKeyboard();
+
     final types = uploadMimeTypes(kind, target);
     final fileType = fileTypeFor(kind);
 
-    final FilePickerResult? result;
+    final PlatformFile? file;
     try {
-      result = await FilePicker.platform.pickFiles(
+      file = await FilePickerPlatform.instance.pickFile(
         type: fileType,
         allowedExtensions: fileType == FileType.custom
             ? types.keys.toList(growable: false)
             : null,
       );
+    } on PlatformException catch (e) {
+      // The code **and** the details: the plugin reports a picker that
+      // would not open and a file it could not read through the same throw,
+      // and only the code tells them apart. The details carry the system's
+      // own error, which is the whole diagnosis when a creator says the
+      // button did nothing.
+      logger.w(
+        'Media picker failed: ${e.code} — ${e.message}'
+        '${e.details == null ? '' : ' (${e.details})'}',
+      );
+      return MediaPickResult.failed(readFailure(e.code));
     } catch (e) {
-      // `pickFiles` rethrows whatever the platform raised: a picker already
+      // `pickFile` rethrows whatever the platform raised: a picker already
       // open, a provider that will not give the bytes up, a host activity
       // the system reclaimed while the picker was up. Unhandled, each of
       // those is a crash where a sentence will do.
       logger.w('Media picker failed', error: e);
       return const MediaPickResult.failed(MediaUploadFailure.pickerFailed);
     }
-    final file = result?.files.singleOrNull;
     if (file == null) return const MediaPickResult.cancelled();
 
     final path = file.path;
@@ -70,9 +87,10 @@ abstract final class CreatorMediaPicker {
       return const MediaPickResult.failed(MediaUploadFailure.unsupportedFormat);
     }
 
-    // `file.size` is what the picker reports; the presigned ticket is minted
-    // against it, so it has to be the length that is actually sent.
-    final size = await _lengthOf(path) ?? file.size;
+    // The length the ticket is minted against has to be the length that is
+    // actually sent, so the file on disk is measured first; `length()` is
+    // the picker's own answer and the fallback when it cannot be.
+    final size = await _lengthOf(path) ?? await file.length() ?? 0;
     if (size <= 0) {
       return const MediaPickResult.failed(MediaUploadFailure.rejected);
     }
@@ -89,6 +107,35 @@ abstract final class CreatorMediaPicker {
       ),
     );
   }
+
+  /// Which platform codes mean *picked, then unreadable* rather than *the
+  /// picker would not open*.
+  ///
+  /// `load_failed` is what the picker answers when it could load none of
+  /// the chosen items, and its `details` carry each one's `domain`, `code`
+  /// and `message` plus the chain of errors underneath.
+  ///
+  /// **What this was actually hiding.** `file_picker` 8.3.7 raised it for
+  /// every iPhone HEVC recording, through four separate faults: it asked
+  /// for the abstract `public.movie` rather than the item's own type, so
+  /// the picker had to transcode; it read the whole file into an `NSData`
+  /// before writing it out again; it named any extension-less video
+  /// `.jpg`; and it appended to a plain `NSMutableArray` from arbitrary
+  /// completion queues, which is what crashed afterwards. A small test
+  /// `.mp4` survived all four. Nothing in Dart could have fixed any of
+  /// them — the upgrade did.
+  ///
+  /// `file_picker_error` was the 8.x name for the same thing, kept because
+  /// a code that no longer arrives costs nothing and a mismapped one costs
+  /// a creator the right sentence.
+  ///
+  /// Everything else — `already_active`, `no_activity`, an unsupported
+  /// picker type — is the picker itself, and there is nothing to suggest.
+  @visibleForTesting
+  static MediaUploadFailure readFailure(String code) => switch (code) {
+    'file_picker_error' || 'load_failed' => MediaUploadFailure.sourceUnreadable,
+    _ => MediaUploadFailure.pickerFailed,
+  };
 
   static Future<int?> _lengthOf(String path) async {
     try {

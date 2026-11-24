@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/material.dart';
 
 import 'package:test_app/core/logger.dart';
@@ -98,11 +98,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _pickVideos() async {
-    final FilePickerResult? result;
+    // `pickFiles` is the multi-select entry point; `pickFile` is the one
+    // that takes a single file.
+    final List<PlatformFile> picked;
     try {
-      result = await FilePicker.platform.pickFiles(
+      picked = await FilePickerPlatform.instance.pickFiles(
         type: FileType.video,
-        allowMultiple: true,
       );
     } catch (e) {
       // `pickFiles` rethrows whatever the platform raised; unhandled, that
@@ -115,12 +116,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       return;
     }
-    if (result == null || !mounted) return;
+    if (picked.isEmpty || !mounted) return;
     setState(() {
-      for (final f in result!.files) {
-        if (f.path != null && !_videos.contains(f.path)) {
-          _videos.add(f.path!);
-        }
+      for (final f in picked) {
+        final path = f.path;
+        if (path != null && !_videos.contains(path)) _videos.add(path);
       }
     });
   }

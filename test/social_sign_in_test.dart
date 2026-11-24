@@ -924,7 +924,14 @@ void main() {
 
       final bloc = AuthBloc(
         repo: AuthRepo(),
-        social: _FakeSocial(offered: SocialProvider.values.toSet()),
+        // With a credential, not just an offer: without one the fake threw
+        // on `credential!`, and the bloc's catch-all turned that into the
+        // same failure a refused request makes — so a test meaning to
+        // exercise a 401 passed without the request ever being made.
+        social: _FakeSocial(
+          credential: _google,
+          offered: SocialProvider.values.toSet(),
+        ),
       );
       addTearDown(bloc.close);
 
@@ -1044,6 +1051,42 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(SnackBar), findsOneWidget);
+    });
+  });
+
+  group('the keyboard, when a provider sheet is about to cover it', () {
+    testWidgets('it is put away before anything else happens', (tester) async {
+      // What a creator reported: tapping "Continue with Google" while the
+      // password field still had focus left the keyboard standing — behind
+      // Google's sheet, and still there on the screen after it. Both
+      // providers present a **native** sheet over Flutter's view, which
+      // does not take the keyboard with it, so the field has to let go
+      // first.
+      //
+      // Asserted on the real service rather than through a screen: pushing
+      // a route disables the old focus scope, so after navigation a widget
+      // test reads the keyboard as gone whether or not anything asked it
+      // to. The moment that matters is this one, before the sheet.
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: TextField())),
+      );
+      await tester.showKeyboard(find.byType(EditableText));
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isTrue, reason: 'nothing typed');
+
+      try {
+        await SocialSignIn().start(SocialProvider.google);
+      } catch (_) {
+        // A test build carries no client id, so this refuses — after the
+        // keyboard has already been told to go, which is the point.
+      }
+      await tester.pump();
+
+      expect(
+        tester.testTextInput.isVisible,
+        isFalse,
+        reason: 'the sheet would have come up over a standing keyboard',
+      );
     });
   });
 

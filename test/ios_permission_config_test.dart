@@ -108,6 +108,46 @@ void main() {
     }
   });
 
+  group('the photo library, which nothing reachable reads', () {
+    test('its usage string is there, because the plugin is still linked', () {
+      // `photo_manager` ships PhotoKit regardless of whether anything
+      // calls it, and iOS kills the app on the spot if a prompt it can
+      // reach has no string to show.
+      expect(plist, contains('<key>NSPhotoLibraryUsageDescription</key>'));
+    });
+
+    test('but no permission_handler macro, because nothing uses one', () {
+      // `photo_manager` carries its own iOS implementation of the prompt.
+      // Compiling `PERMISSION_PHOTOS` in as well would add a second,
+      // unused strategy and its framework to the binary.
+      expect(podfile, isNot(contains('PERMISSION_PHOTOS=1')));
+    });
+
+    test('and the one caller of the library scan is still dormant', () {
+      // `VideoScannerService` lists the whole video library, which is what
+      // the usage string describes. It is reached only from
+      // `home_screen.dart`, which nothing routes. If that changes, the
+      // string is still right — but the App Store privacy answers are not,
+      // so this is worth knowing about.
+      final routed = Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart'))
+          .any(
+            (f) =>
+                !f.path.endsWith('home_screen.dart') &&
+                f.readAsStringSync().contains('HomeScreen'),
+          );
+      expect(
+        routed,
+        isFalse,
+        reason:
+            'home_screen.dart is now reachable, so the library scan can '
+            'run — revisit the App Store privacy answers',
+      );
+    });
+  });
+
   group('the deployment target Apple will insist on', () {
     /// April 2027: below 15.0 is refused by App Store Connect.
     const floor = 15.0;

@@ -1,4 +1,16 @@
 abstract final class AppStrings {
+  /// Chosen, then unreadable.
+  ///
+  /// Named for what the reader sees, not the cause, because the cause was
+  /// never one thing. The one that mattered — an iPhone HEVC recording the
+  /// old picker could not hand over — is fixed in the plugin rather than
+  /// worded around here. What is left is a provider that will not give its
+  /// bytes up, which is worth one line of advice and no more.
+  static String _unreadable(String subject) =>
+      '$subject could not be read. If it is stored in the cloud rather than '
+      'on this device, open it in your gallery first so it downloads, then '
+      'try again.';
+
   static const appTitle = 'GTube';
 
   static const brandName = 'GospelTube';
@@ -214,19 +226,10 @@ abstract final class AppStrings {
 
   static const creatorImageTooLarge =
       'That image is over 8 MB. Pick a smaller one.';
-  static const creatorImageUnreadable = 'That image could not be opened.';
+
+  static String get creatorImageUnreadable => _unreadable('That image');
   static const creatorImageUnsupported =
       'That image format is not supported. Try a JPG or PNG.';
-
-  /// Refused, and the system will ask again: tapping once more re-asks.
-  static const libraryNoAccess =
-      'GospelTube needs access to your photos to pick a picture. Tap again to '
-      'allow it.';
-
-  /// Refused for good. Nothing in the app can re-ask.
-  static const libraryBlocked =
-      'Photo access is turned off for GospelTube. Turn it on in Settings to '
-      'pick a picture.';
 
   static const remindersNeedNotifications =
       'Reminders need notifications turned on for GospelTube. Allow them in '
@@ -234,6 +237,11 @@ abstract final class AppStrings {
 
   static const pickerUnavailable =
       'Your gallery could not be opened just now. Try again.';
+
+  /// Picked, then unreadable. Named separately from [pickerUnavailable]
+  /// because that one is the picker refusing to open, which has no remedy
+  /// to offer at all.
+  static String get sourceUnreadable => _unreadable('That file');
   static const creatorImageChange = 'Change';
   static const creatorImageUploading = 'Uploading...';
   static const creatorImageUploadFailed =
@@ -1356,7 +1364,7 @@ abstract final class AppStrings {
   static const newMediaSchedulePast =
       'That moment has passed. Pick a time still to come.';
   static const newMediaThumbTooLarge = 'That image is larger than 10 MB.';
-  static const newMediaThumbUnreadable = "That image could not be read.";
+  static String get newMediaThumbUnreadable => _unreadable('That image');
   static const newMediaNeedsFile = 'Choose a file first.';
   static const newMediaTitleTooLong = 'Titles are capped at 180 characters.';
   static const newMediaDescriptionTooLong =

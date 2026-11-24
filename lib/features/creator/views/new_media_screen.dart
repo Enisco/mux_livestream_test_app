@@ -602,6 +602,7 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
     // Not the API: the system picker would not open or would not hand the
     // file back.
     MediaUploadFailure.pickerFailed => AppStrings.pickerUnavailable,
+    MediaUploadFailure.sourceUnreadable => AppStrings.sourceUnreadable,
     MediaUploadFailure.notFound => AppStrings.editMediaGone,
     MediaUploadFailure.notAllowed => AppStrings.editMediaNotYours,
     MediaUploadFailure.draftChanged ||

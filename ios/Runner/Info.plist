@@ -6,8 +6,14 @@
 	     to go_router, which has no route for it. -->
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
+	<!-- Picking does NOT need this: the photo picker runs out of process
+	     and hands one file over with a grant attached. The only thing that
+	     reads the library itself is VideoScannerService, which lists the
+	     videos already on the phone — and which nothing currently routes
+	     to. The key stays because photo_manager is still linked, so the
+	     prompt must have a string if that screen is ever wired up. -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Required to pick videos, and your channel photo and banner, from your photo library.</string>
+	<string>Lets GospelTube show the videos already saved on this device so you can choose one.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Required to preview and stream your camera when going live.</string>
 	<key>NSMicrophoneUsageDescription</key>

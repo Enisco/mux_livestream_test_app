@@ -44,6 +44,16 @@ Map<String, String> uploadMimeTypes(
   MediaUploadKind kind,
   MediaUploadTarget target,
 ) => switch (kind) {
+  // What the two cameras record: `mov` is every iPhone, H.264 or HEVC,
+  // and `mp4` is every Android.
+  //
+  // **This list mirrors the API, it does not guess.** Staging answers
+  // `constraints.allowedMimeTypes` with exactly these — see the recorded
+  // body in `new_media_test.dart` — so `mkv`, `3gp` and the rest are left
+  // out on purpose. Android's picker will happily offer them, and letting
+  // one through here would only swap a clear "format not supported" before
+  // anything is sent for a failed upload after a ticket has been minted.
+  // They belong here when the API takes them and not before.
   MediaUploadKind.video => {
     'mp4': 'video/mp4',
     'mov': 'video/quicktime',
@@ -319,9 +329,17 @@ enum MediaUploadFailure {
   /// The creator backed out mid-upload.
   cancelled,
 
-  /// The system picker would not open, or would not hand the file back.
-  /// Nothing to do with the API; see [CreatorMediaPicker].
+  /// The system picker would not open at all. Nothing to do with the API;
+  /// see [CreatorMediaPicker].
   pickerFailed,
+
+  /// The file was picked, and then could not be read. Nothing to do with
+  /// the API either, and kept apart from [pickerFailed] because the two
+  /// want different sentences: this one means the creator chose something
+  /// and the system could not produce it, which is worth a word about
+  /// cloud storage. See `CreatorMediaPicker.readFailure` for what used to
+  /// cause nearly all of these.
+  sourceUnreadable,
 
   /// 404. The row is gone — deleted from the web studio, or by another
   /// member of the channel, while this screen held it.

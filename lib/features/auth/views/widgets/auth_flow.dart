@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:test_app/core/router.dart';
 import 'package:test_app/features/auth/bloc/auth_bloc.dart';
+import 'package:test_app/utils/helpers/keyboard.dart';
 
 /// Where a sign-in goes next, for every screen that can start one.
 ///
@@ -16,6 +17,13 @@ abstract final class AuthFlow {
   /// Acts on [state]. Does nothing for a state it does not handle, so it is
   /// safe to call from a `BlocListener` that sees all of them.
   static void follow(BuildContext context, AuthState state) {
+    // Every branch below leaves the screen the keyboard belongs to. A
+    // `FocusNode` disposed while it still holds focus does not reliably
+    // reach the engine with a hide, so the keyboard outlives the form.
+    if (state is AuthSuccess || state is AuthTwoFactorRequired) {
+      dismissKeyboard();
+    }
+
     switch (state) {
       case AuthSuccess(:final user, :final isNewUser):
         // An account that has just been created has nothing to show in a

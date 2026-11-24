@@ -82,32 +82,29 @@ void main() {
     }
   });
 
-  group('reading the phone\'s own pictures', () {
-    test('both sides of the Android 13 split are declared', () {
-      // `LibraryPermissions` asks for photos at 33 and up and storage below
-      // it. One without the other leaves half the fleet unable to pick.
-      expect(manifest, contains('android.permission.READ_MEDIA_IMAGES'));
-      expect(manifest, contains('android.permission.READ_EXTERNAL_STORAGE'));
-    });
-
-    test('and the old one stops at the version that still needs it', () {
-      // Left open, Play Console rejects the upload and Android 13+ ignores
-      // it anyway.
+  group("reading the phone's own pictures", () {
+    test('the picker needs nothing declared, and nothing is', () {
+      // `android_file_picker` opens ACTION_GET_CONTENT for images, video
+      // and audio alike. The system picker hands one file back with a
+      // grant attached, so the app never holds library access — and a
+      // permission declared for it would be a line on the Play listing
+      // that nothing reads. READ_MEDIA_IMAGES and READ_EXTERNAL_STORAGE
+      // were declared for `file_picker` 8's ACTION_PICK, which did read
+      // MediaStore directly, and went with it.
+      expect(manifest, isNot(contains('android.permission.READ_MEDIA_IMAGES')));
       expect(
         manifest,
-        matches(
-          RegExp(
-            r'android\.permission\.READ_EXTERNAL_STORAGE"\s+'
-            r'android:maxSdkVersion="32"',
-          ),
-        ),
+        isNot(contains('android.permission.READ_EXTERNAL_STORAGE')),
       );
     });
 
-    test('a partial grant is declared, so it can be told from a refusal', () {
-      // Android 14's "Select photos". Without
-      // READ_MEDIA_VISUAL_USER_SELECTED the plugin cannot report `limited`,
-      // and a reader who allowed some photos is told they allowed none.
+    test('and the gallery scan still has the two it does need', () {
+      // `VideoScannerService` reads the library itself through
+      // `photo_manager`, which is a different thing from picking one file.
+      // READ_MEDIA_VISUAL_USER_SELECTED is Android 14's "Select videos":
+      // without it the plugin cannot report a partial grant, and a reader
+      // who allowed some videos is told they allowed none.
+      expect(manifest, contains('android.permission.READ_MEDIA_VIDEO'));
       expect(
         manifest,
         contains('android.permission.READ_MEDIA_VISUAL_USER_SELECTED'),
