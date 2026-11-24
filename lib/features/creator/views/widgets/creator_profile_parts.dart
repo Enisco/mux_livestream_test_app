@@ -9,6 +9,7 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -117,22 +118,18 @@ class CreatorProfileHeader extends StatelessWidget {
           height: 150.s + topInset,
           child: Stack(
             children: [
-              // TODO(api): bannerKey has no resolvable URL yet, so the banner
-              // falls back to the brand gradient.
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.brandPrimaryDeep,
-                        AppColors.brandSecondary,
-                      ],
-                    ),
+              // The brand gradient is the backdrop, not the fallback: it
+              // stays under the cover so a slow or broken load shows the
+              // channel's colours rather than a grey hole.
+              const Positioned.fill(child: _BannerPlate()),
+              if (AssetUrlResolver.resolve(profile.bannerKey) case final cover?)
+                Positioned.fill(
+                  child: Image.network(
+                    cover,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
-              ),
               Positioned(
                 left: 15.s,
                 top: topInset + 12.s,
@@ -157,6 +154,7 @@ class CreatorProfileHeader extends StatelessWidget {
               children: [
                 DetailAvatar(
                   name: profile.displayName,
+                  avatarUrl: AssetUrlResolver.resolve(profile.avatarKey),
                   isOrganization: profile.isOrganization,
                   size: 56,
                 ),
@@ -239,6 +237,22 @@ class CreatorProfileHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The channel's colours, under whatever cover art it has.
+class _BannerPlate extends StatelessWidget {
+  const _BannerPlate();
+
+  @override
+  Widget build(BuildContext context) => const DecoratedBox(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppColors.brandPrimaryDeep, AppColors.brandSecondary],
+      ),
+    ),
+  );
 }
 
 class _Actions extends StatelessWidget {
@@ -745,6 +759,55 @@ class CreatorTestimonyCard extends StatelessWidget {
   }
 }
 
+/// A Library section's heading, with the way to the rest of it.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.section,
+    required this.busy,
+    this.onSeeAll,
+  });
+
+  final LibrarySection section;
+  final bool busy;
+  final VoidCallback? onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.s, 20.s, 16.s, 12.s),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: busy ? null : onSeeAll,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                section.title,
+                style: AppStyles.heading(15, letterSpacing: -0.3),
+              ),
+            ),
+            if (busy)
+              SizedBox(
+                width: 14.s,
+                height: 14.s,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 1.6,
+                  color: AppColors.neutral400,
+                ),
+              )
+            else if (onSeeAll != null)
+              const Icon(
+                AppIcons.chevronRight,
+                size: 14,
+                color: AppColors.neutral400,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// One Library section as the design groups them.
 class LibrarySection {
   const LibrarySection({
@@ -752,12 +815,32 @@ class LibrarySection {
     required this.title,
     required this.items,
     this.total = 0,
+    this.cursor,
   });
 
   final String key;
   final String title;
   final List<WebFeedItem> items;
   final int total;
+
+  /// Where the next page starts, or null when this is all of it.
+  final String? cursor;
+
+  /// Whether the server says there is more than is drawn. `total` is the
+  /// only thing that knows: a full page is not proof of a next one.
+  bool get hasMore => cursor != null && total > items.length;
+
+  LibrarySection copyWith({
+    List<WebFeedItem>? items,
+    String? cursor,
+    bool clearCursor = false,
+  }) => LibrarySection(
+    key: key,
+    title: title,
+    items: items ?? this.items,
+    total: total,
+    cursor: clearCursor ? null : (cursor ?? this.cursor),
+  );
 
   static const order = <String, String>{
     'series': AppStrings.sectionSeries,
@@ -777,6 +860,7 @@ class CreatorLibraryTab extends StatelessWidget {
     required this.onOpen,
     this.onMore,
     this.onSeeAll,
+    this.expanding,
   });
 
   final List<LibrarySection> sections;
@@ -784,33 +868,24 @@ class CreatorLibraryTab extends StatelessWidget {
   final ValueChanged<WebFeedItem>? onMore;
   final ValueChanged<LibrarySection>? onSeeAll;
 
+  /// The section key whose next page is in flight.
+  final String? expanding;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final section in sections) ...[
-          Padding(
-            padding: EdgeInsets.fromLTRB(16.s, 20.s, 16.s, 12.s),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onSeeAll == null ? null : () => onSeeAll!(section),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      section.title,
-                      style: AppStyles.heading(15, letterSpacing: -0.3),
-                    ),
-                  ),
-                  const Icon(
-                    AppIcons.chevronRight,
-                    size: 14,
-                    color: AppColors.neutral400,
-                  ),
-                ],
-              ),
-            ),
+          _SectionHeader(
+            section: section,
+            busy: expanding == section.key,
+            // A chevron is a promise of more. It is drawn only when the
+            // server says there is more than the page already shown — a
+            // section that is complete gets its heading and nothing else.
+            onSeeAll: onSeeAll == null || !section.hasMore
+                ? null
+                : () => onSeeAll!(section),
           ),
           for (final item in section.items)
             LibraryRow(

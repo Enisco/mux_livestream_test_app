@@ -114,6 +114,10 @@ class DetailAvatar extends StatelessWidget {
     final ring =
         ringColor ?? (isOrganization ? AppColors.purple400 : AppColors.cyan400);
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    final letter = Center(
+      child: Text(initial, style: AppStyles.heading(size * 0.44)),
+    );
+    final url = avatarUrl?.trim();
     final avatar = Container(
       width: size.s,
       height: size.s,
@@ -121,16 +125,21 @@ class DetailAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         color: AppColors.brandPrimary,
         border: Border.all(color: ring, width: 2.s),
-        image: avatarUrl == null
-            ? null
-            : DecorationImage(
-                image: NetworkImage(avatarUrl!),
-                fit: BoxFit.cover,
-              ),
       ),
-      child: avatarUrl != null
-          ? null
-          : Center(child: Text(initial, style: AppStyles.heading(size * 0.44))),
+      clipBehavior: Clip.antiAlias,
+      // An `Image.network` and not a `DecorationImage`, which is what this
+      // was: a decoration has no error hook, so the initial had to be
+      // dropped whenever a URL was present, and a key that 404s left a
+      // blank circle for good. `errorBuilder` puts the initial back.
+      child: url == null || url.isEmpty
+          ? letter
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              width: size.s,
+              height: size.s,
+              errorBuilder: (_, _, _) => letter,
+            ),
     );
     if (!isOrganization) return avatar;
     return SizedBox(
@@ -543,6 +552,7 @@ class DetailCommentsPreview extends StatelessWidget {
     this.topComment,
     this.topCommentCreatedAt,
     this.topCommentAuthor,
+    this.topCommentAvatarUrl,
     this.onOpen,
   });
 
@@ -550,6 +560,7 @@ class DetailCommentsPreview extends StatelessWidget {
   final String? topComment;
   final DateTime? topCommentCreatedAt;
   final String? topCommentAuthor;
+  final String? topCommentAvatarUrl;
   final VoidCallback? onOpen;
 
   @override
@@ -584,7 +595,11 @@ class DetailCommentsPreview extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DetailAvatar(name: topCommentAuthor ?? '?', size: 32),
+              DetailAvatar(
+                name: topCommentAuthor ?? '?',
+                avatarUrl: topCommentAvatarUrl,
+                size: 32,
+              ),
               SizedBox(width: 12.s),
               Expanded(
                 child: Column(

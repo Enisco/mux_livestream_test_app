@@ -5,6 +5,7 @@ import 'package:test_app/models/library_models/giving_models.dart';
 import 'package:test_app/models/library_models/library_models.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 
 /// How a "mine" list is ordered.
 enum RecordsSort {
@@ -118,6 +119,9 @@ class ViewerRecordsRepo {
       author: creator?['displayName'] as String? ?? '',
       authorVerified:
           creator?['isVerified'] as bool? ?? creator?['verifiedAt'] != null,
+      authorAvatarUrl: AssetUrlResolver.resolve(
+        creator?['avatarKey'] as String?,
+      ),
       // `contentRef: null` means it went straight to the ministry.
       about: title ?? '',
       aboutKind: ref == null
@@ -187,6 +191,9 @@ class ViewerRecordsRepo {
       author: creator?['displayName'] as String? ?? '',
       authorVerified:
           creator?['isVerified'] as bool? ?? creator?['verifiedAt'] != null,
+      authorAvatarUrl: AssetUrlResolver.resolve(
+        creator?['avatarKey'] as String?,
+      ),
       submittedAgo: longAge(
         DateTime.tryParse(json['createdAt'] as String? ?? ''),
       ),
@@ -259,6 +266,9 @@ class ViewerRecordsRepo {
           '',
       ministryVerified:
           creator?['isVerified'] as bool? ?? creator?['verifiedAt'] != null,
+      ministryAvatarUrl: AssetUrlResolver.resolve(
+        creator?['avatarKey'] as String?,
+      ),
       // The guide names the `creator` byline but not which key holds its
       // id, and the other reads use both spellings.
       creatorId:

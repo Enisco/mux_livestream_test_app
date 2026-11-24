@@ -106,6 +106,9 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   List<CreatorTestimony> _testimonies = const [];
   List<LibrarySection> _library = const [];
 
+  /// The Library section whose next page is being fetched.
+  String? _expandingSection;
+
   @override
   void initState() {
     super.initState();
@@ -186,6 +189,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
                       title: LibrarySection.order[key]!,
                       items: r.items,
                       total: r.total ?? r.items.length,
+                      cursor: r.nextCursor,
                     ),
                   )
                   .catchError((Object e) {
@@ -255,6 +259,48 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
       setState(() => _profile = profile);
     }
     setState(() => _followBusy = false);
+  }
+
+  /// "See all" on a Library section. Each section is fetched 16 rows at a
+  /// time, so the rest of it is the next page — appended in place, because
+  /// no frame in the design puts one section on a screen of its own.
+  Future<void> _seeAllLibrary(LibrarySection section) async {
+    final id = _profile?.id;
+    final cursor = section.cursor;
+    if (id == null || cursor == null || _expandingSection != null) return;
+    setState(() => _expandingSection = section.key);
+    try {
+      final page = await _repo.fetchCreatorLibrary(
+        id,
+        section.key,
+        cursor: cursor,
+      );
+      if (!mounted) return;
+      setState(() {
+        final i = _library.indexWhere((s) => s.key == section.key);
+        if (i >= 0) {
+          _library = [..._library]
+            ..[i] = _library[i].copyWith(
+              items: [..._library[i].items, ...page.items],
+              cursor: page.nextCursor,
+              clearCursor: page.nextCursor == null,
+            );
+        }
+      });
+    } catch (e) {
+      logger.w('library/${section.key} next page failed', error: e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppStrings.creatorLibraryMoreFailed),
+            backgroundColor: AppColors.neutral800,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _expandingSection = null);
+    }
   }
 
   void _openItem(WebFeedItem item) {
@@ -456,6 +502,8 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
             sections: _library,
             onOpen: _openItem,
             onMore: (e) => unawaited(_openCardActions(e)),
+            onSeeAll: (s) => unawaited(_seeAllLibrary(s)),
+            expanding: _expandingSection,
           ),
         ),
       ];

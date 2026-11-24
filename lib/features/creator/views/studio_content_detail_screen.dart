@@ -1,5 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:sizing/sizing.dart';
 
@@ -7,6 +9,8 @@ import 'package:test_app/features/creator/views/new_article_screen.dart';
 import 'package:test_app/features/creator/views/new_event_screen.dart';
 import 'package:test_app/features/creator/views/new_media_screen.dart';
 import 'package:test_app/features/creator/services/content_delete.dart';
+import 'package:test_app/features/engagement/data/share_link_action.dart';
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount;
@@ -68,6 +72,9 @@ class StudioContentDetailScreen extends StatefulWidget {
 
 class _StudioContentDetailScreenState extends State<StudioContentDetailScreen> {
   StudioContentItem get item => widget.item;
+
+  /// A share mint in flight, so a double tap cannot post twice.
+  bool _sharing = false;
 
   /// A delete in flight. Every control is held while it is, because the one
   /// thing worse than a slow delete is two of them.
@@ -177,12 +184,32 @@ class _StudioContentDetailScreenState extends State<StudioContentDetailScreen> {
     );
   }
 
-  /// Nothing in the API returns a public URL for a piece of content — only
-  /// the creator's handle — so there is no link to put on the clipboard yet.
-  /// See OPEN_ISSUES.
-  void _copyLink() {
-    Clipboard.setData(const ClipboardData(text: ''));
-    _report(AppStrings.contentNoPublicLink);
+  /// Mints a share link for this row and puts it on the clipboard — the
+  /// same route the viewer side's Share uses. It replaces a handler that
+  /// reported "no shareable link" for everything and, worse, wrote an empty
+  /// string over whatever the creator had on their clipboard.
+  ///
+  /// Only content the platform is serving gets one. A draft has no public
+  /// address, so saying so is the truth rather than a stand-in.
+  Future<void> _copyLink() async {
+    if (_sharing) return;
+    final targetType = item.shareTargetType;
+    if (!item.hasPublicLink || targetType == null) {
+      _report(AppStrings.contentNotPublicYet);
+      return;
+    }
+    setState(() => _sharing = true);
+    try {
+      final url = await copyShareLink(
+        engagement: GetIt.instance<EngagementRepo>(),
+        targetType: targetType,
+        targetId: item.id,
+      );
+      if (!mounted) return;
+      _report(url ?? AppStrings.cardShareUnavailable);
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 
   @override
@@ -257,14 +284,14 @@ class _StudioContentDetailScreenState extends State<StudioContentDetailScreen> {
                   SizedBox(height: 22.s),
                   _PrimaryAction(
                     label: AppStrings.contentShare,
-                    onTap: () => _report(AppStrings.contentNoPublicLink),
+                    onTap: () => unawaited(_copyLink()),
                   ),
                   SizedBox(height: 12.s),
                   _OutlinedAction(
                     actionKey: const ValueKey('detail-copy-link'),
                     icon: HugeIcons.strokeRoundedLink02,
                     label: AppStrings.contentCopyLink,
-                    onTap: () => _copyLink(),
+                    onTap: () => unawaited(_copyLink()),
                   ),
                   SizedBox(height: 12.s),
                   if (_isEditable)

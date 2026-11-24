@@ -20,8 +20,10 @@ import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/models/discovery_models/vertical_feed_item.dart';
+import 'package:test_app/features/discovery/views/widgets/watch_rail.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/video_fit.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/app_session_service.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
@@ -472,6 +474,7 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
 
   String? _creatorHandle;
   String? _creatorDisplayName;
+  String? _creatorAvatarUrl;
 
   final _repo = GetIt.instance<DiscoveryRepo>();
   final _engagement = GetIt.instance<EngagementRepo>();
@@ -709,11 +712,19 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     if (creator == null) return;
     final handle = creator.handle.isNotEmpty ? creator.handle : null;
     final name = creator.displayName.isNotEmpty ? creator.displayName : null;
-    if (handle == _creatorHandle && name == _creatorDisplayName) return;
+    final avatar = AssetUrlResolver.resolve(creator.avatarKey);
+    // The avatar is checked too: a row that already carried a name would
+    // otherwise return here with the logo still unresolved.
+    if (handle == _creatorHandle &&
+        name == _creatorDisplayName &&
+        avatar == _creatorAvatarUrl) {
+      return;
+    }
     if (mounted) {
       setState(() {
         _creatorHandle = handle;
         _creatorDisplayName = name;
+        _creatorAvatarUrl = avatar;
       });
     }
   }
@@ -1088,14 +1099,15 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _AvatarButton(
+              WatchRailAvatar(
                 displayName: _creatorDisplayName ?? _creatorHandle ?? '',
+                avatarUrl: _creatorAvatarUrl,
                 following: _isFollowing,
                 onTap: _openCreator,
                 onFollow: _toggleFollow,
               ),
-              const SizedBox(height: 24),
-              _FeedActionButton(
+              const SizedBox(height: WatchRail.gapAfterAvatar),
+              WatchRailAction(
                 // Filled and brand-coloured once it is the viewer's own
                 // like, which is the only thing that tells them the tap
                 // landed — the count moves by one and one is easy to miss.
@@ -1106,20 +1118,20 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
                 color: state.liked ? AppColors.brandPrimary : Colors.white,
                 onTap: _toggleLike,
               ),
-              const SizedBox(height: 20),
-              _FeedActionButton(
+              const SizedBox(height: WatchRail.gap),
+              WatchRailAction(
                 icon: IconsaxPlusLinear.message,
                 label: _formatCount(state.comments),
                 onTap: _openComments,
               ),
-              const SizedBox(height: 20),
-              _FeedActionButton(
+              const SizedBox(height: WatchRail.gap),
+              WatchRailAction(
                 icon: IconsaxPlusLinear.send_2,
                 label: AppStrings.cardShare,
                 onTap: () => unawaited(_share()),
               ),
-              const SizedBox(height: 20),
-              _FeedActionButton(
+              const SizedBox(height: WatchRail.gap),
+              WatchRailAction(
                 icon: _isMuted
                     ? IconsaxPlusLinear.volume_slash
                     : IconsaxPlusLinear.volume_high,
@@ -1238,130 +1250,6 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
     if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
     return '$count';
-  }
-}
-
-class _AvatarButton extends StatelessWidget {
-  final String displayName;
-  final VoidCallback onFollow;
-
-  /// Whether the viewer already follows this ministry.
-  final bool following;
-
-  /// The avatar itself opens the channel; the badge on it follows.
-  final VoidCallback onTap;
-  const _AvatarButton({
-    required this.displayName,
-    required this.onFollow,
-    required this.onTap,
-    this.following = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
-    return SizedBox(
-      width: 52,
-      height: 58,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
-                color: AppColors.neutral800,
-              ),
-              child: Center(
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: onFollow,
-              child: Center(
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    // Following turns the badge grey with a tick.
-                    color: following
-                        ? AppColors.neutral700
-                        : AppColors.brandPrimary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    following ? Icons.check_rounded : Icons.add_rounded,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeedActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _FeedActionButton({
-    required this.icon,
-    this.label = '',
-    this.color = Colors.white,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap ?? () {},
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 30,
-            shadows: const [Shadow(blurRadius: 6, color: Colors.black87)],
-          ),
-          if (label.isNotEmpty) ...[
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                shadows: [Shadow(blurRadius: 4, color: Colors.black87)],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }
 

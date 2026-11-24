@@ -243,6 +243,7 @@ class _PrayerCard extends StatelessWidget {
     return _RecordCard(
       moreKey: ValueKey('more-${request.id}'),
       author: request.author,
+      avatarUrl: request.authorAvatarUrl,
       authorVerified: request.authorVerified,
       subtitle: request.aboutIsGeneral
           ? AppStrings.prayerGeneral
@@ -505,6 +506,7 @@ class _TestimonyCard extends StatelessWidget {
     return _RecordCard(
       moreKey: ValueKey('more-${testimony.id}'),
       author: testimony.author,
+      avatarUrl: testimony.authorAvatarUrl,
       authorVerified: testimony.authorVerified,
       subtitle:
           '${AppStrings.testimoniesSubmittedPrefix} ${testimony.submittedAgo}',
@@ -589,6 +591,7 @@ class _RecordCard extends StatelessWidget {
   const _RecordCard({
     required this.moreKey,
     required this.author,
+    this.avatarUrl,
     required this.authorVerified,
     required this.subtitle,
     required this.statusLabel,
@@ -604,6 +607,7 @@ class _RecordCard extends StatelessWidget {
   final Key moreKey;
   final String author;
   final bool authorVerified;
+  final String? avatarUrl;
   final String subtitle;
   final List<List<dynamic>>? subtitleIcon;
   final String statusLabel;
@@ -629,7 +633,7 @@ class _RecordCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Avatar(size: 32.s),
+              _Avatar(size: 32.s, url: avatarUrl),
               SizedBox(width: 10.s),
               Expanded(
                 child: Column(
@@ -783,14 +787,22 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-/// A placeholder ring; creator avatars are not resolved anywhere yet.
+/// The ministry's logo in a ring; the ring alone when there is none, when
+/// the byline lookup failed, or when the key will not load.
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.size});
+  const _Avatar({required this.size, this.url});
 
   final double size;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
+    final src = url?.trim();
+    final blank = Icon(
+      Icons.person,
+      size: size * 0.6,
+      color: AppColors.neutral400,
+    );
     return Container(
       width: size,
       height: size,
@@ -799,7 +811,16 @@ class _Avatar extends StatelessWidget {
         color: AppColors.buttonSecondaryActive,
         border: Border.all(color: AppColors.purple400, width: size / 20),
       ),
-      child: Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400),
+      clipBehavior: Clip.antiAlias,
+      child: src == null || src.isEmpty
+          ? blank
+          : Image.network(
+              src,
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              errorBuilder: (_, _, _) => blank,
+            ),
     );
   }
 }

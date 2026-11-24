@@ -8,6 +8,7 @@ import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
 import 'package:test_app/shared/services/viewer_identity.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 
 /// Shared head of both empty tabs: a tinted disc, a headline and a line of
 /// explanation, then a hairline before the list below.
@@ -194,7 +195,10 @@ class _SuggestionRow extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: 16.s, vertical: 12.s),
         child: Row(
           children: [
-            _Avatar(name: creator.displayName),
+            _Avatar(
+              name: creator.displayName,
+              avatarUrl: AssetUrlResolver.resolve(creator.avatarKey),
+            ),
             SizedBox(width: 12.s),
             Expanded(
               child: Column(
@@ -547,13 +551,19 @@ class _DateBlock extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name});
+  const _Avatar({required this.name, this.avatarUrl});
 
   final String name;
+
+  /// The ministry's logo, falling back to the initial when there is none
+  /// and when the one there is will not load.
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    final letter = Center(child: Text(initial, style: AppStyles.heading(16)));
+    final url = avatarUrl?.trim();
     return Container(
       width: 42.s,
       height: 42.s,
@@ -563,7 +573,16 @@ class _Avatar extends StatelessWidget {
           colors: [AppColors.brandPrimary, AppColors.brandPrimaryDeep],
         ),
       ),
-      child: Center(child: Text(initial, style: AppStyles.heading(16))),
+      clipBehavior: Clip.antiAlias,
+      child: url == null || url.isEmpty
+          ? letter
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              width: 42.s,
+              height: 42.s,
+              errorBuilder: (_, _, _) => letter,
+            ),
     );
   }
 }

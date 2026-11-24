@@ -170,6 +170,7 @@ class SearchContentRow extends StatelessWidget {
         title: item.title,
         creatorName: item.creatorDisplayName,
         creatorVerified: item.creatorVerified,
+        avatarUrl: item.avatarUrl,
         // The whole ladder, not just the first rung: a video published
         // without a cover carries neither a URL nor a key, and only the
         // public asset proxy can answer for it.
@@ -246,7 +247,7 @@ class SearchEventRow extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      _Avatar(url: null, size: 12.s),
+                      _Avatar(url: item.avatarUrl, size: 12.s),
                       SizedBox(width: 4.s),
                       Flexible(
                         child: Text(

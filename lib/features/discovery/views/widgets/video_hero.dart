@@ -164,15 +164,27 @@ class _VideoHeroState extends State<VideoHero> {
   }
 
   Widget _buildFrame(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: VideoFit.landscapeAspect,
-      child: ColoredBox(
-        color: Colors.black,
-        child: ValueListenableBuilder<PlaybackState>(
-          valueListenable: widget.playback.state,
-          builder: (context, state, _) {
-            final active = state.isActive(_mediaId);
-            return ValueListenableBuilder<bool>(
+    return ValueListenableBuilder<PlaybackState>(
+      valueListenable: widget.playback.state,
+      builder: (context, state, _) {
+        final active = state.isActive(_mediaId);
+        // The frame takes the video's own shape once the decoder has
+        // reported it, so a 4:3 sermon or a square clip is neither cropped
+        // to fill a 16:9 box nor padded out to one. Only while this is the
+        // active media: the size on a shared state belongs to whatever is
+        // actually loaded, and borrowing another video's shape would be
+        // worse than the assumption.
+        final aspect = active
+            ? VideoFit.frameAspect(
+                width: state.videoWidth,
+                height: state.videoHeight,
+              )
+            : VideoFit.landscapeAspect;
+        return AspectRatio(
+          aspectRatio: aspect,
+          child: ColoredBox(
+            color: Colors.black,
+            child: ValueListenableBuilder<bool>(
               valueListenable: widget.playback.fullscreen,
               builder: (context, fullscreen, _) => Stack(
                 fit: StackFit.expand,
@@ -186,7 +198,7 @@ class _VideoHeroState extends State<VideoHero> {
                     Video(
                       controller: widget.videoController!,
                       controls: null,
-                      fit: VideoFit.landscapeFrame,
+                      fit: VideoFit.inPageFrame,
                     )
                   else
                     _HeroStill(url: widget.thumbnailUrl),
@@ -224,10 +236,10 @@ class _VideoHeroState extends State<VideoHero> {
                   ),
                 ],
               ),
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

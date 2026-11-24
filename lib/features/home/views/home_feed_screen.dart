@@ -300,6 +300,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
     try {
       await _repo.setFollowing(creator.creatorId, follow: !creator.isFollowing);
       if (!mounted) return;
+      // Every other surface reads the store, so it has to hear about a
+      // follow made here too — otherwise the feed, Explore and search go on
+      // offering Follow for a ministry this reader has just followed.
+      _store.adoptFollowing(creator.creatorId, !creator.isFollowing);
       // Following someone means the tab has content now.
       setState(() {
         _suggestions = _suggestions

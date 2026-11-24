@@ -470,6 +470,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       title: item.title,
       creatorName: item.creatorName,
       creatorVerified: item.creatorVerified,
+      avatarUrl: item.source?.avatarUrl,
       thumbnailAsset: item.thumbnailAsset,
       thumbnailUrl: item.thumbnailUrl,
       glyph: glyphFor(item.kind),

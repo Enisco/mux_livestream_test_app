@@ -7,10 +7,13 @@ import 'package:sizing/sizing.dart';
 import 'package:test_app/core/locator.dart';
 import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/audio_hero.dart';
+import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/discovery/views/widgets/video_hero.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/hls_manifest.dart';
+import 'package:test_app/features/discovery/views/widgets/portrait_watch_view.dart';
+import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/analytics/views/widgets/promoted_impression_tracker.dart';
@@ -83,6 +86,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   bool _followBusy = false;
   bool _canGive = false;
 
+  /// Which way this video is shaped, and so which of the two watching
+  /// surfaces it gets: a frame with the page under it, or the whole screen.
+  ///
+  /// Read from the decoder, which reports the picture's size a beat after
+  /// playback starts — there is nothing in the API that says. **Locked once
+  /// it is known**: the layout may settle on arrival, but it must never
+  /// change under a reader who is already watching.
+  VideoShape _shape = VideoShape.unknown;
+
   final List<MediaComment> _comments = [];
   bool _commentsLoading = false;
   bool _commentsLoadingMore = false;
@@ -104,8 +116,44 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _playback.state.addListener(_followShape);
+    _followShape();
     _resolveSession();
     _fetchDetail();
+  }
+
+  @override
+  void dispose() {
+    _playback.state.removeListener(_followShape);
+    super.dispose();
+  }
+
+  /// Settles which watching surface this video gets, once.
+  ///
+  /// The common path costs nothing: the feed card that opened this screen
+  /// was already autoplaying, so the shared state usually carries the size
+  /// before the first frame is drawn here and the right layout is the first
+  /// one shown. Otherwise it arrives a beat later and the layout settles
+  /// into place.
+  void _followShape() {
+    if (_shape != VideoShape.unknown) return;
+    // Music has its own listening layout, and a track has no picture to be
+    // shaped by.
+    if (_mediaType == MediaTypes.music) return;
+    // Not while the fullscreen route is up. Swapping the surface under it
+    // tears down the hero, and the hero pauses what it was playing on the
+    // way out — which would stop the video the reader is watching. Playback
+    // keeps publishing position, so this settles as soon as that route
+    // closes.
+    if (_playback.fullscreen.value) return;
+    final state = _playback.state.value;
+    if (!state.isActive(_mediaId)) return;
+    final shape = VideoFit.shapeOf(
+      width: state.videoWidth,
+      height: state.videoHeight,
+    );
+    if (shape == VideoShape.unknown || !mounted) return;
+    setState(() => _shape = shape);
   }
 
   Future<void> _resolveSession() async {
@@ -235,6 +283,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   Future<void> _toggleFollow() async {
     final creatorId = _detail?.creator?.creatorId;
     if (creatorId == null || _followBusy) return;
+    if (!_requireAccount('follow creators')) return;
     setState(() => _followBusy = true);
     await _store.toggleFollow(creatorId);
     if (mounted) setState(() => _followBusy = false);
@@ -281,6 +330,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   );
 
   /// Mints a share link and puts it on the clipboard.
+  /// The `…` beside the creator: share the channel, mute it, block it —
+  /// the same sheet every card's overflow opens.
+  Future<void> _openCardActions({bool isOwn = false}) => showCardActionsSheet(
+    context,
+    widget.item,
+    requireAccount: _requireAccount,
+    isOwn: isOwn,
+  );
+
   Future<void> _share() async {
     final url = await copyShareLink(
       engagement: _engagementRepo,
@@ -343,6 +401,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // An upright video gets the whole screen instead of a frame in a page.
+    // Cropping one to fill a 16:9 frame left a strip across the middle of
+    // a screen that was already the right shape for it.
+    if (_shape == VideoShape.portrait) return _buildPortrait();
+
     // The design has no app bar — the back arrow floats over the hero.
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -376,31 +439,91 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   ],
                 ),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: _loading
-                      ? Padding(
-                          padding: EdgeInsets.symmetric(vertical: 64.s),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.brandPrimary,
-                            ),
-                          ),
-                        )
-                      : _error != null
-                      ? _buildError()
-                      // Rebuilt on any engagement change, wherever it was
-                      // made — a like on the card behind this page, a
-                      // comment posted in the sheet over it.
-                      : ListenableBuilder(
-                          listenable: _store,
-                          builder: (context, _) => _buildInfo(),
-                        ),
-                ),
-              ),
+              Expanded(child: SingleChildScrollView(child: _buildPageBody())),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// The title, description, impact row, comments and suggestions — the same
+  /// page on both layouts. Upright, it rides the swipe-up sheet; otherwise it
+  /// scrolls under the hero.
+  Widget _buildPageBody() {
+    if (_loading) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 64.s),
+        child: const Center(
+          child: CircularProgressIndicator(color: AppColors.brandPrimary),
+        ),
+      );
+    }
+    if (_error != null) return _buildError();
+    // Rebuilt on any engagement change, wherever it was made — a like on the
+    // card behind this page, a comment posted in the sheet over it.
+    return ListenableBuilder(
+      listenable: _store,
+      builder: (context, _) => _buildInfo(),
+    );
+  }
+
+  /// Watching an upright video: the picture is the screen, every control the
+  /// page offers is on the rail, and the page itself comes up from the bottom
+  /// edge when it is wanted.
+  Widget _buildPortrait() {
+    final detail = _detail;
+    final creator = detail?.creator;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: ListenableBuilder(
+        listenable: _store,
+        builder: (context, _) {
+          final engagement = _engagement;
+          return PortraitWatchView(
+            playback: _playback,
+            target: _target,
+            videoController: _playback.videoController,
+            playbackUrl: detail?.playback?.playbackUrl,
+            thumbnailUrl: _stillUrl,
+            isLive: detail?.media.isLiveNow ?? widget.item.isLiveNow,
+            title: detail?.media.title.isNotEmpty == true
+                ? detail!.media.title
+                : widget.item.title,
+            creatorName: creator?.displayName ?? widget.item.creatorDisplayName,
+            creatorHandle: creator?.handle,
+            description: detail?.media.description,
+            likes: formatCount(engagement.likes),
+            saves: formatCount(engagement.saves),
+            comments: formatCount(engagement.comments),
+            liked: engagement.liked,
+            saved: engagement.saved,
+            hasCreator: creator != null,
+            avatarUrl: AssetUrlResolver.resolve(creator?.avatarKey),
+            following: creator != null && _store.isFollowing(creator.creatorId),
+            canGive: _canGive,
+            onBack: () => Navigator.of(context).maybePop(),
+            onCreator: creator == null
+                ? null
+                : () =>
+                      openCreatorProfile(context, creatorId: creator.creatorId),
+            onFollow: _toggleFollow,
+            onLike: _toggleLike,
+            onSave: _toggleSave,
+            onShare: () => unawaited(_share()),
+            onGive: () => unawaited(_give()),
+            // No `topInset`: there is no hero to land under, so the sheet
+            // takes the height it normally would.
+            onComments: () => openComments(
+              context,
+              targetType: InteractionTargets.media,
+              targetId: _mediaId,
+              initialCount: engagement.comments,
+            ),
+            // Content only: the sheet scrolls it, handle and all.
+            page: (context) => _buildPageBody(),
+          );
+        },
       ),
     );
   }
@@ -472,6 +595,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   name: creator.displayName,
                   subscribersLabel:
                       '${formatCount(creator.subscriberCount)} Subscribers',
+                  avatarUrl: AssetUrlResolver.resolve(creator.avatarKey),
                   verified: creator.isVerified,
                   isOrganization: creator.isOrganization,
                   following: _store.isFollowing(creator.creatorId),
@@ -479,6 +603,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   onTap: () =>
                       openCreatorProfile(context, creatorId: creator.creatorId),
                   onFollow: _toggleFollow,
+                  onMore: () => unawaited(
+                    _openCardActions(isOwn: creator.isOwnedByViewer),
+                  ),
                 ),
               ],
               SizedBox(height: 23.s),
@@ -505,6 +632,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 count: _engagement.comments,
                 topComment: top?.body,
                 topCommentAuthor: top?.author?.displayName,
+                topCommentAvatarUrl: AssetUrlResolver.resolve(
+                  top?.author?.avatarKey,
+                ),
                 topCommentCreatedAt: top?.createdAt,
                 onOpen: () => openComments(
                   context,

@@ -192,7 +192,11 @@ class ContinueWatchingCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      DetailAvatar(name: progress.creatorName, size: 14),
+                      DetailAvatar(
+                        name: progress.creatorName,
+                        avatarUrl: progress.avatarUrl,
+                        size: 14,
+                      ),
                       SizedBox(width: 5.s),
                       Flexible(
                         child: Text(

@@ -158,6 +158,10 @@ Future<_FakeApi> _pump(WidgetTester tester, _FakeApi api) async {
   return api;
 }
 
+/// A full URL, which `AssetUrlResolver` passes through as-is — so this
+/// needs no `CDN_BASE_URL` loaded.
+const _logo = 'https://cdn.example.test/public/avatar/c1/logo.png';
+
 void main() {
   setUpAll(loadAppFonts);
 
@@ -274,6 +278,64 @@ void main() {
     );
     // From recommended-creators, not a hardcoded trio.
     expect(find.text('CCI International'), findsOneWidget);
+  });
+
+  testWidgets('and so does following one of them, which it used not to', (
+    tester,
+  ) async {
+    // `_unfollow` adopted into the store from the start; `_follow` never
+    // did. So following a suggestion here left the feed, Explore and search
+    // still offering Follow for a ministry now on this very list.
+    await _pump(
+      tester,
+      _FakeApi(
+        recommended: const [
+          {
+            'creatorId': 's1',
+            'displayName': 'CCI International',
+            'handle': 'cciinternational',
+          },
+        ],
+      ),
+    );
+    final store = GetIt.instance<EngagementStore>();
+    expect(store.knowsFollowing('s1'), isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('follow-s1')));
+    await tester.pumpAndSettle();
+
+    expect(store.isFollowing('s1'), isTrue);
+  });
+
+  testWidgets('a ministry with a logo shows it, not a grey stand-in', (
+    tester,
+  ) async {
+    // `MinistryAvatar` drew the same person icon for everyone, with a note
+    // saying ministry avatars were resolved nowhere — which stopped being
+    // true once the feed resolved them. Both models already carried the
+    // URL; the widget simply ignored it.
+    await _pump(
+      tester,
+      _FakeApi(
+        following: [
+          {..._row('c1', 'Living Faith'), 'avatarKey': _logo},
+        ],
+      ),
+    );
+
+    final urls = tester
+        .widgetList<Image>(find.byType(Image))
+        .map((i) => i.image)
+        .whereType<NetworkImage>()
+        .map((p) => p.url);
+    expect(urls, contains(_logo));
+  });
+
+  testWidgets('and one without keeps the ring it always drew', (tester) async {
+    await _pump(tester, _FakeApi(following: [_row('c1', 'Living Faith')]));
+
+    expect(find.byType(Image), findsNothing);
+    expect(find.byIcon(Icons.person), findsWidgets);
   });
 
   testWidgets('unfollowing tells every other surface, not just this list', (

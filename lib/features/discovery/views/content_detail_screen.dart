@@ -17,6 +17,7 @@ import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/engagement/data/share_link_action.dart';
 import 'package:test_app/features/giving/data/give_action.dart';
 import 'package:test_app/features/giving/data/giving_capability_store.dart';
+import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
     show formatCount, relativeAge;
@@ -25,6 +26,7 @@ import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/content_detail.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/analytics_service.dart';
 import 'package:test_app/shared/services/maps_launcher.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
@@ -158,6 +160,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   bool _reported = false;
   bool _authed = false;
   bool _canGive = false;
+  bool _followBusy = false;
 
   /// Mirrors `viewerProgress.completedEntryIds`, updated as days are marked.
   Set<String> _completedEntryIds = const {};
@@ -297,11 +300,41 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
     if (creatorId.isEmpty) return;
     try {
       final creator = await _repo.fetchCreatorById(creatorId);
-      if (mounted) setState(() => _creator = creator);
+      if (!mounted) return;
+      _store.seedFollowing(creator.id, creator.isFollowing);
+      setState(() => _creator = creator);
     } catch (e) {
       logger.w('creator lookup failed', error: e);
     }
   }
+
+  /// Whether the reader follows this ministry. The store is the one truth, so
+  /// a follow made on the channel page or a card shows here without a
+  /// refetch; the row that opened this screen is only the opening guess.
+  bool get _isFollowing => _store.isFollowing(
+    _ministryId,
+    fallback: _creator?.isFollowing ?? widget.item.isFollowingCreator,
+  );
+
+  Future<void> _toggleFollow() async {
+    final creatorId = _ministryId;
+    if (creatorId.isEmpty || _followBusy) return;
+    if (!_requireAccount('follow creators')) return;
+    setState(() => _followBusy = true);
+    await _store.toggleFollow(
+      creatorId,
+      fallback: _creator?.isFollowing ?? widget.item.isFollowingCreator,
+    );
+    if (mounted) setState(() => _followBusy = false);
+  }
+
+  /// The `…` beside the creator — share, mute, block, report.
+  Future<void> _openCardActions() => showCardActionsSheet(
+    context,
+    widget.item,
+    requireAccount: _requireAccount,
+    isOwn: _creator?.isOwnedByViewer ?? false,
+  );
 
   /// Who the gift would go to. The payload names the creator in a different
   /// place per entity type, and a library row names it nowhere but the hit.
@@ -439,14 +472,22 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                   name: _creatorName,
                   subscribersLabel:
                       '${formatCount(_subscribers)} ${AppStrings.subscribers}',
+                  avatarUrl: AssetUrlResolver.imageFor(
+                    url: widget.item.avatarUrl,
+                    key: _creator?.avatarKey,
+                  ),
                   verified: _creator?.isVerified ?? widget.item.creatorVerified,
                   isOrganization:
                       _creator?.isOrganization ??
                       widget.item.meta.creatorType == 'organization',
+                  following: _isFollowing,
+                  busy: _followBusy,
                   onTap: () => openCreatorProfile(
                     context,
                     creatorId: _creator?.id ?? widget.item.profileCreatorId,
                   ),
+                  onFollow: _toggleFollow,
+                  onMore: () => unawaited(_openCardActions()),
                 ),
                 SizedBox(height: 20.s),
                 const DetailDivider(),

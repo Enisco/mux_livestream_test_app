@@ -203,6 +203,7 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
                           title: item.title,
                           creatorName: item.creatorName,
                           creatorVerified: item.creatorVerified,
+                          avatarUrl: item.source?.avatarUrl,
                           thumbnailAsset: item.thumbnailAsset,
                           thumbnailUrl: item.thumbnailUrl,
                           glyph: glyphFor(item.kind),

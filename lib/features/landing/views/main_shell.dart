@@ -11,10 +11,12 @@ import 'package:test_app/features/home/views/widgets/home_feed_header.dart';
 import 'package:test_app/features/landing/views/widgets/gtube_nav_bar.dart';
 import 'package:test_app/features/landing/views/widgets/profile_auth_wall.dart';
 import 'package:test_app/features/profile/views/profile_screen.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/shared/services/volume_key_unmuter.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -77,7 +79,17 @@ class _MainShellState extends State<MainShell> {
         padding: EdgeInsets.only(bottom: 10.s),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [GTubeNavBar(index: _selectedIndex, onChanged: _onNavTap)],
+          children: [
+            GTubeNavBar(
+              index: _selectedIndex,
+              onChanged: _onNavTap,
+              // The You tab draws the reader's own face, the same key the
+              // profile header resolves. The bar has taken an `avatarUrl`
+              // all along and this, its only call site, never passed one —
+              // so the tab drew an empty ring for everybody.
+              avatarUrl: AssetUrlResolver.resolve(LocalStorage.cachedAvatarKey),
+            ),
+          ],
         ),
       ),
     );

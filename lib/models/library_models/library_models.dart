@@ -68,6 +68,7 @@ class PrayerRequest {
     required this.sharedAgo,
     required this.status,
     this.authorVerified = false,
+    this.authorAvatarUrl,
     this.aboutGone = false,
     this.aboutItem,
   });
@@ -75,6 +76,9 @@ class PrayerRequest {
   final String id;
   final String author;
   final bool authorVerified;
+
+  /// The ministry's logo, from the row's `creator` byline.
+  final String? authorAvatarUrl;
 
   /// What it was asked about. Empty when [aboutKind] is
   /// [PrayerAbout.general] — there is no one thing to name.
@@ -110,6 +114,7 @@ class Testimony {
     required this.body,
     required this.status,
     this.authorVerified = false,
+    this.authorAvatarUrl,
     this.wall = '',
     this.creatorId = '',
   });
@@ -117,6 +122,9 @@ class Testimony {
   final String id;
   final String author;
   final bool authorVerified;
+
+  /// The ministry's logo, from the row's `creator` byline.
+  final String? authorAvatarUrl;
 
   /// "3 days ago", "2 weeks ago".
   final String submittedAgo;

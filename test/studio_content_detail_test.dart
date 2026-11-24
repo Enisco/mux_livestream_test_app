@@ -1,6 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
+
+import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/shared/services/api_service.dart';
 
 import 'package:test_app/features/creator/views/studio_content_detail_screen.dart';
 import 'package:test_app/models/creator_models/studio_content_models.dart';
@@ -43,6 +49,33 @@ StudioContentItem _media({
   'categorySlugs': ['bible-study'],
   'publishedAt': '2026-06-06T00:00:00.000Z',
 });
+
+const _shareUrl = 'https://gospeltube.tv/w/abc?analyticsSource=share_link';
+
+/// What the share mint put on the clipboard.
+String? _copied;
+
+class _FakeShareApi implements ApiService {
+  @override
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async => Response<T>(
+    requestOptions: RequestOptions(path: path),
+    statusCode: 200,
+    data:
+        {
+              'data': {'url': _shareUrl},
+            }
+            as T,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
 
 void main() {
   setUpAll(loadAppFonts);
@@ -153,12 +186,56 @@ void main() {
     expect(find.textContaining('%'), findsNothing);
   });
 
-  testWidgets('sharing says plainly that there is no link yet', (tester) async {
-    await _pump(tester, _media());
+  group('sharing a row of your own', () {
+    setUp(() {
+      _copied = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              _copied = (call.arguments as Map)['text'] as String?;
+            }
+            return null;
+          });
+      GetIt.instance.registerSingleton<EngagementRepo>(
+        EngagementRepo(api: _FakeShareApi()),
+      );
+      addTearDown(GetIt.instance.reset);
+    });
 
-    await tester.tap(find.byKey(const ValueKey('detail-copy-link')));
-    await tester.pump();
-    expect(find.text(AppStrings.contentNoPublicLink), findsOneWidget);
+    testWidgets('a published row mints a real link', (tester) async {
+      await _pump(tester, _media());
+
+      await tester.tap(find.byKey(const ValueKey('detail-copy-link')));
+      await tester.pumpAndSettle();
+
+      // The handler used to report "no shareable link" for everything, and
+      // wrote an empty string over whatever the creator had copied.
+      expect(_copied, _shareUrl);
+      expect(find.text(_shareUrl), findsOneWidget);
+    });
+
+    testWidgets('and the big Share button is the same action', (tester) async {
+      await _pump(tester, _media());
+
+      await tester.tap(find.text(AppStrings.contentShare));
+      await tester.pumpAndSettle();
+
+      expect(_copied, _shareUrl);
+    });
+
+    testWidgets('a draft says to publish it first, and copies nothing', (
+      tester,
+    ) async {
+      await _pump(tester, _media(status: 'draft'));
+
+      await tester.tap(find.byKey(const ValueKey('detail-copy-link')));
+      await tester.pumpAndSettle();
+
+      // There is a share route; what a draft lacks is a public page for it
+      // to point at. Minting one would hand over a dead URL.
+      expect(find.text(AppStrings.contentNotPublicYet), findsOneWidget);
+      expect(_copied, isNull);
+    });
   });
 
   testWidgets('nothing overflows on a narrow phone', (tester) async {

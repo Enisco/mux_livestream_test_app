@@ -325,6 +325,7 @@ class _LibraryListScreenState extends State<LibraryListScreen> {
                                 title: entry.title,
                                 creatorName: entry.creatorName,
                                 creatorVerified: entry.creatorVerified,
+                                avatarUrl: entry.source?.avatarUrl,
                                 thumbnailAsset: entry.thumbnailAsset,
                                 thumbnailUrl: entry.thumbnailUrl,
                                 glyph: glyphFor(entry.kind),

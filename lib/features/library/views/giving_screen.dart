@@ -335,7 +335,7 @@ class _GiftRow extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Avatar(size: 28.s),
+              _Avatar(size: 28.s, url: gift.ministryAvatarUrl),
               SizedBox(width: 10.s),
               Expanded(
                 child: Column(
@@ -447,14 +447,22 @@ class _GiftRow extends StatelessWidget {
   }
 }
 
-/// A placeholder ring; ministry avatars are not resolved anywhere yet.
+/// The ministry's logo in a ring; the ring alone when there is none, when
+/// the byline lookup failed, or when the key will not load.
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.size});
+  const _Avatar({required this.size, this.url});
 
   final double size;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
+    final src = url?.trim();
+    final blank = Icon(
+      Icons.person,
+      size: size * 0.6,
+      color: AppColors.neutral400,
+    );
     return Container(
       width: size,
       height: size,
@@ -463,7 +471,16 @@ class _Avatar extends StatelessWidget {
         color: AppColors.buttonSecondaryActive,
         border: Border.all(color: AppColors.purple400, width: size / 20),
       ),
-      child: Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400),
+      clipBehavior: Clip.antiAlias,
+      child: src == null || src.isEmpty
+          ? blank
+          : Image.network(
+              src,
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              errorBuilder: (_, _, _) => blank,
+            ),
     );
   }
 }

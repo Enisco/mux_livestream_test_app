@@ -11,10 +11,12 @@ import 'package:test_app/features/home/views/widgets/feed_card.dart'
 import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/components/auth_sheet.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
+import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/local_storage.dart';
 
 /// Opens the comments for a target (Figma `10861-117621`).
 Future<void> openComments(
@@ -556,7 +558,11 @@ class _CommentBody extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Avatar(name: name, size: compact ? 28.s : 32.s),
+          _Avatar(
+            name: name,
+            size: compact ? 28.s : 32.s,
+            avatarUrl: AssetUrlResolver.resolve(author?.avatarKey),
+          ),
           SizedBox(width: 10.s),
           Expanded(
             child: Column(
@@ -704,14 +710,20 @@ class _VoteButton extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.name, required this.size});
+  const _Avatar({required this.name, required this.size, this.avatarUrl});
 
   final String name;
   final double size;
 
+  /// The author's own picture, which falls back to the initial when there
+  /// is none and when the one there is will not load.
+  final String? avatarUrl;
+
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    final letter = Text(initial, style: AppStyles.heading(13));
+    final url = avatarUrl?.trim();
     return Container(
       width: size,
       height: size,
@@ -724,7 +736,16 @@ class _Avatar extends StatelessWidget {
           colors: [AppColors.purple400, AppColors.cyan400],
         ),
       ),
-      child: Text(initial, style: AppStyles.heading(13)),
+      clipBehavior: Clip.antiAlias,
+      child: url == null || url.isEmpty
+          ? letter
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              errorBuilder: (_, _, _) => letter,
+            ),
     );
   }
 }
@@ -793,7 +814,13 @@ class _Composer extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const _Avatar(name: 'You', size: 32),
+                  _Avatar(
+                    name: AppStrings.commentComposerYou,
+                    size: 32,
+                    avatarUrl: AssetUrlResolver.resolve(
+                      LocalStorage.cachedAvatarKey,
+                    ),
+                  ),
                   SizedBox(width: 10.s),
                   Expanded(
                     child: GestureDetector(

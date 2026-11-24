@@ -256,6 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: row.title,
       creatorName: row.creatorName,
       creatorVerified: row.creatorVerified,
+      avatarUrl: row.source?.avatarUrl,
       thumbnailUrl: row.thumbnailUrl,
       fraction: row.progress ?? 0,
       remainingLabel: remainingOf(row),
@@ -325,6 +326,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ProfileMenuItem(
             leading: DetailAvatar(
               name: channel.displayName,
+              avatarUrl: AssetUrlResolver.resolve(channel.avatarKey),
               isOrganization: channel.isOrganization,
               size: 20,
             ),

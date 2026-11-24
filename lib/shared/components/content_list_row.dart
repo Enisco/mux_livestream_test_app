@@ -14,6 +14,7 @@ class ContentListRow extends StatelessWidget {
     super.key,
     required this.title,
     required this.creatorName,
+    this.avatarUrl,
     this.creatorVerified = false,
     this.thumbnailUrl,
     this.thumbnailAsset,
@@ -35,6 +36,11 @@ class ContentListRow extends StatelessWidget {
   final String title;
   final String creatorName;
   final bool creatorVerified;
+
+  /// The creator's logo beside their name. Resolved by the caller,
+  /// which is the only place that knows which of a row's several
+  /// shapes carries the key.
+  final String? avatarUrl;
 
   final String? thumbnailUrl;
   final String? thumbnailAsset;
@@ -233,7 +239,7 @@ class _Body extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _Avatar(size: 14.s),
+            _Avatar(size: 14.s, url: row.avatarUrl),
             SizedBox(width: 4.s),
             Flexible(
               child: Text(
@@ -302,15 +308,23 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// A placeholder ring. Creator avatars are not resolved from the feed's
-/// `avatarKey` anywhere in the app yet, so every row draws the same stand-in.
+/// The creator's logo in a ring. The ring alone is the fallback, and it
+/// covers all three ways there can be no picture: the creator has none, the
+/// build has no `CDN_BASE_URL`, or the key fails to load.
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.size});
+  const _Avatar({required this.size, this.url});
 
   final double size;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
+    final src = url?.trim();
+    final blank = Icon(
+      Icons.person,
+      size: size * 0.6,
+      color: AppColors.neutral400,
+    );
     return Container(
       width: size,
       height: size,
@@ -319,7 +333,16 @@ class _Avatar extends StatelessWidget {
         color: AppColors.buttonSecondaryActive,
         border: Border.all(color: AppColors.purple400, width: size / 16),
       ),
-      child: Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400),
+      clipBehavior: Clip.antiAlias,
+      child: src == null || src.isEmpty
+          ? blank
+          : Image.network(
+              src,
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              errorBuilder: (_, _, _) => blank,
+            ),
     );
   }
 }

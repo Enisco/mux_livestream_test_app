@@ -212,10 +212,16 @@ class _ManageFollowingScreenState extends State<ManageFollowingScreen> {
   Future<void> _follow(SuggestedMinistry ministry) async {
     try {
       await _repo.follow(ministry.id);
+      // The mirror of `_unfollow`: every other surface reads the store, so
+      // following here has to reach it as well, or the feed and Explore keep
+      // offering Follow for a ministry that is now on this list.
+      if (GetIt.instance.isRegistered<EngagementStore>()) {
+        GetIt.instance<EngagementStore>().adoptFollowing(ministry.id, true);
+      }
       await _load();
     } catch (e) {
       logger.w('Could not follow ${ministry.id}', error: e);
-      if (mounted) _report(AppStrings.followingNotifyFailed);
+      if (mounted) _report(AppStrings.followingFollowFailed);
     }
   }
 
@@ -319,7 +325,7 @@ class _MinistryRow extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 7.s),
       child: Row(
         children: [
-          MinistryAvatar(size: 36.s),
+          MinistryAvatar(size: 36.s, avatarUrl: ministry.avatarUrl),
           SizedBox(width: 10.s),
           Expanded(
             child: Column(
@@ -696,7 +702,7 @@ class _SuggestionRow extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 7.s),
       child: Row(
         children: [
-          MinistryAvatar(size: 34.s),
+          MinistryAvatar(size: 34.s, avatarUrl: ministry.avatarUrl),
           SizedBox(width: 10.s),
           Expanded(
             child: Column(
@@ -757,14 +763,23 @@ class _SuggestionRow extends StatelessWidget {
   }
 }
 
-/// A placeholder ring; ministry avatars are not resolved anywhere yet.
+/// A ministry's logo in a ring, falling back to the ring alone — for a
+/// ministry that has no logo, a build with no `CDN_BASE_URL`, and a key that
+/// fails to load, which all have to look the same.
 class MinistryAvatar extends StatelessWidget {
-  const MinistryAvatar({super.key, required this.size});
+  const MinistryAvatar({super.key, required this.size, this.avatarUrl});
 
   final double size;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
+    final url = avatarUrl?.trim();
+    final blank = Icon(
+      Icons.person,
+      size: size * 0.6,
+      color: AppColors.neutral400,
+    );
     return Container(
       width: size,
       height: size,
@@ -773,7 +788,16 @@ class MinistryAvatar extends StatelessWidget {
         color: AppColors.buttonSecondaryActive,
         border: Border.all(color: AppColors.purple400, width: size / 20),
       ),
-      child: Icon(Icons.person, size: size * 0.6, color: AppColors.neutral400),
+      clipBehavior: Clip.antiAlias,
+      child: url == null || url.isEmpty
+          ? blank
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              width: size,
+              height: size,
+              errorBuilder: (_, _, _) => blank,
+            ),
     );
   }
 }

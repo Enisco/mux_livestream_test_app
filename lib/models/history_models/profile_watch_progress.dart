@@ -11,6 +11,7 @@ class ProfileWatchProgress {
     required this.fraction,
     required this.remainingLabel,
     this.creatorVerified = false,
+    this.avatarUrl,
     this.thumbnailAsset,
     this.thumbnailUrl,
   });
@@ -19,6 +20,9 @@ class ProfileWatchProgress {
   final String title;
   final String creatorName;
   final bool creatorVerified;
+
+  /// The creator's logo beside their name on the card.
+  final String? avatarUrl;
 
   /// How far through, 0-1 — the bar across the bottom of the still.
   final double fraction;

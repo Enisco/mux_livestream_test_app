@@ -443,6 +443,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           title: entry.title,
           creatorName: entry.creatorName,
           creatorVerified: entry.creatorVerified,
+          avatarUrl: entry.source?.avatarUrl,
           thumbnailAsset: entry.thumbnailAsset,
           thumbnailUrl: entry.thumbnailUrl,
           glyph: _glyphFor(entry.kind),

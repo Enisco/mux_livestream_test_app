@@ -163,7 +163,12 @@ void main() {
         'lib/features/discovery/views/widgets/video_hero.dart',
       ).readAsStringSync();
 
-      expect(hero, contains('aspectRatio: VideoFit.landscapeAspect'));
+      // The hero's frame is no longer one fixed shape — it takes the
+      // video's, through `frameAspect`, and falls back to the shared
+      // constant until the decoder has said. What matters here is unchanged:
+      // the shape comes from `VideoFit` and is never written out by hand.
+      expect(hero, contains('VideoFit.frameAspect('));
+      expect(hero, contains('VideoFit.landscapeAspect'));
       expect(
         RegExp(r'aspectRatio:\s*16\s*/\s*9').hasMatch(hero),
         isFalse,

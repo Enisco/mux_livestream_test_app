@@ -24,6 +24,7 @@ class Gift {
     required this.amount,
     required this.document,
     this.ministryVerified = false,
+    this.ministryAvatarUrl,
     this.creatorId = '',
     this.converted = '',
     this.refunded = false,
@@ -33,6 +34,10 @@ class Gift {
   final String id;
   final String ministry;
   final bool ministryVerified;
+
+  /// The ministry's logo, from the gateway's `creator` byline. Null when
+  /// that lookup failed, which is the same case that loses the name.
+  final String? ministryAvatarUrl;
 
   /// Which ministry it went to — what tapping the byline opens. Empty when the
   /// creator lookup degraded and only the legal name on the charge survived.

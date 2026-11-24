@@ -213,27 +213,32 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ring = active ? AppColors.brandPrimary : AppColors.textPrimary;
+    final person = Icon(
+      Icons.person,
+      size: 12.s,
+      color: active ? AppColors.brandPrimary : AppColors.neutral400,
+    );
+    final photo = url?.trim();
     return Container(
       width: 20.s,
       height: 20.s,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppColors.buttonSecondaryActive,
-        border: Border.all(
-          color: active ? AppColors.brandPrimary : AppColors.textPrimary,
-          width: 1.5.s,
-        ),
-        image: url == null || url!.isEmpty
-            ? null
-            : DecorationImage(image: NetworkImage(url!), fit: BoxFit.cover),
+        border: Border.all(color: ring, width: 1.5.s),
       ),
-      child: url == null || url!.isEmpty
-          ? Icon(
-              Icons.person,
-              size: 12.s,
-              color: active ? AppColors.brandPrimary : AppColors.neutral400,
-            )
-          : null,
+      clipBehavior: Clip.antiAlias,
+      // An `Image.network` and not a `DecorationImage`: a decoration has no
+      // error hook, so the icon had to be dropped whenever a URL was
+      // present, and a key that 404s left a bare ring for good.
+      child: photo == null || photo.isEmpty
+          ? person
+          : Image.network(
+              photo,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => person,
+            ),
     );
   }
 }

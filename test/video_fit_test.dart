@@ -159,6 +159,7 @@ void main() {
       const fullBleed = [
         'lib/features/player/views/player_screen.dart',
         'lib/features/discovery/views/vertical_feed_screen.dart',
+        'lib/features/discovery/views/widgets/portrait_watch_view.dart',
       ];
 
       final found = _everyVideoCallUnderLib();
@@ -178,8 +179,8 @@ void main() {
     });
 
     test('and the hero holds one of each, the right way round', () {
-      // The inline hero is a 16:9 frame in a page; the fullscreen route it
-      // pushes is the whole screen. One file, two different answers.
+      // The inline hero is a frame in a page; the fullscreen route it pushes
+      // is the whole screen. One file, two different answers.
       const path = 'lib/features/discovery/views/widgets/video_hero.dart';
       final source = File(path).readAsStringSync();
       final cut = source.indexOf('class _FullscreenVideoState');
@@ -189,7 +190,11 @@ void main() {
       final full = _videoCalls(source.substring(cut));
       expect(inline, hasLength(1));
       expect(full, hasLength(1));
-      expect(inline.single, contains('VideoFit.landscapeFrame'));
+      // `inPageFrame`, not `landscapeFrame`: the frame takes the video's
+      // own shape now, so there is nothing left to crop to fill it, and
+      // cropping is what turned an upright clip into a strip across the
+      // middle of the screen.
+      expect(inline.single, contains('VideoFit.inPageFrame'));
       expect(full.single, contains('VideoFit.fullBleed'));
     });
   });

@@ -351,6 +351,30 @@ void main() {
       expect(saved, 1);
     });
 
+    testWidgets('and the ministry it names opens that ministry', (
+      tester,
+    ) async {
+      // The hero draws a logo and a name and had no handler for either,
+      // while every other surface in the app opens the creator from both.
+      var opened = 0;
+      await _pump(
+        tester,
+        SizedBox(
+          width: 390,
+          child: ExploreHeroPanel(
+            hero: _sampleHero(),
+            topInset: 54,
+            onCreatorTap: () => opened++,
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Grace Chapel'));
+      await tester.pump();
+
+      expect(opened, 1);
+    });
+
     testWidgets('leaves room for the status bar above the artwork', (
       tester,
     ) async {

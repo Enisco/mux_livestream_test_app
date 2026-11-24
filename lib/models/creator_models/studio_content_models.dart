@@ -1,6 +1,7 @@
 /// What a creator has made, flattened into one list.
 library;
 
+import 'package:test_app/models/engagement_models/engagement_models.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 
 /// The kinds the Content tab filters by. `music` is the API's word for what
@@ -209,6 +210,28 @@ class StudioContentItem {
   final String visibility;
 
   final String? thumbnailKey;
+
+  /// The engagement target type this row shares as. The share route takes
+  /// the interaction vocabulary, not the studio's `type`, and a livestream
+  /// or a piece of audio is `media` like any other upload.
+  String? get shareTargetType => switch (kind) {
+    StudioContentKind.video ||
+    StudioContentKind.livestream ||
+    StudioContentKind.audio => InteractionTargets.media,
+    StudioContentKind.post => InteractionTargets.post,
+    StudioContentKind.event => InteractionTargets.event,
+  };
+
+  /// Whether there is a public page to link to. Only content the platform
+  /// is actually serving has one — a draft, a scheduled row, a failed
+  /// transcode or anything moderation is holding has no address yet, and
+  /// minting a link for it would hand the creator a dead URL.
+  bool get hasPublicLink => switch (state) {
+    StudioContentState.published ||
+    StudioContentState.replay ||
+    StudioContentState.live => true,
+    _ => false,
+  };
 
   /// Whether tapping this should open the player.
   bool get isPlayable =>

@@ -322,6 +322,10 @@ abstract final class AppStrings {
   static const replyingTo = 'Replying to';
   static const creatorBadge = 'Creator';
   static const someone = 'Someone';
+
+  /// Stands in for the reader's own name beside the comment box. Not
+  /// `navYou`, which labels a tab and would drift with it.
+  static const commentComposerYou = 'You';
   static const noCommentsYet = 'No comments yet';
   static const beTheFirstToComment =
       'Be the first to share what this meant to you.';
@@ -773,6 +777,21 @@ abstract final class AppStrings {
   static const cardBlock = 'Block this creator';
   static const cardUnblock = 'Unblock this creator';
   static const cardReport = 'Report';
+
+  // The upright watching view: a portrait video given the whole screen,
+  // with its controls on a rail over the picture rather than beside it.
+  //
+  // `watchSound` and `watchUnmute` are the audio toggle and are deliberately
+  // not `cardMute`/`cardUnmute` above, which mute a *ministry* in the
+  // overflow sheet. One word, two meanings, and the wrong one on a rail
+  // would read as silencing the creator.
+  static const watchSound = 'Sound';
+  static const watchUnmute = 'Unmute';
+
+  /// On the handle of the sheet that holds the description, the comments and
+  /// what to watch next. Said in words because a bare grab handle over a
+  /// full-screen video does not read as one.
+  static const watchMore = 'Swipe up for more';
 
   static const cardSharing = 'Getting a link…';
   static const cardShareUnavailable = "That can't be shared";
@@ -1390,7 +1409,13 @@ abstract final class AppStrings {
   static const contentManageOnWeb = 'Manage on web';
   static const contentWebOnlyAction =
       'Open the web studio to edit this content.';
-  static const contentNoPublicLink = 'A shareable link is not available yet.';
+
+  /// Said of a creator's own row that the platform is not serving yet — a
+  /// draft, a scheduled post, a failed transcode, anything in review.
+  /// There is a share route; what is missing is a public page to point
+  /// it at, which publishing fixes.
+  static const contentNotPublicYet =
+      'Publish this first — there is no public page to link to yet.';
 
   // ---- Removing a piece of content ---------------------------------------
 
@@ -1665,8 +1690,6 @@ abstract final class AppStrings {
   static const searchShowMore = 'Show more results';
   static const searchLoadingMore = 'Loading…';
 
-  static const explorePlaylistsNotReady = 'Playlists are not connected yet.';
-
   static const exploreWatch = 'Watch';
   static const exploreAddToPlaylist = 'Add to playlist';
   static const exploreSponsored = 'Sponsored';
@@ -1915,6 +1938,9 @@ abstract final class AppStrings {
   static String followingPostedAgo(String ago) => 'Posted $ago ago';
   static const followingLoadFailed = "Couldn't load who you follow";
   static const followingUnfollowFailed = "Couldn't unfollow — try again";
+  static const followingFollowFailed = "Couldn't follow — try again";
+  static const creatorLibraryMoreFailed =
+      "Couldn't load the rest of that — try again";
   static const followingNotifyFailed = "Couldn't save that — try again";
   static const tooltipVolume = 'Volume';
   static const tooltipFullscreen = 'Fullscreen (F)';
