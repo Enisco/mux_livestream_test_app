@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
@@ -11,6 +12,7 @@ import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/live_badge.dart';
 import 'package:test_app/shared/components/video_fit.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
+import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
@@ -33,6 +35,14 @@ import 'package:test_app/utils/app_constants/app_strings.dart';
 /// video keeps playing behind it, which is the same promise the inline hero
 /// makes when the page scrolls under it.
 class PortraitWatchView extends StatefulWidget {
+  /// How much of the screen a sheet over this video may take.
+  ///
+  /// It used to be 0.92, which left a sliver of video nobody could make
+  /// anything of. At 0.7 the picture keeps a real share of the screen and
+  /// shrinks into it, the way it does on every other short-video app.
+  /// Public because the comment thread has to stop in the same place.
+  static const sheetMax = 0.7;
+
   const PortraitWatchView({
     super.key,
     required this.playback,
@@ -102,7 +112,11 @@ class PortraitWatchView extends StatefulWidget {
   final VoidCallback? onFollow;
   final VoidCallback? onLike;
   final VoidCallback? onSave;
-  final VoidCallback? onComments;
+
+  /// Awaited, not fired and forgotten: the picture shrinks out of the
+  /// way while the thread is up, and this future is what says when it
+  /// has come back down.
+  final Future<void> Function()? onComments;
   final VoidCallback? onShare;
   final VoidCallback? onGive;
 
@@ -140,6 +154,19 @@ class _PortraitWatchViewState extends State<PortraitWatchView> {
   Timer? _hidePlayPause;
 
   bool _descriptionOpen = false;
+
+  /// The comment thread is up over the video.
+  bool _commentsOpen = false;
+
+  /// The last change to the covered fraction came from a drag, so the
+  /// picture must track the finger rather than animate after it.
+  bool _draggingSheet = false;
+
+  /// How much of the screen is under a sheet right now, 0 to [sheetMax].
+  double get _covered => math.max(
+    _sheetOpen * PortraitWatchView.sheetMax,
+    _commentsOpen ? PortraitWatchView.sheetMax : 0.0,
+  );
 
   final _sheetController = DraggableScrollableController();
 
@@ -192,6 +219,21 @@ class _PortraitWatchViewState extends State<PortraitWatchView> {
         kind: PlaybackKind.video,
       );
     });
+  }
+
+  /// Opens the thread and holds the picture small until it is shut.
+  Future<void> _openComments() async {
+    final open = widget.onComments;
+    if (open == null) return;
+    setState(() {
+      _draggingSheet = false;
+      _commentsOpen = true;
+    });
+    try {
+      await open();
+    } finally {
+      if (mounted) setState(() => _commentsOpen = false);
+    }
   }
 
   void _togglePlay() {
@@ -260,7 +302,21 @@ class _PortraitWatchViewState extends State<PortraitWatchView> {
             return Stack(
               fit: StackFit.expand,
               children: [
-                _media(state, active),
+                // Shrinks into whatever the sheet leaves it, pinned to
+                // the top, rather than staying full-bleed behind a panel
+                // that covers most of it.
+                AnimatedFractionallySizedBox(
+                  // A drag has to track the finger; a sheet that opens on
+                  // its own gets to animate.
+                  duration: _draggingSheet
+                      ? Duration.zero
+                      : const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  alignment: Alignment.topCenter,
+                  widthFactor: 1,
+                  heightFactor: 1 - _covered,
+                  child: _media(state, active),
+                ),
 
                 // A tap anywhere on the picture plays or pauses. There is no
                 // separate play button sitting over the video the whole time.
@@ -478,13 +534,15 @@ class _PortraitWatchViewState extends State<PortraitWatchView> {
                 WatchRailAction(
                   icon: IconsaxPlusLinear.message,
                   label: widget.comments,
-                  onTap: widget.onComments,
+                  onTap: _openComments,
                 ),
                 const SizedBox(height: WatchRail.gap),
                 WatchRailAction(
-                  icon: widget.saved
-                      ? IconsaxPlusBold.archive
-                      : IconsaxPlusLinear.archive,
+                  // The same glyph the feed cards use. This rail had an
+                  // `archive` box, so the control that saves a video
+                  // looked like a different action here than on the card
+                  // the reader tapped to get here.
+                  asset: AppAssets.iconFeedBookmark,
                   label: widget.saves,
                   color: widget.saved ? AppColors.brandPrimary : Colors.white,
                   onTap: widget.onSave,
@@ -639,7 +697,10 @@ class _PortraitWatchViewState extends State<PortraitWatchView> {
         final span = note.maxExtent - note.minExtent;
         final open = span <= 0 ? 0.0 : (note.extent - note.minExtent) / span;
         if ((open - _sheetOpen).abs() > 0.01) {
-          setState(() => _sheetOpen = open.clamp(0.0, 1.0));
+          setState(() {
+            _draggingSheet = true;
+            _sheetOpen = open.clamp(0.0, 1.0);
+          });
         }
         return false;
       },
@@ -647,11 +708,14 @@ class _PortraitWatchViewState extends State<PortraitWatchView> {
         controller: _sheetController,
         initialChildSize: shut,
         minChildSize: shut,
-        maxChildSize: 0.92,
+        maxChildSize: PortraitWatchView.sheetMax,
         snap: true,
         builder: (context, controller) => DecoratedBox(
           decoration: const BoxDecoration(
-            color: AppColors.base1,
+            // A shade above the page behind it. On `base1` the panel was
+            // the same black as everything else, so sliding it up read as
+            // the video going out rather than a layer arriving over it.
+            color: AppColors.sheetSurface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           // One scroll view for the handle and the page together. Shut, it

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/text_capitalization.dart';
 
 class GTubeTextField extends StatefulWidget {
   const GTubeTextField({
@@ -19,7 +20,7 @@ class GTubeTextField extends StatefulWidget {
     this.autofillHints,
     this.autofocus = false,
     this.readOnly = false,
-    this.textCapitalization = TextCapitalization.none,
+    this.textCapitalization,
   });
 
   final TextEditingController controller;
@@ -37,7 +38,12 @@ class GTubeTextField extends StatefulWidget {
   /// still needs to be able to see.
   final bool readOnly;
 
-  final TextCapitalization textCapitalization;
+  /// Left unset, the field takes its lead from [keyboardType]: prose is
+  /// shifted, machine text is not. See
+  /// [sentenceCaseUnlessMachineText]. A password that can be revealed
+  /// has to say `none` itself — while it is revealed [obscureText] is
+  /// false, so there is nothing left here to read it off.
+  final TextCapitalization? textCapitalization;
 
   static const radius = 8.0;
   static const horizontalPadding = 16.0;
@@ -84,7 +90,12 @@ class _GTubeTextFieldState extends State<GTubeTextField> {
       focusNode: _focusNode,
       autofocus: widget.autofocus,
       keyboardType: widget.keyboardType,
-      textCapitalization: widget.textCapitalization,
+      textCapitalization:
+          widget.textCapitalization ??
+          sentenceCaseUnlessMachineText(
+            widget.keyboardType,
+            obscured: widget.obscureText,
+          ),
       inputFormatters: widget.inputFormatters,
       obscureText: widget.obscureText,
       readOnly: widget.readOnly,

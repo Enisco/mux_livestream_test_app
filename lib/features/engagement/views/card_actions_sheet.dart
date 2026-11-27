@@ -7,7 +7,7 @@ import 'package:test_app/core/locator.dart';
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
-import 'package:test_app/features/library/views/playlists_screen.dart';
+import 'package:test_app/features/library/views/add_to_playlist_sheet.dart';
 import 'package:test_app/features/creator/views/widgets/impact_sheets.dart'
     show showReportSheet;
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
@@ -45,9 +45,27 @@ Future<void> showCardActionsSheet(
   final canHide = InteractionTypes.notInterestedTargets.contains(
     item.entityType,
   );
-  final isMedia =
-      item.entityType == 'media' || item.entityType == 'media_series';
+  // PARKED(1.5): a playlist holds **media**, one row at a time. Widening
+  // that is not planned backend-side, and a media *series* is not one of
+  // its items either — `POST .../items` refuses a series id. So the row
+  // is absent on a blog, a devotional, an event and a series, rather than
+  // present and always failing.
+  final canAddToPlaylist =
+      item.entityType == 'media' && item.entityId.isNotEmpty;
   final isEvent = item.entityType == 'event';
+
+  // The interaction API's own name for this row's type, which is not
+  // always the feed's `entityType` — a `devotional_series` interacts as a
+  // `devotional`, a `calendar_event` as an `event`. The card reads and
+  // writes through this mapping, so the sheet has to as well or the two
+  // keep separate state for the same thing. Null for a creator row or a
+  // media series, which carry no interactions at all.
+  final saveTarget = InteractionTargets.fromEntityType(item.entityType);
+  final saved =
+      saveTarget != null &&
+      engagementStore
+          .resolve(saveTarget, item.entityId, FeedCardActions.baselineOf(item))
+          .saved;
 
   final hidden = engagementStore.isNotInterested(item.entityId);
   final muted = creatorId == null ? false : engagementStore.isMuted(creatorId);
@@ -78,10 +96,7 @@ Future<void> showCardActionsSheet(
         label: AppStrings.cardGiveNow,
         icon: HugeIcons.strokeRoundedGift,
       ),
-    // PARKED(1.5): playlists hold media only, and widening them is not
-    // planned — so the row is absent on blog, devotional and event cards
-    // rather than present and refused.
-    if (isMedia)
+    if (canAddToPlaylist)
       const LibraryAction(
         label: AppStrings.cardAddToPlaylist,
         icon: HugeIcons.strokeRoundedPlayList,
@@ -96,10 +111,15 @@ Future<void> showCardActionsSheet(
         label: following ? AppStrings.cardUnfollow : AppStrings.cardFollow,
         icon: HugeIcons.strokeRoundedUserAdd01,
       ),
-    if (!isCreatorRow)
-      const LibraryAction(
-        label: AppStrings.cardBookmark,
-        icon: HugeIcons.strokeRoundedBookmark02,
+    // Says which way it goes. The row was a fixed "Bookmark" however long
+    // the thing had been saved, so there was no way to tell from the sheet
+    // that it already was, and no way to take it out from here.
+    if (saveTarget != null)
+      LibraryAction(
+        label: saved ? AppStrings.cardBookmarked : AppStrings.cardBookmark,
+        icon: saved
+            ? HugeIcons.strokeRoundedBookmark03
+            : HugeIcons.strokeRoundedBookmark02,
       ),
     if (creatorId != null)
       LibraryAction(
@@ -137,9 +157,19 @@ Future<void> showCardActionsSheet(
   );
   if (picked == null || !context.mounted) return;
 
+  // Resolved once, up front, rather than through `context` each time.
+  // Most of these handlers report **after** awaiting the server, and by
+  // then the reader may well have left — blocking a ministry now closes
+  // its page under them. A messenger read from a dead context meant the
+  // answer, including "that did not work", was simply never shown.
+  // `maybeOf`, not `of`: resolving it up front would otherwise turn a
+  // missing messenger from "no snackbar" into a throw on opening the
+  // sheet, for a caller that may never show one.
+  final messenger = ScaffoldMessenger.maybeOf(context);
+
   void say(String message) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (messenger == null || !messenger.mounted) return;
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message, style: AppStyles.body(13)),
         backgroundColor: AppColors.neutral800,
@@ -154,7 +184,7 @@ Future<void> showCardActionsSheet(
 
   switch (picked) {
     case AppStrings.cardShare:
-      final url = await copyShareLink(
+      final outcome = await shareLink(
         engagement: engagement,
         targetType: item.isCreatorRow ? 'creator' : item.entityType,
         // For a creator, send the **creator id** — the handle is resolved
@@ -162,10 +192,15 @@ Future<void> showCardActionsSheet(
         targetId: creatorId != null && item.isCreatorRow
             ? creatorId
             : item.entityId,
+        subject: item.title,
+        from: shareOriginOf(context),
       );
-      // A refusal is final: the target is not shareable until its creator
-      // changes its visibility, so this reports rather than retrying.
-      say(url ?? AppStrings.cardShareUnavailable);
+      // Only a refusal is worth saying out loud, and it is final: the
+      // target is not shareable until its creator changes its visibility.
+      // A sheet the reader opened and backed out of needs no snackbar.
+      if (outcome == ShareLinkOutcome.unavailable) {
+        say(AppStrings.cardShareUnavailable);
+      }
 
     case AppStrings.cardNotInterested:
     case AppStrings.cardUndoNotInterested:
@@ -233,11 +268,13 @@ Future<void> showCardActionsSheet(
       }
 
     case AppStrings.cardBookmark:
-      if (!gate('save this')) return;
-      // The same toggle that put it in Saved; the store owns the state so
-      // every other surface agrees without a reload.
+    case AppStrings.cardBookmarked:
+      if (saveTarget == null || !gate('save this')) return;
+      // The same toggle the card's own bookmark runs, on the same key, so
+      // the two cannot drift apart: the store owns the state and every
+      // surface watching it redraws without a reload.
       engagementStore.toggleSave(
-        targetType: item.entityType,
+        targetType: saveTarget,
         targetId: item.entityId,
         fallback: FeedCardActions.baselineOf(item),
       );
@@ -252,12 +289,14 @@ Future<void> showCardActionsSheet(
 
     case AppStrings.cardAddToPlaylist:
       if (!gate('use playlists')) return;
-      // The playlists list is where a destination is chosen; adding from a
-      // card without first naming a playlist has no screen in the design.
-      await Navigator.push(
+      // This used to push the playlists *browse* screen, which has no way
+      // to know what is being added — so a reader could tap through a
+      // playlist, or make one, and nothing was ever put in it.
+      final chosen = await showAddToPlaylistSheet(
         context,
-        MaterialPageRoute<void>(builder: (_) => const PlaylistsScreen()),
+        mediaId: item.entityId,
       );
+      if (chosen != null) say(chosen.message);
 
     case AppStrings.cardViewEvents:
       openCreatorProfile(context, creatorId: creatorId);
@@ -273,6 +312,10 @@ Future<void> showCardActionsSheet(
           reason: outcome.reason.slug,
           detail: outcome.detail,
         );
+        // Out of the lists at once. The report itself suppresses nothing
+        // server-side — a moderator decides that — but scrolling back
+        // past what you just objected to is its own insult.
+        engagementStore.setReported(item.entityId);
         say(AppStrings.commentReported);
       } catch (e) {
         // Reporting your own content is refused, as is a target that is not

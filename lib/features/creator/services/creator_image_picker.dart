@@ -4,10 +4,40 @@ import 'dart:ui' as ui;
 import 'package:file_picker_platform_interface/file_picker_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 
 import 'package:test_app/core/logger.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/helpers/keyboard.dart';
+
+/// The frame a picked image is cropped to.
+///
+/// Each ratio matches the box the picture is drawn in, so `BoxFit.cover`
+/// has nothing left to trim at render time.
+enum CropShape {
+  /// A channel logo or profile photo. Masked as a circle; cropped square,
+  /// so no avatar carries an alpha channel.
+  square(1, circular: true),
+
+  /// A channel banner, matching `CreatorProfileHeader`'s `150.s` box plus
+  /// the status bar inset it draws under.
+  banner(2 / 1),
+
+  /// Thumbnails, article and event covers, live covers, playlist covers:
+  /// the content cards and `PlaylistMosaic`'s `104` by `58` tile.
+  wide(16 / 9);
+
+  const CropShape(this.aspectRatio, {this.circular = false});
+
+  final double aspectRatio;
+
+  /// Whether the editor masks to a circle. Never changes the bytes.
+  final bool circular;
+}
+
+/// Shows a cropper over [bytes] and answers the cropped bytes, or `null`
+/// when the reader backed out of it.
+typedef CropPresenter = Future<Uint8List?> Function(Uint8List bytes);
 
 /// An image the reader chose, in a form the API will accept.
 class PickedImage {
@@ -84,7 +114,22 @@ abstract final class CreatorImagePicker {
   /// import from.
   static const _raw = {'dng', 'raw', 'cr2', 'cr3', 'nef', 'arw', 'orf', 'rw2'};
 
-  static Future<PickResult> pick({required int maxBytes}) async {
+  /// The longest edge handed to the crop editor, which holds the whole
+  /// picture decoded at four bytes a pixel for as long as it is open.
+  static const _editorMaxEdge = 1600;
+
+  /// For the JPEG handed to the editor, and so for what comes back: it
+  /// re-encodes in the format it was given.
+  static const _jpegQuality = 88;
+
+  /// Formats that can carry transparency. JPEG cannot, and would fill a
+  /// logo's transparent pixels with black, so these stay PNG.
+  static const _withAlpha = {'png', 'webp', 'gif', 'avif'};
+
+  static Future<PickResult> pick({
+    required int maxBytes,
+    CropPresenter? crop,
+  }) async {
     // The system picker is presented over Flutter's view and does not take
     // the keyboard with it. See [dismissKeyboard].
     dismissKeyboard();
@@ -139,7 +184,112 @@ abstract final class CreatorImagePicker {
       return const PickResult.failed(PickFailure.unreadable);
     }
 
-    return _fromBytes(bytes, file.name, maxBytes);
+    return crop == null
+        ? _fromBytes(bytes, file.name, maxBytes)
+        : cropThen(bytes, file.name, maxBytes, crop);
+  }
+
+  /// Crops first, then normalises what comes back through [_fromBytes].
+  ///
+  /// That order keeps the byte budget off pixels the crop is about to
+  /// discard, which would otherwise cost a second resample.
+  @visibleForTesting
+  static Future<PickResult> cropThen(
+    Uint8List bytes,
+    String filename,
+    int maxBytes,
+    CropPresenter crop,
+  ) async {
+    final extension = _extensionOf(filename);
+    if (_raw.contains(extension)) {
+      return const PickResult.failed(PickFailure.unsupported);
+    }
+
+    final keepAlpha = _withAlpha.contains(extension);
+    final editable = await _editable(bytes, keepAlpha: keepAlpha);
+    if (editable == null) {
+      return const PickResult.failed(PickFailure.unsupported);
+    }
+
+    final cropped = await crop(editable);
+    if (cropped == null || cropped.isEmpty) {
+      return const PickResult.cancelled();
+    }
+
+    // The editor answers in the format it was given, so the name follows
+    // what [_editable] chose rather than what was picked.
+    return _fromBytes(
+      cropped,
+      '${_stem(filename)}.${keepAlpha ? 'png' : 'jpg'}',
+      maxBytes,
+    );
+  }
+
+  /// The picked bytes in a form the crop editor can read, bounded to
+  /// [_editorMaxEdge]. `null` when nothing on this device could read them.
+  ///
+  /// Always re-encoded through `dart:ui`, never passed through. The editor
+  /// decodes with the `image` package, which does not read HEIC and has no
+  /// error path for what it cannot parse — the exception escapes an async
+  /// gap and leaves the editor on its spinner for good.
+  ///
+  /// Decoded straight to the target size, as in [_shrinkToFit].
+  static Future<Uint8List?> _editable(
+    Uint8List bytes, {
+    required bool keepAlpha,
+  }) async {
+    final size = await _dimensions(bytes);
+    if (size == null) return null;
+
+    final (width, height) = size;
+    if (width <= 0 || height <= 0) return null;
+
+    final longest = math.max(width, height);
+    final scale = longest > _editorMaxEdge ? _editorMaxEdge / longest : 1.0;
+    final target = (
+      (width * scale).round().clamp(1, width),
+      (height * scale).round().clamp(1, height),
+    );
+
+    return keepAlpha
+        ? _encodePng(bytes, width: target.$1, height: target.$2)
+        : _encodeJpeg(bytes, width: target.$1, height: target.$2);
+  }
+
+  /// Decodes at [width] by [height] and writes JPEG.
+  ///
+  /// `dart:ui` writes only PNG and raw pixels, so the frame is decoded
+  /// there and encoded by the `image` package. Straight, not
+  /// premultiplied, RGBA: premultiplied would darken partial alpha.
+  static Future<Uint8List?> _encodeJpeg(
+    Uint8List bytes, {
+    required int width,
+    required int height,
+  }) async {
+    ui.Image? decoded;
+    try {
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: width,
+        targetHeight: height,
+      );
+      decoded = (await codec.getNextFrame()).image;
+      final raw = await decoded.toByteData(
+        format: ui.ImageByteFormat.rawStraightRgba,
+      );
+      if (raw == null) return null;
+
+      return await compute(_jpegFromRgba, (
+        raw.buffer.asUint8List(),
+        decoded.width,
+        decoded.height,
+      ));
+    } catch (e) {
+      logger.w('Could not re-encode picked image as JPEG', error: e);
+      return null;
+    } finally {
+      decoded?.dispose();
+    }
   }
 
   /// Which platform codes mean *picked, then unreadable* rather than *the
@@ -336,4 +486,17 @@ abstract final class CreatorImagePicker {
       decoded?.dispose();
     }
   }
+}
+
+/// Encodes raw RGBA as JPEG, in an isolate. Top-level because [compute]
+/// cannot reach a private static method.
+Uint8List _jpegFromRgba((Uint8List, int, int) args) {
+  final (pixels, width, height) = args;
+  final frame = img.Image.fromBytes(
+    width: width,
+    height: height,
+    bytes: pixels.buffer,
+    numChannels: 4,
+  );
+  return img.encodeJpg(frame, quality: CreatorImagePicker._jpegQuality);
 }

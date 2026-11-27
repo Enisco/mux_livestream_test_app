@@ -986,6 +986,12 @@ class GivingField extends StatelessWidget {
           controller: controller,
           hint: label,
           keyboardType: keyboardType,
+          // Never shifted, whatever the keyboard. These are identity and
+          // bank details, and they are checked character for character
+          // against what the provider holds — a name the keyboard
+          // capitalised for the reader is a mismatch nobody can see and
+          // nobody can override from the client.
+          textCapitalization: TextCapitalization.none,
           contentPadding: EdgeInsets.all(12.s),
         ),
         if (hint case final note?) ...[

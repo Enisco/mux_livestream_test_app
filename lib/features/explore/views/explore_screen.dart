@@ -10,7 +10,7 @@ import 'package:test_app/features/creator/views/creator_profile_screen.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/search_screen.dart';
 import 'package:test_app/features/explore/data/explore_categories.dart';
-import 'package:test_app/features/library/views/playlists_screen.dart';
+import 'package:test_app/features/library/views/add_to_playlist_sheet.dart';
 import 'package:test_app/features/explore/repo/explore_repo.dart';
 import 'package:test_app/features/explore/views/widgets/explore_category_chips.dart';
 import 'package:test_app/features/explore/views/widgets/explore_cards.dart';
@@ -29,6 +29,7 @@ import 'package:test_app/shared/services/token_storage_service.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
+import 'package:test_app/utils/app_constants/app_styles.dart';
 
 /// Explore: the catalogue as rails — what is live now, what the reader left
 /// unfinished, and what is worth starting.
@@ -139,17 +140,69 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return false;
   }
 
-  /// The design's second hero action. Choosing a destination is what the
-  /// playlists screen is for — adding from a card without first naming one
-  /// has no frame in the design, which is also how the card sheet's
-  /// "Add to playlist" behaves.
-  Future<void> _addToPlaylist() async {
+  /// The design's second hero action. It used to push the playlists
+  /// *browse* screen, which cannot be told what is being added, so nothing
+  /// ever was — the same fault the card sheet's row had.
+  Future<void> _addToPlaylist(String mediaId) async {
     if (!await _requireAccount('use playlists')) return;
     if (!mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute<void>(builder: (_) => const PlaylistsScreen()),
+    final result = await showAddToPlaylistSheet(context, mediaId: mediaId);
+    if (result == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.message, style: AppStyles.body(13)),
+        backgroundColor: AppColors.neutral800,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
+  }
+
+  /// The page less anything the reader has blocked, muted, hidden or
+  /// reported.
+  ///
+  /// Explore is a tab inside an `IndexedStack`, so it keeps whatever it
+  /// loaded for as long as the app runs. A ministry blocked from the home
+  /// feed or from search would otherwise go on filling these rails until
+  /// a restart — and blocking is not a suggestion.
+  ExplorePage _visible(ExplorePage page) {
+    if (!getIt.isRegistered<EngagementStore>()) return page;
+    final store = getIt<EngagementStore>();
+    bool keep(String creatorId, String id) =>
+        !store.hidesRow(creatorId: creatorId, targetId: id);
+    List<ExploreCard> cards(List<ExploreCard> rows) =>
+        rows.where((c) => keep(c.creator.id, c.id)).toList(growable: false);
+
+    final trending = cards(page.trending);
+    final hero = page.hero;
+    return ExplorePage(
+      // The hero's Watch opens the top trending card, so a hero without
+      // one behind it is a button with nothing to press. It is drawn from
+      // that card in the first place, so the two normally go together —
+      // this is the case where filtering parts them.
+      hero:
+          hero != null && trending.isNotEmpty && keep(hero.creator.id, hero.id)
+          ? hero
+          : null,
+      trending: trending,
+      live: cards(page.live),
+      continueWatching: cards(page.continueWatching),
+      devotionals: cards(page.devotionals),
+      articles: cards(page.articles),
+      // A ministry row is the ministry, so its own id is both.
+      ministries: page.ministries
+          .where((m) => keep(m.id, m.id))
+          .toList(growable: false),
+      events: page.events
+          .where((e) => keep(e.creator.id, e.id))
+          .toList(growable: false),
+    );
+  }
+
+  /// The hero's row, when it is a piece of media with an id to file.
+  String? get _heroMediaId {
+    final row = _page?.hero?.source;
+    if (row == null || row.entityType != 'media') return null;
+    return row.entityId.isEmpty ? null : row.entityId;
   }
 
   @override
@@ -190,12 +243,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
         ],
       );
     }
+    // The rails watch the store so a ministry blocked elsewhere leaves
+    // them without a refetch.
+    if (!getIt.isRegistered<EngagementStore>()) return _rails(_page!);
+    return ListenableBuilder(
+      listenable: getIt<EngagementStore>().hiddenChanges,
+      builder: (context, _) => _rails(_visible(_page!)),
+    );
+  }
+
+  Widget _rails(ExplorePage page) {
     return _Content(
-      page: _page!,
+      page: page,
       onOpenCard: _openCard,
       onOpenCreator: _openCreator,
       onFollow: _toggleFollow,
-      onAddToPlaylist: () => unawaited(_addToPlaylist()),
+      onAddToPlaylist: switch (_heroMediaId) {
+        final id? => () => unawaited(_addToPlaylist(id)),
+        null => null,
+      },
       onTopic: (category) => Navigator.push(
         context,
         MaterialPageRoute(
@@ -243,7 +309,10 @@ class _Content extends StatelessWidget {
   final ValueChanged<ExploreCard> onOpenCard;
   final ValueChanged<String> onOpenCreator;
   final ValueChanged<ExploreCreatorRef> onFollow;
-  final VoidCallback onAddToPlaylist;
+
+  /// Null when the hero is not a piece of media, which hides the
+  /// control rather than drawing one that cannot work.
+  final VoidCallback? onAddToPlaylist;
 
   /// A Browse chip is a category, so it narrows by slug rather than running
   /// a search for the label's words.

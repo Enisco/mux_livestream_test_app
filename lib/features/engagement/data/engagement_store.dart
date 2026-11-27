@@ -182,6 +182,25 @@ class EngagementStore extends ChangeNotifier {
   final _muted = <String>{};
   final _blocked = <String>{};
 
+  /// Rows this viewer has reported in this session. Local only: reporting
+  /// posts no suppression, and the backend keeps serving the row until a
+  /// moderator acts on it. Nobody wants to keep scrolling past the thing
+  /// they just objected to, so it leaves the lists at once.
+  final _reported = <String>{};
+
+  final _hidden = _HiddenNotifier();
+
+  /// Fires when a row or a creator is hidden or brought back, and at no
+  /// other time.
+  ///
+  /// A feed list watches **this**, not the store itself. The store wakes
+  /// its listeners on every like, save and comment count — a dozen times
+  /// a scroll — and a list that rebuilt on all of those would discard and
+  /// rebuild every card in it to answer a question whose answer had not
+  /// changed. What a list needs to know is only ever "has the set of rows
+  /// I may draw moved", and that is this.
+  Listenable get hiddenChanges => _hidden;
+
   /// Whether this viewer has hidden a row. Read from
   /// `GET /v1/engagement/interactions/{type}/{id}`, whose `types` include
   /// `not_interested` — it is one viewer's own flag, never a tally.
@@ -193,6 +212,35 @@ class EngagementStore extends ChangeNotifier {
 
   void setNotInterested(String targetId, bool hidden) =>
       _flag(_notInterested, targetId, hidden);
+
+  bool isReported(String targetId) => _reported.contains(targetId);
+
+  /// A report went through. Separate from [setNotInterested] on purpose:
+  /// the two look the same on screen but only one of them is a stored
+  /// preference, and the card sheet must not offer "Undo not interested"
+  /// for something the reader reported and never hid.
+  void setReported(String targetId) => _flag(_reported, targetId, true);
+
+  /// Whether a row belongs out of a list the viewer is looking at **now**,
+  /// without waiting for the next fetch.
+  ///
+  /// This is the client half of a two-sided arrangement. The backend stops
+  /// returning a blocked creator's work and a suppressed row on the next
+  /// page, which is the durable half; this is the page already on screen
+  /// when the reader acted. Neither alone is enough — without this the row
+  /// they just blocked sits there until a refresh, and without the backend
+  /// it comes back on the next scroll.
+  bool hidesRow({String? creatorId, String? targetId}) {
+    if (targetId != null && targetId.isNotEmpty) {
+      if (_notInterested.contains(targetId)) return true;
+      if (_reported.contains(targetId)) return true;
+    }
+    if (creatorId != null && creatorId.isNotEmpty) {
+      if (_blocked.contains(creatorId)) return true;
+      if (_muted.contains(creatorId)) return true;
+    }
+    return false;
+  }
 
   void setMuted(String creatorId, bool muted) =>
       _flag(_muted, creatorId, muted);
@@ -215,13 +263,26 @@ class EngagementStore extends ChangeNotifier {
       if (id.isEmpty) continue;
       if (into.add(id)) added = true;
     }
-    if (added) notifyListeners();
+    if (added) _announceHidden();
   }
 
   void _flag(Set<String> into, String id, bool on) {
     if (id.isEmpty) return;
     final changed = on ? into.add(id) : into.remove(id);
-    if (changed) notifyListeners();
+    if (changed) _announceHidden();
+  }
+
+  /// Both audiences: anything watching the store as a whole, and the
+  /// lists watching only for rows coming and going.
+  void _announceHidden() {
+    notifyListeners();
+    _hidden.notify();
+  }
+
+  @override
+  void dispose() {
+    _hidden.dispose();
+    super.dispose();
   }
 
   void seedFollowing(String creatorId, bool following) {
@@ -362,4 +423,11 @@ class EngagementStore extends ChangeNotifier {
       _inFlight.remove(guard);
     }
   }
+}
+
+/// [EngagementStore.hiddenChanges]. A notifier of its own rather than a
+/// flag on the store, so a list can subscribe to the one event it cares
+/// about.
+class _HiddenNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
 }

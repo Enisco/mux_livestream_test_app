@@ -13,6 +13,7 @@ import 'package:test_app/features/discovery/views/media_series_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/shared/components/markdown_body.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/leave_when_hidden.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/engagement/data/share_link_action.dart';
 import 'package:test_app/features/giving/data/give_action.dart';
@@ -157,6 +158,19 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
 
   String get _id => widget.overrideId ?? widget.item.entityId;
 
+  /// Hide or report this piece, or block whoever made it, and the page
+  /// showing it should go with it.
+  late final _leaveWhenHidden = LeaveWhenHidden(
+    store: _store,
+    isHidden: () => _store.hidesRow(
+      creatorId: _creator?.id ?? widget.item.profileCreatorId,
+      targetId: _id,
+    ),
+    leave: () {
+      if (mounted) Navigator.maybePop(context);
+    },
+  );
+
   bool _reported = false;
   bool _authed = false;
   bool _canGive = false;
@@ -176,7 +190,14 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _leaveWhenHidden.attach();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _leaveWhenHidden.detach();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -365,19 +386,20 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
     );
   }
 
-  /// Mints a share link and puts it on the clipboard. Share had no handler
-  /// before Give arrived beside it.
+  /// Mints a share link and hands it to the device's share sheet. It used
+  /// to go on the clipboard instead, which is not what Share means.
   Future<void> _share() async {
-    final url = await copyShareLink(
+    final outcome = await shareLink(
       engagement: _engagement,
       targetType: _targetType,
       targetId: _id,
+      from: shareOriginOf(context),
     );
-    if (!mounted) return;
+    if (!mounted || outcome != ShareLinkOutcome.unavailable) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          url ?? AppStrings.cardShareUnavailable,
+          AppStrings.cardShareUnavailable,
           style: AppStyles.body(13),
         ),
         backgroundColor: AppColors.base2,
@@ -433,13 +455,23 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   }
 
   Widget _body() {
+    // The bar stays put whatever the body is doing — including while the
+    // fetch is still running, which is where the reader actually waits.
+    // It used to appear only once the content had loaded, so a page that
+    // was slow, or that failed, left no way back.
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.brandPrimary),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TopBar(onBack: () => Navigator.of(context).maybePop()),
+          const Expanded(
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.brandPrimary),
+            ),
+          ),
+        ],
       );
     }
-    // The bar stays put whatever the body is doing. It used to be drawn only
-    // once the content had loaded, so a page that failed left no way back.
     if (_failed) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,

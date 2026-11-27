@@ -301,7 +301,9 @@ class _CommentsSheetState extends State<CommentsSheet> {
           top: Radius.circular(top > 0 ? 16.s : 0),
         ),
         child: ColoredBox(
-          color: AppColors.base1,
+          // A shade above the page it covers, so it reads as a layer
+          // rather than as the page behind it going dark.
+          color: AppColors.sheetSurface,
           child: Column(
             children: [
               _buildHeader(),
@@ -842,6 +844,7 @@ class _Composer extends StatelessWidget {
                             focusNode: focusNode,
                             minLines: 1,
                             maxLines: 4,
+                            textCapitalization: TextCapitalization.sentences,
                             textInputAction: TextInputAction.newline,
                             style: AppStyles.body(13),
                             cursorColor: AppColors.brandPrimary,

@@ -18,6 +18,7 @@ import 'package:test_app/features/creator/views/widgets/new_event_parts.dart';
 import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/models/creator_models/event_draft_models.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -271,6 +272,11 @@ class _NewEventScreenState extends State<NewEventScreen> {
   Future<void> _pickCover() async {
     final result = await CreatorImagePicker.pick(
       maxBytes: EventRepo.coverMaxBytes,
+      crop: cropTo(
+        context,
+        shape: CropShape.wide,
+        title: AppStrings.cropCoverTitle,
+      ),
     );
     if (!mounted || result.isCancelled) return;
 

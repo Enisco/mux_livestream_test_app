@@ -20,6 +20,7 @@ import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
 import 'package:test_app/features/creator/views/widgets/visibility_sheet.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/models/creator_models/media_upload_models.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -319,7 +320,14 @@ class _NewMediaScreenState extends State<NewMediaScreen> {
   // ---- the thumbnail -----------------------------------------------------
 
   Future<void> _pickThumbnail() async {
-    final result = await CreatorImagePicker.pick(maxBytes: _thumbnailMaxBytes);
+    final result = await CreatorImagePicker.pick(
+      maxBytes: _thumbnailMaxBytes,
+      crop: cropTo(
+        context,
+        shape: CropShape.wide,
+        title: AppStrings.cropThumbnailTitle,
+      ),
+    );
     if (!mounted || result.isCancelled) return;
 
     switch (result.failure) {

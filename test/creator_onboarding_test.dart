@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/features/creator/views/creator_live_screen.dart';
 import 'package:test_app/features/creator/views/creator_polish_screens.dart';
 import 'package:test_app/features/creator/views/creator_type_screen.dart';
@@ -238,6 +239,31 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(AppStrings.creatorBannerTapToAdd), findsOneWidget);
+    });
+
+    testWidgets('the banner is shown at the ratio it is cropped to', (
+      tester,
+    ) async {
+      await _pump(tester, const CreatorBannerScreen());
+
+      final frame = tester.getSize(
+        find.byKey(const ValueKey('creator-banner-picker')),
+      );
+      expect(
+        frame.width / frame.height,
+        closeTo(CropShape.banner.aspectRatio, 0.05),
+      );
+    });
+
+    testWidgets('the taller banner still fits a small screen', (tester) async {
+      // The banner grew by about a third when it took the crop's ratio.
+      await _pump(
+        tester,
+        const CreatorBannerScreen(),
+        size: const Size(320, 568),
+      );
+
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('links start with the three the design names', (tester) async {

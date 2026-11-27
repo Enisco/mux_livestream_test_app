@@ -22,8 +22,9 @@ import 'package:test_app/features/giving/data/giving_capability_store.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
 import 'package:test_app/features/home/data/feed_card_mapper.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart';
-import 'package:test_app/features/home/views/widgets/home_loader.dart';
+import 'package:test_app/shared/components/leavable_loader.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
+import 'package:test_app/features/engagement/data/leave_when_hidden.dart';
 import 'package:test_app/models/creator_models/creator_profile.dart';
 import 'package:test_app/models/discovery_models/web_feed_item.dart';
 import 'package:test_app/models/engagement_models/engagement_models.dart';
@@ -91,6 +92,17 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   );
 
   CreatorProfile? _profile;
+
+  /// Block or mute this ministry from the sheet here and the page you are
+  /// looking at is the one page that should not survive it.
+  late final _leaveWhenHidden = LeaveWhenHidden(
+    store: _store,
+    isHidden: () =>
+        _store.hidesRow(creatorId: widget.creatorId ?? _profile?.id),
+    leave: () {
+      if (mounted) Navigator.maybePop(context);
+    },
+  );
   bool _loading = true;
   bool _failed = false;
   bool _authed = false;
@@ -112,7 +124,14 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _leaveWhenHidden.attach();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _leaveWhenHidden.detach();
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -364,7 +383,7 @@ class _CreatorProfileScreenState extends State<CreatorProfileScreen> {
   }
 
   Widget _body() {
-    if (_loading) return const HomeLoader();
+    if (_loading) return const LeavableLoader();
     final loaded = _profile;
     if (_failed || loaded == null) {
       // A ministry whose page cannot be read still has to be leavable: this

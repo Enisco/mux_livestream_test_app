@@ -14,6 +14,7 @@ import 'package:test_app/features/settings/data/settings_dummy_data.dart';
 import 'package:test_app/features/settings/views/confirm_change_screen.dart';
 import 'package:test_app/features/settings/views/widgets/settings_form.dart';
 import 'package:test_app/features/settings/views/widgets/settings_row.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
@@ -110,6 +111,11 @@ class _ProfileInfoScreenState extends State<ProfileInfoScreen> {
     if (_busy) return;
     final picked = await CreatorImagePicker.pick(
       maxBytes: AccountRepo.avatarMaxBytes,
+      crop: cropTo(
+        context,
+        shape: CropShape.square,
+        title: AppStrings.cropPhotoTitle,
+      ),
     );
     if (picked.isCancelled || !mounted) return;
     if (picked.failure case final why?) {

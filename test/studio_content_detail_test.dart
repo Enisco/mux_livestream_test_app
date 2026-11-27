@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
 
@@ -10,6 +11,7 @@ import 'package:test_app/shared/services/api_service.dart';
 
 import 'package:test_app/features/creator/views/studio_content_detail_screen.dart';
 import 'package:test_app/models/creator_models/studio_content_models.dart';
+import 'package:test_app/features/engagement/data/share_link_action.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'helpers/load_app_fonts.dart';
 
@@ -54,6 +56,9 @@ const _shareUrl = 'https://gospeltube.tv/w/abc?analyticsSource=share_link';
 
 /// What the share mint put on the clipboard.
 String? _copied;
+
+/// What the Share button handed to the device's sheet.
+String? _shared;
 
 class _FakeShareApi implements ApiService {
   @override
@@ -189,6 +194,13 @@ void main() {
   group('sharing a row of your own', () {
     setUp(() {
       _copied = null;
+      _shared = null;
+      // No platform channel in a test, so the sheet is stood in for.
+      shareSheetForTesting = (url, subject, from) async {
+        _shared = url;
+        return ShareResultStatus.success;
+      };
+      addTearDown(() => shareSheetForTesting = null);
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, (call) async {
             if (call.method == 'Clipboard.setData') {
@@ -214,13 +226,18 @@ void main() {
       expect(find.text(_shareUrl), findsOneWidget);
     });
 
-    testWidgets('and the big Share button is the same action', (tester) async {
+    testWidgets('and the big Share button opens the device sheet', (
+      tester,
+    ) async {
       await _pump(tester, _media());
 
       await tester.tap(find.text(AppStrings.contentShare));
       await tester.pumpAndSettle();
 
-      expect(_copied, _shareUrl);
+      // Both buttons used to copy, so the one marked Share did not share.
+      // Copy link still copies; Share hands the link to the OS.
+      expect(_shared, _shareUrl);
+      expect(_copied, isNull);
     });
 
     testWidgets('a draft says to publish it first, and copies nothing', (
@@ -235,6 +252,7 @@ void main() {
       // to point at. Minting one would hand over a dead URL.
       expect(find.text(AppStrings.contentNotPublicYet), findsOneWidget);
       expect(_copied, isNull);
+      expect(_shared, isNull);
     });
   });
 

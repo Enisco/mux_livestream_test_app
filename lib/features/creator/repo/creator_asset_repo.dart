@@ -5,6 +5,7 @@ import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/shared/services/api_service.dart';
 import 'package:test_app/shared/services/s3_upload.dart';
 import 'package:test_app/utils/app_constants/api_endpoints.dart';
+import 'package:test_app/utils/app_constants/app_strings.dart';
 
 /// The two images a channel carries, and what staging will accept for each.
 enum CreatorAssetKind {
@@ -15,6 +16,21 @@ enum CreatorAssetKind {
 
   final String slug;
   final int maxBytes;
+}
+
+/// How each kind is framed before it is uploaded. Here, not on the
+/// screens, because onboarding and the studio editor pick the same two
+/// images and must crop them the same way.
+extension CreatorAssetCrop on CreatorAssetKind {
+  CropShape get cropShape => switch (this) {
+    CreatorAssetKind.avatar => CropShape.square,
+    CreatorAssetKind.banner => CropShape.banner,
+  };
+
+  String get cropTitle => switch (this) {
+    CreatorAssetKind.avatar => AppStrings.cropLogoTitle,
+    CreatorAssetKind.banner => AppStrings.cropCoverTitle,
+  };
 }
 
 /// Where the upload went wrong, in terms the screen can explain.

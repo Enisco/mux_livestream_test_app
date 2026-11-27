@@ -411,6 +411,9 @@ class _TurnOnGivingSheetState extends State<TurnOnGivingSheet> {
           key: const ValueKey('giving-legal-name'),
           controller: _name,
           hint: AppStrings.givingLegalName,
+          // Has to match the bank account exactly, so the keyboard does
+          // not get to shift anything in it.
+          textCapitalization: TextCapitalization.none,
           contentPadding: EdgeInsets.all(12.s),
         ),
         SizedBox(height: 8.s),
@@ -1089,6 +1092,7 @@ class _UpdateSettlementSheetState extends State<UpdateSettlementSheet> {
           key: const ValueKey('update-legal-name'),
           controller: _name,
           hint: AppStrings.givingLegalName,
+          textCapitalization: TextCapitalization.none,
           contentPadding: EdgeInsets.all(12.s),
         ),
         SizedBox(height: 8.s),

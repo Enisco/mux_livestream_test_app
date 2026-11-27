@@ -68,6 +68,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
   bool _loading = false;
   bool _loadingMore = false;
   bool _failed = false;
+
+  /// The last page request failed. Separate from [_failed], which is the
+  /// *first* load: a page that will not come is only worth saying out
+  /// loud when there is nothing on screen behind it — see [_list].
+  bool _pageFailed = false;
   bool _authed = false;
 
   /// Empty-tab companions. Fetched lazily, only when a tab comes up empty.
@@ -170,6 +175,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
     setState(() {
       _loading = true;
       _failed = false;
+      _pageFailed = false;
     });
     if (!_canQueryTab) {
       setState(() {
@@ -240,12 +246,14 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
       setState(() {
         _items = [..._items, ...result.items];
         _cursor = result.nextCursor;
+        _pageFailed = false;
       });
       FeedCardActions.seedRows(_store, result.items);
       unawaited(_primeGiving(result.items));
       unawaited(_hydrateInteractions(result.items));
     } catch (e) {
       logger.w('Home feed page failed', error: e);
+      if (mounted) setState(() => _pageFailed = true);
     } finally {
       _loadingMore = false;
     }
@@ -387,7 +395,37 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
     }
     if (_loading && _items.isEmpty) return const HomeLoader();
     if (_failed && _items.isEmpty) return ErrorStateView(onRetry: _load);
-    if (_items.isEmpty) return _emptyForTab();
+
+    // Blocking a ministry, muting one, hiding a row or reporting one takes
+    // it off this list straight away, rather than leaving it there until
+    // the next fetch drops it. The builder is what makes that immediate:
+    // the cards each watch the store already, but the *list* has to as
+    // well or a row the reader removed keeps its place.
+    return ListenableBuilder(
+      listenable: _store.hiddenChanges,
+      builder: (context, _) =>
+          _list(FeedCardActions.visibleRows(_store, _items)),
+    );
+  }
+
+  Widget _list(List<WebFeedItem> items) {
+    if (items.isEmpty) {
+      if (_cursor != null) {
+        // The page that would have refilled this did not come, and there
+        // is nothing on screen to scroll, so nothing will ask again. A
+        // spinner here would spin for good.
+        if (_pageFailed) return ErrorStateView(onRetry: _load);
+        // Everything on this page was hidden and there is more to fetch.
+        // Same reason the scroll listener cannot help: there is nothing
+        // left to scroll. Without this the feed stops dead at "nothing
+        // here" with pages still waiting.
+        if (!_loadingMore) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _loadMore());
+        }
+        return const HomeLoader();
+      }
+      return _emptyForTab();
+    }
 
     return RefreshIndicator(
       color: AppColors.brandPrimary,
@@ -398,9 +436,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
         padding: EdgeInsets.only(
           bottom: 92 + MediaQuery.paddingOf(context).bottom,
         ),
-        itemCount: _items.length + (_cursor == null ? 0 : 1),
+        itemCount: items.length + (_cursor == null ? 0 : 1),
         itemBuilder: (context, index) {
-          if (index >= _items.length) {
+          if (index >= items.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
@@ -408,7 +446,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen>
               ),
             );
           }
-          final item = _items[index];
+          final item = items[index];
           final card = FeedCard(
             data: FeedCardMapper.toCardData(item),
             // A channel row IS the creator, so its body opens the profile.

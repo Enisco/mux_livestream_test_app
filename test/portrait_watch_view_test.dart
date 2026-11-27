@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,9 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 import 'package:test_app/features/discovery/views/widgets/portrait_watch_view.dart';
 import 'package:test_app/features/discovery/views/widgets/watch_rail.dart';
+import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/shared/components/video_fit.dart';
+import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/shared/services/playback_controller.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 
@@ -124,7 +127,9 @@ void main() {
             onSave: () => taps['save'] = (taps['save'] ?? 0) + 1,
             onShare: () => taps['share'] = (taps['share'] ?? 0) + 1,
             onGive: () => taps['give'] = (taps['give'] ?? 0) + 1,
-            onComments: () => taps['comments'] = (taps['comments'] ?? 0) + 1,
+            onComments: () async {
+              taps['comments'] = (taps['comments'] ?? 0) + 1;
+            },
             onFollow: () => taps['follow'] = (taps['follow'] ?? 0) + 1,
             onCreator: () => taps['creator'] = (taps['creator'] ?? 0) + 1,
             onBack: () => taps['back'] = (taps['back'] ?? 0) + 1,
@@ -447,12 +452,125 @@ void main() {
       await tester.drag(find.text(AppStrings.watchMore), const Offset(0, -600));
       await tester.pumpAndSettle();
 
+      // Up to the cap and no further: the picture keeps the rest of the
+      // screen and shrinks into it, rather than being covered to a
+      // sliver nobody can make anything of.
+      const ceiling = 844 * (1 - PortraitWatchView.sheetMax);
+      final handleTop = tester.getRect(find.text(AppStrings.watchMore)).top;
       expect(
-        tester.getRect(find.text(AppStrings.watchMore)).top,
-        lessThan(200),
+        handleTop,
+        greaterThan(ceiling - 1),
+        reason: 'the sheet went past the cap and swallowed the video',
+      );
+      expect(
+        handleTop,
+        lessThan(ceiling + 80),
         reason: 'dragging the handle should have brought the sheet up',
       );
       expect(find.text('Up next'), findsOneWidget);
+    });
+
+    testWidgets('and Save is the glyph the feed card uses', (tester) async {
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PortraitWatchView(
+            playback: FakePlayback(),
+            target: _target,
+            title: 'A sermon',
+            saves: '1',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // The rail drew an `archive` box, so saving a video looked like a
+      // different action here than on the card that opened it.
+      expect(
+        tester
+            .widgetList<DesignIcon>(find.byType(DesignIcon))
+            .map((i) => i.asset),
+        contains(AppAssets.iconFeedBookmark),
+      );
+    });
+
+    testWidgets('and the picture shrinks into what the sheet leaves it', (
+      tester,
+    ) async {
+      // TikTok's behaviour, and the point of capping the sheet: the video
+      // scales down into the strip above the panel instead of sitting
+      // full-bleed behind it with almost none of it visible.
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PortraitWatchView(
+            playback: FakePlayback(),
+            target: _target,
+            title: 'A sermon',
+            page: (context) => const Column(
+              children: [SizedBox(height: 900, child: Text('Up next'))],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      double factor() => tester
+          .widget<AnimatedFractionallySizedBox>(
+            find.byType(AnimatedFractionallySizedBox),
+          )
+          .heightFactor!;
+
+      // Shut, the picture still has the whole screen.
+      expect(factor(), 1);
+
+      await tester.drag(find.text(AppStrings.watchMore), const Offset(0, -600));
+      await tester.pumpAndSettle();
+
+      expect(factor(), closeTo(1 - PortraitWatchView.sheetMax, 0.02));
+    });
+
+    testWidgets('and shrinks for the comment thread too', (tester) async {
+      tester.view.physicalSize = const Size(390, 844) * 3;
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+
+      final opened = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PortraitWatchView(
+            playback: FakePlayback(),
+            target: _target,
+            title: 'A sermon',
+            comments: '2',
+            onComments: () => opened.future,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      double factor() => tester
+          .widget<AnimatedFractionallySizedBox>(
+            find.byType(AnimatedFractionallySizedBox),
+          )
+          .heightFactor!;
+
+      expect(factor(), 1);
+
+      await tester.tap(find.text('2'));
+      await tester.pumpAndSettle();
+
+      expect(factor(), closeTo(1 - PortraitWatchView.sheetMax, 0.02));
+
+      // And comes back when the thread is shut.
+      opened.complete();
+      await tester.pumpAndSettle();
+
+      expect(factor(), 1);
     });
 
     testWidgets('and the controls over the video go with it', (tester) async {

@@ -118,6 +118,9 @@ class _SignInScreenState extends State<SignInScreen> {
             controller: _passwordCtrl,
             hint: AppStrings.fieldPassword,
             obscureText: _obscurePassword,
+            // Said here and not inferred: with Show on, `obscureText` is
+            // false and nothing else marks this as a password.
+            textCapitalization: TextCapitalization.none,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.password],
             trailing: GestureDetector(

@@ -73,6 +73,13 @@ abstract final class AppColors {
 
   static const neutral900 = Color(0xFF171717);
 
+  /// The surface a sheet draws on, a shade above the page behind it.
+  ///
+  /// A sheet over the watch screen used to be `base1` — the same black as
+  /// everything else — so a panel sliding up over a video read as the
+  /// video going out rather than as a layer arriving on top of it.
+  static const sheetSurface = Color(0xFF171717);
+
   static const fieldBg = Color(0xFF151515);
 
   static const green600 = Color(0xFF00A63E);

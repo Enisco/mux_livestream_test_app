@@ -184,29 +184,56 @@ class _StudioContentDetailScreenState extends State<StudioContentDetailScreen> {
     );
   }
 
-  /// Mints a share link for this row and puts it on the clipboard — the
-  /// same route the viewer side's Share uses. It replaces a handler that
-  /// reported "no shareable link" for everything and, worse, wrote an empty
-  /// string over whatever the creator had on their clipboard.
+  /// The address this row would be shared at, or null when it has none.
   ///
   /// Only content the platform is serving gets one. A draft has no public
   /// address, so saying so is the truth rather than a stand-in.
+  String? get _shareTargetType =>
+      item.hasPublicLink ? item.shareTargetType : null;
+
+  /// Share hands the link to the device's sheet; Copy link, below, puts it
+  /// on the clipboard. Both used to do the second thing, so the button
+  /// marked Share did not share.
+  Future<void> _share(Rect? from) async {
+    await _withLink((targetType) async {
+      final outcome = await shareLink(
+        engagement: GetIt.instance<EngagementRepo>(),
+        targetType: targetType,
+        targetId: item.id,
+        subject: item.title,
+        from: from,
+      );
+      if (mounted && outcome == ShareLinkOutcome.unavailable) {
+        _report(AppStrings.cardShareUnavailable);
+      }
+    });
+  }
+
   Future<void> _copyLink() async {
-    if (_sharing) return;
-    final targetType = item.shareTargetType;
-    if (!item.hasPublicLink || targetType == null) {
-      _report(AppStrings.contentNotPublicYet);
-      return;
-    }
-    setState(() => _sharing = true);
-    try {
+    await _withLink((targetType) async {
       final url = await copyShareLink(
         engagement: GetIt.instance<EngagementRepo>(),
         targetType: targetType,
         targetId: item.id,
       );
-      if (!mounted) return;
-      _report(url ?? AppStrings.cardShareUnavailable);
+      if (mounted) {
+        _report(url ?? AppStrings.cardShareUnavailable);
+      }
+    });
+  }
+
+  /// One in flight at a time, and nothing at all for a row with no public
+  /// address.
+  Future<void> _withLink(Future<void> Function(String targetType) run) async {
+    if (_sharing) return;
+    final targetType = _shareTargetType;
+    if (targetType == null) {
+      _report(AppStrings.contentNotPublicYet);
+      return;
+    }
+    setState(() => _sharing = true);
+    try {
+      await run(targetType);
     } finally {
       if (mounted) setState(() => _sharing = false);
     }
@@ -284,7 +311,7 @@ class _StudioContentDetailScreenState extends State<StudioContentDetailScreen> {
                   SizedBox(height: 22.s),
                   _PrimaryAction(
                     label: AppStrings.contentShare,
-                    onTap: () => unawaited(_copyLink()),
+                    onTap: () => unawaited(_share(shareOriginOf(context))),
                   ),
                   SizedBox(height: 12.s),
                   _OutlinedAction(

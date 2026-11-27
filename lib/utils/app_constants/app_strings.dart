@@ -956,6 +956,25 @@ abstract final class AppStrings {
   static const playlistAdd = 'Add';
   static const playlistAddSelection = 'Add selection';
 
+  // Choosing which playlist a piece of content goes into. "Add to
+  // playlist" used to open the browse screen, which has no way to say
+  // what is being added, so nothing was ever added.
+  static const playlistPickTitle = 'Save to playlist';
+  static const playlistPickNew = 'New playlist';
+  static const playlistPickEmpty =
+      'You have no playlists yet. Make one and this goes straight into it.';
+  static const playlistPickFailed = 'Your playlists did not load. Try again.';
+  static String playlistPickAdded(String name) => 'Added to $name';
+  static String playlistPickAlreadyIn(String name) => 'Already in $name';
+  static String playlistPickCount(int items) =>
+      items == 1 ? '1 item' : '$items items';
+
+  /// A playlist at `MEDIA_PLAYLIST_SERIES_MAX_ITEMS`. The guide asks for
+  /// the limit in the add sheet rather than a refusal on submit.
+  static const playlistPickFull = 'Full';
+  static String playlistPickFullNote(int limit) =>
+      'A playlist holds $limit items. Take something out to add more.';
+
   // What one row inside a playlist offers.
   static const playlistItemPlay = 'Play';
   static const playlistItemRemove = 'Remove from playlist';
@@ -1988,7 +2007,16 @@ abstract final class AppStrings {
   static const discover = 'Discover';
   static const watchNow = 'Watch Now';
 
-  static const shortVideos = 'Short Videos';
+  /// The swipe-through screen's heading.
+  ///
+  /// It read "Short Videos", which the screen cannot honour:
+  /// `POST /v1/discovery/vertical-feed` filters by neither duration nor
+  /// orientation — its pools are subscriptions, more-from-this-creator
+  /// and a broad popularity browse — so a ten-minute landscape sermon
+  /// turns up under it as readily as a clip. The screen is now only
+  /// reached by swiping a ministry's own library, which claims nothing
+  /// about length, and the heading says only what is true.
+  static const swipeFeedTitle = 'Videos';
   static const featureShortVideosDesc = 'Full-screen vertical video feed';
 
   /// The You tab before anyone has signed in.
@@ -2492,4 +2520,20 @@ abstract final class AppStrings {
   static const givingWriteFailed = 'That did not go through. Try again.';
 
   static String filesCount(int n) => '$n file${n == 1 ? '' : 's'}';
+
+  // ---- cropping a picked image -------------------------------------------
+
+  static const cropPhotoTitle = 'Crop photo';
+  static const cropLogoTitle = 'Crop logo';
+  static const cropCoverTitle = 'Crop cover';
+  static const cropThumbnailTitle = 'Crop thumbnail';
+
+  /// Said once, over the editor, because the gestures are not signposted
+  /// anywhere else.
+  static const cropHint = 'Drag the frame, pull the corners to resize';
+
+  static const cropReset = 'Reset';
+  static const cropConfirm = 'Use this';
+
+  static const cropFailed = 'That picture could not be cropped. Try another.';
 }

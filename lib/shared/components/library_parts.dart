@@ -194,6 +194,7 @@ class LibrarySearchField extends StatelessWidget {
             child: TextField(
               controller: controller,
               onChanged: onChanged,
+              textCapitalization: TextCapitalization.sentences,
               textInputAction: TextInputAction.search,
               cursorColor: AppColors.brandPrimary,
               style: AppStyles.label(

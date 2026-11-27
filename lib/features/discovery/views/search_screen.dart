@@ -99,8 +99,10 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _browsingATopic = false;
 
   /// What is on screen. The server does the matching now, so this is the
-  /// page as it came back rather than a sifted feed.
-  List<WebFeedItem> get _results => _items;
+  /// page as it came back — less anything the reader has blocked, muted,
+  /// hidden or reported since, which has to go at once rather than on the
+  /// next query.
+  List<WebFeedItem> get _results => FeedCardActions.visibleRows(_store, _items);
 
   @override
   void initState() {
@@ -505,22 +507,32 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     if (_failed) return ErrorStateView(onRetry: _load);
 
-    final groups = _groups();
-    if (groups.isEmpty) return _empty();
+    // The list itself has to watch the store, not just the rows in it:
+    // a row the reader has just blocked leaves the results, and that is a
+    // change of membership rather than of a row's own state.
+    return ListenableBuilder(
+      listenable: _store.hiddenChanges,
+      builder: (context, _) {
+        final groups = _groups();
+        if (groups.isEmpty) return _empty();
 
-    return ListView(
-      controller: _scroll,
-      padding: EdgeInsets.only(top: 8.s, bottom: 110.s),
-      children: [
-        ...groups,
-        if (_cursor != null)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 24.s),
-            child: const Center(
-              child: CircularProgressIndicator(color: AppColors.brandPrimary),
-            ),
-          ),
-      ],
+        return ListView(
+          controller: _scroll,
+          padding: EdgeInsets.only(top: 8.s, bottom: 110.s),
+          children: [
+            ...groups,
+            if (_cursor != null)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 24.s),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.brandPrimary,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

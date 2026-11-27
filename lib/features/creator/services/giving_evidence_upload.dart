@@ -22,6 +22,9 @@ Future<EvidenceUpload> pickAndAttachEvidence({
   ApiService? api,
   S3Send? send,
 }) async {
+  // Deliberately uncropped, and the only pick in the app that is: a
+  // reviewer must see the whole document, and nothing here is drawn in a
+  // fixed box anyway.
   final picked = await CreatorImagePicker.pick(maxBytes: evidenceMaxBytes);
   if (picked.isCancelled) {
     return (attached: false, fileId: null, problem: null);

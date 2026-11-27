@@ -346,9 +346,12 @@ class ThumbnailWell extends StatelessWidget {
     behavior: HitTestBehavior.opaque,
     onTap: onPick,
     child: DashedBorder(
-      child: SizedBox(
-        height: 96.s,
-        width: double.infinity,
+      // The shape every one of these is cropped to, so the well shows the
+      // whole of what was chosen rather than a band sliced out of it by
+      // `BoxFit.cover`, and the slot does not change size once it is
+      // filled. See [CropShape.wide].
+      child: AspectRatio(
+        aspectRatio: CropShape.wide.aspectRatio,
         child: image == null && existingUrl == null
             ? Center(
                 child: _pill(emptyLabel ?? AppStrings.newMediaThumbnailCta),

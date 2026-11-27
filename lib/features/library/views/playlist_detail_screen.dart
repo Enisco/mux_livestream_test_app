@@ -22,6 +22,7 @@ import 'package:test_app/models/library_models/playlist_models.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/content_list_row.dart';
 import 'package:test_app/shared/components/design_icon.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/shared/components/library_parts.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -190,7 +191,14 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
 
   /// Pick a cover, upload it, name it on the playlist.
   Future<void> _editCover() async {
-    final picked = await CreatorImagePicker.pick(maxBytes: _coverMaxBytes);
+    final picked = await CreatorImagePicker.pick(
+      maxBytes: _coverMaxBytes,
+      crop: cropTo(
+        context,
+        shape: CropShape.wide,
+        title: AppStrings.cropCoverTitle,
+      ),
+    );
     if (picked.isCancelled || !mounted) return;
     if (picked.failure case final why?) {
       _report(switch (why) {

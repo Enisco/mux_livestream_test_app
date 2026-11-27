@@ -76,6 +76,25 @@ class FeedCardActions {
     comments: item.facets.comments,
   );
 
+  /// The rows still worth drawing. A creator blocked or muted, and a row
+  /// hidden or reported, leave every list the moment the reader says so —
+  /// the page on screen was fetched before they acted, and the backend's
+  /// own suppression only reaches the *next* page.
+  ///
+  /// Call this inside a `ListenableBuilder` on the store, or the list will
+  /// not redraw when one of those flags moves.
+  static List<WebFeedItem> visibleRows(
+    EngagementStore store,
+    List<WebFeedItem> rows,
+  ) => rows
+      .where(
+        (row) => !store.hidesRow(
+          creatorId: row.profileCreatorId,
+          targetId: row.entityId,
+        ),
+      )
+      .toList(growable: false);
+
   /// Records what a page of rows says, so cards show real counts before anyone
   /// touches them.
   static void seedRows(EngagementStore store, List<WebFeedItem> rows) {

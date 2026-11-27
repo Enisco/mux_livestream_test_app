@@ -7,6 +7,7 @@ import 'package:test_app/features/creator/repo/content_asset_repo.dart';
 import 'package:test_app/features/creator/repo/post_repo.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/utils/app_constants/app_assets.dart';
 import 'package:test_app/shared/components/design_icon.dart';
 import 'package:test_app/features/home/views/widgets/feed_card.dart'
@@ -216,6 +217,11 @@ class _NewArticleScreenState extends State<NewArticleScreen> {
   Future<PickedImage?> _pickImage() async {
     final result = await CreatorImagePicker.pick(
       maxBytes: PostRepo.coverMaxBytes,
+      crop: cropTo(
+        context,
+        shape: CropShape.wide,
+        title: AppStrings.cropCoverTitle,
+      ),
     );
     if (!mounted || result.isCancelled) return null;
 

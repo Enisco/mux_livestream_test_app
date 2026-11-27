@@ -185,6 +185,7 @@ class _NameField extends StatelessWidget {
       child: TextField(
         controller: controller,
         autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
         cursorColor: AppColors.brandPrimary,
         style: AppStyles.body(14),
         decoration: InputDecoration(

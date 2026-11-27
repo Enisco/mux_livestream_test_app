@@ -9,6 +9,7 @@ import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/text_capitalization.dart';
 
 /// The shape every account form takes: a title, a column of labelled fields,
 /// and one action pinned above the home indicator.
@@ -94,7 +95,7 @@ class SettingsFormField extends StatefulWidget {
     this.locked = false,
     this.keyboardType,
     this.textInputAction,
-    this.textCapitalization = TextCapitalization.none,
+    this.textCapitalization,
   });
 
   final String label;
@@ -116,7 +117,12 @@ class SettingsFormField extends StatefulWidget {
 
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
-  final TextCapitalization textCapitalization;
+
+  /// Left unset, the field follows [keyboardType] — see
+  /// [sentenceCaseUnlessMachineText]. [obscure] is read here rather
+  /// than the live `obscureText`, which goes false the moment the
+  /// reader taps Show and would otherwise shift a password.
+  final TextCapitalization? textCapitalization;
 
   @override
   State<SettingsFormField> createState() => _SettingsFormFieldState();
@@ -147,7 +153,12 @@ class _SettingsFormFieldState extends State<SettingsFormField> {
               obscureText: _hidden,
               keyboardType: widget.keyboardType,
               textInputAction: widget.textInputAction,
-              textCapitalization: widget.textCapitalization,
+              textCapitalization:
+                  widget.textCapitalization ??
+                  sentenceCaseUnlessMachineText(
+                    widget.keyboardType,
+                    obscured: widget.obscure,
+                  ),
               inputFormatters: widget.keyboardType == TextInputType.phone
                   ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s-]'))]
                   : null,

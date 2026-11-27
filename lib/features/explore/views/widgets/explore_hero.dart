@@ -103,8 +103,13 @@ class ExploreHeroPanel extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(child: _WatchButton(onTap: onWatch)),
-                      SizedBox(width: 10.s),
-                      Expanded(child: _PlaylistButton(onTap: onAddToPlaylist)),
+                      // Playlists hold media only, so the second action is
+                      // absent — not inert — when the hero is not a piece
+                      // of media the reader could file.
+                      if (onAddToPlaylist case final add?) ...[
+                        SizedBox(width: 10.s),
+                        Expanded(child: _PlaylistButton(onTap: add)),
+                      ],
                     ],
                   ),
                 ],

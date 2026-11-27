@@ -13,6 +13,7 @@ import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/shared/components/app_icons.dart';
 import 'package:test_app/shared/components/error_state_view.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/shared/services/asset_url_resolver.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -28,7 +29,11 @@ class StudioProfileScreen extends StatefulWidget {
   final CreatorAssetRepo? assets;
 
   /// The photo library, injected so a test never reaches the plugin.
-  final Future<PickResult> Function({required int maxBytes})? picker;
+  final Future<PickResult> Function({
+    required int maxBytes,
+    CropPresenter? crop,
+  })?
+  picker;
 
   @override
   State<StudioProfileScreen> createState() => _StudioProfileScreenState();
@@ -135,7 +140,10 @@ class _StudioProfileScreenState extends State<StudioProfileScreen> {
     if (creatorId == null) return;
 
     final pick = widget.picker ?? CreatorImagePicker.pick;
-    final result = await pick(maxBytes: kind.maxBytes);
+    final result = await pick(
+      maxBytes: kind.maxBytes,
+      crop: cropTo(context, shape: kind.cropShape, title: kind.cropTitle),
+    );
     if (!mounted || result.isCancelled) return;
     if (result.failure case final failure?) {
       setState(() => _problem = _pickProblem(failure));
@@ -332,20 +340,24 @@ class _StudioProfileScreenState extends State<StudioProfileScreen> {
   Widget _sectionLabel(String text) => Text(text, style: AppStyles.heading(14));
 
   Widget _cover() {
+    // How far the logo hangs below the cover, as it does on the channel's
+    // own page.
+    final logoDrop = 28.s;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _sectionLabel(AppStrings.studioProfileCover),
         SizedBox(height: 8.s),
-        SizedBox(
-          height: 150.s,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _Tile(
+        // Shown at the ratio it is cropped to, so the reader sees the
+        // whole of what they chose rather than a band out of its middle.
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            AspectRatio(
+              aspectRatio: CropShape.banner.aspectRatio,
+              child: _Tile(
                 tileKey: const ValueKey('studio-profile-cover'),
-                height: 122.s,
                 radius: 10.s,
                 busy: _uploading == CreatorAssetKind.banner,
                 picked: _newBanner,
@@ -353,25 +365,27 @@ class _StudioProfileScreenState extends State<StudioProfileScreen> {
                 emptyLabel: AppStrings.studioProfileNoCover,
                 onTap: () => unawaited(_pick(CreatorAssetKind.banner)),
               ),
-              Positioned(
-                left: 14.s,
-                bottom: 0,
-                child: _Tile(
-                  tileKey: const ValueKey('studio-profile-logo'),
-                  height: 64.s,
-                  width: 64.s,
-                  circle: true,
-                  busy: _uploading == CreatorAssetKind.avatar,
-                  picked: _newAvatar,
-                  url: _avatarUrl,
-                  emptyLabel: null,
-                  onTap: () => unawaited(_pick(CreatorAssetKind.avatar)),
-                ),
+            ),
+            Positioned(
+              left: 14.s,
+              bottom: -logoDrop,
+              child: _Tile(
+                tileKey: const ValueKey('studio-profile-logo'),
+                height: 64.s,
+                width: 64.s,
+                circle: true,
+                busy: _uploading == CreatorAssetKind.avatar,
+                picked: _newAvatar,
+                url: _avatarUrl,
+                emptyLabel: null,
+                onTap: () => unawaited(_pick(CreatorAssetKind.avatar)),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        SizedBox(height: 6.s),
+        // The stack is only as tall as the cover, so the logo's overhang
+        // is reserved here instead.
+        SizedBox(height: logoDrop + 6.s),
         Row(
           children: [
             Text(
@@ -414,6 +428,7 @@ class _StudioProfileScreenState extends State<StudioProfileScreen> {
             controller: _about,
             maxLines: 5,
             minLines: 3,
+            textCapitalization: TextCapitalization.sentences,
             maxLength: AppStrings.creatorBioLimit,
             cursorColor: AppColors.brandPrimary,
             style: AppStyles.body(13, lineHeight: 18 / 13),
@@ -442,19 +457,22 @@ class _StudioProfileScreenState extends State<StudioProfileScreen> {
 class _Tile extends StatelessWidget {
   const _Tile({
     required this.tileKey,
-    required this.height,
     required this.busy,
     required this.picked,
     required this.url,
     required this.emptyLabel,
     required this.onTap,
+    this.height,
     this.width,
     this.radius,
     this.circle = false,
   });
 
   final Key tileKey;
-  final double height;
+
+  /// Left out when something outside is sizing the tile, as the cover's
+  /// [AspectRatio] does.
+  final double? height;
   final double? width;
   final double? radius;
   final bool circle;

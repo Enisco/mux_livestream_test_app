@@ -500,15 +500,26 @@ class DetailDescriptionCard extends StatefulWidget {
 }
 
 class _DetailDescriptionCardState extends State<DetailDescriptionCard> {
+  /// How much is shown before the toggle has been pressed.
+  static const _collapsedLines = 4;
+
   bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
+    final bodyStyle = AppStyles.label(
+      12,
+      weight: AppStyles.bold,
+      color: AppColors.neutral400,
+      lineHeight: 16 / 12,
+    );
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(10.s),
       decoration: BoxDecoration(
-        color: AppColors.fieldBg,
+        // A shade above the page, and above the watch sheet too — on the
+        // lifted sheet surface the old `fieldBg` was all but flush.
+        color: AppColors.neutral800,
         borderRadius: BorderRadius.circular(8.s),
       ),
       child: Column(
@@ -517,29 +528,60 @@ class _DetailDescriptionCardState extends State<DetailDescriptionCard> {
         children: [
           Text(widget.title, style: AppStyles.heading(13)),
           SizedBox(height: 6.s),
-          Text(
-            widget.body,
-            maxLines: _expanded ? null : 4,
-            overflow: _expanded ? null : TextOverflow.ellipsis,
-            style: AppStyles.label(
-              12,
-              weight: AppStyles.bold,
-              color: AppColors.neutral400,
-              lineHeight: 16 / 12,
-            ),
-          ),
-          SizedBox(height: 6.s),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Text(
-              _expanded ? AppStrings.showLess : AppStrings.showMore,
-              style: AppStyles.heading(11),
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Whether there is anything behind the fold, asked of the
+              // same text at the same width the paragraph is about to be
+              // laid out at. The toggle used to be drawn unconditionally,
+              // so a one-line description offered to "Show more" and then
+              // showed exactly what was already on screen.
+              final overflows = _overflows(context, constraints, bodyStyle);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.body,
+                    maxLines: _expanded ? null : _collapsedLines,
+                    overflow: _expanded ? null : TextOverflow.ellipsis,
+                    style: bodyStyle,
+                  ),
+                  if (overflows) ...[
+                    SizedBox(height: 6.s),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _expanded = !_expanded),
+                      child: Text(
+                        _expanded ? AppStrings.showLess : AppStrings.showMore,
+                        style: AppStyles.heading(11),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  bool _overflows(
+    BuildContext context,
+    BoxConstraints constraints,
+    TextStyle style,
+  ) {
+    final width = constraints.maxWidth;
+    if (!width.isFinite || width <= 0) return false;
+    final painter = TextPainter(
+      text: TextSpan(text: widget.body, style: style),
+      maxLines: _collapsedLines,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: width);
+    final exceeded = painter.didExceedMaxLines;
+    painter.dispose();
+    return exceeded;
   }
 }
 

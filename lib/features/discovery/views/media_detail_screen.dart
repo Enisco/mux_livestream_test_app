@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:sizing/sizing.dart';
 import 'package:test_app/core/locator.dart';
-import 'package:test_app/features/discovery/views/vertical_feed_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/audio_hero.dart';
 import 'package:test_app/features/engagement/views/card_actions_sheet.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
@@ -22,6 +21,7 @@ import 'package:test_app/features/discovery/repo/discovery_repo.dart';
 import 'package:test_app/features/discovery/views/content_detail_screen.dart';
 import 'package:test_app/features/discovery/views/widgets/detail_sections.dart';
 import 'package:test_app/features/engagement/data/engagement_store.dart';
+import 'package:test_app/features/engagement/data/leave_when_hidden.dart';
 import 'package:test_app/features/engagement/data/feed_card_actions.dart';
 import 'package:test_app/features/engagement/data/share_link_action.dart';
 import 'package:test_app/features/giving/data/give_action.dart';
@@ -71,6 +71,19 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   final _repo = GetIt.instance<DiscoveryRepo>();
   final _engagementRepo = GetIt.instance<EngagementRepo>();
   final _store = getIt<EngagementStore>();
+
+  /// Report the video or block its ministry from the sheet here and this
+  /// page should not be what you are left looking at.
+  late final _leaveWhenHidden = LeaveWhenHidden(
+    store: _store,
+    isHidden: () => _store.hidesRow(
+      creatorId: _detail?.creator?.creatorId ?? widget.item.profileCreatorId,
+      targetId: widget.item.entityId,
+    ),
+    leave: () {
+      if (mounted) Navigator.maybePop(context);
+    },
+  );
   final _giving = getIt<GivingCapabilityStore>();
   late final _actions = FeedCardActions(
     store: _store,
@@ -116,6 +129,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _leaveWhenHidden.attach();
     _playback.state.addListener(_followShape);
     _followShape();
     _resolveSession();
@@ -124,6 +138,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
   @override
   void dispose() {
+    _leaveWhenHidden.detach();
     _playback.state.removeListener(_followShape);
     super.dispose();
   }
@@ -339,17 +354,20 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     isOwn: isOwn,
   );
 
+  /// Hands the minted link to the device's share sheet.
   Future<void> _share() async {
-    final url = await copyShareLink(
+    final outcome = await shareLink(
       engagement: _engagementRepo,
       targetType: InteractionTargets.media,
       targetId: _mediaId,
+      subject: widget.item.title,
+      from: shareOriginOf(context),
     );
-    if (!mounted) return;
+    if (!mounted || outcome != ShareLinkOutcome.unavailable) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          url ?? AppStrings.cardShareUnavailable,
+          AppStrings.cardShareUnavailable,
           style: AppStyles.body(13),
         ),
         backgroundColor: AppColors.base2,
@@ -512,13 +530,17 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             onSave: _toggleSave,
             onShare: () => unawaited(_share()),
             onGive: () => unawaited(_give()),
-            // No `topInset`: there is no hero to land under, so the sheet
-            // takes the height it normally would.
+            // Upright, the thread stops where the watch sheet stops, so
+            // the picture keeps the same share of the screen whichever
+            // panel is up over it — and shrinks into it either way.
             onComments: () => openComments(
               context,
               targetType: InteractionTargets.media,
               targetId: _mediaId,
               initialCount: engagement.comments,
+              topInset:
+                  MediaQuery.sizeOf(context).height *
+                  (1 - PortraitWatchView.sheetMax),
             ),
             // Content only: the sheet scrolls it, handle and all.
             page: (context) => _buildPageBody(),
@@ -641,7 +663,14 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   targetType: InteractionTargets.media,
                   targetId: _mediaId,
                   initialCount: _engagement.comments,
-                  topInset: _heroHeight,
+                  // Upright there is no inline hero to land under, so
+                  // `_heroHeight` is null and the thread would have taken
+                  // the screen — a different height from the very same
+                  // thread opened off the rail, on the very same screen.
+                  topInset:
+                      _heroHeight ??
+                      MediaQuery.sizeOf(context).height *
+                          (1 - PortraitWatchView.sheetMax),
                 ),
               ),
             ],
@@ -709,70 +738,23 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  /// Only where there is actually a run to swipe through: a single still
-  /// image or a one-off would just be this page with a different chrome.
-  bool get _canSwipeFeed =>
-      _mediaType != MediaTypes.music &&
-      _suggestions.any((s) => s.entityType == 'media');
-
-  void _openVerticalFeed() {
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (_) => VerticalFeedScreen(
-          anchorMediaId: _mediaId,
-          // What the reader was looking at when they swiped in.
-          prioritizeMediaIds: [
-            for (final s in _suggestions)
-              if (s.entityType == 'media') s.entityId,
-          ],
-          source: AnalyticsSource.suggestedContent,
-        ),
-      ),
-    );
-  }
-
   Widget _buildUpNext() {
     return Padding(
       padding: EdgeInsets.fromLTRB(16.s, 18.s, 16.s, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(child: DetailSectionHeading(AppStrings.upNext)),
-              // Turns "similar videos" into something you keep swiping
-              // through, starting on the one already playing.
-              if (_canSwipeFeed)
-                GestureDetector(
-                  key: const ValueKey('watch-in-feed'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _openVerticalFeed,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4.s),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.swipe_vertical_rounded,
-                          size: 16.s,
-                          color: AppColors.brandPrimary,
-                        ),
-                        SizedBox(width: 6.s),
-                        Text(
-                          AppStrings.watchInFeed,
-                          style: AppStyles.label(
-                            13,
-                            color: AppColors.brandPrimary,
-                            weight: AppStyles.semiBold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          // PARKED: the row used to carry a "Swipe feed" control that
+          // opened the videos below as a full-screen swipe-through. It
+          // was unwired on 2026-11-26: that screen titles itself "Short
+          // Videos", and `POST /v1/discovery/vertical-feed` filters by
+          // neither duration nor orientation — its pools are
+          // subscriptions, more-from-this-creator and a broad popularity
+          // browse — so what it served was ordinary long-form video
+          // under a heading promising the opposite. The screen is still
+          // in the tree and still reached from a ministry's own library,
+          // which claims nothing about length.
+          const DetailSectionHeading(AppStrings.upNext),
           SizedBox(height: 18.s),
           for (final s in _suggestions)
             Padding(

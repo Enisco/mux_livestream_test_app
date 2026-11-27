@@ -182,6 +182,7 @@ class _OtherField extends StatelessWidget {
     return TextField(
       controller: controller,
       focusNode: focusNode,
+      textCapitalization: TextCapitalization.sentences,
       style: AppStyles.body(
         14,
         color: AppColors.textPrimary,

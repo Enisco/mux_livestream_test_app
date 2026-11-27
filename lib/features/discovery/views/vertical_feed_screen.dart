@@ -15,6 +15,7 @@ import 'package:test_app/features/engagement/data/engagement_store.dart';
 import 'package:test_app/features/engagement/data/share_link_action.dart';
 import 'package:test_app/features/engagement/data/vertical_feed_actions.dart';
 import 'package:test_app/features/engagement/repo/engagement_repo.dart';
+import 'package:test_app/features/discovery/views/widgets/portrait_watch_view.dart';
 import 'package:test_app/features/engagement/views/comments_sheet.dart';
 import 'package:test_app/models/analytics_models/analytics_models.dart';
 import 'package:test_app/models/discovery_models/media_detail.dart';
@@ -339,7 +340,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text(AppStrings.shortVideos),
+        title: const Text(AppStrings.swipeFeedTitle),
         elevation: 0,
       ),
       body: child,
@@ -372,7 +373,7 @@ class _VerticalFeedScreenState extends State<VerticalFeedScreen> {
                 onPressed: () => Navigator.pop(context),
               ),
               const Text(
-                AppStrings.shortVideos,
+                AppStrings.swipeFeedTitle,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -460,6 +461,9 @@ class _VerticalFeedPage extends StatefulWidget {
 
 class _VerticalFeedPageState extends State<_VerticalFeedPage>
     with AutomaticKeepAliveClientMixin {
+  /// The comment thread is up over this video.
+  bool _commentsOpen = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -934,7 +938,17 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
         fit: StackFit.expand,
         children: [
           const ColoredBox(color: Colors.black),
-          _buildMedia(),
+          // Shrinks into what the thread leaves it, pinned to the top,
+          // rather than staying full-bleed behind a panel over most of
+          // it.
+          AnimatedFractionallySizedBox(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            widthFactor: 1,
+            heightFactor: _commentsOpen ? 1 - PortraitWatchView.sheetMax : 1,
+            child: _buildMedia(),
+          ),
           const Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -1059,26 +1073,45 @@ class _VerticalFeedPageState extends State<_VerticalFeedPage>
   void _toggleLike() => _actions.like(widget.item);
 
   /// Reading a thread needs no account — the sheet gates its own composer.
-  void _openComments() => unawaited(
-    openComments(
-      context,
-      targetType: InteractionTargets.media,
-      targetId: widget.item.mediaId,
-      initialCount: _engagementState.comments,
-    ),
-  );
+  ///
+  /// Awaited rather than fired and forgotten, because the picture shrinks
+  /// into the space above the thread and this is what says when it has
+  /// come back down.
+  void _openComments() => unawaited(_showComments());
+
+  Future<void> _showComments() async {
+    setState(() => _commentsOpen = true);
+    try {
+      await openComments(
+        context,
+        targetType: InteractionTargets.media,
+        targetId: widget.item.mediaId,
+        initialCount: _engagementState.comments,
+        // Same share of the screen the upright watch view gives it, so a
+        // video does not sit behind a different amount of panel
+        // depending on which way the reader got to it.
+        topInset:
+            MediaQuery.sizeOf(context).height *
+            (1 - PortraitWatchView.sheetMax),
+      );
+    } finally {
+      if (mounted) setState(() => _commentsOpen = false);
+    }
+  }
 
   Future<void> _share() async {
-    final url = await copyShareLink(
+    final outcome = await shareLink(
       engagement: _engagement,
       targetType: InteractionTargets.media,
       targetId: widget.item.mediaId,
+      subject: widget.item.title,
+      from: shareOriginOf(context),
     );
-    if (!mounted) return;
+    if (!mounted || outcome != ShareLinkOutcome.unavailable) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          url ?? AppStrings.cardShareUnavailable,
+          AppStrings.cardShareUnavailable,
           style: const TextStyle(fontSize: 13, color: Colors.white),
         ),
         backgroundColor: AppColors.neutral800,

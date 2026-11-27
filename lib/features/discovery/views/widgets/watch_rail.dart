@@ -1,4 +1,8 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+
+import 'package:test_app/shared/components/design_icon.dart';
 
 import 'package:test_app/utils/app_constants/app_colors.dart';
 
@@ -134,13 +138,20 @@ class _Initial extends StatelessWidget {
 class WatchRailAction extends StatelessWidget {
   const WatchRailAction({
     super.key,
-    required this.icon,
+    this.icon,
+    this.asset,
     this.label = '',
     this.color = Colors.white,
     this.onTap,
-  });
+  }) : assert(icon != null || asset != null, 'give the row something to draw');
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// An SVG from the design set, drawn instead of [icon]. The rail is a
+  /// font-icon rail, but a few of these actions also appear on the feed
+  /// cards and have to be the same glyph there and here.
+  final String? asset;
+
   final String label;
   final Color color;
   final VoidCallback? onTap;
@@ -160,12 +171,15 @@ class WatchRailAction extends StatelessWidget {
           children: [
             // The shadows are what keep a white icon legible over a video
             // that might be white at that moment too.
-            Icon(
-              icon,
-              color: color,
-              size: 30,
-              shadows: const [Shadow(blurRadius: 6, color: Colors.black87)],
-            ),
+            if (asset case final svg?)
+              _ShadowedGlyph(asset: svg, color: color)
+            else
+              Icon(
+                icon,
+                color: color,
+                size: 30,
+                shadows: const [Shadow(blurRadius: 6, color: Colors.black87)],
+              ),
             if (label.isNotEmpty) ...[
               const SizedBox(height: 3),
               Text(
@@ -178,6 +192,44 @@ class WatchRailAction extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// An SVG with the same legibility treatment [Icon] gets from `shadows`.
+///
+/// There is no shadow parameter on `SvgPicture`, so the glyph is drawn
+/// twice: a blurred black copy underneath, then the real one over it.
+class _ShadowedGlyph extends StatelessWidget {
+  const _ShadowedGlyph({required this.asset, required this.color});
+
+  final String asset;
+  final Color color;
+
+  static const _size = 26.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      height: 30,
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+              child: DesignIcon(
+                asset,
+                width: _size,
+                height: _size,
+                color: Colors.black87,
+              ),
+            ),
+            DesignIcon(asset, width: _size, height: _size, color: color),
           ],
         ),
       ),

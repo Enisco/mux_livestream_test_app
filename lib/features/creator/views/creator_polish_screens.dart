@@ -9,6 +9,7 @@ import 'package:test_app/features/creator/repo/creator_asset_repo.dart';
 import 'package:test_app/features/creator/repo/creator_repo.dart';
 import 'package:test_app/features/creator/services/creator_image_picker.dart';
 import 'package:test_app/features/creator/views/widgets/creator_onboarding_parts.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/shared/components/onboarding_scaffold.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
@@ -28,7 +29,10 @@ mixin _AssetStep<T extends StatefulWidget> on State<T> {
   Future<void> pickAndUpload() async {
     if (uploading) return;
 
-    final result = await CreatorImagePicker.pick(maxBytes: kind.maxBytes);
+    final result = await CreatorImagePicker.pick(
+      maxBytes: kind.maxBytes,
+      crop: cropTo(context, shape: kind.cropShape, title: kind.cropTitle),
+    );
     if (!mounted || result.isCancelled) return;
     if (result.failure case final failure?) {
       _reportPickFailure(context, failure);
@@ -287,6 +291,10 @@ class CreatorBannerScreen extends StatefulWidget {
   State<CreatorBannerScreen> createState() => _CreatorBannerScreenState();
 }
 
+/// How far the logo hangs below the banner, as it does on the channel's
+/// own page.
+const _logoDrop = 28.0;
+
 class _CreatorBannerScreenState extends State<CreatorBannerScreen>
     with _AssetStep {
   @override
@@ -306,17 +314,18 @@ class _CreatorBannerScreenState extends State<CreatorBannerScreen>
           const SizedBox(height: 18),
           // The banner and the avatar that overlaps it, so the reader sees how
           // the two sit together before choosing either.
-          SizedBox(
-            height: 150,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                GestureDetector(
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Shown at the ratio it is cropped to, so the reader sees
+              // the whole of what they chose.
+              AspectRatio(
+                aspectRatio: CropShape.banner.aspectRatio,
+                child: GestureDetector(
                   key: const ValueKey('creator-banner-picker'),
                   behavior: HitTestBehavior.opaque,
                   onTap: pickAndUpload,
                   child: Container(
-                    height: 122,
                     width: double.infinity,
                     alignment: Alignment.center,
                     clipBehavior: Clip.antiAlias,
@@ -369,28 +378,30 @@ class _CreatorBannerScreenState extends State<CreatorBannerScreen>
                           ),
                   ),
                 ),
-                Positioned(
-                  left: 14,
-                  bottom: 0,
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.fieldBg,
-                    ),
-                    child: const HugeIcon(
-                      icon: HugeIcons.strokeRoundedImage02,
-                      color: AppColors.neutral400,
-                      size: 20,
-                    ),
+              ),
+              Positioned(
+                left: 14,
+                bottom: -_logoDrop,
+                child: Container(
+                  width: 54,
+                  height: 54,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.fieldBg,
+                  ),
+                  child: const HugeIcon(
+                    icon: HugeIcons.strokeRoundedImage02,
+                    color: AppColors.neutral400,
+                    size: 20,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          // The stack is only as tall as the banner, so the logo's
+          // overhang is reserved here instead.
+          const SizedBox(height: _logoDrop + 14),
           if (picked != null) ...[
             uploading
                 ? const _UploadingLine()
@@ -555,6 +566,7 @@ class _CreatorBioScreenState extends State<CreatorBioScreen> {
               controller: _controller,
               maxLines: null,
               expands: true,
+              textCapitalization: TextCapitalization.sentences,
               textAlignVertical: TextAlignVertical.top,
               maxLength: AppStrings.creatorBioLimit,
               cursorColor: AppColors.brandPrimary,

@@ -106,7 +106,8 @@ Future<_FakeApi> _pump(
   bool failRead = false,
   bool failWrite = false,
   _FakeAssets? assets,
-  Future<PickResult> Function({required int maxBytes})? picker,
+  Future<PickResult> Function({required int maxBytes, CropPresenter? crop})?
+  picker,
 }) async {
   SharedPreferences.setMockInitialValues({});
   await LocalStorage.init();
@@ -139,16 +140,19 @@ Future<_FakeApi> _pump(
   return api;
 }
 
-/// Stands in for the photo library.
-Future<PickResult> Function({required int maxBytes}) _picker(
-  PickedImage? image, {
-  PickFailure? failure,
-}) =>
-    ({required int maxBytes}) async => failure != null
-    ? PickResult.failed(failure)
-    : image == null
-    ? const PickResult.cancelled()
-    : PickResult.picked(image);
+/// Stands in for the photo library. [sawCrop] records whether the screen
+/// asked for a cropper; the shape it would use is checked on
+/// `CreatorAssetCrop`, not here.
+Future<PickResult> Function({required int maxBytes, CropPresenter? crop})
+_picker(PickedImage? image, {PickFailure? failure, List<bool>? sawCrop}) =>
+    ({required int maxBytes, CropPresenter? crop}) async {
+      sawCrop?.add(crop != null);
+      return failure != null
+          ? PickResult.failed(failure)
+          : image == null
+          ? const PickResult.cancelled()
+          : PickResult.picked(image);
+    };
 
 /// A real 1x1 PNG: the preview decodes it, so junk bytes throw.
 final _image = PickedImage(
@@ -189,6 +193,36 @@ void main() {
     expect(find.byKey(const ValueKey('studio-profile-cover')), findsOneWidget);
     expect(find.byKey(const ValueKey('studio-profile-logo')), findsOneWidget);
     expect(find.byKey(const ValueKey('studio-profile-about')), findsOneWidget);
+  });
+
+  testWidgets('the cover is shown at the ratio it is cropped to', (
+    tester,
+  ) async {
+    // A fixed-height tile was about 2.9:1, so a 2:1 cover lost a third of
+    // its height to `BoxFit.cover` and the reader never saw what they
+    // picked.
+    await _pump(tester);
+
+    final tile = tester.getSize(
+      find.byKey(const ValueKey('studio-profile-cover')),
+    );
+    expect(
+      tile.width / tile.height,
+      closeTo(CropShape.banner.aspectRatio, 0.05),
+    );
+  });
+
+  testWidgets('the logo still hangs below the cover', (tester) async {
+    await _pump(tester);
+
+    final cover = tester.getRect(
+      find.byKey(const ValueKey('studio-profile-cover')),
+    );
+    final logo = tester.getRect(
+      find.byKey(const ValueKey('studio-profile-logo')),
+    );
+    expect(logo.bottom, greaterThan(cover.bottom));
+    expect(logo.top, lessThan(cover.bottom));
   });
 
   testWidgets('an untouched form has nothing to save', (tester) async {
@@ -285,6 +319,22 @@ void main() {
     // And the about text, which nobody touched, does not ride along as an
     // edit of itself.
     expect(body.containsKey('bio'), isFalse);
+  });
+
+  testWidgets('a channel image is offered for cropping before it uploads', (
+    tester,
+  ) async {
+    final sawCrop = <bool>[];
+    await _pump(
+      tester,
+      assets: _FakeAssets(),
+      picker: _picker(_image, sawCrop: sawCrop),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('studio-profile-logo')));
+    await tester.pumpAndSettle();
+
+    expect(sawCrop, [true]);
   });
 
   testWidgets('an upload that failed arms nothing and says why', (

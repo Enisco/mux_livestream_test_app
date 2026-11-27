@@ -460,4 +460,73 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
   });
+
+  group('a pick that is cropped first', () {
+    test('the editor is offered the picture before anything else is', () async {
+      FilePickerPlatform.instance = _FakePicker(
+        _FakeFile(name: 'logo.png', bytes: png),
+      );
+
+      final offered = <Uint8List>[];
+      final result = await CreatorImagePicker.pick(
+        maxBytes: _avatarMax,
+        crop: (bytes) async {
+          offered.add(bytes);
+          return bytes;
+        },
+      );
+
+      expect(
+        offered,
+        hasLength(1),
+        reason: 'a crop that was asked for has to actually be offered',
+      );
+      expect(result.image, isNotNull);
+    });
+
+    test('and is not offered it when no cropper was asked for', () async {
+      FilePickerPlatform.instance = _FakePicker(
+        _FakeFile(name: 'logo.png', bytes: png),
+      );
+
+      final result = await CreatorImagePicker.pick(maxBytes: _avatarMax);
+
+      expect(result.image, isNotNull);
+      expect(result.image!.filename, 'logo.png');
+    });
+
+    test('backing out of the editor leaves nothing picked', () async {
+      FilePickerPlatform.instance = _FakePicker(
+        _FakeFile(name: 'logo.png', bytes: png),
+      );
+
+      final result = await CreatorImagePicker.pick(
+        maxBytes: _avatarMax,
+        crop: (_) async => null,
+      );
+
+      expect(result.isCancelled, isTrue);
+      expect(result.image, isNull);
+      expect(result.failure, isNull);
+    });
+
+    test('a picker that would not open never reaches the editor', () async {
+      var opened = false;
+      FilePickerPlatform.instance = _FakePicker(
+        null,
+        throws: PlatformException(code: 'already_active'),
+      );
+
+      final result = await CreatorImagePicker.pick(
+        maxBytes: _avatarMax,
+        crop: (bytes) async {
+          opened = true;
+          return bytes;
+        },
+      );
+
+      expect(opened, isFalse);
+      expect(result.failure, PickFailure.unavailable);
+    });
+  });
 }

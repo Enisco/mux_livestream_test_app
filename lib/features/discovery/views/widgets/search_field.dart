@@ -74,6 +74,10 @@ class SearchHeaderField extends StatelessWidget {
               focusNode: focusNode,
               onChanged: onChanged,
               onSubmitted: onSubmitted,
+              // Ministries, people and titles are nearly all proper
+              // nouns, and the country picker's search already behaves
+              // this way through `GTubeTextField`.
+              textCapitalization: TextCapitalization.sentences,
               textInputAction: TextInputAction.search,
               cursorColor: AppColors.brandPrimary,
               style: AppStyles.label(

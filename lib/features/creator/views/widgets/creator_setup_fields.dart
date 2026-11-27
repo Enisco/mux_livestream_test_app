@@ -5,6 +5,7 @@ import 'package:test_app/shared/components/app_icons.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_styles.dart';
+import 'package:test_app/utils/helpers/text_capitalization.dart';
 
 enum HandleState { idle, checking, available, taken, invalid }
 
@@ -53,6 +54,7 @@ class CreatorTextField extends StatelessWidget {
     this.contentPadding = const EdgeInsets.all(16),
     this.keyboardType,
     this.maxLines = 1,
+    this.textCapitalization,
   });
 
   final TextEditingController controller;
@@ -63,11 +65,18 @@ class CreatorTextField extends StatelessWidget {
   /// The organisation's About box is the only multi-line one.
   final int maxLines;
 
+  /// Left unset, the field follows [keyboardType]: a title, a description
+  /// or an address comes up shifted, an email or an amount does not. See
+  /// [sentenceCaseUnlessMachineText].
+  final TextCapitalization? textCapitalization;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      textCapitalization:
+          textCapitalization ?? sentenceCaseUnlessMachineText(keyboardType),
       maxLines: maxLines,
       style: AppStyles.body(13, color: AppColors.neutral50),
       cursorColor: AppColors.textPrimary,

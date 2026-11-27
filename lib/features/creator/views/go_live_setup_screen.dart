@@ -14,6 +14,7 @@ import 'package:test_app/features/creator/views/widgets/new_media_parts.dart';
 import 'package:test_app/models/creator_models/creator_models.dart';
 import 'package:test_app/models/creator_models/livestream_models.dart';
 import 'package:test_app/models/creator_models/media_upload_models.dart';
+import 'package:test_app/shared/components/image_crop_screen.dart';
 import 'package:test_app/shared/components/primary_button.dart';
 import 'package:test_app/utils/app_constants/app_colors.dart';
 import 'package:test_app/utils/app_constants/app_strings.dart';
@@ -106,7 +107,14 @@ class _GoLiveSetupScreenState extends State<GoLiveSetupScreen> {
   }
 
   Future<void> _pickCover() async {
-    final result = await CreatorImagePicker.pick(maxBytes: 10 * 1024 * 1024);
+    final result = await CreatorImagePicker.pick(
+      maxBytes: 10 * 1024 * 1024,
+      crop: cropTo(
+        context,
+        shape: CropShape.wide,
+        title: AppStrings.cropCoverTitle,
+      ),
+    );
     if (!mounted || result.isCancelled) return;
 
     switch (result.failure) {

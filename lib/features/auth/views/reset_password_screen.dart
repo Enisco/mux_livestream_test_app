@@ -172,6 +172,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             controller: _tokenCtrl,
             hint: AppStrings.resetCodeHint,
             readOnly: _tokenFromLink,
+            // A code out of an email, not prose: never shifted.
+            textCapitalization: TextCapitalization.none,
             textInputAction: TextInputAction.next,
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? AppStrings.resetCodeRequired
@@ -183,6 +185,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             controller: _passwordCtrl,
             hint: AppStrings.newPasswordHint,
             obscureText: _obscure,
+            // Said here and not inferred: with Show on, `obscureText` is
+            // false and nothing else marks this as a password.
+            textCapitalization: TextCapitalization.none,
             textInputAction: TextInputAction.next,
             autofillHints: const [AutofillHints.newPassword],
             trailing: GestureDetector(
@@ -210,6 +215,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             controller: _confirmCtrl,
             hint: AppStrings.confirmPasswordHint,
             obscureText: _obscure,
+            textCapitalization: TextCapitalization.none,
             textInputAction: TextInputAction.done,
             validator: (v) =>
                 v == _passwordCtrl.text ? null : AppStrings.passwordsDoNotMatch,
